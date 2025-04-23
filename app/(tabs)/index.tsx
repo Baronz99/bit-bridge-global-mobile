@@ -11,12 +11,13 @@ import moneyFormat from "@/utils/moneyFormat";
 import { Link, useRouter } from "expo-router";
 import { ActivityIndicator, FlatList, Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import {splitString} from "@/utils/index"
-import { userProfile } from "@/api/auth";
 import { useState } from "react";
 import powerDistribution from "../../data/powerDistributions.json"
+import PowerProviderCard from "@/components/ProviderCard";
+import ProviderCard from "@/components/Card";
 export default function Index() {
   const router = useRouter()
-  const {authState: {token}} = useAuth()
+  const {authState: {token}, userProfileData} = useAuth()
   const [selectedService, setSelectedService] = useState<string>("Top Up")
 
 
@@ -27,9 +28,6 @@ export default function Index() {
     //   category: "mobile provider"
     // }
   }))
-
-
-    const {userProfileData } = useAuth()
   
 
 
@@ -60,7 +58,7 @@ export default function Index() {
             }
           })
 
-          console.log("picked ====> ", cableList.length, cableList)
+          // console.log("picked ====> ", cableList?.length, cableList)
    
 
   const prevsummary = [
@@ -164,7 +162,7 @@ export default function Index() {
        
 
 
-        <View>
+        <View className="">
 
           <FlatList
           data={prevsummary}
@@ -186,11 +184,11 @@ export default function Index() {
           
         </View>
 
-        <View>
+        <View className="">
           <FlatList
           data={recentTransaction}
           renderItem={({item}) => (
-            <TouchableOpacity className=" rounded-lg text-sm h-16 w-20 shadow-sm flex flex-col justify-center items-center">
+            <TouchableOpacity className="bg-alt/80 border rounded-lg text-sm h-16 w-20 shadow-sm flex flex-col justify-center items-center">
               <Text>{item.biller}</Text>
               <Text> {item.amount}</Text>
 
@@ -209,15 +207,30 @@ export default function Index() {
       </View>
 
 
-      <View>
+      <View className="mb-6 p-4 ">
         <Text className="text-white">{pickedService?.label}</Text>
       </View>
 
-      <View>
+
+      <ScrollView 
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={{
+        paddingHorizontal: 10
+      }}
+
+      className=" w-full">
+
+
+      <View className="flex flex-row gap-3 w-full overflow-x-scroll">
         {services.map(item => (
-          <TouchableOpacity onPress={() => setSelectedService(item.name)} ><Text className="text-white font-semibold bg-app-primary py-2 px-4 rounded-md">{item.label}</Text></TouchableOpacity>
+          <TouchableOpacity
+          key={item.name} onPress={() => setSelectedService(item.name)} ><Text className="text-white  font-semibold w-max bg-app-primary py-2.5 px-4 rounded-md">{item.label}</Text></TouchableOpacity>
         ))}
       </View>
+
+      </ScrollView>
+
 
 
       {
@@ -235,22 +248,12 @@ export default function Index() {
         })
       }
 
-      {/* {services.map((item: any) => {
-        if(item.label === selectedService ){
+      {services.map((item: any) => {
+        if(item.name === selectedService ){
           return (item.render)
         }
        
-      })}
-
-      <MobileService VTUList={VTUList} loading={loading} error={error} datalist={datalist} /> */}
-
-
-
-
-        
-
-
- 
+      })} 
       
       </ScrollView>
     </View>
@@ -359,15 +362,9 @@ const CableService = ({
           
           ItemSeparatorComponent={() => <View className="w-4 -red-50"/>}
           renderItem={({item}: any) => (
-            <Link href={`/mobileProviders/${item.id}`} asChild>
+            <ProviderCard link={`/cableProviders/${item.id}`} item={item} />
             
-              <TouchableOpacity 
-                key={item?.id} className="bg-gray-800/50 overflow-hidden rounded-lg w-40 h-40 flex-row items-center gap-3 mb-3">
-                <Image source={images[`${splitString(item.name)}`]} className="w-full h-full" />
-                
-              </TouchableOpacity>
             
-              </Link>
 
           )}
           keyExtractor={(item) => item?.id?.toString()}
@@ -399,38 +396,33 @@ const PowerService = ({
          <View className="flex-1 mt-5">
      
  
-         {powerList && (<>
+         {powerList && (
+          <>
            <View className="mt-10">
-             <Text className="text-lg text-white font-bold mb-3">VTU Top Up </Text>
+             <Text className="text-lg text-white font-bold mb-3">Discos </Text>
  
              <FlatList
-             numColumns={2}
+             numColumns={3}
              data={powerList}
              contentContainerStyle={{
-              paddingBottom: 100
-            }}
+              paddingBottom: 10           
+             }}
              showsHorizontalScrollIndicator={false}
              columnWrapperStyle={{
               justifyContent: "flex-start",
-              gap: 20,
+              
+              gap: 10,
               paddingRight: 5,
-              marginBottom: 10
+              marginBottom: 10,
+              // backgroundColor: "red"
              }}
-             ItemSeparatorComponent={() => <View className="w-4 -red-50"/>}
+            //  ItemSeparatorComponent={() => <View className="w-4 -red-50"/>}
              renderItem={({item}: any) => (
-               <Link href={`/mobileProviders/${item.id}`} asChild>
-               
-                 <TouchableOpacity 
-                  key={item?.id} className="bg-gray-800/50 overflow-hidden rounded-lg w-40 h-40 flex-row items-center gap-3 mb-3">
-                   <Image source={images[`${splitString(item.name)}`]} className="w-full h-full" />
-                  
-                 </TouchableOpacity>
-               
-                 </Link>
+               <PowerProviderCard item={item} />
  
              )}
              keyExtractor={(item) => item?.id?.toString()}
-             className="mb-4 mt-3"
+             className="px-5"
              
              />
  

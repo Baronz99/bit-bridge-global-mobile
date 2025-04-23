@@ -9,8 +9,8 @@ import EKEDC from "@/assets/power-providers/Eko-Electric-Payment-PHCN.jpg"
 import EEDC from "@/assets/power-providers/Enugu-Electric-EEDC.jpg"
 import IKEDC from "@/assets/power-providers/Ikeja-Electric-Payment-PHCN.jpg"
 import JED from "@/assets/power-providers/Jos-Electric-JED.jpg"
-import kedc from "@/assets/power-providers/Kano-Electric.jpg"
-import kdedc from "@/assets/power-providers/Kaduna-Electric-KAEDCO.jpg"
+import gotv from "@/assets/images/gotv.webp"
+import dstv from "@/assets/images/dstv.webp"
 import PHED from "@/assets/power-providers/Port-Harcourt-Electric.jpg"
 
 
@@ -27,5 +27,7 @@ import PHED from "@/assets/power-providers/Port-Harcourt-Electric.jpg"
   EEDC,
   IKEDC,
   JED,
-  PHED
+  PHED,
+  dstv,
+  gotv
 };

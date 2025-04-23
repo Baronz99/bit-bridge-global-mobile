@@ -1,4 +1,4 @@
-import { Image, ScrollView, Text, TouchableOpacity, View } from 'react-native'
+import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import React, { useEffect, useState } from 'react'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import useFetch from '@/services/useFetch'
@@ -10,31 +10,20 @@ import { splitString } from '@/utils'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
 import { createPurchaseOrder, getPriceList } from '@/api/billOrder'
 import FormSelect from '@/components/FormSelect'
+
+// import powerDistribution from "../../data/powerDistributions.json"
+import powerDistribution from "../../../data/powerDistributions.json"
+
 const ProvideDertails = () => {
     const {id} = useLocalSearchParams()
     const router = useRouter()
     const {authState: {token}, } = useAuth()
     const [error, setError] = useState<string | null>(null)
-    const {data} = useFetch(()=> getProvision({
-      id: id as string,
-      token: token
-  }) )
 
 
-  const {data: priceList, refetch} = useFetch(()=> getPriceList({
-    id: id as string,
-    provider: data?.product.provider,
-    service_type: data?.service_type,
-    token: token
-}),  false )
+  const data = powerDistribution.find(item => String(item.id) === id)
 
 
-
-useEffect(()=> {
-  if(data && data?.service_type === "DATA"){
-    refetch()
-  }
-}, [data])
 
     // const {}
     const [formValue, setFormValue] = useState({
@@ -50,7 +39,7 @@ useEffect(()=> {
 
       try {
        const response =  await createPurchaseOrder({
-          orderData: {...formValue, email: "", service_type: data.service_type, biller: data.product.provider.toUpperCase(), skip: true},
+          orderData: {...formValue, email: "", service_type: "ELECTRICITY", biller: data?.biller},
            token
         }
         )   
@@ -97,7 +86,7 @@ useEffect(()=> {
                 onChangeText={(text: string) => setFormValue({...formValue, billersCode: text})}
                 value={formValue.billersCode}    
                 />
-                {data?.service_type === "VTU" && (
+         
                 <FormInput 
                 name='amount'
                 label='amount'
@@ -105,27 +94,7 @@ useEffect(()=> {
                 onChangeText={(text: string) => setFormValue({...formValue, amount: text})}
                 value={formValue.amount}    
                 />
-                )}
 
-                {data?.service_type === "DATA" && (
-                <FormSelect 
-                options={priceList ?? []}
-                selectedValue={formValue.tariff_class}
-                name='tarrif_class'
-                label='Data Plan'
-                placeHolder='Data Plan'
-                onValueChange={(value: string) => {
-
-                  console.log(value)
-                  const newAmountdata = priceList.find((price: any) => price.value === value)
-                  
-                  setFormValue({...formValue,
-                    amount: newAmountdata.amount,
-                    description: newAmountdata.label,
-                     tariff_class: value})}}
-
-                     />
-                )}
 
 
                 <TouchableOpacity onPress={handleFormSubmit} className='border rounded-md mt-4 border-alt py-5 '>
