@@ -1,0 +1,57 @@
+[{
+    "id": 1,
+    "name": "Ikeja Electric Payment - IKEDC",
+    "description": "Prepaid and Postpaid IKEDC payment",
+    "image": "IKEDC",
+    "serviceID": "ikeja-electric",
+    "biller": "ikeja"
+
+},
+{
+    "id": 2,
+    "name": "Abuja Electric Payment - AEDC",
+    "description": "Prepaid and Postpaid AEDC payment",
+    "image": "AEDC",
+    "serviceID": "abuja-electric",
+    "biller": "abuja"
+},
+{
+    "id": 4,
+    "name": "Enugu Electric - EEDC",
+    "description": "Prepaid and Postpaid EEDC payment",
+    "image": "EEDC",
+    "serviceID": "enugu-electric",
+    "biller": "enugu"
+},
+{
+    "id": 5,
+    "name": "Jos Electric - JED",
+    "description": "Prepaid and Postpaid JED payment",
+    "image": "JED",
+    "serviceID": "jos-electric",
+    "biller": "jos"
+
+
+
+},
+{
+    "id": 6,
+    "name": "PHED - Port Harcourt Electric",
+    "description": "Prepaid and Postpaid PHED payment",
+    "image": "PHED",
+    "serviceID": "portharcourt-electric",
+    "biller": "PH"
+
+
+},
+{
+    "id": 7,
+    "name": "Eko Electric Payment - EKEDC",
+    "description": "Prepaid and Postpaid IKEDC payment",
+    "image": "EKEDC",
+    "serviceID": "eko-electric",
+    "biller": "eko"
+
+
+
+}]

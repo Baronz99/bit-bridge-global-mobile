@@ -12,6 +12,7 @@ module.exports = {
           "app-primary": "#2f3b69",
           // alt: "#695d2f",
          alt: " rgb(255 204 0)",
+         mtn: "#2f3b69",
         ligth: {
           100: "#d6c6ff",
           200: "#A8b5db",

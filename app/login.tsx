@@ -13,6 +13,8 @@ const Login = () => {
 
     const {onLogin} = useAuth()
 
+    console.log(formInput)
+
 
 
 

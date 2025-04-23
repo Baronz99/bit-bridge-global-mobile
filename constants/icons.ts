@@ -8,6 +8,11 @@ import save from "@/assets/icons/save.png";
 import star from "@/assets/icons/star.png";
 import play from "@/assets/icons/play.png";
 import arrow from "@/assets/icons/arrow.png";
+import trophy from "@/assets/icons/trophy.png";
+import walletColor from "@/assets/icons/wallet-color.png"
+import tag from "@/assets/icons/tag.png"
+import withdraw from "@/assets/icons/withdraw.png"
+
 import appLogo from "@/assets/logos/logo.png"
 export const icons = {
   home,
@@ -20,5 +25,9 @@ export const icons = {
   play,
   arrow,
   transaction,
-  wallet
+  wallet,
+  trophy,
+  walletColor,
+  withdraw,
+  tag
 };

@@ -22,6 +22,11 @@ export default function RootLayout() {
       headerShown: false
     }} />
 
+<Stack.Screen
+    name="mobileProviders/[id]"
+    options={{
+      headerShown: false
+    }} />
 
     </Stack>
 

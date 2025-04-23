@@ -4,14 +4,17 @@ import { Fontisto, Ionicons, Octicons } from '@expo/vector-icons';
 interface InputProps {
     
 }
-const FormInput = ({ label, icon, isPassword, hidePassword, setHidePassword, ...props }: any) => {
+const FormInput = ({ label, icon, placeHolder, isPassword, hidePassword, setHidePassword, ...props }: any) => {
   return (
     <View style={{ marginBottom: 20 }}>
     <View className='absolute left-4'>
       <Octicons name={icon} size={30} color={"gray"} />
     </View>
-    <Text className=''>{label}</Text>
-    <TextInput className='p-4 pr-20'{...props} />
+    <Text className='text-white my-3'>{label}</Text>
+    <TextInput
+    placeholderTextColor={"gray"} placeholder={placeHolder} className='p-4 pr-20 border-alt border text-white rounded'{...props} 
+    
+    />
     {isPassword && (
       <TouchableOpacity
         onPress={() => setHidePassword(!hidePassword)}

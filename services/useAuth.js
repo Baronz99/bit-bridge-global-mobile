@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import * as SecureStore from "expo-secure-store";
 import APP_CONFIG from "@/api/baseUrl";
+import axios from "axios";
 
 // interface AuthState {
 //   token: string | null;
@@ -19,11 +20,8 @@ import APP_CONFIG from "@/api/baseUrl";
 
 // }
 
-
-
-
-const token_key = "auth_token"; // Should be a real key
-const baseUrl = APP_CONFIG.base_url // Replace with your real base URL
+const token_key = "auth_token";
+const {base_url, api_route} = APP_CONFIG
 
 const AuthContext = createContext(null);
 
@@ -36,6 +34,7 @@ export const useAuth = () => {
   return context;
 };
 
+
 // Provider component
 const AuthProvider = ({ children }) => {
   const [authState, setAuthState] = useState({
@@ -43,15 +42,14 @@ const AuthProvider = ({ children }) => {
     authenticated: null,
   });
 
+  const [authProfile, setAuthProfile] = useState(null);
+
   useEffect(() => {
     const loadToken = async () => {
       const token = await SecureStore.getItemAsync(token_key);
-      console.log("my token", token)
       if (token) {
-        setAuthState({
-          token,
-          authenticated: true,
-        });
+        setAuthState({ token, authenticated: true });
+       await userProfile(token)
       }
     };
     loadToken();
@@ -59,7 +57,7 @@ const AuthProvider = ({ children }) => {
 
   const register = async (email, password) => {
     try {
-      const response = await fetch(`${baseUrl}/register`, {
+      const response = await fetch(`${base_url}/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -116,10 +114,38 @@ const AuthProvider = ({ children }) => {
     }
   };
 
+
+  const userProfile = async(token) => {
+
+    try {
+      
+              const response = await axios.get(`${base_url + api_route}users/user_profile`, {  
+                  headers: {
+                "Authorization": `Bearer ${token}`
+            }})
+              const {data} =  response.data
+              setAuthProfile(data)
+              return data
+
+          } catch (error) {
+              if(error.response){
+                console.log("log error",error.response.data)
+                await SecureStore.deleteItemAsync(token_key);
+                setAuthState({token: null, authenticated: false })
+                  return  error.response.data || "error occured"
+              }
+      
+              return   "something went wrong"
+      
+          }
+      
+      }
+
   const value = {
     onRegister: register,
     onLogin: login,
     onLogout: logout,
+    userProfileData: authProfile,
     authState,
   };
 

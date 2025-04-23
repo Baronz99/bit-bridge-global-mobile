@@ -43,11 +43,11 @@ const TabIcon = ({
   }
 }
 const _layout = () => {
-  const {authState, onLogout} = useAuth()
-  console.log(authState?.authenticated)
+  const {authState, onLogout,userProfileData } = useAuth()
+ 
   return (
     <>
-    {false?
+    {authState?.authenticated ?
      <>
       <Tabs
     screenOptions={{
