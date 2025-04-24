@@ -1,13 +1,20 @@
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
-import React from 'react'
+import React, { useState } from 'react'
 import { useLocalSearchParams } from 'expo-router'
 import useFetch from '@/services/useFetch'
 import { getProvision } from '@/api/products'
 import { confirmPayment, getPurchaseOrder } from '@/api/billOrder'
 import { useAuth } from '@/services/useAuth'
+import Loader from '@/components/Loader'
+import moneyFormat from '@/utils/moneyFormat'
+import NotificationAlert from '@/components/notification'
+import useNotification from '@/hooks/useNotification'
 
 const MobileDetailConfirm = () => {
       const {orderId} = useLocalSearchParams()
+          const [loader, setLoader] = useState(false)
+          const {notification, setNotification} = useNotification()
+      
           const {authState: {token}, } = useAuth()
 
 
@@ -19,32 +26,35 @@ const MobileDetailConfirm = () => {
           
 
           
-          const handleConfirmation = (payment_method: string) => {
+          const handleConfirmation = async (payment_method: string) => {
+            setLoader(true)
 
             try {
 
-             const response =  confirmPayment({queryId: orderId, payment_method, token})
-            //  console.log(response)
+             const response = await  confirmPayment({queryId: orderId, payment_method, token})
+             setLoader(false)
+             console.log("data purchase ==========================>",response)
+             setNotification({
+              error: false,
+              message: response?.message || "Data Purchased",
+              data: null
+            })
              
         
               
-            } catch (error) {
-              console.log(error)
+            } catch (error: any) {
+              setLoader(false)
+              setNotification({
+                error: true,
+                message: error.message || "something went wrong",
+                data: null
+              })
               
             }
         
  
     }
       
-
-    //   const {data} = useFetch(()=> getProvision({
-    //     id: id as string,
-    //     token: token  }
-    //   )
-    // )
-
-    console.log("fetched purchase:",data)
-
   return (
     <View className='flex-1 p-4 bg-primary'>
 
@@ -52,6 +62,7 @@ const MobileDetailConfirm = () => {
           <Text className='text-lg font-medium text-black'> Confirm Number</Text>
           <Text> {data?.service_type}</Text>
           <Text className='text-2xl font-medium'> {data?.meter_number}</Text>
+          <Text className='text-2xl font-medium'> {moneyFormat(data?.amount)}</Text>
           <Text className='text-2xl font-medium'> {data?.description}</Text>
 
 
@@ -60,6 +71,8 @@ const MobileDetailConfirm = () => {
          <TouchableOpacity onPress={() => handleConfirmation("wallet")} className='border rounded-md mt-4 border-alt py-5 '>
                           <Text className='text-alt text-center'>Confirm </Text>
           </TouchableOpacity>
+          { loader && <Loader/>}
+          <NotificationAlert message={notification.message} error={notification.error} data={notification.data} />
 
     </View>
   )

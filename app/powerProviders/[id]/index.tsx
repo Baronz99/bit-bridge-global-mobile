@@ -17,19 +17,18 @@ import powerDistribution from "../../../data/powerDistributions.json"
 const ProvideDertails = () => {
     const {id} = useLocalSearchParams()
     const router = useRouter()
-    const {authState: {token}, } = useAuth()
+    const {authState: {token}, userProfileData  } = useAuth()
     const [error, setError] = useState<string | null>(null)
 
 
   const data = powerDistribution.find(item => String(item.id) === id)
 
+  console.log(data)
 
-
-    // const {}
     const [formValue, setFormValue] = useState({
       billersCode: "",
         amount: "",
-        tariff_class: "",
+        phone: "",
         description: null
         
     })
@@ -39,14 +38,14 @@ const ProvideDertails = () => {
 
       try {
        const response =  await createPurchaseOrder({
-          orderData: {...formValue, email: "", service_type: "ELECTRICITY", biller: data?.biller},
+          orderData: {...formValue, email: userProfileData.email, service_type: "ELECTRICITY", biller: data?.biller},
            token
         }
         )   
-        console.log("response  dtaa", response, response?.id)
+        console.log("response  data", response.data.id)
 
 
-        if(response)  router.push(`/mobileProviders/${id}/confirm/${response?.id}`)
+        if(response)  router.push(`/powerProviders/${id}/confirm/${response?.data.id}`)
 
       } catch (error: any) {
 
@@ -54,9 +53,6 @@ const ProvideDertails = () => {
         
       }
   }
-
-
-
 
  
   return (
@@ -81,10 +77,20 @@ const ProvideDertails = () => {
               <View>
                 <FormInput 
                 name='billerCode'
-                label='Phone Number'
+                label='Meter Number'
                 placeHolder='Enter Biller Code'
+                
                 onChangeText={(text: string) => setFormValue({...formValue, billersCode: text})}
                 value={formValue.billersCode}    
+                />
+
+<FormInput 
+                name='phone'
+                label='Phone Number '
+                placeHolder='Phone Number'
+                
+                onChangeText={(text: string) => setFormValue({...formValue, phone: text})}
+                value={formValue.phone}    
                 />
          
                 <FormInput 

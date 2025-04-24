@@ -10,6 +10,7 @@ import { splitString } from '@/utils'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
 import { createPurchaseOrder, getPriceList } from '@/api/billOrder'
 import FormSelect from '@/components/FormSelect'
+import Loader from '@/components/Loader'
 const ProvideDertails = () => {
     const {id} = useLocalSearchParams()
     const router = useRouter()
@@ -31,13 +32,14 @@ const ProvideDertails = () => {
 
 
 useEffect(()=> {
-  if(data && data?.service_type === "DATA"){
+  if(data && data?.service_type === "TV"){
     refetch()
   }
 }, [data])
 
-    // const {}
-    const [formValue, setFormValue] = useState({
+console.log(data?.service_type)
+
+const [formValue, setFormValue] = useState({
       billersCode: "",
         amount: "",
         tariff_class: "",
@@ -50,14 +52,14 @@ useEffect(()=> {
 
       try {
        const response =  await createPurchaseOrder({
-          orderData: {...formValue, email: "", service_type: data.service_type, biller: data.product.provider.toUpperCase(), skip: true},
+          orderData: {...formValue, email: "", service_type: data.service_type, biller: data.product.provider.toUpperCase()},
            token
         }
         )   
         console.log("response  dtaa", response, response?.id)
 
 
-        if(response)  router.push(`/mobileProviders/${id}/confirm/${response?.id}`)
+        if(response)  router.push(`/cableProviders/${id}/confirm/${response?.id}`)
 
       } catch (error: any) {
 
@@ -107,7 +109,7 @@ useEffect(()=> {
                 />
                 )}
 
-                {data?.service_type === "DATA" && (
+             
                 <FormSelect 
                 options={priceList ?? []}
                 selectedValue={formValue.tariff_class}
@@ -125,8 +127,6 @@ useEffect(()=> {
                      tariff_class: value})}}
 
                      />
-                )}
-
 
                 <TouchableOpacity onPress={handleFormSubmit} className='border rounded-md mt-4 border-alt py-5 '>
                     <Text className='text-alt text-center'>Proceed</Text>
@@ -143,6 +143,9 @@ useEffect(()=> {
 
 
       </ScrollView>
+
+      { loader && <Loader/>}
+
     </View>
   )
 }

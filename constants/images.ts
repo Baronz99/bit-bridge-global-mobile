@@ -12,6 +12,9 @@ import JED from "@/assets/power-providers/Jos-Electric-JED.jpg"
 import gotv from "@/assets/images/gotv.webp"
 import dstv from "@/assets/images/dstv.webp"
 import PHED from "@/assets/power-providers/Port-Harcourt-Electric.jpg"
+import fail from "@/assets/images/fail.png"
+import sorry from "@/assets/images/sorry.png"
+import success from "@/assets/images/success.png"
 
 
 
@@ -29,5 +32,8 @@ import PHED from "@/assets/power-providers/Port-Harcourt-Electric.jpg"
   JED,
   PHED,
   dstv,
-  gotv
+  gotv,
+  fail,
+  sorry,
+  success
 };

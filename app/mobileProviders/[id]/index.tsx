@@ -10,8 +10,11 @@ import { splitString } from '@/utils'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
 import { createPurchaseOrder, getPriceList } from '@/api/billOrder'
 import FormSelect from '@/components/FormSelect'
+import Loader from '@/components/Loader'
 const ProvideDertails = () => {
     const {id} = useLocalSearchParams()
+    const [loader, setLoader] = useState(false)
+    
     const router = useRouter()
     const {authState: {token}, } = useAuth()
     const [error, setError] = useState<string | null>(null)
@@ -47,6 +50,7 @@ useEffect(()=> {
 
 
     const handleFormSubmit = async() => {
+      setLoader(true)
 
       try {
        const response =  await createPurchaseOrder({
@@ -54,14 +58,13 @@ useEffect(()=> {
            token
         }
         )   
-        console.log("response  dtaa", response, response?.id)
 
+        setLoader(false)
 
-        if(response)  router.push(`/mobileProviders/${id}/confirm/${response?.id}`)
+        if(response)  router.push(`/mobileProviders/${id}/confirm/${response?.data.id}`)
 
       } catch (error: any) {
-
-        console.log(error.message)
+        setLoader(false)
         
       }
   }
@@ -93,14 +96,14 @@ useEffect(()=> {
                 <FormInput 
                 name='billerCode'
                 label='Phone Number'
-                placeHolder='Enter Biller Code'
+                placeHolder='Enter 11 digits Number'
                 onChangeText={(text: string) => setFormValue({...formValue, billersCode: text})}
                 value={formValue.billersCode}    
                 />
                 {data?.service_type === "VTU" && (
                 <FormInput 
                 name='amount'
-                label='amount'
+                label='Amount'
                 placeHolder='Enter Amount'
                 onChangeText={(text: string) => setFormValue({...formValue, amount: text})}
                 value={formValue.amount}    
@@ -143,6 +146,9 @@ useEffect(()=> {
 
 
       </ScrollView>
+
+      { loader && <Loader/>}
+
     </View>
   )
 }

@@ -11,20 +11,18 @@ export const createPurchaseOrder = async({orderData, token}) => {
                 "Authorization": `Bearer ${token}`}
         });
 
-        const {data} = response.data; 
-
+        const data = response.data; 
         return data;
     } catch (error: any) {
         if (error.response) {
             throw  new Error(error.response.data.message)
         }
        
-        throw  error.message || "Something went wrong"
+        throw new Error( error.message || "Something went wrong")
     }
 }
 
 export const getPurchaseOrder = async({id, token}) => {
-    console.log("get puchase: =====>",id, token)
     try {
         const response = await axios.get(`${base_url + api_route}payment_processors/${id}`, {
             headers: {
@@ -43,7 +41,6 @@ export const getPurchaseOrder = async({id, token}) => {
         if (error.response) {
             throw new Error( error.response.data.message);
         }
-        console.error(error);
         throw new Error("Something went wrong" )
     }
 }
@@ -51,7 +48,6 @@ export const getPurchaseOrder = async({id, token}) => {
 
 
 export const confirmPayment =  async({token, queryId, payment_method} : any) => {
-    console.log(payment_method)
     try {
         const response = await axios.get(`${base_url + api_route}payment_processors/${queryId}/confirm_payment?payment_method=${payment_method}`, {
             headers: {
@@ -59,15 +55,13 @@ export const confirmPayment =  async({token, queryId, payment_method} : any) => 
             }
         });
 
-        const {data} = response.data;      
+        const data = response.data;      
 
         return data;
     } catch (error: any) {
         if (error.response) {
-            console.log("torryy rrroy", error.response.data.message)
             throw new Error( error.response.data.message);
         }
-        console.error(error.response);
         throw new Error ( "Something went wrong" )
     }
 }

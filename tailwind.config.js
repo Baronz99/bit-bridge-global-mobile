@@ -13,8 +13,9 @@ module.exports = {
           // alt: "#695d2f",
          alt: " rgb(255 204 0)",
          mtn: "#2f3b69",
-        ligth: {
-          100: "#d6c6ff",
+         "dstv-blue": "#0071b0",
+        light: {
+          100: "#f3f3f3",
           200: "#A8b5db",
           300: "#9ca4ab"
         },
