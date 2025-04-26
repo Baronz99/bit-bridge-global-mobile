@@ -72,24 +72,26 @@ const _layout = () => {
       }
     }}
     >
-        <Tabs.Screen
-        name='index'
+      <Tabs.Screen
+        name='utility'
         options={{
-            title: "Home",
-            headerShown: false,
-            tabBarIcon: ({ focused}) => (
-              <>
-              <TabIcon  focused={focused}
-              icon={icons.home}
-              title="Home"
-              />
-              </>
-            )
+          title: "Utilities",
+          headerShown: false,
+          tabBarIcon: ({ focused}) => (
+            <>
+            <TabIcon  focused={focused}
+            icon={icons.utility}
+            title="Utilities"
+            />
 
-        }}
+
+            </>
+          )
+
+      }}
         
         />
-         <Tabs.Screen
+        <Tabs.Screen
         name='wallet'
         options={{
             title: "wallet",
@@ -108,25 +110,23 @@ const _layout = () => {
         
         />  
         <Tabs.Screen
-        name='profile'
+        name='index'
         options={{
-            title: "Profile",
+            title: "Home",
             headerShown: false,
             tabBarIcon: ({ focused}) => (
               <>
               <TabIcon  focused={focused}
-              icon={icons.person}
-              title="Profile"
+              icon={icons.home}
+              title="Home"
               />
-
-
               </>
             )
 
         }}
         
-        
         />
+   
 
         
         <Tabs.Screen

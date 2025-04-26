@@ -13,6 +13,8 @@ import FormSelect from '@/components/FormSelect'
 import Loader from '@/components/Loader'
 const ProvideDertails = () => {
     const {id} = useLocalSearchParams()
+        const [loader, setLoader] = useState(false)
+    
     const router = useRouter()
     const {authState: {token}, } = useAuth()
     const [error, setError] = useState<string | null>(null)
@@ -37,8 +39,6 @@ useEffect(()=> {
   }
 }, [data])
 
-console.log(data?.service_type)
-
 const [formValue, setFormValue] = useState({
       billersCode: "",
         amount: "",
@@ -49,6 +49,7 @@ const [formValue, setFormValue] = useState({
 
 
     const handleFormSubmit = async() => {
+      setLoader(true)
 
       try {
        const response =  await createPurchaseOrder({
@@ -56,15 +57,13 @@ const [formValue, setFormValue] = useState({
            token
         }
         )   
-        console.log("response  dtaa", response, response?.id)
 
+        setLoader(false)
 
-        if(response)  router.push(`/cableProviders/${id}/confirm/${response?.id}`)
+        if(response)  router.push(`/cableProviders/${id}/confirm/${response?.data.id}`)
 
       } catch (error: any) {
-
-        console.log(error.message)
-        
+        setLoader(false)        
       }
   }
 

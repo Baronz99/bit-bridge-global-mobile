@@ -11,7 +11,7 @@ module.exports = {
         accent: "#a855f7",
           "app-primary": "#2f3b69",
           // alt: "#695d2f",
-         alt: " rgb(255 204 0)",
+         alt: "#ffcc00",
          mtn: "#2f3b69",
          "dstv-blue": "#0071b0",
         light: {

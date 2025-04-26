@@ -10,16 +10,13 @@ import { AntDesign } from '@expo/vector-icons'
 import { gifs } from '@/constants/gifs'
 import Loader from '@/components/Loader'
 import NotificationAlert from '@/components/notification'
+import useNotification from '@/hooks/useNotification'
 
 const CableetailConfirm = () => {
       const {orderId} = useLocalSearchParams()
       const [loader, setLoader] = useState(false)
           const {authState: {token}, } = useAuth()
-          const [notification, setNotification] = useState({
-            error: true,
-            message: null,
-            data: null
-          })
+          const {notification, setNotification} = useNotification()
 
 
           const {data, refetch, loading, error, reset} = useFetch(()=> getPurchaseOrder({

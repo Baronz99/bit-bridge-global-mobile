@@ -15,6 +15,9 @@ import PHED from "@/assets/power-providers/Port-Harcourt-Electric.jpg"
 import fail from "@/assets/images/fail.png"
 import sorry from "@/assets/images/sorry.png"
 import success from "@/assets/images/success.png"
+import cable from "@/assets/images/cable.png"
+import mobile from "@/assets/images/mobile1.png"
+import electricity from "@/assets/images/electricity.png"
 
 
 
@@ -35,5 +38,9 @@ import success from "@/assets/images/success.png"
   gotv,
   fail,
   sorry,
-  success
+  success,
+  cable,
+  mobile,
+  electricity
+
 };

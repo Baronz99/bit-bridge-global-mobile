@@ -58,7 +58,6 @@ export default function Index() {
             }
           })
 
-          // console.log("picked ====> ", cableList?.length, cableList)
    
 
   const prevsummary = [
@@ -387,18 +386,22 @@ const CableService = ({
   )
 }
 
-const PowerService = ({
+export const PowerService = ({
   powerList
  }: any) => {
+  console.log("first: ===>", powerList)
    return (
  
      <View>
+      <Text className="text-white">Hey</Text>
          <View className="flex-1 mt-5">
      
  
          {powerList && (
           <>
            <View className="mt-10">
+           <Text className="text-white">Hey</Text>
+
              <Text className="text-lg text-white font-bold mb-3">Discos </Text>
  
              <FlatList

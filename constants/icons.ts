@@ -12,6 +12,7 @@ import trophy from "@/assets/icons/trophy.png";
 import walletColor from "@/assets/icons/wallet-color.png"
 import tag from "@/assets/icons/tag.png"
 import withdraw from "@/assets/icons/withdraw.png"
+import utility from "@/assets/icons/power-line.png"
 
 import appLogo from "@/assets/logos/logo.png"
 export const icons = {
@@ -29,5 +30,7 @@ export const icons = {
   trophy,
   walletColor,
   withdraw,
-  tag
+  tag,
+  utility
+
 };

@@ -8,7 +8,7 @@ export const getProducts = async({
 }: {
     token: string  ,
     params?: {
-        category?: string
+        category?: "mobile provider" | "gift card" | "service" | "utility" | "crypto"
         type?: string
     }
 
