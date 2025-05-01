@@ -9,13 +9,18 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.emmykage.bitbridgeapp",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/logos/logo.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.emmykage.bitbridgeapp"
     },
     "web": {
       "bundler": "metro",
@@ -46,6 +51,12 @@
         "projectId": "3c19e796-d824-4788-8258-771676d2fe71"
       }
     },
-    "owner": "emmykage"
+    "owner": "emmykage",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/3c19e796-d824-4788-8258-771676d2fe71"
+    }
   }
 }

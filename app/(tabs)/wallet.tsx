@@ -21,7 +21,7 @@ const wallet = () => {
     <View className='flex-1 bg-primary px-4'>
       <ScrollView>
         
-        <View className='min-h-40 mt-20 pt-20 bg-gray-900 rounded-3xl items- justify-center px-4'>
+        <View className='min-h-40 pt-20 bg-gray-900 rounded-3xl items- justify-center px-4'>
         <Text className='text-center text-white my-4'>Your Wallet Ballance</Text>
           <Text className='text-white text-4xl font-medium  text-center '>
             {moneyFormat(userProfileData?.wallet.balance)}
