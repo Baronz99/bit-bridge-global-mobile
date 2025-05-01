@@ -5,7 +5,7 @@ interface InputProps {
     
 }
 const FormInput = ({ label, icon, value, placeHolder, isPassword, onChangeText, hidePassword, setHidePassword, ...props }: any) => {
-  // console.log("props value ======>",label)
+  console.log("props value ======>",isPassword)
   return (
     <View 
     // style={{ marginBottom: 0 }}
@@ -16,7 +16,7 @@ const FormInput = ({ label, icon, value, placeHolder, isPassword, onChangeText, 
     <Text className='text-white my-3'>{label}</Text>
     <TextInput
 
-    // value={value}
+    value={value}
     onChangeText={onChangeText}
     placeholderTextColor={"gray"}
      placeholder={placeHolder} 
