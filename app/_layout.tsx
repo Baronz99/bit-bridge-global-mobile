@@ -67,6 +67,13 @@ export default function RootLayout() {
 
           }}
         />
+         <Stack.Screen
+          name="transaction/confirm"
+          options={{
+            headerTitle: "Status"
+
+          }}
+        />
 
     </Stack>
 
