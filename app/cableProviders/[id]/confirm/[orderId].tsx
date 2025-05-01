@@ -69,9 +69,10 @@ const CableetailConfirm = () => {
     <View className='flex-1 px-4 bg-primary w-full'>
 
       <View className='bg-light-100 mb-10 mx-4 text-dstv-blue justify-center items-center py-10 rounded-lg mt-4'>
-          <Text className='text-2xl font-semibold text-dstv-blue'> Confirm Number</Text>
+          <Text className='text-2xl font-semibold text-dstv-blue'> Confirm Decoder Details</Text>
           <Text> {data?.service_type}</Text>
           <Text className='text-2xl font-medium text-dstv-blue'> {data?.meter_number}</Text>
+          <Text className='text-2xl font-medium text-dstv-blue'> {data?.name}</Text>
           <Text className='text-2xl font-medium text-dstv-blue text-center'> {data?.description}</Text>
 
 

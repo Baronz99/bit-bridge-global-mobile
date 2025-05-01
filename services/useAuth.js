@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from "react
 import * as SecureStore from "expo-secure-store";
 import APP_CONFIG from "@/api/baseUrl";
 import axios from "axios";
+import { Flag } from "react-native-appwrite";
 
 // interface AuthState {
 //   token: string | null;
@@ -41,6 +42,8 @@ const AuthProvider = ({ children }) => {
     token: null,
     authenticated: null,
   });
+
+  const [loadingState, setLoadingState] = useState(false)
 
   const [authProfile, setAuthProfile] = useState(null);
 
@@ -146,7 +149,7 @@ const AuthProvider = ({ children }) => {
     onLogin: login,
     onLogout: logout,
     userProfileData: authProfile,
-    authState,
+    authState
   };
 
   return (

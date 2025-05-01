@@ -44,8 +44,8 @@ const Utilities = () => {
 
           }}
           ListHeaderComponent={
-            <View className='py-10 bg-gray-900/60'>
-              <Text className='text-white text-center'> Utilities</Text>
+            <View className='py-10 rounded-3xl bg-gray-900/60'>
+              <Text className='text-white text-xl text-center'> Utilities</Text>
 
               </View>
           }

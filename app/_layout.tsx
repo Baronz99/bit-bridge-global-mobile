@@ -9,24 +9,64 @@ export default function RootLayout() {
     
       <StatusBar hidden={true} />
 
-   <Stack >
+   <Stack 
+   screenOptions={{
+    
+      // headerShown: false,
+      headerTitleStyle: {
+        color: "orange"
+
+      },
+      headerStyle: {
+        backgroundColor: "#030014"
+
+      }
+    
+   }}
+   >
     <Stack.Screen
     name="(tabs)"
     options={{
-      headerShown: false
-    }} />
+      headerShown: false,
+      headerTitle: "Home",
+      headerTitleStyle: {
+        color: "orange"
+
+      },
+      // headerTintColor: "red"
+    }} 
+    />
 
     <Stack.Screen
-        name="mobile/[service]"
+        name="mobileProviders/index"
         options={{
-          headerShown: false
-        }} />
+          headerTitle: "Mobile Top Up"
 
-    <Stack.Screen
-        name="mobileProviders/[id]"
+        }}
+        />
+        <Stack.Screen
+        name="fundWallet/index"
         options={{
-          headerShown: false
-        }} />
+          headerTitle: "Fund Wallet"
+
+        }}
+        />
+        
+      <Stack.Screen
+        name="mobileProviders/[id]/index"
+        options={{
+          headerTitle: "Mobile Top Up"
+
+        }}
+        />
+
+        <Stack.Screen
+          name="withdrawFund/index"
+          options={{
+            headerTitle: "WithdrawFund"
+
+          }}
+        />
 
     </Stack>
 

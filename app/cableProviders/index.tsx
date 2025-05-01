@@ -9,9 +9,6 @@ import { splitString } from '@/utils'
 
 const index = () => {
     const {authState: {token}} = useAuth()
-    console.log(token)
-    
-    
     
     const {data} = useFetch(() => getProducts({
         token,
@@ -50,7 +47,7 @@ const index = () => {
                     horizontal
                     showsHorizontalScrollIndicator={false}
                     renderItem={({item}: any) => (
-                        <Link href={`/mobileProviders/${item.id}`} asChild>
+                        <Link href={`/cableProviders/${item.id}`} asChild>
                             <TouchableOpacity className='w-40 h-32 bg-gray-200 rounded overflow-hidden'>
                                 <Image source={images[`${splitString(item.name)}`]} className='w-full h-full' />
                             </TouchableOpacity>

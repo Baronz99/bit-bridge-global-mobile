@@ -15,7 +15,6 @@ const database = new Databases(client)
 
 
 export const updateSearchCount = async (query: string, movie: Movie) => {
-console.log(query, DATABASE_ID, COLLECTION_ID, "hey")
 
     try{
 
@@ -23,7 +22,6 @@ console.log(query, DATABASE_ID, COLLECTION_ID, "hey")
         Query.equal("searchTerm", query)
     ])
 
-    console.log("result to update cart", result.documents)
     if(result.documents.length > 0){
         const existingMovie = result.documents[0];
         console.log(existingMovie.$id)

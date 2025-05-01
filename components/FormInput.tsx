@@ -4,7 +4,8 @@ import { Fontisto, Ionicons, Octicons } from '@expo/vector-icons';
 interface InputProps {
     
 }
-const FormInput = ({ label, icon, placeHolder, isPassword, hidePassword, setHidePassword, ...props }: any) => {
+const FormInput = ({ label, icon, value, placeHolder, isPassword, onChangeText, hidePassword, setHidePassword, ...props }: any) => {
+  // console.log("props value ======>",value)
   return (
     <View style={{ marginBottom: 20 }}>
     <View className='absolute left-4'>
@@ -12,7 +13,13 @@ const FormInput = ({ label, icon, placeHolder, isPassword, hidePassword, setHide
     </View>
     <Text className='text-white my-3'>{label}</Text>
     <TextInput
-    placeholderTextColor={"gray"} placeholder={placeHolder} className='p-4 pr-20 border-alt border text-white rounded'{...props} 
+
+    // value={value}
+    onChangeText={onChangeText}
+    placeholderTextColor={"gray"}
+     placeholder={placeHolder} 
+     className='p-4 pr-20 border-alt border text-white rounded'
+     {...props} 
     
     />
     {isPassword && (
@@ -29,4 +36,3 @@ const FormInput = ({ label, icon, placeHolder, isPassword, hidePassword, setHide
 
 export default FormInput
 
-const styles = StyleSheet.create({})

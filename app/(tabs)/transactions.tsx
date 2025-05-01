@@ -1,4 +1,4 @@
-import { ActivityIndicator, FlatList, Image, StyleSheet, Text, View } from 'react-native'
+import { ActivityIndicator, FlatList, Image, ScrollView, StyleSheet, Text, View } from 'react-native'
 import React, { useEffect, useState } from 'react'
 import { images } from '@/constants/images'
 import MovieCard from '@/components/movieCard'
@@ -8,109 +8,65 @@ import { fetchMovies } from '@/services/api'
 import { icons } from '@/constants/icons'
 import SearchBar from '@/components/SearchBar'
 import { updateSearchCount } from '@/services/app-write'
+import { getTransactions } from '@/api/transactions'
+import { useAuth } from '@/services/useAuth'
+import moneyFormat from '@/utils/moneyFormat'
+import { dateFormat } from '@/utils/dateFormat'
 
 const Transactions = () => {
 
     const router = useRouter()
-    const [searchQuery, setSearchQuery] = useState("")
-
-   
-    const {data: movies, reset, refetch: loadMovies, loading: moviesLoading, error: movieError } = useFetch(() => fetchMovies({
-      query: searchQuery
-    }), false)
-
-    useEffect(()=> {
-      const timeoutId = setTimeout(async() =>{
+    const {userProfileData, authState: {token}} = useAuth()
   
-      if(searchQuery.trim()){ 
-        await loadMovies()
-      
-      }
-      else{
-        reset()
-      }
+    const {data, loading} = useFetch(() => getTransactions({
+      token
+    }))
+    // console.log(userProfileData?.wallet, data?.data)
 
-    }, 500)
-
-
-    return () => clearTimeout(timeoutId)
-
-    },[searchQuery])
-
-    useEffect(() => {
-      if(movies?.length > 0 && movies?.[0]){
-        updateSearchCount(searchQuery, movies[0])      
-
-       }
-    }, [movies])
+    
   
   
   return (
-    <View className='flex-1 bg-primary'>
+    <View className='flex-1 bg-primary px-4'>
       <Image source={images.bg} resizeMode='cover' className='absolute w-full z-0'/>
-      <FlatList
-      className='px-5'
-      numColumns={3}
-      contentContainerStyle={{
-        paddingBottom: 100
-      }}
-       keyExtractor={(item) => item.id.toString()}
-      renderItem={({item}) => <MovieCard {...item}/>}
-      columnWrapperStyle={{
-        justifyContent: "center",
-        gap: 16,
-        marginVertical: 16
-      }}
-      ListHeaderComponent={
-        <>
-        <View className='w-full flex-row justify-center mt-20 items-center'>
-            <Image source={icons.logo} className='w-12 h-10 '/>
-        </View>
-        <View className='my-5'>
-          <SearchBar value={searchQuery}
-           onChangeText={(text: string)=> setSearchQuery(text)}
-            onPress={()=> {}} placeHolder='Search Movies' />
-
-        </View>
-        {moviesLoading && (
-          <ActivityIndicator size={"large"} color={"#000ff"} className='my-3'/>
-        )}
-        {movieError && (
-          <Text className='text-red-500 px-5 my-3'>
-            Error: {movieError.message}
-
+      <ScrollView className='g-red-100'>
+     
+        <View className='min-h-40 mt-10 bg-gray-900 rounded-3xl items- justify-center px-4'>
+        
+          <Text className='text-white font-medium text-3xl text-center'>
+            {moneyFormat(userProfileData?.wallet.balance)}
+ 
           </Text>
-        )}
+        </View>
+       
+       <View className="m-4 border border-gray-300 rounded-lg overflow-hidden ">
+          <View className="flex-row bg-gray-800 px-4 py-3">
+            <Text className="flex-1 font-semibold text-gray-200">Status</Text>
+            <Text className="flex-1 font-semibold text-gray-200 text-right">Amount (₦)</Text>
 
-{/* {! &&   ? length > 0 &&  } */}
-
-
-        {!moviesLoading && !movieError  && searchQuery.trim() && movies?.length > 0 && (
-          <Text className='text-lg'>
-            Search for {" "}
-
-            <Text className='text-accent'> {searchQuery}</Text>
-
-          </Text>
-        )
-
-        }
-      
-        </>
-      }
-      ListEmptyComponent={
-        !moviesLoading && !movieError ? (
-          <View className='mt-10 px-5 '>
-            <Text className='text-center text-gray-500'>
-              {searchQuery.trim() ? "No movie found" : "Search for a movie"}
-
-            </Text>
+            <Text className="flex-1 font-semibold text-gray-200 text-right">Time </Text>
+          </View>
 
 
-            </View>
-        ) : null
-      }
-      data={movies}/>
+
+          <ScrollView className="h-full flex-1 bg-red-">
+
+            {loading ? <ActivityIndicator
+            size={"large"}
+            color={"#000ff"}
+            className='mt-10 self-center'
+            />
+            
+            : data && data?.data.map((item, index) => (
+              <View key={index} className="flex-row border-t border-gray-200 px-4 py-2">
+                <Text className="flex-1 text-gray-200">{item.status}</Text>
+                <Text className="flex-1 text-center text-white">{moneyFormat(item.amount)}</Text>
+                <Text className="flex-1  text-right text-white">{dateFormat(item.created_at)}</Text>
+              </View>
+            ))}
+          </ScrollView>
+        </View>
+      </ScrollView>
     </View>
   )
 }

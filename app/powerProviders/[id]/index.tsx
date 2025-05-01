@@ -23,8 +23,6 @@ const ProvideDertails = () => {
 
   const data = powerDistribution.find(item => String(item.id) === id)
 
-  console.log(data)
-
     const [formValue, setFormValue] = useState({
       billersCode: "",
         amount: "",
@@ -49,7 +47,7 @@ const ProvideDertails = () => {
 
       } catch (error: any) {
 
-        console.log(error.message)
+        // console.log(error.message)
         
       }
   }

@@ -1,4 +1,4 @@
-import { Image, ScrollView, Text, TouchableOpacity, View } from 'react-native'
+import { Image, SafeAreaView, ScrollView, Text, TouchableOpacity, View } from 'react-native'
 import React, { useEffect, useState } from 'react'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import useFetch from '@/services/useFetch'
@@ -75,8 +75,10 @@ useEffect(()=> {
 
  
   return (
+    <SafeAreaView className='flex-1 bg-primary'>
+      
     <View 
-    className='flex-1 bg-primary px-4 mt-4'>
+    className='flex-1 bg-primary px-4'>
       <ScrollView
       contentContainerStyle={{
         paddingBottom: 80
@@ -120,7 +122,6 @@ useEffect(()=> {
                 placeHolder='Data Plan'
                 onValueChange={(value: string) => {
 
-                  console.log(value)
                   const newAmountdata = priceList.find((price: any) => price.value === value)
                   
                   setFormValue({...formValue,
@@ -151,6 +152,8 @@ useEffect(()=> {
       { loader && <Loader/>}
 
     </View>
+    
+    </SafeAreaView>
   )
 }
 

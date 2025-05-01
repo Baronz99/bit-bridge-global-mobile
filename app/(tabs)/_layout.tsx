@@ -1,10 +1,11 @@
-import { Image, ImageBackground, StyleSheet, Text, View } from 'react-native'
+import { Image, ImageBackground, SafeAreaView, StyleSheet, Text, View } from 'react-native'
 import React from 'react'
 import { Tabs } from 'expo-router'
 import { images } from '@/constants/images'
 import { icons } from '@/constants/icons'
 import { useAuth } from '@/services/useAuth'
 import Login from '../login'
+import Loader from '@/components/Loader'
 
 
 
@@ -43,10 +44,12 @@ const TabIcon = ({
   }
 }
 const _layout = () => {
-  const {authState, onLogout,userProfileData } = useAuth()
- 
+  const {authState, onLogout,userProfileDatam } = useAuth()
   return (
     <>
+    <SafeAreaView className='flex-1 bg-primary'>
+      
+
     {authState?.authenticated ?
      <>
       <Tabs
@@ -72,6 +75,43 @@ const _layout = () => {
       }
     }}
     >
+       <Tabs.Screen
+        name='index'
+        options={{
+            title: "Home",
+            headerShown: false,
+            tabBarIcon: ({ focused}) => (
+              <>
+              <TabIcon  focused={focused}
+              icon={icons.home}
+              title="Home"
+              />
+              </>
+            )
+
+        }}
+        
+        />
+
+        <Tabs.Screen
+          name='wallet'
+          options={{
+              title: "wallet",
+              headerShown: false,
+              tabBarIcon: ({ focused}) => (
+                <>
+                <TabIcon  focused={focused}
+                icon={icons.wallet}
+                title="Wallet"
+                />
+                </>
+              )
+
+          }}
+                
+        
+        />  
+   
       <Tabs.Screen
         name='utility'
         options={{
@@ -91,42 +131,8 @@ const _layout = () => {
       }}
         
         />
-        <Tabs.Screen
-        name='wallet'
-        options={{
-            title: "wallet",
-            headerShown: false,
-            tabBarIcon: ({ focused}) => (
-              <>
-              <TabIcon  focused={focused}
-              icon={icons.wallet}
-              title="Wallet"
-              />
-              </>
-            )
-
-        }}
-        
-        
-        />  
-        <Tabs.Screen
-        name='index'
-        options={{
-            title: "Home",
-            headerShown: false,
-            tabBarIcon: ({ focused}) => (
-              <>
-              <TabIcon  focused={focused}
-              icon={icons.home}
-              title="Home"
-              />
-              </>
-            )
-
-        }}
-        
-        />
-   
+       
+       
 
         
         <Tabs.Screen
@@ -154,6 +160,9 @@ const _layout = () => {
       <>
         <Login/>
         </>}
+
+        
+    </SafeAreaView>
    
         </>
   )

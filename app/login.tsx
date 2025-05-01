@@ -13,9 +13,6 @@ const Login = () => {
 
     const {onLogin} = useAuth()
 
-    console.log(formInput)
-
-
 
 
     const handleLogin = async () => {
@@ -37,7 +34,6 @@ const Login = () => {
               <Formik
                 onSubmit={(values, {setSubmitting})=> {
                     if(values.email == "" || values.password == ""){
-                        console.log("first")
                         // setSubmitting(false)
                     }else{
                         handleLogin   (values, setSubmitting)    

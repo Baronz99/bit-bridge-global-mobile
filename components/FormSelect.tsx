@@ -4,24 +4,36 @@ import { Picker } from '@react-native-picker/picker';
 
 
 const FormSelect = ({
-    name,
     label,
-    placeHolder,
     selectedValue,
     onValueChange,
-    options
-}) => {
+    options,
+    placeholder
+}: any) => {
+  console.log( selectedValue)
 
   return (
     <View className=''>
-      <Text className='text-white'>{label}</Text>
+      <Text className='text-white mb-4'>{label}</Text>
+
+
+      <View
+      style={{
+        borderRadius: 4,
+        // borderWidth: 1,
+        // borderColor: '#ffcc00', // <-- ORANGE border color
+        overflow: 'hidden',
+      }}
+      >
+
 
       <Picker
-      className='bg-yellow-200'
+      placeholder={placeholder}
        selectedValue={selectedValue}
        onValueChange={onValueChange}
+       style={{color: "white", backgroundColor: "#ffcc0018"}}
        >
-  {
+        {
             options.map((option: any) => (
                 <Picker.Item key={option.label} label={option.label}value={option.value}/>
 
@@ -30,15 +42,9 @@ const FormSelect = ({
         }
 
       </Picker>
-      {/* <Picker
-        selectedValue={selectedValue}
-        onValueChange={onValueChange}
-     
-      >
-      
-        
-      </Picker> */}
-    </View>
+      </View>
+
+       </View>
   )
 }
 

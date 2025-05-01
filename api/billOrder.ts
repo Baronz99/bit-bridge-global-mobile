@@ -33,7 +33,6 @@ export const getPurchaseOrder = async({id, token}) => {
 
 
         const {data} = response.data;    
-        console.log("redereed data for product ====>=",data)
         return data;
 
     } catch (error: any) {
@@ -65,6 +64,28 @@ export const confirmPayment =  async({token, queryId, payment_method} : any) => 
         throw new Error ( "Something went wrong" )
     }
 }
+
+
+export const confirmBillPayment =  async({token, queryId, payment_method} : any) => {
+    try {
+        const response = await axios.get(`${base_url + api_route}bill_orders/${queryId}/initialize_confirm_payment?payment_method=${payment_method}`, {
+            headers: {
+                "Authorization": `Bearer ${token}`
+            }
+        });
+
+        const data = response.data;      
+
+        return data;
+    } catch (error: any) {
+        if (error.response) {
+            throw new Error( error.response.data.message);
+        }
+        throw new Error ( "Something went wrong" )
+    }
+}
+
+
 
 export const getPriceList =  async({provider, service_type, token}: any) => {
     try {

@@ -93,8 +93,8 @@ const [formValue, setFormValue] = useState({
               <View>
                 <FormInput 
                 name='billerCode'
-                label='Phone Number'
-                placeHolder='Enter Biller Code'
+                label='IUC number'
+                placeHolder='Enter 10 digit IUC Number'
                 onChangeText={(text: string) => setFormValue({...formValue, billersCode: text})}
                 value={formValue.billersCode}    
                 />
@@ -116,8 +116,6 @@ const [formValue, setFormValue] = useState({
                 label='Data Plan'
                 placeHolder='Data Plan'
                 onValueChange={(value: string) => {
-
-                  console.log(value)
                   const newAmountdata = priceList.find((price: any) => price.value === value)
                   
                   setFormValue({...formValue,

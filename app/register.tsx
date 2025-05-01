@@ -36,7 +36,6 @@ const Register = () => {
             {/* <Formik
             onSubmit={(values, {setSubmitting})=> {
                 if(values.email == "" || values.password == ""){
-                    console.log("first")
                     // setSubmitting(false)
                 }else{
                     handleLogin(values, setSubmitting)    
