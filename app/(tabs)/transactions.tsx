@@ -1,13 +1,9 @@
 import { ActivityIndicator, FlatList, Image, ScrollView, StyleSheet, Text, View } from 'react-native'
 import React, { useEffect, useState } from 'react'
 import { images } from '@/constants/images'
-import MovieCard from '@/components/movieCard'
 import { useRouter } from 'expo-router'
 import useFetch from '@/services/useFetch'
-import { fetchMovies } from '@/services/api'
-import { icons } from '@/constants/icons'
-import SearchBar from '@/components/SearchBar'
-import { updateSearchCount } from '@/services/app-write'
+
 import { getTransactions } from '@/api/transactions'
 import { useAuth } from '@/services/useAuth'
 import moneyFormat from '@/utils/moneyFormat'
@@ -27,16 +23,31 @@ const Transactions = () => {
   
   
   return (
-    <View className='flex-1 bg-primary px-4'>
-      <Image source={images.bg} resizeMode='cover' className='absolute w-full z-0'/>
+    <View className='flex-1 bg-primary'>
+      <Image source={images.bg} resizeMode='cover' className='absolute top-0 left-0 w-full z-0'/>
       <ScrollView className='g-red-100'>
      
-        <View className='min-h-40 mt-10 bg-gray-900 rounded-3xl items- justify-center px-4'>
+        <View className='min-h-40 mt-5 mx-4 bg-gray-900 rounded-xl items- justify-center px-4'>
         
           <Text className='text-white font-medium text-3xl text-center'>
             {moneyFormat(userProfileData?.wallet.balance)}
  
           </Text>
+          <View className='mt-10 flex-row justify-between text-center'>
+            <View className='text-center'>
+              <Text className='font-medium text-xl text-alt'>Withdrawal</Text>
+              <Text className='text-2xl text-white text-center font-semibold'> {moneyFormat(0)}</Text>
+            </View>
+            <View>
+              <Text className='text-green-700 font-medium text-xl'> Deposit</Text>
+              <Text className='text-2xl font-semibold text-white text-center'> {moneyFormat(0)}</Text>
+            </View>
+          
+          </View>
+        </View>
+        <View className='my-4 mx-4'>
+          <Text className='text-white text-base'>Recent Transactions</Text>
+
         </View>
        
        <View className="m-4 border border-gray-300 rounded-lg overflow-hidden ">
@@ -49,7 +60,9 @@ const Transactions = () => {
 
 
 
-          <ScrollView className="h-full flex-1 bg-red-">
+          <ScrollView 
+          showsVerticalScrollIndicator={false} 
+          className="h-full flex-1 bg-red-">
 
             {loading ? <ActivityIndicator
             size={"large"}
@@ -73,4 +86,3 @@ const Transactions = () => {
 
 export default Transactions
 
-const styles = StyleSheet.create({})

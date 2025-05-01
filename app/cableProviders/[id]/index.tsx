@@ -73,7 +73,7 @@ const [formValue, setFormValue] = useState({
  
   return (
     <View 
-    className='flex-1 bg-primary px-4 mt-4'>
+    className='flex-1 bg-primary px-4 '>
       <ScrollView
       contentContainerStyle={{
         paddingBottom: 80

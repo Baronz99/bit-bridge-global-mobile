@@ -74,6 +74,37 @@ export default function RootLayout() {
 
           }}
         />
+        
+        <Stack.Screen
+          name="mobileProviders/[id]/confirm/[orderId]"
+          options={{
+            headerTitle: "Confirm Payment"
+
+          }}
+        />
+        <Stack.Screen
+          name="cableProviders/[id]/index"
+          options={{
+            headerTitle: "Subscribe TV"
+
+          }}
+        />
+
+<Stack.Screen
+          name="powerProviders/[id]/index"
+          options={{
+            headerTitle: "Pay Electric Bills"
+
+          }}
+        />
+        
+        <Stack.Screen
+          name="cableProviders/[id]/confirm/[orderId]"
+          options={{
+            headerTitle: "Confirm Payment"
+
+          }}
+        />
 
     </Stack>
 

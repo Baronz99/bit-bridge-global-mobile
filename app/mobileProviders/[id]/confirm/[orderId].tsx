@@ -3,7 +3,7 @@ import React, { useState } from 'react'
 import { useLocalSearchParams } from 'expo-router'
 import useFetch from '@/services/useFetch'
 import { getProvision } from '@/api/products'
-import { confirmPayment, getPurchaseOrder } from '@/api/billOrder'
+import { confirmBillPayment, confirmPayment, getPurchaseOrder } from '@/api/billOrder'
 import { useAuth } from '@/services/useAuth'
 import Loader from '@/components/Loader'
 import moneyFormat from '@/utils/moneyFormat'
@@ -54,6 +54,35 @@ const MobileDetailConfirm = () => {
         
  
     }
+
+    const handleCardConfirmation = async (payment_method: string) => {
+      setLoader(true)
+
+      try {
+
+       const response = await  confirmBillPayment({queryId: orderId, payment_method, token})
+       setLoader(false)
+       console.log("data purchase ==========================>",response)
+       setNotification({
+        error: false,
+        message: response?.message || "Data Purchased",
+        data: null
+      })
+       
+  
+        
+      } catch (error: any) {
+        setLoader(false)
+        setNotification({
+          error: true,
+          message: error.message || "something went wrong",
+          data: null
+        })
+        
+      }
+  
+
+}
       
   return (
     <View className='flex-1 p-4 bg-primary'>
@@ -69,7 +98,11 @@ const MobileDetailConfirm = () => {
       </View>
 
          <TouchableOpacity onPress={() => handleConfirmation("wallet")} className='border rounded-md mt-4 border-alt py-5 '>
-                          <Text className='text-alt text-center'>Confirm </Text>
+                          <Text className='text-alt text-center'>Pay from Wallet </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={() => handleCardConfirmation("card")} className='border rounded-md mt-4 border-green-400 py-5 '>
+                          <Text className='text-green-400 text-center'>Pay from Bank </Text>
           </TouchableOpacity>
           { loader && <Loader/>}
           <NotificationAlert message={notification.message} error={notification.error} data={notification.data} />

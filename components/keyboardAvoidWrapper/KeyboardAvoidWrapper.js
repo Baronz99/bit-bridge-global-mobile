@@ -5,7 +5,7 @@ const KeyboardAvoidWrapper = ({children}) => {
   return (
     <KeyboardAvoidingView style={{flex: 1}} 
     behavior={Platform.OS === "ios" ? "padding" : undefined}
-    className=' flex-1 p-4'>
+    className=' flex-1 '>
       <View className="flex-1  p-2">
 
         <ScrollView

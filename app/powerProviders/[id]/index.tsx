@@ -52,10 +52,12 @@ const ProvideDertails = () => {
       }
   }
 
- 
+ console.log("iamge name =>", splitString(data?.name))
+
+
   return (
     <View 
-    className='flex-1 bg-primary px-4 mt-4'>
+    className='flex-1 bg-primary px-4 '>
       <ScrollView
       contentContainerStyle={{
         paddingBottom: 80
@@ -66,13 +68,13 @@ const ProvideDertails = () => {
         
         
         <View className='py-6'>
-            <Image source={images[`${splitString(data?.name)}`]} className='w-full h-40 rounded-lg'/>
+            <Image source={images[`${data.image}`]} resizeMode='stretch' className='w-full h-40 rounded-lg'/>
             
            
 
             <KeyboardAvoidWrapper>
 
-              <View>
+              <View className=' mt-4 w-full'>
                 <FormInput 
                 name='billerCode'
                 label='Meter Number'
@@ -81,8 +83,9 @@ const ProvideDertails = () => {
                 onChangeText={(text: string) => setFormValue({...formValue, billersCode: text})}
                 value={formValue.billersCode}    
                 />
-
-<FormInput 
+                
+                
+                <FormInput 
                 name='phone'
                 label='Phone Number '
                 placeHolder='Phone Number'
@@ -93,7 +96,7 @@ const ProvideDertails = () => {
          
                 <FormInput 
                 name='amount'
-                label='amount'
+                label='Amount'
                 placeHolder='Enter Amount'
                 onChangeText={(text: string) => setFormValue({...formValue, amount: text})}
                 value={formValue.amount}    
