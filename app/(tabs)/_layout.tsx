@@ -1,4 +1,4 @@
-import { Image, ImageBackground, SafeAreaView, StyleSheet, Text, View } from 'react-native'
+import { Image, ImageBackground, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import React from 'react'
 import { Tabs } from 'expo-router'
 import { images } from '@/constants/images'
@@ -50,8 +50,8 @@ const _layout = () => {
     <SafeAreaView className='flex-1 bg-primary'>
       
 
-    {authState?.authenticated ?
-     <>
+      {authState?.authenticated ?
+      <>
       <Tabs
     screenOptions={{
       tabBarShowLabel: false,
@@ -79,7 +79,18 @@ const _layout = () => {
         name='index'
         options={{
             title: "Home",
-            headerShown: false,
+            headerShown: true,
+            header: () => <View>
+
+              <View className='h-20 px-4 flex-row justify-between items-center bg-primary'>
+                <Text className='text-white font-medium'>Hello</Text>
+                <TouchableOpacity className='' onPress={()=> onLogout()}>
+                  <Image source={icons.logout} tintColor={"#ffcc00"} className='w-7 h-7'/>
+
+                </TouchableOpacity>
+              </View>
+
+            </View>,
             tabBarIcon: ({ focused}) => (
               <>
               <TabIcon  focused={focused}
@@ -164,7 +175,7 @@ const _layout = () => {
         
     </SafeAreaView>
    
-        </>
+   </>
   )
 }
 

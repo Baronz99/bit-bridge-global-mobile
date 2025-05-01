@@ -15,6 +15,7 @@ import withdraw from "@/assets/icons/withdraw.png"
 import withdrawal from "@/assets/icons/withdrawal.png"
 import utility from "@/assets/icons/power-line.png"
 import transfer from "@/assets/icons/money-transfer.png"
+import logout from "@/assets/icons/logout.png"
 
 import appLogo from "@/assets/logos/logo.png"
 export const icons = {
@@ -35,6 +36,7 @@ export const icons = {
   withdrawal,
   tag,
   utility,
-  transfer
+  transfer,
+  logout
 
 };
