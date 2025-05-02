@@ -96,7 +96,7 @@ const AuthProvider = ({ children }) => {
 
       const token = response.headers.get('Authorization').split(" ")[1]
       await SecureStore.setItemAsync(token_key, token);
-      setAuthState({ token: result.token, authenticated: true });
+      setAuthState({ token: token, authenticated: true });
 
       return result;
     } catch (error) {
@@ -149,6 +149,7 @@ const AuthProvider = ({ children }) => {
     onLogin: login,
     onLogout: logout,
     userProfileData: authProfile,
+    loadProfile: userProfile,
     authState
   };
 

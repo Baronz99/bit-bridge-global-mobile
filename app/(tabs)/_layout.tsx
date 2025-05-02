@@ -1,11 +1,12 @@
 import { Image, ImageBackground, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
-import React from 'react'
+import React, { useEffect } from 'react'
 import { Tabs } from 'expo-router'
 import { images } from '@/constants/images'
 import { icons } from '@/constants/icons'
 import { useAuth } from '@/services/useAuth'
 import Login from '../login'
 import Loader from '@/components/Loader'
+import { userProfile } from '@/api/auth'
 
 
 
@@ -44,7 +45,10 @@ const TabIcon = ({
   }
 }
 const _layout = () => {
-  const {authState, onLogout,userProfileDatam } = useAuth()
+  const {authState, onLogout,userProfileData, loadProfile} = useAuth()
+  // console.log("fetcg profile:" ,userProfileData, authState)
+
+
   return (
     <>
     <SafeAreaView className='flex-1 bg-primary'>
@@ -83,7 +87,7 @@ const _layout = () => {
             header: () => <View>
 
               <View className='h-20 px-4 flex-row justify-between items-center bg-primary'>
-                <Text className='text-white font-medium'>Hello</Text>
+                <Text className='text-white font-medium'>Hello, {userProfileData?.email}</Text>
                 <TouchableOpacity className='' onPress={()=> onLogout()}>
                   <Image source={icons.logout} tintColor={"#ffcc00"} className='w-7 h-7'/>
 

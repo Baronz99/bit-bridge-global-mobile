@@ -13,7 +13,7 @@ const Login = () => {
         password: ""
     })
 
-    const [hidePassword, setHidePassword] = useState(false)
+    const [hidePassword, setHidePassword] = useState(true)
 
     const {onLogin} = useAuth()
     console.log(formInput)

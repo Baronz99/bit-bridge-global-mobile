@@ -8,18 +8,24 @@ import FormInput from '@/components/FormInput';
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper';
 
 const Login = () => {
-    const [formInput, setFormInput] = useState({
-        email: "",
-        password: ""
-    })
-
-    const {onLogin} = useAuth()
+      const [formInput, setFormInput] = useState({
+           email: "",
+           password: ""
+       })
+   
+       const [hidePassword, setHidePassword] = useState(true)
+   
+       const {onRegister} = useAuth()
+       console.log(formInput)
+   
+   
+   
 
 
 
     const handleLogin = async () => {
         try {
-          const result = await onLogin(formInput);
+          const result = await onRegister(formInput);
 
           
         } catch (error) {
@@ -46,10 +52,13 @@ const Login = () => {
   className='border-gray-600 border-b  my-0 py-4 border-b-1 text-base font-semibold px-3 '
   />
    <FormInput  placeholder='Enter Password' 
-
-    onChangeText={(value) => setFormInput({...formInput, email: value })}
-    className='border-gray-600 border-b py-4 my-0  border-b-1 text-base font-semibold px-3 '
-    />
+              isPassword={true}
+              secureTextEntry={hidePassword}
+              hidePassword={hidePassword}
+              setHidePassword={setHidePassword}
+            onChangeText={(value) => setFormInput({...formInput, password: value })}
+            className='border-gray-600 text-white border-b py-4 my-0  border-b-1 text-base font-semibold px-3 '
+            />
     <TouchableOpacity className='py-3  flex-row items-center flex justify-center mt-10  bg-app-primary rounded-lg'
       onPress={handleLogin}
       >

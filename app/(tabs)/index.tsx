@@ -8,13 +8,13 @@ import moneyFormat from "@/utils/moneyFormat";
 import { Link, useRouter } from "expo-router";
 import { ActivityIndicator, FlatList, Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import {splitString} from "@/utils/index"
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import powerDistribution from "../../data/powerDistributions.json"
 import PowerProviderCard from "@/components/ProviderCard";
 import ProviderCard from "@/components/Card";
 export default function Index() {
   const router = useRouter()
-  const {authState: {token}, userProfileData} = useAuth()
+  const {authState: {token}, userProfileData, loadProfile} = useAuth()
   const [selectedService, setSelectedService] = useState<string>("Top Up")
 
 
@@ -130,7 +130,9 @@ export default function Index() {
 
   const pickedService = services.find(item => item.name === selectedService)
 
-
+  useEffect(()=> {
+    loadProfile(token)
+  },[])
 
   return (
     <View
