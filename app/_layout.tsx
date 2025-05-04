@@ -7,7 +7,9 @@ export default function RootLayout() {
   return  <>
   <AuthProvider>
     
-      <StatusBar hidden={true} />
+      <StatusBar hidden={false}
+      barStyle={"light-content"}
+       backgroundColor={"black"}/>
 
       <Stack 
       screenOptions={{        
@@ -110,6 +112,23 @@ export default function RootLayout() {
               name="sign-up"
               options={{
                 headerShown: false,
+              }}
+            />
+
+
+<Stack.Screen
+              name="cableProviders/index"
+              options={{
+                headerTitle: "Cable TV List"
+
+              }}
+            />
+            
+<Stack.Screen
+              name="powerProviders/index"
+              options={{
+                headerTitle: "Electric Bills"
+
               }}
             />
             

@@ -16,7 +16,7 @@ const ProvideDertails = () => {
     const [loader, setLoader] = useState(false)
     
     const router = useRouter()
-    const {authState: {token}, } = useAuth()
+    const {authState: {token},userProfileData } = useAuth()
     const [error, setError] = useState<string | null>(null)
     const {data} = useFetch(()=> getProvision({
       id: id as string,
@@ -54,7 +54,7 @@ useEffect(()=> {
 
       try {
        const response =  await createPurchaseOrder({
-          orderData: {...formValue, email: "", service_type: data.service_type, biller: data.product.provider.toUpperCase(), skip: true},
+          orderData: {...formValue, email: userProfileData?.email, service_type: data.service_type, biller: data.product.provider.toUpperCase(), skip: true},
            token
         }
         )   

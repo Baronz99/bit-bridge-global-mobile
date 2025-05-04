@@ -43,11 +43,11 @@ const index = () => {
             })
 
 
-            console.log("transaction respose: ====> ", response.responseBody.checkoutUrl)
+            console.log("transaction respose: ====> ", response)
             setLoading(false)
 
 
-            response
+            // response
             // setNotice({
             //     error: false,
             //     message: response.message,
@@ -90,7 +90,7 @@ const index = () => {
 
 
         <NotificationAlert message={notice.message} data={notice.data} error={notice.error}/>
-        <TouchableOpacity onPress={handleSubmit} className='bg-theme-primary py-6 mt-auto mb-10 rounded-xl'>
+        <TouchableOpacity onPress={handleSubmit} className='bg-theme-primary py-6 mt-10 mb-10 rounded-xl'>
             <Text className='text-alt font-medium text-center'> Pay With Bank</Text>
         </TouchableOpacity>
 

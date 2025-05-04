@@ -47,10 +47,10 @@ const Login = () => {
   
 <View>
 <FormInput 
-  placeholder='Enter Email Address' 
-  onChangeText={(value) => setFormInput({...formInput, email: value })}
-  className='border-gray-600 border-b  my-0 py-4 border-b-1 text-base font-semibold px-3 '
-  />
+          placeholder='Enter Email Address' 
+          onChangeText={(value) => setFormInput({...formInput, email: value })}
+          className='border-gray-600 border-b text-white  my-0 py-4 border-b-1 text-base font-semibold px-3 '
+          />
    <FormInput  placeholder='Enter Password' 
               isPassword={true}
               secureTextEntry={hidePassword}

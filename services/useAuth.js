@@ -60,16 +60,18 @@ const AuthProvider = ({ children }) => {
 
   const register = async (email, password) => {
     try {
-      const response = await fetch(`${base_url}/register`, {
+      const response = await fetch(`${base_url}/signup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
-      if (!response.ok) throw new Error("Failed to register");
-
       const result = await response.json();
+
+      if (!response.ok){ throw new Error( result?.message ?? "Failed to register");}
+
       await SecureStore.setItemAsync(token_key, result.token);
       setAuthState({ token: result.token, authenticated: true });
+      console.log("sign up result ====>", result)
 
       return result;
     } catch (error) {

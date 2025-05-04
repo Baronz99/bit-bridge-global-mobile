@@ -1,4 +1,4 @@
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import React, { useState } from 'react'
 import { useLocalSearchParams } from 'expo-router'
 import useFetch from '@/services/useFetch'
@@ -33,6 +33,7 @@ const MobileDetailConfirm = () => {
 
              const response = await  confirmPayment({queryId: orderId, payment_method, token})
              setLoader(false)
+
              console.log("data purchase ==========================>",response)
              setNotification({
               error: false,
@@ -62,10 +63,16 @@ const MobileDetailConfirm = () => {
 
        const response = await  confirmBillPayment({queryId: orderId, payment_method, token})
        setLoader(false)
+
+       if(payment_method === "card"){
+        Linking.openURL(response.responseBody.checkoutUrl)
+
+       }
+
        console.log("data purchase ==========================>",response)
        setNotification({
         error: false,
-        message: response?.message || "Data Purchased",
+        message: response?.message || "Recharge Successful",
         data: null
       })
        
@@ -97,7 +104,7 @@ const MobileDetailConfirm = () => {
 
       </View>
 
-         <TouchableOpacity onPress={() => handleConfirmation("wallet")} className='border rounded-md mt-4 border-alt py-5 '>
+         <TouchableOpacity onPress={() => handleCardConfirmation("wallet")} className='border rounded-md mt-4 border-alt py-5 '>
                           <Text className='text-alt text-center'>Pay from Wallet </Text>
           </TouchableOpacity>
 

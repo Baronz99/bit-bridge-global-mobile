@@ -90,6 +90,8 @@ export const initiateMonnifyTransaction =  async({
             }
         }
 
+        console.log("show transaction: ===>", formdata)
+
     try {
 
         const response = await axios.post(`${base_url + api_route}transactions/initialize_transaction`, 
@@ -110,4 +112,35 @@ export const initiateMonnifyTransaction =  async({
         }
         throw new Error("Something went wrong")
     }
+}
+
+
+export const getTransactionRecord = async({
+    id,
+    token
+}: {
+    id: string,
+    token: string
+}) => {
+
+    console.log(id)
+
+
+    try {
+        const response = await axios.get(`${base_url + api_route}transaction_records/${id}`, {
+            headers: {
+                "Authorization": `Bearer ${token}`
+            }
+        } )
+    
+        const {data} = response.data
+        return data 
+    } catch (error: any) {
+        if(error?.response){
+            throw new Error(error.response.data.message)
+        }
+
+        throw new Error(error.message || "SOmething went wrong")
+    }
+  
 }
