@@ -10,6 +10,7 @@ export const getTransactions = async({
     params?: {
         category?: string
         type?: string
+        transaction_type: "deposit" | "withdraw"
     }
 
 }) => {
@@ -49,8 +50,6 @@ export const createTransaction =  async({
                 ...data
             }
         }
-
-        console.log("formdata ===>",formdata)
 
     try {
 
@@ -123,7 +122,7 @@ export const getTransactionRecord = async({
     token: string
 }) => {
 
-    console.log(id)
+    console.log("record id =====>", id)
 
 
     try {
@@ -134,12 +133,14 @@ export const getTransactionRecord = async({
         } )
     
         const {data} = response.data
+        console.log(data)
         return data 
     } catch (error: any) {
         if(error?.response){
             throw new Error(error.response.data.message)
         }
 
+        console.log("error fetch", error.response)
         throw new Error(error.message || "SOmething went wrong")
     }
   

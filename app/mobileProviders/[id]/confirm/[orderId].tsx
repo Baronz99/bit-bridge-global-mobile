@@ -9,13 +9,14 @@ import Loader from '@/components/Loader'
 import moneyFormat from '@/utils/moneyFormat'
 import NotificationAlert from '@/components/notification'
 import useNotification from '@/hooks/useNotification'
+import Summary from '@/components/cards/Summary'
 
 const MobileDetailConfirm = () => {
       const {orderId} = useLocalSearchParams()
           const [loader, setLoader] = useState(false)
           const {notification, setNotification} = useNotification()
       
-          const {authState: {token}, } = useAuth()
+          const {authState: {token},loadProfile } = useAuth()
 
 
           const {data, refetch, loading, error, reset} = useFetch(()=> getPurchaseOrder({
@@ -69,12 +70,13 @@ const MobileDetailConfirm = () => {
 
        }
 
-       console.log("data purchase ==========================>",response)
        setNotification({
         error: false,
         message: response?.message || "Recharge Successful",
         data: null
       })
+
+      loadProfile(token)
        
   
         
@@ -93,25 +95,37 @@ const MobileDetailConfirm = () => {
       
   return (
     <View className='flex-1 p-4 bg-primary'>
-
-      <View className='bg-alt/60 mb-10 justify-center items-center py-10 rounded-lg mt-4'>
-          <Text className='text-lg font-medium text-black'> Confirm Number</Text>
-          <Text> {data?.service_type}</Text>
-          <Text className='text-2xl font-medium'> {data?.meter_number}</Text>
-          <Text className='text-2xl font-medium'> {moneyFormat(data?.amount)}</Text>
-          <Text className='text-2xl font-medium'> {data?.description}</Text>
-
-
+      
+      
+      <View className="mb-6">
+        <Text className="text-2xl font-bold text-white text-center">Confirm Recharge</Text>
+        <Text className="text-sm text-white text-center mt-1">
+          Please verify the transaction details below.
+        </Text>
       </View>
 
-         <TouchableOpacity onPress={() => handleCardConfirmation("wallet")} className='border rounded-md mt-4 border-alt py-5 '>
+      <View className="bg-gray-800 rounded-2xl p-6 shadow-lg mb-8">
+        <Text className="text-lg font-semibold text-center text-gray-200 mb-4">
+          Recharge Details
+        </Text>
+
+       <Summary data={data} />
+      </View>
+
+      <View className="space-y-4">
+      <TouchableOpacity onPress={() => handleCardConfirmation("wallet")} className='border rounded-md mt-4 border-alt py-5 '>
                           <Text className='text-alt text-center'>Pay from Wallet </Text>
           </TouchableOpacity>
 
           <TouchableOpacity onPress={() => handleCardConfirmation("card")} className='border rounded-md mt-4 border-green-400 py-5 '>
                           <Text className='text-green-400 text-center'>Pay from Bank </Text>
           </TouchableOpacity>
-          { loader && <Loader/>}
+      </View>
+
+   
+
+    
+        <Loader open={loading}/>
           <NotificationAlert message={notification.message} error={notification.error} data={notification.data} />
 
     </View>
@@ -120,4 +134,3 @@ const MobileDetailConfirm = () => {
 
 export default MobileDetailConfirm
 
-const styles = StyleSheet.create({})

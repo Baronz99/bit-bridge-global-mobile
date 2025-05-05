@@ -25,11 +25,13 @@ export const getProducts = async({
         });
 
         const {data} = response.data;
+
         return data;
     } catch (error: any) {
         if (error.response) {
             throw new Error (error.response.data.message || "Something went wrong")
         }
+        console.log("first product  error ====> ", error.message)
 
         throw error.message || "Something went wrong" 
     }

@@ -1,14 +1,27 @@
-import { Image, StyleSheet, Text, View } from 'react-native'
+import { ActivityIndicator, Image, Modal, StyleSheet, Text, View } from 'react-native'
 import React from 'react'
 import { gifs } from '@/constants/gifs'
 
-const Loader = () => {
+const Loader = ({
+  open,
+  onclose,
+}: any) => {
   return (
-    <View
-    style={{ top: '50%', left: '50%', transform: [{ translateX: "-50%" }, { translateY: "-50%" }] }}
-   className='bg-app-primary/80 rounded absolute  w-40 py-10'>
-     <Image source={gifs.loader} className='w-20 h-20 m-auto' />
-   </View>
+   
+        <Modal
+             visible={open}
+             transparent={true}
+             animationType='fade'
+             onRequestClose={()=> onclose}
+       
+             >
+               <View className='flex-1 bg-gray-900/50 justify-center items-center'>
+
+               <ActivityIndicator    color={"#000ff"}  size={"large"} />
+               {/* <Image source={gifs.loader} className='w-20 h-20 m-auto' /> */}
+       
+               </View>
+             </Modal>
   )
 }
 

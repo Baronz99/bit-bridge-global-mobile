@@ -28,11 +28,15 @@ const Transactions = () => {
       <ScrollView className='g-red-100'>
      
         <View className='min-h-40 mt-5 mx-4 bg-gray-900 rounded-xl items- justify-center px-4'>
-        
+        {
+          loading ? <ActivityIndicator/> :
           <Text className='text-white font-medium text-3xl text-center'>
-            {moneyFormat(userProfileData?.wallet.balance)}
- 
-          </Text>
+
+          {moneyFormat(userProfileData?.wallet.balance)}
+
+        </Text>
+
+        }
           <View className='mt-10 flex-row justify-between text-center'>
             <View className='text-center'>
               <Text className='font-medium text-xl text-alt'>Withdrawal</Text>
@@ -50,12 +54,12 @@ const Transactions = () => {
 
         </View>
        
-       <View className="m-4 border border-gray-300 rounded-lg overflow-hidden ">
+       <View className="flex-row border-b border-gray-600 pb-2 mb-2 overflow-hidden ">
           <View className="flex-row bg-gray-800 px-4 py-3">
-            <Text className="flex-1 font-semibold text-gray-200">Status</Text>
-            <Text className="flex-1 font-semibold text-gray-200 text-right">Amount (₦)</Text>
+            <Text className="flex-1 text-gray-300 font-semibold">Status</Text>
+            <Text className="flex-1 text-gray-300 font-semibold">Amount (₦)</Text>
 
-            <Text className="flex-1 font-semibold text-gray-200 text-right">Time </Text>
+            <Text className="flex-1 text-gray-300 font-semibold">Time </Text>
           </View>
 
 

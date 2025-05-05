@@ -55,6 +55,8 @@ export default function Index() {
             }
           })
 
+
+          console.log(error)
    
 
   const prevsummary = [
@@ -150,9 +152,13 @@ export default function Index() {
         {/* <Image source={icons.logo} className="w-12 h-10 mt-20 mb-5 mx-auto"/> */}
       <View className="flex-1">
         <View className="bg-gray-900/70  my-6 rounded-3xl min-h-40 py-7 px-6">
+        {loading ? <ActivityIndicator/> : 
+        <>
           <Text className="text-white text-left text-xl font-bold my-4">Wallet Balance</Text>
           <Text className="text-white text-left text-3xl font-bold">{moneyFormat(userProfileData?.wallet?.balance)}</Text>
 
+        </>}
+          
           <View className="flex-row my-4 items-center gap-5">
             <Image source={icons.trophy} className="w-5 h-5" />
             <Text className="text-white">0.00</Text>

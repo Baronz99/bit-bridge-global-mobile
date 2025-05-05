@@ -5,10 +5,10 @@ interface InputProps {
     
 }
 const FormInput = ({ label, icon, value, placeHolder, isPassword, onChangeText, hidePassword, setHidePassword, ...props }: any) => {
-  console.log("props value ======>",isPassword)
+
   return (
     <View 
-    // style={{ marginBottom: 0 }}
+    style={{ marginBottom: 15 }}
     >
     <View className='absolute left-4'>
       <Octicons name={icon} size={30} color={"gray"} />

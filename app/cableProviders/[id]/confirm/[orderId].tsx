@@ -1,9 +1,9 @@
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { Image, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import React, { useState } from 'react'
 import { useLocalSearchParams } from 'expo-router'
 import useFetch from '@/services/useFetch'
 import { getProvision } from '@/api/products'
-import { confirmPayment, getPurchaseOrder } from '@/api/billOrder'
+import { confirmBillPayment, confirmPayment, getPurchaseOrder } from '@/api/billOrder'
 import { useAuth } from '@/services/useAuth'
 import { images } from '@/constants/images'
 import { AntDesign } from '@expo/vector-icons'
@@ -11,11 +11,12 @@ import { gifs } from '@/constants/gifs'
 import Loader from '@/components/Loader'
 import NotificationAlert from '@/components/notification'
 import useNotification from '@/hooks/useNotification'
+import Summary from '@/components/cards/Summary'
 
 const CableetailConfirm = () => {
       const {orderId} = useLocalSearchParams()
       const [loader, setLoader] = useState(false)
-          const {authState: {token}, } = useAuth()
+          const {authState: {token}, loadProfile} = useAuth()
           const {notification, setNotification} = useNotification()
 
 
@@ -26,72 +27,72 @@ const CableetailConfirm = () => {
      
           
 
-          
-          const handleConfirmation = async (payment_method: string) => {
-            setLoader(true)
-            try {
+    const handleCardConfirmation = async (payment_method: string) => {
+      setLoader(true)
 
-             const response = await confirmPayment({queryId: orderId, payment_method, token})
-            setNotification({
-              error: false,
-              message: response?.message || "Payment Successful",
-              data: response.data
-            })     
-            
-            setLoader(false)
+      try {
+
+       const response = await  confirmBillPayment({queryId: orderId, payment_method, token})
+       setLoader(false)
+
+       if(payment_method === "card"){
+        Linking.openURL(response.responseBody.checkoutUrl)
+
+       }
+
+       setNotification({
+        error: false,
+        message: response?.message || "Recharge Successful",
+        data: null
+      })
+       
+
+      loadProfile(token)
+  
         
-              
-            } catch (error: any) {
-
-              setLoader(false)
-              setNotification({
-                error: true,
-                message: error.message || "operation failed",
-                data: null
-
-              })
-              
-            }
+      } catch (error: any) {
+        setLoader(false)
+        setNotification({
+          error: true,
+          message: error.message || "something went wrong",
+          data: null
+        })
         
- 
-    }
+      }
+  
+
+}
       
-
-    //   const {data} = useFetch(()=> getProvision({
-    //     id: id as string,
-    //     token: token  }
-    //   )
-    // )
-
-    console.log("fetched purchase:", data)
 
   return (
     <View className='flex-1 px-4 bg-primary w-full'>
 
-      <View className='bg-light-100 mb-10 mx-4 text-dstv-blue justify-center items-center py-10 rounded-lg mt-4'>
-          <Text className='text-2xl font-semibold text-dstv-blue'> Confirm Decoder Details</Text>
-          <Text> {data?.service_type}</Text>
-          <Text className='text-2xl font-medium text-dstv-blue'> {data?.meter_number}</Text>
-          <Text className='text-2xl font-medium text-dstv-blue'> {data?.name}</Text>
-          <Text className='text-2xl font-medium text-dstv-blue text-center'> {data?.description}</Text>
+    <View className="mb-6">
+        <Text className="text-2xl font-bold text-white text-center">Confirm Cable Subsccription</Text>
+        <Text className="text-sm text-white text-center mt-1">
+          Please verify the transaction details below.
+        </Text>
+      </View>
 
+      <View className="bg-gray-800 rounded-2xl p-6 shadow-lg mb-8">
+        <Text className="text-lg font-semibold text-center text-gray-200 mb-4">
+          TV Details
+        </Text>
+
+       <Summary data={data} />
 
       </View>
 
-      <TouchableOpacity onPress={() => handleConfirmation("wallet")} className='border rounded-md mt-4 border-alt py-5 '>
-        <Text className='text-alt text-center'>Confirm </Text>
-      </TouchableOpacity>
+      <TouchableOpacity onPress={() => handleCardConfirmation("wallet")} className='border rounded-md mt-4 border-alt py-5 '>
+                          <Text className='text-alt text-center'>Pay from Wallet </Text>
+          </TouchableOpacity>
 
+          <TouchableOpacity onPress={() => handleCardConfirmation("card")} className='border rounded-md mt-4 border-green-400 py-5 '>
+                          <Text className='text-green-400 text-center'>Pay from Bank </Text>
+          </TouchableOpacity>
+          { loader && <Loader/>}
+          <NotificationAlert message={notification.message} error={notification.error} data={notification.data} />
 
-
-
-    
-    <NotificationAlert message={notification.message} error={notification.error} data={data} />
-
- 
-
-
-   { loader && <Loader/>}
      
 
     </View>

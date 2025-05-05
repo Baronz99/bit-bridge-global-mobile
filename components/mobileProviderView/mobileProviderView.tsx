@@ -25,11 +25,39 @@ const MobileProviderView = ({
     }
 }
   return (
-    <View>        
+    <View>  
+        {data && 
+
+            <View>
+
+            <View className='bg-gray-800 px-4 rounded-lg py-6 my-6 overflow-hidden'>
+                <Text className='font-medium text-xl text-white'>Airtime Top up</Text>
+            </View>
+
+
+            <FlatList
+            data={vtuList}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+
+            renderItem={({item}) => (
+                <Link href={`/mobileProviders/${item.id}`} asChild>
+                <TouchableOpacity className='w-40 h-32 bg-gray-900 rounded'>
+                    <Image source={images[`${splitString(item.name)}`]} className='w-full h-full' />
+
+                </TouchableOpacity>
+
+                </Link>
+                )}
+            ItemSeparatorComponent={() => <View className='w-4'/>}
+            />
+            </View>
+            }
+
             {data && 
             <View >            
                 <View className='bg-gray-800 px-4 rounded-lg py-6 my-6'>
-                     <Text className='font-medium text-xl text-white'>Mobile Top up</Text></View>
+                     <Text className='font-medium text-xl text-white'>Mobile Data</Text></View>
 
             <FlatList
             data={dataList}
@@ -55,32 +83,7 @@ const MobileProviderView = ({
             </View>
             }
 
-            {data && 
-
-            <View>
-
-            <View className='bg-gray-800 px-4 rounded-lg py-6 my-6 overflow-hidden'>
-                 <Text className='font-medium text-xl text-white'>Airtime Top up</Text></View>
-
-
-            <FlatList
-            data={vtuList}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-
-            renderItem={({item}) => (
-                <Link href={`/mobileProviders/${item.id}`} asChild>
-                <TouchableOpacity className='w-40 h-32 bg-gray-900 rounded'>
-                    <Image source={images[`${splitString(item.name)}`]} className='w-full h-full' />
-
-                </TouchableOpacity>
-
-                </Link>
-                )}
-            ItemSeparatorComponent={() => <View className='w-4'/>}
-            />
-        </View>
-        }
+            
 
 
         </View>

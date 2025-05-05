@@ -8,7 +8,7 @@ import NotificationAlert from '@/components/notification'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
 
 const index = () => {
-    const {authState: {token}, userProfileData} = useAuth()
+    const {authState: {token}, userProfileData, loadProfile} = useAuth()
     const [loading, setLoading] = useState(false)
     const [formData, setFormData] = useState({
         amount: 0,
@@ -43,11 +43,10 @@ const index = () => {
             })
 
 
-            console.log("transaction respose: ====> ", response)
             setLoading(false)
+            loadProfile(token)
 
 
-            // response
             // setNotice({
             //     error: false,
             //     message: response.message,
@@ -59,7 +58,6 @@ const index = () => {
         } catch (error: any ) {
             setLoading(false)
 
-            console.log("first error ====>", error)
 
             setNotice({
                 error: true,

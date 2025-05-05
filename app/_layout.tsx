@@ -131,6 +131,15 @@ export default function RootLayout() {
 
               }}
             />
+
+<Stack.Screen
+              name="powerProviders/[id]/confirm/[orderId]"
+              options={{
+                headerTitle: "Confirm Utility Bills"
+
+              }}
+            />
+            
             
             <Stack.Screen
               name="login"

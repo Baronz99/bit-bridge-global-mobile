@@ -148,8 +148,7 @@ useEffect(()=> {
 
 
       </ScrollView>
-
-      { loader && <Loader/>}
+       <Loader open={loader}/>
 
     </View>
     
