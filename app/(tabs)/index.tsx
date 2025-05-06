@@ -12,19 +12,26 @@ import React, { useEffect, useState } from "react";
 import powerDistribution from "../../data/powerDistributions.json"
 import PowerProviderCard from "@/components/ProviderCard";
 import ProviderCard from "@/components/Card";
+import AppModal from "@/components/modal/Modal";
+import Loader from "@/components/Loader";
+import { getRescentPurchaseOrder, repurchaseOrder } from "@/api/billOrder";
+import NotificationAlert from "@/components/notification";
+import useNotification from "@/hooks/useNotification";
 export default function Index() {
   const router = useRouter()
   const {authState: {token}, userProfileData, loadProfile} = useAuth()
   const [selectedService, setSelectedService] = useState<string>("Top Up")
-
-
-
+  const [billOrder, setBillOrder] = useState<any | null>(null)
+  const [openModal, setOpenModal] = useState(false)
+  const {notification, setNotification} = useNotification()
+  const [toggleAlert, setToggleAlert] = useState(false)
   const {data, loading, error } = useFetch(() => getProducts({
     token,
-    // params: {
-    //   category: "mobile provider"
-    // }
   }))
+
+
+
+  const {data: recentTransaction } = useFetch(() => getRescentPurchaseOrder({token}))
   
 
 
@@ -77,24 +84,7 @@ export default function Index() {
     }
   ]
 
-  const recentTransaction = [
-    {
-      id: 1,
-      biller: "MTN",
-      amount: "5000"
-    },
-    {
-      id: 2,
-      biller: "AIRTEL",
-      amount: "5000"
-    }
-    ,
-    {
-      id: 3,
-      biller: "GLO",
-      amount: "5000"
-    }
-  ]
+
 
 
 
@@ -125,6 +115,47 @@ export default function Index() {
  
   }
   ]
+
+  const [loader, setLoader] = useState(false)
+
+  
+  const handleRepurchase = async(id: string) => {
+
+    try{
+    const response =  await repurchaseOrder({
+        id,
+        token
+      })
+
+      setOpenModal(false)
+      setToggleAlert(true)
+      setNotification({
+        error: false,
+        message: response.message,
+        data: response.data
+      })
+    }catch(error: any){
+      error?.message
+      setLoader(false)
+      setOpenModal(false)
+
+      setToggleAlert(true)
+      setNotification({
+        error: true,
+        message: error.message,
+        data: null
+   
+      })
+
+
+    }
+   
+
+}
+
+
+console.log("this error  ==> ", toggleAlert)
+
 
   const pickedService = services.find(item => item.name === selectedService)
 
@@ -170,13 +201,14 @@ export default function Index() {
           <FlatList
           data={prevsummary}
           renderItem={({item}) => (
-            <View className="bg-gray-800/50 p-4 rounded-lg flex-row items-center gap-3 mb-3">
+            
+            <TouchableOpacity  className="bg-gray-800/50 p-4 rounded-lg flex-row items-center gap-3 mb-3">
               <Image source={item.icon} className="w-6 h-6" />
               <View>
                 <Text className="text-base text-white/70 font-bold">{item.label}</Text>
                 <Text className="text-sm text-gray-500">{moneyFormat(item.amount)}</Text>
               </View>
-            </View>
+            </TouchableOpacity>
           )}
           keyExtractor={(item) => item.id.toString()}
           horizontal
@@ -191,9 +223,13 @@ export default function Index() {
           <FlatList
           data={recentTransaction}
           renderItem={({item}) => (
-            <TouchableOpacity className="bg-alt/80 border rounded-lg text-sm h-16 w-40 shadow-sm flex flex-col justify-center items-center">
+            <TouchableOpacity
+            onPress={()  => {
+              setOpenModal(true)
+              setBillOrder(item)}}
+               className="bg-alt/80 border rounded-lg text-sm h-16 w-40 shadow-sm flex flex-col justify-center items-center">
               <Text className="font-semibold">{item.biller}</Text>
-              <Text> {item.amount}</Text>
+              <Text className="text-primary font-medium text-xl"> {moneyFormat(item.amount)}</Text>
 
             </TouchableOpacity>
             )}
@@ -250,9 +286,63 @@ export default function Index() {
       }
       
      </ScrollView>
+
+     <AppModal onclose={()=> setOpenModal(false)} open={openModal}>
+      <View className="f bg-black/70 justify-center items-center px-6">
+          <View className="bg-gray-900 p-6 rounded-2xl w-full max-w-md">
+            <Text className="text-white text-xl font-semibold text-center mb-4">
+              Confirm Transaction
+            </Text>
+            <Text className="text-gray-300 text-center mb-6">
+              Are you sure you want to proceed with this transaction?
+            </Text>
+
+            <View className="">
+            <Text className={`${billOrder?.biller === "MTN" ? "text-alt" : billOrder?.biller === "GLO" ? "text-green-500" : "text-white"}  font-semibold text-center text-lg`}>{billOrder?.biller}</Text>
+
+            <LabelText label={"Description"} value={`subscription ${billOrder?.service_type} `}/>
+            <LabelText label={"Recipient"} value={billOrder?.meter_number}/>
+                <Text className="text-3xl text-white text-center my-2">{moneyFormat(billOrder?.amount ?? 0)}</Text>
+      
+            </View>
+
+            <View className="flex-row gap-4 justify-between space-x-4">
+              <TouchableOpacity
+                onPress={() => setOpenModal(false)}
+                className="flex-1 bg-gray-700 py-3 rounded-xl items-center"
+              >
+                <Text className="text-white font-medium">Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={()=> {handleRepurchase(billOrder?.id)}}
+                className="flex-1 bg-green-600 py-3 rounded-xl items-center"
+              >
+                <Text className="text-white font-medium">Proceed</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+     </AppModal>
+     <AppModal open={toggleAlert} onclose={()=> setToggleAlert(false)}>
+      <NotificationAlert onPress={()=> setToggleAlert(false)} message={notification?.message} error={notification.error} data={notification.data}/>
+
+     </AppModal>
+
+     <Loader open={loader} />
+
+
     </View>
   );
 }
+
+const LabelText = ({label, value}: any) => (
+  <View className="justify-between flex-row "> 
+  <Text className="text-white">{label}</Text> 
+  <Text className="text-white bg-red text-center text-lg">{value}  </Text>
+
+</View>
+)
 
 const MobileService = ({
  datalist, VTUList

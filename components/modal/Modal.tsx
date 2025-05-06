@@ -1,4 +1,4 @@
-import { StyleSheet, Text, TouchableOpacity, View , Modal} from 'react-native'
+import { StyleSheet, Text, TouchableOpacity, View , Modal, Pressable, TouchableWithoutFeedback} from 'react-native'
 import React from 'react'
 
 const AppModal = ({
@@ -9,16 +9,25 @@ const AppModal = ({
   return (
     
           <Modal
+          
           visible={open}
           transparent={true}
           animationType='fade'
           onRequestClose={()=> onclose}
     
           >
-            <View className='flex-1 bg-white/50 justify-center items-center'>
-                {children}
+            <Pressable
+            onPress={onclose}
+            className='flex-1 bg-primary/50 justify-center items-center'>
+            <Pressable 
+            // onPress={()=> {}}
+            >
+            {children}
     
-            </View>
+            </Pressable>
+            </Pressable>
+
+        
           </Modal>
   )
 }

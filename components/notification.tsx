@@ -6,15 +6,21 @@ import { images } from '@/constants/images'
 const NotificationAlert = ({
     message,
     error,
-    data
-}: any) => {
+    data,
+    onPress
+}: {
+    message?: string | null,
+    error: boolean,
+    data?: any,
+    onPress?: () => void
+}) => {
     console.log(data)
   return (
-    <View>
+    <View className='bg-primary/50 w-full'>
    {
       message && 
       <View className='bg-al h-60 fixed w-[100%]    top-0  m justify-center items-center  '>
-        <AntDesign name="close" size={24} color="gray" className='ml-auto'/>
+        <AntDesign onPress={onPress} name="close" size={24} color="gray" className='ml-auto'/>
 
         {error ?
             <View>
