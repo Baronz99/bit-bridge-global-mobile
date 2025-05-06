@@ -191,8 +191,8 @@ export default function Index() {
           <FlatList
           data={recentTransaction}
           renderItem={({item}) => (
-            <TouchableOpacity className="bg-alt/80 border rounded-lg text-sm h-16 w-20 shadow-sm flex flex-col justify-center items-center">
-              <Text>{item.biller}</Text>
+            <TouchableOpacity className="bg-alt/80 border rounded-lg text-sm h-16 w-40 shadow-sm flex flex-col justify-center items-center">
+              <Text className="font-semibold">{item.biller}</Text>
               <Text> {item.amount}</Text>
 
             </TouchableOpacity>
