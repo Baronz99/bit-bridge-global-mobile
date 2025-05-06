@@ -171,7 +171,6 @@ console.log("this error  ==> ", toggleAlert)
       <ScrollView className="flex-1 px-5"
       contentContainerStyle={{
         minHeight: "100%",
-        // backgroundColor: "red",
         paddingBottom: 100
       }}
       showsVerticalScrollIndicator={false}
