@@ -17,7 +17,7 @@ const Transactions = () => {
     const {data, loading} = useFetch(() => getTransactions({
       token
     }))
-    // console.log(userProfileData?.wallet, data?.data)
+    console.log(userProfileData?.wallet)
 
     
   
@@ -28,33 +28,43 @@ const Transactions = () => {
       <ScrollView className='g-red-100'>
      
         <View className='min-h-40 mt-5 mx-4 bg-gray-900 rounded-xl items- justify-center px-4'>
-        {
-          loading ? <ActivityIndicator/> :
-          <Text className='text-white font-medium text-3xl text-center'>
+     
+          <View className=''>
+         
+            <View className="bg-gray-900 p-5 rounded-2xl shadow-lg">
+              <Text className="text-white text-lg font-semibold mb-2">Wallet Balance</Text>
+              <Text className="text-3xl font-bold text-green-400 mb-4">{moneyFormat(userProfileData?.wallet.balance)}</Text>
 
-          {moneyFormat(userProfileData?.wallet.balance)}
+              <View className="flex-row justify-between mt-2">
+                <View className="flex-1 mr-2">
+                  <Text className="text-gray-400 text-sm">Deposits</Text>
+                  <Text className="text-green-300 font-medium">{moneyFormat(userProfileData?.wallet?.total_deposit ?? 0)}</Text>
+                </View>
 
-        </Text>
-
-        }
-          <View className='mt-10 flex-row justify-between text-center'>
-            <View className='text-center'>
-              <Text className='font-medium text-xl text-alt'>Withdrawal</Text>
-              <Text className='text-2xl text-white text-center font-semibold'> {moneyFormat(0)}</Text>
-            </View>
-            <View>
-              <Text className='text-green-700 font-medium text-xl'> Deposit</Text>
-              <Text className='text-2xl font-semibold text-white text-center'> {moneyFormat(0)}</Text>
+                <View className="flex-1 ml-2">
+                  <Text className="text-gray-400 text-sm">Withdrawals</Text>
+                  <Text className="text-red-400 font-medium">{moneyFormat(userProfileData?.wallet?.withdrawn ?? 0)}</Text>
+                </View>
+              </View>
             </View>
           
           </View>
+
+
+
+
+
+       
+
+
+
         </View>
         <View className='my-4 mx-4'>
           <Text className='text-white text-base'>Recent Transactions</Text>
 
         </View>
        
-       <View className="flex-row border-b border-gray-600 pb-2 mb-2 overflow-hidden ">
+       <View className="flex-r border-b mx-4  border-gray-600 pb-2 mb-2 overflow-hidden ">
           <View className="flex-row bg-gray-800 px-4 py-3">
             <Text className="flex-1 text-gray-300 font-semibold">Status</Text>
             <Text className="flex-1 text-gray-300 font-semibold">Amount (₦)</Text>
