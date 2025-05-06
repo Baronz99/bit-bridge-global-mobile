@@ -62,15 +62,13 @@ const Transactions = () => {
 
             <Text className="flex-1 text-gray-300 text-center font-semibold">Time </Text>
           </View>
-          <View className='flex-1'>
-
-            
+          <View className='flex-1'>      
 
 
 
           <ScrollView 
-          showsVerticalScrollIndicator={false} 
-          contentContainerStyle={{
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{
             paddingBottom: 40,
             marginBottom: 40
 
