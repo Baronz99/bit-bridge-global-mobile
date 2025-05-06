@@ -71,8 +71,6 @@ const AuthProvider = ({ children }) => {
 
       await SecureStore.setItemAsync(token_key, result.token);
       setAuthState({ token: result.token, authenticated: true });
-      console.log("sign up result ====>", result)
-
       return result;
     } catch (error) {
       console.error("Register error:", error);
@@ -134,7 +132,6 @@ const AuthProvider = ({ children }) => {
 
           } catch (error) {
               if(error.response){
-                console.log("log error",error.response.data)
                 await SecureStore.deleteItemAsync(token_key);
                 setAuthState({token: null, authenticated: false })
                   return  error.response.data || "error occured"

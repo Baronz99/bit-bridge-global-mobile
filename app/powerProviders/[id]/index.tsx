@@ -51,8 +51,6 @@ const ProvideDertails = () => {
 
       } catch (error: any) {
         setLoader(false)
-
-        console.log(error.message)
         
       }
   }

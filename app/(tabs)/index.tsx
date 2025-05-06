@@ -37,27 +37,23 @@ export default function Index() {
       }
     })})
 
-      const VTUList = data?.flatMap((item: any) => {
-        return item.provisions.flatMap((provision : any) =>  {
-          if(provision.service_type === "VTU"){
-            return provision
+    const VTUList = data?.flatMap((item: any) => {
+      return item.provisions.flatMap((provision : any) =>  {
+        if(provision.service_type === "VTU"){
+          return provision
+        }else{
+          return []
+        }})})
+
+
+        const cableList = data?.flatMap((item: any) => {
+          if(item.category === "utility"){
+            return item.provisions.flatMap((provision: any) => (provision))
           }else{
-            return []
-          }})})
+          return []
 
-
-          const cableList = data?.flatMap((item: any) => {
-            if(item.category === "utility"){
-              return item.provisions.flatMap((provision: any) => (provision))
-            }else{
-            return []
-
-            }
-          })
-
-
-          console.log(error)
-   
+          }
+        })   
 
   const prevsummary = [
  
@@ -391,8 +387,8 @@ const CableService = ({
 export const PowerService = ({
   powerList
  }: any) => {
-  console.log("first: ===>", powerList)
-   return (
+
+  return (
  
      <View>
          <View className="flex-1 mt-5">

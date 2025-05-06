@@ -46,9 +46,6 @@ const TabIcon = ({
 }
 const _layout = () => {
   const {authState, onLogout,userProfileData, loadProfile} = useAuth()
-  // console.log("fetcg profile:" ,userProfileData, authState)
-
-
   return (
     <>
     <SafeAreaView className='flex-1 bg-primary'>

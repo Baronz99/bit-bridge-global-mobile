@@ -16,9 +16,6 @@ const Login = () => {
     const [hidePassword, setHidePassword] = useState(true)
 
     const {onLogin} = useAuth()
-    console.log(formInput)
-
-
 
     const handleLogin = async () => {
         try {

@@ -26,7 +26,7 @@ const Utilities = () => {
     image: images.cable
   }]
   return (
-    <View className='flex-1 bg-primary'>
+    <View className='flex-1 px-4 bg-primary'>
       <ScrollView>
         <View className='mt-10'>
           <FlatList

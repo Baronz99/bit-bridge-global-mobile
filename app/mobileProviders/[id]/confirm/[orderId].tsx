@@ -34,8 +34,6 @@ const MobileDetailConfirm = () => {
 
              const response = await  confirmPayment({queryId: orderId, payment_method, token})
              setLoader(false)
-
-             console.log("data purchase ==========================>",response)
              setNotification({
               error: false,
               message: response?.message || "Data Purchased",

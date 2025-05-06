@@ -16,12 +16,6 @@ const Login = () => {
        const [hidePassword, setHidePassword] = useState(true)
    
        const {onRegister} = useAuth()
-       console.log(formInput)
-   
-   
-   
-
-
 
     const handleLogin = async () => {
         try {

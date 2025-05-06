@@ -36,7 +36,7 @@ export const getPurchaseOrder = async({id, token}) => {
         return data;
 
     } catch (error: any) {
-        console.log("error message ===> ",error.response.data.message)
+
         if (error.response) {
             throw new Error( error.response.data.message);
         }

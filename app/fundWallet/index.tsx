@@ -26,8 +26,6 @@ const index = () => {
     const handleSubmit = async() => {
 
         setLoading(true)
-        // console.log(formData)
-
         try {
             const response = await initiateMonnifyTransaction({
                 data: {
@@ -68,8 +66,8 @@ const index = () => {
             
         }
     }
-    console.log(formData)
-  return (
+
+    return (
     <View className='flex-1 bg-primary px-4'>
 
         <KeyboardAvoidWrapper>

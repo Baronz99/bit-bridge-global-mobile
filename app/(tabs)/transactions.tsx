@@ -17,10 +17,7 @@ const Transactions = () => {
     const {data, loading} = useFetch(() => getTransactions({
       token
     }))
-    console.log(userProfileData?.wallet)
-
-    
-  
+ 
   
   return (
     <View className='flex-1 bg-primary'>

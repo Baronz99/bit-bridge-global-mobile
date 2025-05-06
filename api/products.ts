@@ -31,7 +31,6 @@ export const getProducts = async({
         if (error.response) {
             throw new Error (error.response.data.message || "Something went wrong")
         }
-        console.log("first product  error ====> ", error.message)
 
         throw error.message || "Something went wrong" 
     }
@@ -97,7 +96,7 @@ export const getProvision = async({id,
         return data;
     } catch (error: any) {
         if (error.response) {
-            console.log("error", error.response.data)
+
             throw new Error (error.response.data.message || "Something went wrong")
         }
 
