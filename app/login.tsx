@@ -1,4 +1,4 @@
-import { Image, KeyboardAvoidingView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import { ActivityIndicator, Image, KeyboardAvoidingView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import React, { useState } from 'react'
 import { icons } from '@/constants/icons'
 import { Link, router } from 'expo-router'
@@ -14,16 +14,22 @@ const Login = () => {
     })
 
     const [hidePassword, setHidePassword] = useState(true)
+       const [loading, setLoading] = useState(false)
 
     const {onLogin} = useAuth()
 
     const handleLogin = async () => {
-        try {
-          const result = await onLogin(formInput);
 
-          
+        try {
+          setLoading(true)
+
+          const result = await onLogin(formInput);
+          console.log(result)
+
+          setLoading(false)
+
         } catch (error) {
-          // Handle errors during the login process
+          setLoading(false)
           console.error("Login error:", error.message);
         }
       };
@@ -57,9 +63,9 @@ const Login = () => {
             <TouchableOpacity className='py-3  flex-row items-center flex justify-center mt-10  bg-app-primary rounded-lg'
               onPress={handleLogin}
               >
-                  {/* <Image source={icons.arrow} className='size-5 mr-1 mt-0.5 rotate-180' tintColor={"red"} /> */}
-                  <Text className=' font-semibold text-base text-gray-100'>Login</Text>
-
+           {loading ? <ActivityIndicator/> :
+                    <Text className=' font-semibold text-base text-gray-100'>Log In</Text>
+                  }
             </TouchableOpacity> 
 
         </View>

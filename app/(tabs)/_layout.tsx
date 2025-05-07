@@ -49,14 +49,13 @@ const _layout = () => {
   const {authState, onLogout,userProfileData, loading} = useAuth()
 
 
-  console.log("first view ===>===== ", authState?.authenticated)
-
   if(loading)  return <LoaderScreen/>
-  
+
   if(authState?.authenticated){
     return <AppContent userProfileData={userProfileData} onLogout={onLogout} />
 
   }
+
   
     return <Login/>
   

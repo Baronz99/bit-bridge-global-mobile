@@ -41,13 +41,11 @@ const wallet = () => {
             <Text className='text-alt mt-4'>Withdraw Fund</Text>
           </TouchableOpacity>
           <TouchableOpacity 
-          onPress={() => router.push("/transaction/confirm")} 
+          // onPress={() => router.push("/transaction/confirm")} 
           className='bg-g justify-center items-center flex-1'>
             <Image tintColor={"#ffcc00"} source={icons.transfer} className='w-10 h-10' />
             <Text className='text-alt mt-4'>Fund Transafer</Text>
-          </TouchableOpacity>
-          
-          
+          </TouchableOpacity>        
         
         </View>
         </View>
