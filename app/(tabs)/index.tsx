@@ -152,11 +152,6 @@ export default function Index() {
    
 
 }
-
-
-console.log("this error  ==> ", toggleAlert)
-
-
   const pickedService = services.find(item => item.name === selectedService)
 
   useEffect(()=> {

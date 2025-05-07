@@ -32,7 +32,7 @@ const Login = () => {
               <Image source={icons.appLogo} className="w-full h-96 mb-5 mx-auto"/>
               <Link href={"/sign-up"} asChild>        
         <TouchableOpacity className='w-24 m-auto py-3' >
-          <Text className='text-white text-center'>Sign Up</Text>
+          <Text className='text-white text-center border-gray-100 border-b py-2 '>Sign Up</Text>
         </TouchableOpacity>
         </Link>
       <KeyboardAvoidWrapper>

@@ -8,28 +8,30 @@ const FormInput = ({ label, icon, value, placeHolder, isPassword, onChangeText, 
 
   return (
     <View 
+    className=''
     style={{ marginBottom: 15 }}
     >
-    <View className='absolute left-4'>
-      <Octicons name={icon} size={30} color={"gray"} />
+    <View className='absolute left-4 '>
+      <Octicons name={icon} size={20} color={"gray"} />
     </View>
-    <Text className='text-white my-3'>{label}</Text>
+    {label &&  <Text className='text-white my-3'>{label}</Text>
+  }
     <TextInput
 
     value={value}
     onChangeText={onChangeText}
     placeholderTextColor={"gray"}
      placeholder={placeHolder} 
-     className='p-4 pr-20 border-alt border text-white rounded'
+     className='p-4 pr-20 border-alt border  text-white rounded'
      {...props} 
     
     />
     {isPassword && (
       <TouchableOpacity
         onPress={() => setHidePassword(!hidePassword)}
-        className='absolute right-3.5 top-7 z-10'
+        className='absolute right-3.5 top-2 z-10'
       >
-        <Ionicons name={hidePassword ? 'eye-off' : 'eye'} size={30} color={"#9ca3af"} />
+        <Ionicons name={hidePassword ? 'eye-off' : 'eye'} size={26} color={"#9ca3af"} />
       </TouchableOpacity>
     )}
   </View>

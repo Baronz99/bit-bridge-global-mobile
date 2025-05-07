@@ -7,6 +7,7 @@ import { useAuth } from '@/services/useAuth'
 import Login from '../login'
 import Loader from '@/components/Loader'
 import { userProfile } from '@/api/auth'
+import LoaderScreen from '../LoaderScreen'
 
 
 
@@ -45,13 +46,34 @@ const TabIcon = ({
   }
 }
 const _layout = () => {
-  const {authState, onLogout,userProfileData, loadProfile} = useAuth()
+  const {authState, onLogout,userProfileData, loading} = useAuth()
+
+
+  console.log("first view ===>===== ", authState?.authenticated)
+
+  if(loading)  return <LoaderScreen/>
+  
+  if(authState?.authenticated){
+    return <AppContent userProfileData={userProfileData} onLogout={onLogout} />
+
+  }
+  
+    return <Login/>
+  
+  
+}
+
+
+const AppContent = ({
+  onLogout,
+  userProfileData
+}: any) => {
   return (
     <>
     <SafeAreaView className='flex-1 bg-primary'>
       
 
-      {authState?.authenticated ?
+
       <>
       <Tabs
         screenOptions={{
@@ -90,6 +112,7 @@ const _layout = () => {
 
                 </TouchableOpacity>
               </View>
+
 
             </View>,
             tabBarIcon: ({ focused}) => (
@@ -164,10 +187,8 @@ const _layout = () => {
 
 
         </Tabs>
-      </> : 
-      <>
-        <Login/>
-        </>}
+      </> 
+   
 
         
     </SafeAreaView>

@@ -43,7 +43,7 @@ const AuthProvider = ({ children }) => {
     authenticated: null,
   });
 
-  const [loadingState, setLoadingState] = useState(false)
+  const [loadingState, setLoadingState] = useState(true)
 
   const [authProfile, setAuthProfile] = useState(null);
 
@@ -54,6 +54,10 @@ const AuthProvider = ({ children }) => {
         setAuthState({ token, authenticated: true });
        await userProfile(token)
       }
+
+      setLoadingState(false)
+
+
     };
     loadToken();
   }, []);
@@ -147,6 +151,7 @@ const AuthProvider = ({ children }) => {
     onRegister: register,
     onLogin: login,
     onLogout: logout,
+    loading: loadingState,
     userProfileData: authProfile,
     loadProfile: userProfile,
     authState

@@ -35,7 +35,7 @@ const Login = () => {
 <Image source={icons.appLogo} className="w-full h-96 0 mt-20 mb-5 mx-auto"/>
 <Link href={"/login"} asChild>        
 <TouchableOpacity className='w-24 m-auto py-3' >
-  <Text className='text-white text-center'>Log In</Text>
+  <Text className='text-white text-center border-gray-100 border-b '>Log In</Text>
 </TouchableOpacity>
 </Link>
   
