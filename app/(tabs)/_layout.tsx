@@ -54,28 +54,28 @@ const _layout = () => {
       {authState?.authenticated ?
       <>
       <Tabs
-    screenOptions={{
-      tabBarShowLabel: false,
-      tabBarItemStyle: {
-        width: "100%",
-        height: "100%",
-        justifyContent: "center",
-        alignItems: "center"
+        screenOptions={{
+          tabBarShowLabel: false,
+          tabBarItemStyle: {
+            width: "100%",
+            height: "100%",
+            justifyContent: "center",
+            alignItems: "center"
 
-      },
-      tabBarStyle: {
-        backgroundColor: "#0f0D23",
-        borderRadius: 50,
-        marginHorizontal: 1,
-        marginBottom: 26,
-        height: 52,
-        position: "absolute",
-        overflow: "hidden",
-        borderWidth: 1,
-        borderColor: "#0f0D23"
-      }
-    }}
-    >
+          },
+          tabBarStyle: {
+            backgroundColor: "#0f0D23",
+            borderRadius: 50,
+            marginHorizontal: 1,
+            marginBottom: 26,
+            height: 52,
+            position: "absolute",
+            overflow: "hidden",
+            borderWidth: 1,
+            borderColor: "#0f0D23"
+          }
+        }}
+        >
        <Tabs.Screen
         name='index'
         options={{
@@ -142,11 +142,7 @@ const _layout = () => {
 
       }}
         
-        />
-       
-       
-
-        
+        />        
         <Tabs.Screen
         name='transactions'
         options={{

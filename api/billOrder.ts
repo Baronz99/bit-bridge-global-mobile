@@ -22,6 +22,27 @@ export const createPurchaseOrder = async({orderData, token}) => {
     }
 }
 
+
+export const updateOrderStatus = async({id, orderData, token}: any) => {
+   
+    try {
+        const response = await axios.patch(`${base_url + api_route}payment_processors//${id}/update_status`,orderData, {
+            headers: {
+                "Authorization": `Bearer ${token}`}
+        });
+
+        const data = response.data; 
+        return data;
+    } catch (error: any) {
+        if (error.response) {
+            throw  new Error(error.response.data.message)
+        }
+       
+        throw new Error( error.message || "Something went wrong")
+    }
+}
+
+
 export const getPurchaseOrder = async({id, token}) => {
     try {
         const response = await axios.get(`${base_url + api_route}payment_processors/${id}`, {

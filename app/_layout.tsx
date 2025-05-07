@@ -21,7 +21,8 @@ export default function RootLayout() {
         headerStyle: {
           backgroundColor: "#030014"
 
-        }
+        },
+        headerTintColor: "white"
         
       }}
       >

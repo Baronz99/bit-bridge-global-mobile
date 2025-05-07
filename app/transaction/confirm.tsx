@@ -7,11 +7,14 @@ import useFetch from '@/services/useFetch'
 import { getTransactionRecord } from '@/api/transactions'
 import { useAuth } from '@/services/useAuth'
 import moneyFormat from '@/utils/moneyFormat'
+import { updateOrderStatus } from '@/api/billOrder'
 
 const confirm = () => {
   const {authState: {token}, loadProfile} = useAuth()
   
-    const {reference} = useLocalSearchParams()
+    // const {reference} = useLocalSearchParams()
+
+    const reference = "bbg-1746604425"
     const {data, loading} = useFetch(()=> getTransactionRecord({
       id: reference as string,
       token: token
@@ -21,10 +24,30 @@ const confirm = () => {
 
     const receipt_type = reference?.split("-")[0]
 
+
+    // const {data: {updateData}, refetch } = useFetch(()=> updateOrderStatus({
+    //   id: reference as string,
+    //   token: token,
+    //   orderData: {
+    //     type: receipt_type,
+
+    //   }
+    // }), false)
+
+
     useEffect(()=> {
       loadProfile(token)
     }, [])
 
+
+    // useEffect(() => {
+    //   if(data && data?.status ===  "initialized"){
+    //     // refetch()
+
+    //   }
+    // },[])
+
+    // console.log(data)
     
   return (
     <View className='flex-1 px-4 bg-primary'>

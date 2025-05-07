@@ -85,7 +85,7 @@ const Transactions = () => {
               <View key={index} className="flex-row border-t border-gray-200 px-4 py-2">
                 <Text className="flex-1 text-gray-200">{item.status}</Text>
                 <Text className="flex-1 text-center text-white">{moneyFormat(item.amount)}</Text>
-                <Text className="flex-1  text-right text-white">{dateFormat(item.created_at)}</Text>
+                <Text className="flex-1  text-center text-white">{dateFormat(item.created_at)}</Text>
               </View>
             ))}
           </ScrollView>

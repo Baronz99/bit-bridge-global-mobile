@@ -18,7 +18,6 @@ const Index = () => {
     <View className='flex-1 bg-primary'>
         <View className="mt-10">
 
-
             <Text className="text-lg text-white font-bold mb-3">Discos </Text>
 
             <FlatList
