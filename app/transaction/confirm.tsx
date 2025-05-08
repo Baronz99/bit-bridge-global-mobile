@@ -12,9 +12,9 @@ import { updateOrderStatus } from '@/api/billOrder'
 const confirm = () => {
   const {authState: {token}, loadProfile} = useAuth()
   
-    // const {reference} = useLocalSearchParams()
+    const {reference} = useLocalSearchParams()
 
-    const reference = "bbg-1746604425"
+    // const reference = "bbg-1746604425"
     const {data, loading} = useFetch(()=> getTransactionRecord({
       id: reference as string,
       token: token
@@ -25,14 +25,14 @@ const confirm = () => {
     const receipt_type = reference?.split("-")[0]
 
 
-    // const {data: {updateData}, refetch } = useFetch(()=> updateOrderStatus({
-    //   id: reference as string,
-    //   token: token,
-    //   orderData: {
-    //     type: receipt_type,
+    const {data: {updateData}, refetch, error: {updateError} } = useFetch(()=> updateOrderStatus({
+      id: reference as string,
+      token: token,
+      orderData: {
+        type: receipt_type,
 
-    //   }
-    // }), false)
+      }
+    }), false)
 
 
     useEffect(()=> {
@@ -40,12 +40,12 @@ const confirm = () => {
     }, [])
 
 
-    // useEffect(() => {
-    //   if(data && data?.status ===  "initialized"){
-    //     // refetch()
+    useEffect(() => {
+      if(data && data?.status ===  "initialized"){
+        refetch()
 
-    //   }
-    // },[])
+      }
+    },[data])
 
     // console.log(data)
     
@@ -89,6 +89,9 @@ const confirm = () => {
           </View>
         }
       </View>}
+      <Text className='text-center text-white'>
+        {updateData?.message ?? updateError?.message}
+      </Text>
 
 
       <Link href={"/"} asChild>

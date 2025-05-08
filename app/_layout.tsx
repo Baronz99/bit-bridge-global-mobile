@@ -115,12 +115,18 @@ export default function RootLayout() {
                 headerShown: false,
               }}
             />
-
-
-<Stack.Screen
+            <Stack.Screen
               name="cableProviders/index"
               options={{
                 headerTitle: "Cable TV List"
+
+              }}
+            />
+            
+            <Stack.Screen
+              name="orderDetails/[id]"
+              options={{
+                headerTitle: "Details"
 
               }}
             />

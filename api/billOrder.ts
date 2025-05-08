@@ -23,10 +23,10 @@ export const createPurchaseOrder = async({orderData, token}) => {
 }
 
 
-export const updateOrderStatus = async({id, orderData, token}: any) => {
+export const updateOrderStatus = async({id, token}: any) => {
    
     try {
-        const response = await axios.patch(`${base_url + api_route}payment_processors//${id}/update_status`,orderData, {
+        const response = await axios.get(`${base_url + api_route}payment_processors/${id}/update_status`, {
             headers: {
                 "Authorization": `Bearer ${token}`}
         });
@@ -43,7 +43,7 @@ export const updateOrderStatus = async({id, orderData, token}: any) => {
 }
 
 
-export const getPurchaseOrder = async({id, token}) => {
+export const getPurchaseOrder = async({id, token}: any) => {
     try {
         const response = await axios.get(`${base_url + api_route}payment_processors/${id}`, {
             headers: {
@@ -53,7 +53,7 @@ export const getPurchaseOrder = async({id, token}) => {
 
 
 
-        const {data} = response.data;    
+        const {data} = response.data; 
         return data;
 
     } catch (error: any) {
@@ -125,6 +125,37 @@ export const repurchaseOrder =  async({id, token}: any) => {
         }
 
         throw new Error( "Something went wrong" );
+    }
+}
+
+
+export const getUserOrders = async({
+
+    token,
+    params
+}: {
+    token: string,
+    params?: {
+        status: string
+    }
+}) => {
+    try {
+        const response = await axios.get(`${base_url + api_route}bill_orders/user`, {
+            headers: {
+                "Authorization": `Bearer ${token}`
+            }
+        });
+
+        const {data} = response.data;    
+        return data;
+    } catch (error: any) {
+        if (error.response) {
+
+            console.log(error.response)
+            throw new Error(error.response?.message || "failed to purchace" );
+        }
+        console.error(error);
+        throw new Error("Something went wrong");
     }
 }
 
