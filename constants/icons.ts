@@ -16,8 +16,18 @@ import withdrawal from "@/assets/icons/withdrawal.png"
 import utility from "@/assets/icons/power-line.png"
 import transfer from "@/assets/icons/money-transfer.png"
 import logout from "@/assets/icons/logout.png"
+import login from "@/assets/icons/login.png"
+import user from "@/assets/icons/user.png"
+import lock from "@/assets/icons/padlock.png"
+import bin from "@/assets/icons/bin.png"
+import phone from "@/assets/icons/phone-call.png"
+import legal from "@/assets/icons/legal-document.png"
+import wifi from "@/assets/icons/wi-fi.png"
+import electricity from "@/assets/icons/power.png"
+import television from "@/assets/icons/television.png"
 
 import appLogo from "@/assets/logos/logo.png"
+
 export const icons = {
   home,
   appLogo,
@@ -37,6 +47,15 @@ export const icons = {
   tag,
   utility,
   transfer,
-  logout
+  logout,
+  login,
+  user,
+  bin,
+  lock,
+  legal,
+  phone,
+  wifi,
+  electricity,
+  television
 
 };

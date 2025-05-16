@@ -10,7 +10,7 @@ import moneyFormat from '@/utils/moneyFormat'
 import { dateFormat } from '@/utils/dateFormat'
 import { getUserOrders } from '@/api/billOrder'
 
-const Transactions = () => {
+const index = () => {
 
     const router = useRouter()
     const {userProfileData, authState: {token}} = useAuth()
@@ -22,39 +22,14 @@ const Transactions = () => {
   
   return (
     <View className='flex-1 bg-primary'>
-      <Image source={images.bg} resizeMode='cover' className='absolute top-0 left-0 w-full z-0'/>
+
       <View className='flex-1'>
      
-        <View className='min-h-40 mt-5 mx-4 bg-gray-900 rounded-xl items- justify-center px-4'>
-     
-          <View className=''>
-         
-            <View className="bg-gray-900 p-5 rounded-2xl shadow-lg">
-              <Text className="text-white text-lg font-semibold mb-2">Wallet Balance</Text>
-              <Text className="text-3xl font-bold text-green-400 mb-4">{moneyFormat(userProfileData?.wallet.balance)}</Text>
-
-              <View className="flex-row justify-between mt-2">
-                <View className="flex-1 mr-2">
-                  <Text className="text-gray-400 text-sm">Deposits</Text>
-                  <Text className="text-green-300 font-medium">{moneyFormat(userProfileData?.wallet?.total_deposit ?? 0)}</Text>
-                </View>
-
-                <View className="flex-1 ml-2">
-                  <Text className="text-gray-400 text-sm">Withdrawals</Text>
-                  <Text className="text-red-400 font-medium">{moneyFormat(userProfileData?.wallet?.withdrawn ?? 0)}</Text>
-                </View>
-              </View>
-            </View>
-          
-          </View>
-
-
-
-        </View>
+    
 
         
         <View className='my-4 mx-4'>
-          <Text className='text-white text-base'>Recent Transactions</Text>
+          <Text className='text-white text-base'>Transaction History</Text>
 
         </View>
        
@@ -104,5 +79,5 @@ const Transactions = () => {
   )
 }
 
-export default Transactions
+export default index
 

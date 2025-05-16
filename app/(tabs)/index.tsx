@@ -17,6 +17,8 @@ import Loader from "@/components/Loader";
 import { getRescentPurchaseOrder, repurchaseOrder } from "@/api/billOrder";
 import NotificationAlert from "@/components/notification";
 import useNotification from "@/hooks/useNotification";
+import { Feather } from "@expo/vector-icons";
+import ViewBox from "@/components/view-box/ViewBoxIcon";
 export default function Index() {
   const router = useRouter()
   const {authState: {token}, userProfileData, loadProfile} = useAuth()
@@ -33,6 +35,35 @@ export default function Index() {
 
   const {data: recentTransaction } = useFetch(() => getRescentPurchaseOrder({token}))
   
+  const items = [
+       {
+      id: 0,
+      label: "Airtime",
+      btn: "Select Provider",
+      link: "/airtime-top-up",
+      image: icons.phone
+    }, 
+    {
+      id: 2,
+      label: "Data",
+      btn: "Select Provider",
+      link: "/data-subscription",
+      image: icons.wifi
+    },{
+      id: 1,
+      label: "Electricity",
+      btn: "Select Probider",
+      link: "/powerProviders",
+      image: icons.electricity
+    },
+   
+    {
+      id: 3,
+      label: "Cable Tv",
+      btn: "Select TV",
+      link: "/cableProviders",
+      image: icons.television
+    }]
 
 
   const datalist = data?.flatMap((item: any) => {
@@ -172,20 +203,56 @@ export default function Index() {
       >
         {/* <Image source={icons.logo} className="w-12 h-10 mt-20 mb-5 mx-auto"/> */}
       <View className="flex-1">
-        <View className="bg-gray-900/70  my-6 rounded-3xl min-h-40 py-7 px-6">
-        {loading ? <ActivityIndicator/> : 
-        <>
-          <Text className="text-white text-left text-xl font-bold my-4">Wallet Balance</Text>
-          <Text className="text-white text-left text-3xl font-bold">{moneyFormat(userProfileData?.wallet?.balance)}</Text>
+        <View className="bg-purple-700 my-6 flex-row justify-between rounded-2xl h-28  px-6">
+            {loading ? <ActivityIndicator/> : 
+            <>
+            <View>
+                 <Text className="text-white text-base text-left font-bold mt-2">Wallet Balance</Text>
+                <Text className="text-white text-left text-lg  font-bold">{moneyFormat(userProfileData?.wallet?.balance)}</Text>
+             
+             
+             <View className="flex-row my-1 items-center gap-2">
+              <Image source={icons.trophy} className="w-5 h-5" />
+                <Text className="text-white">0.00</Text>
+              </View>  
+            </View>
 
-        </>}
+             <View className="flex-col my-2 items-center gap-2">
+
+                <TouchableOpacity 
+                onPress={() => router.push("/history/Index") }
+                className="gap-3 font-semibold items-center rounded-2xl flex-row py-1 px-4">
+                  <Text className="text-white">
+                    History
+                  </Text>
+                  <Feather name="arrow-right" size={14} color="white" />
+                </TouchableOpacity>             
+                <TouchableOpacity 
+                 onPress={() => router.push("/withdrawFund") }
+
+                className="bg-purple-900 font-semibold rounded-2xl py-2 px-4">
+                  <Text className="text-white">
+                    Fund Wallet
+                  </Text>
+                </TouchableOpacity>
+
+              </View>
+           
+            </>}
+              
+             
+
+        </View>
+
+        <View className='bg-gray-900/60 p-4 rounded-xl'>
+          <Text className='text-white'>Bill Payment</Text>
+          <View className='py-4 flex-wrap gap-y-4 flex-row'>
+            {items.map(item => (
+            <ViewBox link={item.link} icon={item.image} label={item.label}/>
+
+            ))}
           
-          <View className="flex-row my-4 items-center gap-5">
-            <Image source={icons.trophy} className="w-5 h-5" />
-            <Text className="text-white">0.00</Text>
-
           </View>
-
         </View>
        
 
@@ -196,7 +263,7 @@ export default function Index() {
           data={prevsummary}
           renderItem={({item}) => (
             
-            <TouchableOpacity  className="bg-gray-800/50 p-4 rounded-lg flex-row items-center gap-3 mb-3">
+            <TouchableOpacity className="bg-gray-800/50 p-4 min-w-40 rounded-lg flex-row items-center gap-3 mb-3">
               <Image source={item.icon} className="w-6 h-6" />
               <View>
                 <Text className="text-base text-white/70 font-bold">{item.label}</Text>

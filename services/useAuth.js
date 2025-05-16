@@ -82,6 +82,7 @@ const AuthProvider = ({ children }) => {
   };
 
   const login = async (data) => {
+    console.log(data)
     try {
       const response = await fetch(`https://bitbridgeglobal-fa54ecb89f7d.herokuapp.com/login`, { 
         method: "POST",
@@ -91,6 +92,7 @@ const AuthProvider = ({ children }) => {
 
       if (!response.ok) {
         const result = await response.text();
+
 
         throw new Error(result);
       }
@@ -105,6 +107,9 @@ const AuthProvider = ({ children }) => {
       return result;
     } catch (error) {
       if (error instanceof Error) {
+
+                console.log("log sttus",error?.message )
+
         throw error;
       } else {
         throw new Error("Something went wrong");

@@ -18,6 +18,7 @@ import success from "@/assets/images/success.png"
 import cable from "@/assets/images/cable.png"
 import mobile from "@/assets/images/mobile1.png"
 import electricity from "@/assets/images/electricity.png"
+import user from "@/assets/images/user.png"
 
 
 
@@ -41,6 +42,7 @@ import electricity from "@/assets/images/electricity.png"
   success,
   cable,
   mobile,
+  user,
   electricity
 
 };

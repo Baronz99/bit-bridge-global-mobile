@@ -8,8 +8,9 @@ export default function RootLayout() {
   <AuthProvider>
     
       <StatusBar hidden={false}
-      barStyle={"light-content"}
-       backgroundColor={"black"}/>
+        barStyle={"light-content"}
+        backgroundColor={"black"}
+        />
 
       <Stack 
       screenOptions={{        
@@ -153,6 +154,18 @@ export default function RootLayout() {
               options={{
                 headerShown: false,
               }}
+            />
+  
+            <Stack.Screen
+              name="history/Index"
+              options={{
+                headerTitle: "History"              }}
+            />
+
+             <Stack.Screen
+              name="airtime-top-up/index"
+              options={{
+                headerTitle: "Airtime"              }}
             />
 
         </Stack>

@@ -14,33 +14,34 @@ import LoaderScreen from '../LoaderScreen'
 const TabIcon = ({
   focused, icon, title
 
-}) => {
+}: any) => {
   if(focused){
 
     return(
-      <ImageBackground
-                className='flex flex-row w-full gap-1 flex-1 min-w-[112px] min-h-16 mt-4 justify-center rounded-full overflow-hidden items-center'
-                source={images.highlight}>
-                  <Image source={icon}
-                  
-                  tintColor="#151312"
-                  className="size-5"
-                  />
-  
-                  <Text
-                  className='text-secondary text-base font-semibold'>{title}</Text>
-  
-  
-                  </ImageBackground>
+      <View
+        className='flex flex-col w-full gap-1 flex-1 min-w-[112px] min-h-16 mt-4 justify-center rounded-full overflow-hidden items-center'
+        // source={images.highlight}
+        >
+          <Image source={icon}
+          
+          tintColor="#ffcc00"
+          className="size-5"
+          />
+
+          <Text
+          className='text-alt text-base font-semibold'>{title}</Text>
+
+
+       </View>
     )
   }else{
     return(
           <View   className=' w-full flex-1 min-w-[112px] min-h-14 mt-4 justify-center rounded-full overflow-hidden items-center'>
-      <Image source={icon}
-                
-                tintColor="#a8b5db"
-                className="size-5"
-                />
+            
+             <Image source={icon} tintColor="#a8b5db" className="size-5"                />
+             <Text className='text-[#a8b5db] text-base font-normal'>{title}</Text>
+  
+  
     </View>
     )
   }
@@ -76,7 +77,17 @@ const AppContent = ({
       <>
       <Tabs
         screenOptions={{
+          // headerShown: true,
+          headerTitleStyle: {
+          color: "white",
+          fontSize: 14
+
+        },
+
           tabBarShowLabel: false,
+          headerStyle: {
+          backgroundColor: "#030014"
+        },
           tabBarItemStyle: {
             width: "100%",
             height: "100%",
@@ -86,10 +97,9 @@ const AppContent = ({
           },
           tabBarStyle: {
             backgroundColor: "#0f0D23",
-            borderRadius: 50,
-            marginHorizontal: 1,
-            marginBottom: 26,
-            height: 52,
+            marginHorizontal: 0,
+            marginBottom: 0,
+            height: 62,
             position: "absolute",
             overflow: "hidden",
             borderWidth: 1,
@@ -132,7 +142,7 @@ const AppContent = ({
           options={{
               title: "wallet",
               headerShown: false,
-              tabBarIcon: ({ focused}) => (
+              tabBarIcon: ({ focused} : any) => (
                 <>
                 <TabIcon  focused={focused}
                 icon={icons.wallet}
@@ -147,15 +157,15 @@ const AppContent = ({
         />  
    
       <Tabs.Screen
-        name='utility'
+        name='service'
         options={{
-          title: "Utilities",
-          headerShown: false,
+          title: "All Services",
+            headerTintColor: "white",        
           tabBarIcon: ({ focused}) => (
             <>
             <TabIcon  focused={focused}
             icon={icons.utility}
-            title="Utilities"
+            title="Service"
             />
 
 
@@ -165,16 +175,17 @@ const AppContent = ({
       }}
         
         />        
-        <Tabs.Screen
-        name='transactions'
+      
+         <Tabs.Screen
+        name='profile'
         options={{
             title: "Transactions",
-            headerShown: false,
-            tabBarIcon: ({ focused}) => (
+            headerShown: true,
+            tabBarIcon: ({ focused} :any) => (
               <>
               <TabIcon  focused={focused}
-              icon={icons.transaction}
-              title="Transactions"
+              icon={icons.person}
+              title="Profile"
               />
               </>
             )
