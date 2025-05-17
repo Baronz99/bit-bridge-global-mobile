@@ -171,7 +171,19 @@ export default function RootLayout() {
                     <Stack.Screen
               name="airtime-top-up/confirm/[orderId]"
               options={{
-                headerTitle: "Cornfirm Data" 
+                headerTitle: "Cornfirm Airtime" 
+               }}
+            />
+                     <Stack.Screen
+              name="data-subscription/confirm/[orderId]"
+              options={{
+                headerTitle: "Cornfirm Airtime" 
+               }}
+            />
+              <Stack.Screen
+              name="data-subscription/index"
+              options={{
+                headerTitle: "Data" 
                }}
             />
 

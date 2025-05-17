@@ -37,7 +37,7 @@ useEffect(()=> {
   if(data && data?.service_type === "DATA"){
     refetch()
   }
-}, [data])
+  }, [data])
 
     // const {}
     const [formValue, setFormValue] = useState({

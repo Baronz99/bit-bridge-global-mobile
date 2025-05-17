@@ -14,10 +14,10 @@ import { createPurchaseOrder } from '@/api/billOrder'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
 import FormInput from '@/components/FormInput'
 import FormSelect from '@/components/FormSelect'
+import Loader from '@/components/Loader'
 
 const index = () => {
-      const router = useRouter()
-  
+  const router = useRouter()  
   const [loader, setLoader] = useState(false)
 
   const [selectProvider, setSelectedProvider] = useState(null)
@@ -33,61 +33,32 @@ const index = () => {
       
   })
 
-      
 
 
-          const handleFormSubmit = async() => {
-            setLoader(true)
-      
-            try {
-             const response =  await createPurchaseOrder({
-                orderData: {...formValue, email: userProfileData?.email, service_type: selectProvision?.service_type, biller: selectProvider?.provider.toUpperCase(), skip: true},
-                 token
-              }
-              )   
-      
-              setLoader(false)
-            
-      
-              router.push(`/airtime-top-up/confirm/${response?.data.id}`)
-      
-            } catch (error: any) {
-              console.log("error=",error.message)
-              setLoader(false)
 
-              
-            }
-        }
-  
-    const items = [
-         {
-        id: 0,
-        label: "Airtime",
-        btn: "Select Provider",
-        link: "/airtime-top-up",
-        image: icons.phone
-      }, 
-      {
-        id: 2,
-        label: "Data",
-        btn: "Select Provider",
-        link: "/data-subscription",
-        image: icons.wifi
-      },{
-        id: 1,
-        label: "Electricity",
-        btn: "Select Probider",
-        link: "/powerProviders",
-        image: icons.electricity
-      },
-     
-      {
-        id: 3,
-        label: "Cable Tv",
-        btn: "Select TV",
-        link: "/cableProviders",
-        image: icons.television
-      }]
+  const handleFormSubmit = async() => {
+    setLoader(true)
+
+    try {
+      const response =  await createPurchaseOrder({
+        orderData: {...formValue, email: userProfileData?.email, service_type: selectProvision?.service_type, biller: selectProvider?.provider.toUpperCase(), skip: true},
+          token
+      }
+      )   
+
+      setLoader(false)
+    
+
+      router.push(`/airtime-top-up/confirm/${response?.data.id}`)
+
+    } catch (error: any) {
+      console.log("error=",error.message)
+      setLoader(false)
+
+      
+    }
+  }
+
 
       const {data} = useFetch(() => getProducts({
         token,
@@ -112,11 +83,10 @@ const index = () => {
         console.log("first =====>")
 
       if(selectProvider){
-                console.log("second =====>")
 
       
       const provision = selectProvider?.provisions?.find((item : any) => item.service_type === "VTU")
-      console.log("provissions====>",provision)
+
       setSelectedProvision(provision)
       }
 
@@ -129,16 +99,20 @@ const index = () => {
         }
       })
       
+
+      console.log("first selected provider", selectProvider?.provider)
    
  
   return (
+    <>
+    
     <View className='flex-1 bg-primary px-4'>
        <View className='bg-gray-900/60 p-4 rounded-xl'>
           <View
            className='py-4 flex-wrap gap-y-4 flex-row'>
             {airtimeBillers_ && airtimeBillers_?.map((item: any) => (
               <>
-              <SelectBoxIcon key={item.id} onSelect={() => serSelectedProvider(item)} icon={images[`${splitString(item?.provider)}`]} 
+              <SelectBoxIcon key={item.id} onSelect={() => setSelectedProvider(item)} icon={images[`${splitString(item?.provider)}`]} 
                 label={splitString(item?.provider)}
               />
             </>
@@ -208,6 +182,8 @@ const index = () => {
          </ScrollView>
         </View>
     </View>
+    <Loader open={loader} />
+    </>
   )
 }
 

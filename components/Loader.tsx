@@ -5,7 +5,10 @@ import { gifs } from '@/constants/gifs'
 const Loader = ({
   open,
   onclose,
-}: any) => {
+}: {
+  open: boolean
+  onclose?: () => void
+}) => {
   return (
    
         <Modal
