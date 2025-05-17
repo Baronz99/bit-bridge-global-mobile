@@ -52,9 +52,7 @@
       }
     },
     "owner": "emmykage",
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
+    "runtimeVersion": "1.0.0",
     "updates": {
       "url": "https://u.expo.dev/3c19e796-d824-4788-8258-771676d2fe71"
     }
