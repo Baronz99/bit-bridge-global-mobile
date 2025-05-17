@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react'
 import useFetch from '@/services/useFetch'
 import { getProducts } from '@/api/products'
 import { useAuth } from '@/services/useAuth'
-import { Link } from 'expo-router'
+import { Link, useRouter } from 'expo-router'
 import { images } from '@/constants/images'
 import { splitString } from '@/utils'
 import MobileProviderView from '@/components/mobileProviderView/mobileProviderView'
@@ -16,9 +16,12 @@ import FormInput from '@/components/FormInput'
 import FormSelect from '@/components/FormSelect'
 
 const index = () => {
+      const router = useRouter()
+  
   const [loader, setLoader] = useState(false)
 
-  const [selectProvider, setSelectedProvider] = useState("mtn")
+  const [selectProvider, setSelectedProvider] = useState(null)
+  const [selectProvision, setSelectedProvision] = useState(null)
 
   const {authState: {token},userProfileData } = useAuth()  
 
@@ -38,17 +41,20 @@ const index = () => {
       
             try {
              const response =  await createPurchaseOrder({
-                orderData: {...formValue, email: userProfileData?.email, service_type: data.service_type, biller: data.product.provider.toUpperCase(), skip: true},
+                orderData: {...formValue, email: userProfileData?.email, service_type: selectProvision?.service_type, biller: selectProvider?.provider.toUpperCase(), skip: true},
                  token
               }
               )   
       
               setLoader(false)
+            
       
-              if(response)  router.push(`/mobileProviders/${id}/confirm/${response?.data.id}`)
+              router.push(`/airtime-top-up/confirm/${response?.data.id}`)
       
             } catch (error: any) {
+              console.log("error=",error.message)
               setLoader(false)
+
               
             }
         }
@@ -91,29 +97,30 @@ const index = () => {
 
     }))
 
-
-    const airtimeBillers = data?.flatMap((item: any) => (
-      item?.provisions?.flatMap((prov: any) => {
-      if (prov.service_type === "VTU"){
-        return prov
-      }
-      else {
-        return []
-      }
-      }
-    )
-    ))
-
     useEffect(() => {
 
       if(data){  
-      const airtimeProvider = data.find((provider: any) => provider.provider === selectProvider)
+      const airtimeProvider = data.find((provider: any) => provider.provider.toLowerCase() === "mtn")
+
       setSelectedProvider(airtimeProvider)
       }
       
     
     },[data])
 
+    useEffect(()=> {
+        console.log("first =====>")
+
+      if(selectProvider){
+                console.log("second =====>")
+
+      
+      const provision = selectProvider?.provisions?.find((item : any) => item.service_type === "VTU")
+      console.log("provissions====>",provision)
+      setSelectedProvision(provision)
+      }
+
+    },[selectProvider])
 
       const airtimeBillers_ = data?.map((item: any) => {
 
@@ -122,11 +129,8 @@ const index = () => {
         }
       })
       
-      console.log(selectProvider)
-
    
-  const provision = airtimeBillers_?.provisions
-
+ 
   return (
     <View className='flex-1 bg-primary px-4'>
        <View className='bg-gray-900/60 p-4 rounded-xl'>
@@ -134,7 +138,7 @@ const index = () => {
            className='py-4 flex-wrap gap-y-4 flex-row'>
             {airtimeBillers_ && airtimeBillers_?.map((item: any) => (
               <>
-              <SelectBoxIcon onSelect={() => serSelectedProvider(item)} icon={images[`${splitString(item?.provider)}`]} 
+              <SelectBoxIcon key={item.id} onSelect={() => serSelectedProvider(item)} icon={images[`${splitString(item?.provider)}`]} 
                 label={splitString(item?.provider)}
               />
             </>
@@ -160,7 +164,7 @@ const index = () => {
                 onChangeText={(text: string) => setFormValue({...formValue, billersCode: text})}
                 value={formValue.billersCode}    
                 />
-                {data?.service_type === "VTU" && (
+                {selectProvision?.service_type === "VTU" && (
                 <FormInput 
                 name='amount'
                 label='Amount'
@@ -170,7 +174,7 @@ const index = () => {
                 />
                 )}
 
-                {data?.service_type === "DATA" && (
+                {selectProvision?.service_type === "DATA" && (
                 <FormSelect 
                 options={priceList ?? []}
                 selectedValue={formValue.tariff_class}

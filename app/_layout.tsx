@@ -168,6 +168,13 @@ export default function RootLayout() {
                 headerTitle: "Airtime"              }}
             />
 
+                    <Stack.Screen
+              name="airtime-top-up/confirm/[orderId]"
+              options={{
+                headerTitle: "Cornfirm Data" 
+               }}
+            />
+
         </Stack>
 
     
