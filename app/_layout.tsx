@@ -186,6 +186,20 @@ export default function RootLayout() {
                 headerTitle: "Data" 
                }}
             />
+            <Stack.Screen
+              name="electricity-provider/index"
+              options={{
+                headerTitle: "Electricty" 
+              }}
+            />
+
+            <Stack.Screen
+            name="cable-tv-provider/index"
+            options={{
+              headerTitle: "Cable Tv" 
+            }}
+          />
+
 
         </Stack>
 

@@ -37,42 +37,44 @@ const Login = () => {
     <View className='flex-1 bg-primary px-4 '>
               <Image source={icons.appLogo} className="w-full h-96 mb-5 mx-auto"/>
               <Link href={"/sign-up"} asChild>        
-        <TouchableOpacity className='w-24 m-auto py-3' >
-          <Text className='text-white text-center border-gray-100 border-b py-2 '>Sign Up</Text>
-        </TouchableOpacity>
+       
         </Link>
       <KeyboardAvoidWrapper>
 
-        <View>
+        <View className='flex-1'>
         
           
-        <View>
-        <FormInput 
-          placeholder='Enter Email Address' 
-          onChangeText={(value) => setFormInput({...formInput, email: value })}
-          className='border-gray-600 border-b text-white  my-0 py-4 border-b-1 text-base font-semibold px-3 '
-          />
-           <FormInput  placeholder='Enter Password' 
-              isPassword={true}
-              secureTextEntry={hidePassword}
-              hidePassword={hidePassword}
-              setHidePassword={setHidePassword}
-            onChangeText={(value) => setFormInput({...formInput, password: value })}
-            className='border-gray-600 text-white border-b py-4 my-0  border-b-1 text-base font-semibold px-3 '
+          <View>
+          <FormInput 
+            placeholder='Enter Email Address' 
+            onChangeText={(value) => setFormInput({...formInput, email: value })}
+            className='border-gray-600 border-b text-white  my-0 py-4 border-b-1 text-base font-semibold px-3 '
             />
-            <TouchableOpacity className='py-3  flex-row items-center flex justify-center mt-10  bg-app-primary rounded-lg'
-              onPress={handleLogin}
-              >
-           {loading ? <ActivityIndicator/> :
-                    <Text className=' font-semibold text-base text-gray-100'>Log In</Text>
-                  }
-            </TouchableOpacity> 
+            <FormInput  placeholder='Enter Password' 
+                isPassword={true}
+                secureTextEntry={hidePassword}
+                hidePassword={hidePassword}
+                setHidePassword={setHidePassword}
+              onChangeText={(value) => setFormInput({...formInput, password: value })}
+              className='border-gray-600 text-white border-b py-4 my-0  border-b-1 text-base font-semibold px-3 '
+              />
+              <TouchableOpacity className='py-3  flex-row items-center flex justify-center mt-10  bg-app-primary rounded-lg'
+                onPress={handleLogin}
+                >
+            {loading ? <ActivityIndicator/> :
+                      <Text className=' font-semibold text-base text-gray-100'>Log In</Text>
+                    }
+              </TouchableOpacity> 
 
-        </View>
-        
-        
+          </View>
+           <TouchableOpacity className='w-full m-auto mt-auto py-3 flex-row' >
+
+              <Text className='text-white  w-full border-gray-800 border-b py-2 text-center'>Dont have an account?  <Link href={"/register"} className=' text-center border-gray-100 border-b text-alt py-2 '>  Sign Up</Link></Text>
+            
+            </TouchableOpacity>       
       
         </View>
+  
         </KeyboardAvoidWrapper>
 
 

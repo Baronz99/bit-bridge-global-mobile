@@ -11,7 +11,7 @@ import NotificationAlert from '@/components/notification'
 import useNotification from '@/hooks/useNotification'
 import Summary from '@/components/cards/Summary'
 
-const MobileDetailConfirm = () => {
+const PowerDetailConfirm = () => {
       const {orderId} = useLocalSearchParams()
           const [loader, setLoader] = useState(false)
           const {notification, setNotification} = useNotification()
@@ -130,5 +130,5 @@ const MobileDetailConfirm = () => {
   )
 }
 
-export default MobileDetailConfirm
+export default PowerDetailConfirm
 

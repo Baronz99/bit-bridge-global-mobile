@@ -53,7 +53,7 @@ export default function Index() {
       id: 1,
       label: "Electricity",
       btn: "Select Probider",
-      link: "/powerProviders",
+      link: "/electricity-provider",
       image: icons.electricity
     },
    
@@ -61,7 +61,7 @@ export default function Index() {
       id: 3,
       label: "Cable Tv",
       btn: "Select TV",
-      link: "/cableProviders",
+      link: "/cable-tv-provider",
       image: icons.television
     }]
 
