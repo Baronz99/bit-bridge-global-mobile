@@ -8,6 +8,9 @@ import FormInput from '@/components/FormInput';
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper';
 
 const Login = () => {
+
+      const [errorMessage, setErrorMessage] = useState(null)
+  
          const [formInput, setFormInput] = useState({
              email: "",
              first_name: "",
@@ -30,7 +33,7 @@ const Login = () => {
           setLoading(false)          
         } catch (error) {
           // Handle errors during the login process
-          console.error("Login error:", error.message);
+          setErrorMessage(error.message)
           setLoading(false)
 
         }
@@ -73,6 +76,8 @@ const Login = () => {
             onChangeText={(value) => setFormInput({...formInput, password: value })}
             className='border-gray-600 text-white border-b py-4 my-0  border-b-1 text-base font-semibold px-3 '
             />
+            <Text className='text-red-600'>{errorMessage} </Text>
+            
             <TouchableOpacity className='py-3  flex-row items-center flex justify-center mt-10  bg-app-primary rounded-lg'
               onPress={handleLogin}
               >

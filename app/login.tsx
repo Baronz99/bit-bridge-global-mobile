@@ -8,6 +8,8 @@ import FormInput from '@/components/FormInput';
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper';
 
 const Login = () => {
+    const [errorMessage, setErrorMessage] = useState(null)
+
     const [formInput, setFormInput] = useState({
         email: "",
         password: ""
@@ -30,6 +32,7 @@ const Login = () => {
 
         } catch (error) {
           setLoading(false)
+          setErrorMessage(error.message)
           console.error("Login error:", error.message);
         }
       };
@@ -67,6 +70,8 @@ const Login = () => {
               </TouchableOpacity> 
 
           </View>
+
+          <Text className='text-red-600'>{errorMessage} </Text>
            <TouchableOpacity className='w-full m-auto mt-auto py-3 flex-row' >
 
               <Text className='text-white  w-full border-gray-800 border-b py-2 text-center'>Dont have an account?  <Link href={"/sign-up"} className=' text-center border-gray-100 border-b text-alt py-2 '>  Sign Up</Link></Text>
