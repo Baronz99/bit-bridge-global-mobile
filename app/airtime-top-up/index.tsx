@@ -52,7 +52,6 @@ const index = () => {
       router.push(`/airtime-top-up/confirm/${response?.data.id}`)
 
     } catch (error: any) {
-      console.log("error=",error.message)
       setLoader(false)
 
       
@@ -100,7 +99,6 @@ const index = () => {
       })
       
 
-      console.log("first selected provider", selectProvider?.provider)
    
  
   return (
@@ -112,8 +110,8 @@ const index = () => {
            className='py-4 flex-wrap gap-y-4 flex-row'>
             {airtimeBillers_ && airtimeBillers_?.map((item: any) => (
               <>
-              <SelectBoxIcon key={item.id} onSelect={() => setSelectedProvider(item)} icon={images[`${splitString(item?.provider)}`]} 
-                label={splitString(item?.provider)}
+              <SelectBoxIcon selectedLabel={selectProvider?.provider} key={item.id} onSelect={() => setSelectedProvider(item)} icon={images[`${splitString(item?.provider)}`]} 
+                label={item?.provider}
               />
             </>
 

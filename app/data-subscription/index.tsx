@@ -13,6 +13,7 @@ import FormInput from '@/components/FormInput'
 import SelectBoxIcon from '@/components/select-box/SelectBoxIcon'
 import { splitString } from '@/utils'
 import FormSelect from '@/components/FormSelect'
+import { images } from '@/constants/images'
 
 const index = () => {
   const router = useRouter()  
@@ -113,8 +114,8 @@ const index = () => {
            className='py-4 flex-wrap gap-y-4 flex-row'>
             {airtimeBillers_ && airtimeBillers_?.map((item: any) => (
               <>
-              <SelectBoxIcon key={item.id} onSelect={() => setSelectedProvider(item)} icon={images[`${splitString(item?.provider)}`]} 
-                label={splitString(item?.provider)}
+              <SelectBoxIcon key={item.id} selectedLabel={selectProvider?.provider} onSelect={() => setSelectedProvider(item)} icon={images[`${splitString(item?.provider)}`]} 
+                label={item?.provider}
               />
             </>
 
@@ -122,8 +123,6 @@ const index = () => {
             ))}          
           </View>
         </View>
-        
-
 
         <View className='py-6'>
 

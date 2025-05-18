@@ -89,7 +89,6 @@ const index = () => {
                 if(!(formData.bank.trim().length > 1) || !(formData.address.trim().length > 1 )|| !(formData.amount > 10) ){
                     console.log("error occured")
                 }else{
-                    // console.log("first")
                     setModalVisible(true)
                     
                 }

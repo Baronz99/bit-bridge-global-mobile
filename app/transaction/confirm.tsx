@@ -47,7 +47,6 @@ const confirm = () => {
       }
     },[data])
 
-    // console.log(data)
     
   return (
     <View className='flex-1 px-4 bg-primary'>

@@ -8,7 +8,6 @@ const ProviderCard = ({
     item,
     link
 }: any) => {
-    console.log("item =====>", item.name, splitString(item.name))
   return (
     <Link href={link} asChild>
                

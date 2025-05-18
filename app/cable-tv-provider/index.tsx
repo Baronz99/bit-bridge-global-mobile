@@ -60,7 +60,6 @@ const index = () => {
           router.push(`/cable-tv-provider/confirm/${response?.data.id}`)
     
         } catch (error: any) {
-          console.log("error=",error.message)
           setLoader(false)
     
           
@@ -71,10 +70,11 @@ const index = () => {
 
     useEffect(() => {
         if(data) {
+            console.log("first data", data)
         const tvProvider =  data.find((provider: any) => provider.provider.toLowerCase() === "dstv")
         setSelectedProvider(tvProvider)
         }
-    }, [])
+    }, [data])
 
     useEffect(()=> {
       if(selectProvision){
@@ -96,7 +96,8 @@ const index = () => {
           return item
         }
       })
-      
+
+  
   return (
     <View className='flex-1 bg-primary px-4'>
         <View className='bg-gray-900/60 p-4 rounded-xl'>
@@ -104,7 +105,7 @@ const index = () => {
            className='py-4 flex-wrap gap-y-4 flex-row'>
             {cableProviders && cableProviders?.map((item: any) => (
               <>
-              <SelectBoxIcon key={item.id} onSelect={() => setSelectedProvider(item)} icon={images[`${splitString(item?.provider)}`]} 
+              <SelectBoxIcon key={item.id} onSelect={() => setSelectedProvider(item)} selectedLabel={selectProvider?.provider?.toLowerCase()} icon={images[`${splitString(item?.provider)}`]} 
                 label={splitString(item?.provider)}
               />
             </>
@@ -123,7 +124,6 @@ const index = () => {
         >     
         <View  className='flex-1 bg-primary px-4 '>            
         <View className='py-6'>
-            <Image source={images[`${splitString(selectProvider?.provider)}`]} className='w-full h-40 rounded-lg'/>
             <KeyboardAvoidWrapper>
                 <View>
                     <FormInput 

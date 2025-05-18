@@ -26,7 +26,6 @@ const Login = () => {
           setLoading(true)
 
           const result = await onLogin(formInput);
-          console.log(result)
 
           setLoading(false)
 

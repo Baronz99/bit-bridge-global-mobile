@@ -15,13 +15,18 @@ import { AntDesign, Feather, FontAwesome, Ionicons } from '@expo/vector-icons'
 const Profile = () => {
 
     const router = useRouter()
-    const {userProfileData, authState: {token}} = useAuth()
+    const {userProfileData, authState: {token}, loadProfile} = useAuth()
   
     const {data, loading} = useFetch(() => getUserOrders({
       token
     }))
+
+
+    useEffect(()=> {
+      loadProfile()
+    },[])
  
-  console.log(userProfileData)
+  console.log("user data", userProfileData)
   return (
     <View className='flex-1 bg-primary'>
       <Image source={images.bg} resizeMode='cover' className='absolute top-0 left-0 w-full z-0'/>

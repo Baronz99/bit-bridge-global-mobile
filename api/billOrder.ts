@@ -151,7 +151,6 @@ export const getUserOrders = async({
     } catch (error: any) {
         if (error.response) {
 
-            console.log(error.response)
             throw new Error(error.response?.message || "failed to purchace" );
         }
         console.error(error);
@@ -177,7 +176,6 @@ export const getRescentPurchaseOrder = async({
     } catch (error: any) {
         if (error.response) {
 
-            console.log(error.response)
             throw new Error(error.response?.message || "failed to purchace" );
         }
         console.error(error);
