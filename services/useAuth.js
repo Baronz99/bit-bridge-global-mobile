@@ -125,6 +125,12 @@ const AuthProvider = ({ children }) => {
       const result = await response.json();
 
       const token = response.headers.get('Authorization').split(" ")[1]
+
+      if(!token){
+        throw new Error("No token returned")
+
+      }
+      
       await SecureStore.setItemAsync(token_key, token);
       setAuthState({ token: token, authenticated: true });
 

@@ -133,7 +133,7 @@ const LinkView = ({
     <Link href={link}  asChild>   
             <TouchableOpacity className='flex-row gap-5 items-center '>
               <Image source={icon}  tintColor={"white"} className='w-7 h-7' />
-              <Text className={`${style==="danger" ? "text-red-600" : "text-white"} flex-1  '`}>{label}</Text>
+              <Text className={`${style==="danger" ? "text-red-600" : "text-white"} flex-1`}>{label}</Text>
               <Feather name="arrow-right" size={20} color="white" />
 
             </TouchableOpacity>
