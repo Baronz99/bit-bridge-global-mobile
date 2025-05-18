@@ -110,12 +110,7 @@ export default function RootLayout() {
             />
             
             
-            <Stack.Screen
-              name="sign-up"
-              options={{
-                headerShown: false,
-              }}
-            />
+         
             <Stack.Screen
               name="cableProviders/index"
               options={{
@@ -153,6 +148,13 @@ export default function RootLayout() {
               name="login"
               options={{
                 headerShown: false,
+              }}
+            />
+
+            <Stack.Screen
+              name="sign-up"
+              options={{
+                headerTitle: "Register"
               }}
             />
   

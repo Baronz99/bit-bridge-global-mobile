@@ -4,10 +4,14 @@ import { icons } from '@/constants/icons'
 import { router } from 'expo-router'
 import { Formik } from 'formik';
 import { useAuth } from '@/services/useAuth';
+import FormInput from '@/components/FormInput';
 
 const Register = () => {
     const [formInput, setFormInput] = useState({
         email: "",
+        first_name: "",
+        last_name: "",
+        phone: "",
         password: ""
     })
 
@@ -27,10 +31,9 @@ const Register = () => {
         }
       };
   return (
-    <View className='flex-1 px-12 items-center justify-center bg-blue-'>
-        <Image source={icons.appLogo} className="w-full h-96 0 mt-20 mb-5 mx-auto"/>
-        <Text className='font-semibold text-2xl text-gray-600'> Login </Text>
-                <View className='bg- w-full'>
+    <View className='flex-1 px-4 -12 items-center justify-center bg-gray-950'>
+        <Image source={icons.appLogo} className="w-full h-96 0 mt-0 mb-5 mx-auto"/>
+          <View className='bg- w-full'>
             {/* <Text className='text-left'>Email:</Text> */}
 
             {/* <Formik
@@ -50,17 +53,37 @@ const Register = () => {
             
             >
               {  ({handleChange, handleBlur, handleSubmit, values, isSubmitting}) => ( */}
-                        <View>
+              <View>
 
-                        <TextInput  placeholder='Email' 
+                  
+
+
+
+                 
+                         <TextInput  placeholder='Email' 
 
                         onChangeText={(value) => setFormInput({...formInput, email: value })}
-                        className='border-gray-600 border-b py-4 bg-gray-200 border-b-1 text-base font-semibold px-3 '
+                        className='border-gray-600 border-b mb-4 py-4  border-b-1 text-base font-semibold px-3 '
                         />
-                            <TextInput 
+                         <TextInput  placeholder='Email' 
+
+                        onChangeText={(value) => setFormInput({...formInput, email: value })}
+                        className='border-gray-600 border-b mb-4 py-4 border-b-1 text-base font-semibold px-3 '
+                        />
+                         <TextInput  placeholder='Email' 
+
+                        onChangeText={(value) => setFormInput({...formInput, email: value })}
+                        className='border-gray-600 border-b mb-4 py-4 bg-gray-200 border-b-1 text-base font-semibold px-3 '
+                        />
+                         <TextInput  placeholder='Email' 
+
+                        onChangeText={(value) => setFormInput({...formInput, email: value })}
+                        className='border-gray-600 border-b mb-4 py-4 bg-gray-200 border-b-1 text-base font-semibold px-3 '
+                        />
+                        <TextInput 
                                onChangeText={(value) => setFormInput({...formInput, password: value })}
                                secureTextEntry placeholder='Password' 
-                               className='border-gray-600 border-b mt-4 py-4 bg-gray-200 border-b-1 text-base font-semibold px-3'
+                               className='border-gray-600 border-b mb-4 py-4 bg-gray-200 border-b-1 text-base font-semibold px-3'
                                />
 
                                <Text>
@@ -71,7 +94,7 @@ const Register = () => {
                             onPress={handleLogin}
                             >
                                 {/* <Image source={icons.arrow} className='size-5 mr-1 mt-0.5 rotate-180' tintColor={"red"} /> */}
-                                <Text className=' font-semibold text-base text-gray-100'>Login</Text>
+                                <Text className=' font-semibold text-base text-gray-100'>Sign UP</Text>
     
                             </TouchableOpacity> 
                 </View>

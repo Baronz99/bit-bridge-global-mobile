@@ -22,7 +22,7 @@ const FormInput = ({ label, icon, value, placeHolder, isPassword, onChangeText, 
     onChangeText={onChangeText}
     placeholderTextColor={"gray"}
      placeholder={placeHolder} 
-     className='p-4 pr-20 border-alt border  text-white rounded'
+     className='p-4 pr-20 border-alt border  text-white rounded overflow-hidden'
      {...props} 
     
     />

@@ -44,6 +44,7 @@ const AuthProvider = ({ children }) => {
   });
 
   const [loadingState, setLoadingState] = useState(true)
+  const [errorMessage, setErrorMessage] = useState(null)
 
   const [authProfile, setAuthProfile] = useState(null);
 
@@ -62,27 +63,50 @@ const AuthProvider = ({ children }) => {
     loadToken();
   }, []);
 
-  const register = async (email, password) => {
+  const register = async (formData) => {
+    const user = {
+      email,
+      password,
+      user_profile_attributes: {
+        first_name: formData.first_name,
+        last_name: formData.last_name,
+        phone_number: formData.phone
+      }
+    }
     try {
       const response = await fetch(`${base_url}/signup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify(user),
       });
       const result = await response.json();
 
       if (!response.ok){ throw new Error( result?.message ?? "Failed to register");}
 
-      await SecureStore.setItemAsync(token_key, result.token);
-      setAuthState({ token: result.token, authenticated: true });
+
+
+      const authheader = response.headers.get('Authorization')      
+      const token = authheader.split(" ")[1];
+
+      if(!token){
+              throw new Error("No token returned")
+            }
+           
+
+      await SecureStore.setItemAsync(token_key, token);
+      setAuthState({ token: token, authenticated: true });
+
       return result;
     } catch (error) {
-      console.error("Register error:", error);
-    }
+      if (error instanceof Error) {
+              throw error;
+            } else {
+              throw new Error("Something went wrong");
+            }        }
   };
 
   const login = async (data) => {
-    console.log(data)
+
     try {
       const response = await fetch(`https://bitbridgeglobal-fa54ecb89f7d.herokuapp.com/login`, { 
         method: "POST",
@@ -107,9 +131,6 @@ const AuthProvider = ({ children }) => {
       return result;
     } catch (error) {
       if (error instanceof Error) {
-
-                console.log("log sttus",error?.message )
-
         throw error;
       } else {
         throw new Error("Something went wrong");

@@ -69,7 +69,7 @@ const Login = () => {
           </View>
            <TouchableOpacity className='w-full m-auto mt-auto py-3 flex-row' >
 
-              <Text className='text-white  w-full border-gray-800 border-b py-2 text-center'>Dont have an account?  <Link href={"/register"} className=' text-center border-gray-100 border-b text-alt py-2 '>  Sign Up</Link></Text>
+              <Text className='text-white  w-full border-gray-800 border-b py-2 text-center'>Dont have an account?  <Link href={"/sign-up"} className=' text-center border-gray-100 border-b text-alt py-2 '>  Sign Up</Link></Text>
             
             </TouchableOpacity>       
       
