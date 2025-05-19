@@ -189,7 +189,10 @@ export default function Index() {
     loadProfile(token)
   },[])
 
+
+
   return (
+    <>
     <View
     className="flex-1 bg-primary" 
     >
@@ -220,7 +223,7 @@ export default function Index() {
              <View className="flex-col my-2 items-center gap-2">
 
                 <TouchableOpacity 
-                onPress={() => router.push("/history/Index") }
+                onPress={() => router.push("/history/index") }
                 className="gap-3 font-semibold items-center rounded-2xl flex-row py-1 px-4">
                   <Text className="text-white">
                     History
@@ -394,6 +397,9 @@ export default function Index() {
 
 
     </View>
+
+
+    </>
   );
 }
 

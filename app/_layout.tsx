@@ -126,16 +126,15 @@ export default function RootLayout() {
 
               }}
             />
-            
-<Stack.Screen
+            <Stack.Screen
               name="powerProviders/index"
               options={{
                 headerTitle: "Electric Bills"
 
               }}
             />
-
-<Stack.Screen
+            
+            <Stack.Screen
               name="powerProviders/[id]/confirm/[orderId]"
               options={{
                 headerTitle: "Confirm Utility Bills"
@@ -158,10 +157,13 @@ export default function RootLayout() {
               }}
             />
   
-            <Stack.Screen
-              name="history/Index"
+           
+                <Stack.Screen
+              name="history/index"
               options={{
-                headerTitle: "History"              }}
+                headerTitle: "History"
+
+              }}
             />
 
              <Stack.Screen
@@ -201,6 +203,14 @@ export default function RootLayout() {
               headerTitle: "Cable Tv" 
             }}
           />
+
+              <Stack.Screen
+                name="delete-deactivate/index"
+                options={{
+                  headerShown: true,
+                  headerTitle: "Delete Account" 
+                }}
+              />
 
 
         </Stack>

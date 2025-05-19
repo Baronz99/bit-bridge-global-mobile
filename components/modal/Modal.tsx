@@ -20,6 +20,7 @@ const AppModal = ({
             onPress={onclose}
             className='flex-1 bg-primary/50 justify-center items-center'>
             <Pressable 
+            className=' px-4 w-full'
             // onPress={()=> {}}
             >
             {children}

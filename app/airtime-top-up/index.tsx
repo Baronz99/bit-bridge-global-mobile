@@ -79,11 +79,8 @@ const index = () => {
     },[data])
 
     useEffect(()=> {
-        console.log("first =====>")
-
-      if(selectProvider){
-
-      
+       
+      if(selectProvider){      
       const provision = selectProvider?.provisions?.find((item : any) => item.service_type === "VTU")
 
       setSelectedProvision(provision)

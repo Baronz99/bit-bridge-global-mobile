@@ -11,23 +11,31 @@ import { dateFormat } from '@/utils/dateFormat'
 import { getUserOrders } from '@/api/billOrder'
 import { icons } from '@/constants/icons'
 import { AntDesign, Feather, FontAwesome, Ionicons } from '@expo/vector-icons'
+import AppModal from '@/components/modal/Modal'
 
 const Profile = () => {
 
     const router = useRouter()
-    const {userProfileData, authState: {token}, loadProfile} = useAuth()
+        const [toggleModal, setToggleModal] = useState(false)
+    
+    const {userProfileData, authState: {token}, onLogout, loadProfile} = useAuth()
   
     const {data, loading} = useFetch(() => getUserOrders({
       token
     }))
+
+    const handleLogout = async() => {
+      await onLogout()
+    }
 
 
     useEffect(()=> {
       loadProfile()
     },[])
  
-  console.log("user data", userProfileData)
+
   return (
+    <>
     <View className='flex-1 bg-primary'>
       <Image source={images.bg} resizeMode='cover' className='absolute top-0 left-0 w-full z-0'/>
       <ScrollView
@@ -57,8 +65,8 @@ const Profile = () => {
           </View>
        
           <View className='bg-gray-900 my-4 py-4 px-4 rounded-xl'>
-            <Link href={"/"}  asChild>   
-            <TouchableOpacity className='flex-row gap-4 items-center '>
+            <Link href={"/accountProfile"} asChild>   
+            <TouchableOpacity className='flex-row gap-4 items-center'>
               <FontAwesome name="user-o" size={20} color="white" />
               <Text className='text-white flex-1  '>My Profile</Text>
               <Feather name="arrow-right" size={20} color="white" />
@@ -72,7 +80,7 @@ const Profile = () => {
           </View>
 
           <View className='bg-gray-900 my-4 py-4 px-4 rounded-xl'>
-            <Link href={"/"}  asChild>   
+            <Link href={"/change-password"}  asChild>   
             <TouchableOpacity className='flex-row gap-4 items-center '>
               <Feather name="shield" size={20} color="white" />
               <Text className='text-white flex-1 '>Change Password</Text>
@@ -87,7 +95,7 @@ const Profile = () => {
           </View>
 
           <View className='bg-gray-900 my-4 gap-6 py-4 px-4 rounded-xl'>
-            <Link href={"/"}  asChild>   
+            <Link href={"/legal"}  asChild>   
             <TouchableOpacity className='flex-row gap-4 items-center '>
             <Ionicons name="document-text-outline" size={20} color="white" />  
             <Text className='text-white flex-1 '>Legal</Text>
@@ -95,21 +103,24 @@ const Profile = () => {
 
             </TouchableOpacity>
             </Link>
-            <Link href={"/"}  asChild>   
+            <Link href={"/delete-deactivate"}  asChild>   
             <TouchableOpacity className='flex-row gap-4 items-center '>
               <AntDesign name="delete" size={20} color="white" />   
               <Text className='text-white flex-1 '>Deactivate/Delete</Text>
               <Feather name="arrow-right" size={20} color="white" />
 
             </TouchableOpacity>
-            </Link>  <Link href={"/"}  asChild>   
-            <TouchableOpacity className='flex-row gap-4 items-center '>
+            </Link>  
+            <TouchableOpacity
+            onPress={() => {setToggleModal(true)}}
+            
+            className='flex-row gap-4 items-center '>
               <AntDesign name="logout" size={20} color="white" /> 
               <Text className='text-red-700 flex-1 '>Log out</Text>
               <Feather name="arrow-right" size={20} color="white" />
 
             </TouchableOpacity>
-            </Link>
+
 
 
             {/* <LinkView  icon={icons.legal} link={"/"} label={"Legal"}/>
@@ -120,6 +131,31 @@ const Profile = () => {
         </View>
       </ScrollView>
     </View>
+
+     <AppModal open={toggleModal} onclose={() => setToggleModal(false)}>
+        <View className='bg-gray-900 w-full rounded-xl px-4'>
+            <Text className='text-white text-center text-2xl my-2'>Log Out </Text>
+            <Text className='my-4 text-center  text-white'>Are you sure you want to Log Out </Text>
+            <View className='flex-row gap-4 my-6 justify-between'>
+                <TouchableOpacity 
+                onPress={() => setToggleModal(false)} 
+                className='bg-black py-3 flex-1 rounded-xl'>
+                    <Text className='text-white text-center '>
+                        Cancel
+                    </Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                onPress={handleLogout} 
+                className='bg-orange-700 flex-1  py-3 rounded-xl'>
+                    <Text className='text-white text-center'>
+                        Log Out
+                    </Text>
+                </TouchableOpacity>
+            </View>
+        </View>
+            </AppModal>
+
+    </>
   )
 }
 

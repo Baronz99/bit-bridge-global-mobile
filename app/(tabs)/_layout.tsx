@@ -1,5 +1,5 @@
 import { Image, ImageBackground, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Tabs } from 'expo-router'
 import { images } from '@/constants/images'
 import { icons } from '@/constants/icons'
@@ -8,6 +8,7 @@ import Login from '../login'
 import Loader from '@/components/Loader'
 import { userProfile } from '@/api/auth'
 import LoaderScreen from '../LoaderScreen'
+import AppModal from '@/components/modal/Modal'
 
 
 
@@ -49,6 +50,8 @@ const TabIcon = ({
 const _layout = () => {
   const {authState, onLogout,userProfileData, loading} = useAuth()
 
+  console.log("=====>", authState?.token)
+
 
   if(loading)  return <LoaderScreen/>
 
@@ -68,6 +71,17 @@ const AppContent = ({
   onLogout,
   userProfileData
 }: any) => {
+
+  
+          const [toggleModal, setToggleModal] = useState(false)
+      
+  
+    
+  
+      const handleLogout = () => {
+        onLogout()
+      }
+  
   return (
     <>
     <SafeAreaView className='flex-1 bg-primary'>
@@ -116,7 +130,7 @@ const AppContent = ({
 
               <View className='h-20 px-4 flex-row justify-between items-center bg-primary'>
                 <Text className='text-white font-medium'>Hello, {userProfileData?.email}</Text>
-                <TouchableOpacity className='' onPress={()=> onLogout()}>
+                <TouchableOpacity className='' onPress={()=> setToggleModal(true)}>
                   <Image source={icons.logout} tintColor={"#ffcc00"} className='w-7 h-7'/>
 
                 </TouchableOpacity>
@@ -140,8 +154,8 @@ const AppContent = ({
         <Tabs.Screen
           name='wallet'
           options={{
-              title: "wallet",
-              headerShown: false,
+              title: "Wallet",
+              headerShown: true,
               tabBarIcon: ({ focused} : any) => (
                 <>
                 <TabIcon  focused={focused}
@@ -204,6 +218,29 @@ const AppContent = ({
 
         
     </SafeAreaView>
+
+         <AppModal open={toggleModal} onclose={() => setToggleModal(false)}>
+            <View className='bg-gray-900 w-full rounded-xl px-4'>
+                <Text className='text-white text-center text-2xl my-2'>Log Out </Text>
+                <Text className='my-4 text-center  text-white'>Are you sure you want to Log Out </Text>
+                <View className='flex-row gap-4 my-6 justify-between'>
+                    <TouchableOpacity 
+                    onPress={() => setToggleModal(false)} 
+                    className='bg-black py-3 flex-1 rounded-xl'>
+                        <Text className='text-white text-center '>
+                            Cancel
+                        </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                    onPress={handleLogout} 
+                    className='bg-orange-700 flex-1  py-3 rounded-xl'>
+                        <Text className='text-white text-center'>
+                            Log Out
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+            </View>
+                </AppModal>
    
    </>
   )

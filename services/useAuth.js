@@ -49,7 +49,9 @@ const AuthProvider = ({ children }) => {
   const [authProfile, setAuthProfile] = useState(null);
 
   useEffect(() => {
-    const loadToken = async () => {
+    // setLoadingState(true)
+
+    (async () => {
       const token = await SecureStore.getItemAsync(token_key);
       if (token) {
         setAuthState({ token, authenticated: true });
@@ -59,8 +61,7 @@ const AuthProvider = ({ children }) => {
       setLoadingState(false)
 
 
-    };
-    loadToken();
+    })();
   }, []);
 
   const register = async (formData) => {
@@ -156,11 +157,13 @@ const AuthProvider = ({ children }) => {
 
   const userProfile = async(token) => {
 
+    console.log("user tohke for profile", token)
+
     try {
       
               const response = await axios.get(`${base_url + api_route}users/user_profile`, {  
                   headers: {
-                "Authorization": `Bearer ${token}`
+                "Authorization": `Bearer ${authState?.token}`
             }})
               const {data} =  response.data
               setAuthProfile(data)
@@ -168,8 +171,10 @@ const AuthProvider = ({ children }) => {
 
           } catch (error) {
               if(error.response){
-                await SecureStore.deleteItemAsync(token_key);
-                setAuthState({token: null, authenticated: false })
+                // await SecureStore.deleteItemAsync(token_key);
+
+                console.log("error from uawe profile")
+                // setAuthState({token: null, authenticated: false })
                   return  error.response.data || "error occured"
               }
       
