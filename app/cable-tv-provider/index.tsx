@@ -70,7 +70,6 @@ const index = () => {
 
     useEffect(() => {
         if(data) {
-            console.log("first data", data)
         const tvProvider =  data.find((provider: any) => provider.provider.toLowerCase() === "dstv")
         setSelectedProvider(tvProvider)
         }

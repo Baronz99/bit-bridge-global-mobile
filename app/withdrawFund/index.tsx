@@ -63,7 +63,6 @@ const index = () => {
             })            
         }
     }
-    console.log(formData)
   return (
     <View className='flex-1 bg-primary px-4'>
         <ScrollView
@@ -85,9 +84,8 @@ const index = () => {
                 <NotificationAlert message={notice.message} data={notice.data} error={notice.error}/>
 
                 <TouchableOpacity onPress={() => {
-                  console.log(!formData.bank.trim().length > 1)
+               
                 if(!(formData.bank.trim().length > 1) || !(formData.address.trim().length > 1 )|| !(formData.amount > 10) ){
-                    console.log("error occured")
                 }else{
                     setModalVisible(true)
                     

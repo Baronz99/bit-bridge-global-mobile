@@ -66,12 +66,12 @@ const AuthProvider = ({ children }) => {
 
   const register = async (formData) => {
     const user = {
-      email,
-      password,
+      email: formData.email.trim(),
+      password: formData.password.trim(),
       user_profile_attributes: {
-        first_name: formData.first_name,
-        last_name: formData.last_name,
-        phone_number: formData.phone
+        first_name: formData.first_name.trim(),
+        last_name: formData.last_name.trim(),
+        phone_number: formData.phone.trim()
       }
     }
     try {
@@ -156,9 +156,6 @@ const AuthProvider = ({ children }) => {
 
 
   const userProfile = async(token) => {
-
-    console.log("user tohke for profile", token)
-
     try {
       
               const response = await axios.get(`${base_url + api_route}users/user_profile`, {  
@@ -171,9 +168,6 @@ const AuthProvider = ({ children }) => {
 
           } catch (error) {
               if(error.response){
-                // await SecureStore.deleteItemAsync(token_key);
-
-                console.log("error from uawe profile")
                 // setAuthState({token: null, authenticated: false })
                   return  error.response.data || "error occured"
               }

@@ -23,7 +23,7 @@ const index = () => {
              })
            const [loading, setLoading] = useState(false)
        
-           const [hidePassword, setHidePassword] = useState(true)
+           const [hidePassword, setHidePassword] = useState(false)
        
              
         const handleUpdate = async () => {
@@ -38,16 +38,12 @@ const index = () => {
     
               setLoading(false)          
             } catch (error: any) {
-              // Handle errors during the login process
+
               setErrorMessage(error.message)
               setLoading(false)
     
             }
           };
-
-          const handleHidePassword = () => {
-            setHidePassword(!hidePassword)
-          }
 
   return (
     <>
@@ -63,18 +59,30 @@ const index = () => {
               placeholder='Old Password'
               secureTextEntry={hidePassword} 
               value={formInput.old_password}
+              isPassword={true}
+              setHidePassword={setHidePassword}
+              hidePassword={hidePassword}
               onChangeText={(value) => setFormInput({...formInput, old_password: value })}
               className='border-gray-800 border-b text-white  my-0 py-4 border-b-1 text-base font-semibold px-3 '
               />
             
             <FormInput 
-            value={formInput?.confirm_password}
               placeholder='New Password ' 
+              value={formInput.password}
+              secureTextEntry={hidePassword} 
+                isPassword={true}
+
+              setHidePassword={setHidePassword}
+              hidePassword={hidePassword}
               onChangeText={(value) => setFormInput({...formInput, password: value })}
               className='border-gray-600 border-b text-white  my-0 py-4 border-b-1 text-base font-semibold px-3 '
               />  
               <FormInput 
-            value={formInput?.confirm_password}
+              secureTextEntry={hidePassword} 
+              isPassword={true}
+              value={formInput?.confirm_password}
+              setHidePassword={setHidePassword}
+              hidePassword={hidePassword}
               placeholder='Confirm Password' 
               onChangeText={(value) => setFormInput({...formInput, confirm_password: value })}
               className='border-gray-600 border-b text-white  my-0 py-4 border-b-1 text-base font-semibold px-3 '

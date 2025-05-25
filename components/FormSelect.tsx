@@ -10,8 +10,6 @@ const FormSelect = ({
     options,
     placeholder
 }: any) => {
-  console.log( selectedValue)
-
   return (
     <View className=''>
       <Text className='text-white mb-4'>{label}</Text>

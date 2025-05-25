@@ -46,7 +46,7 @@ export const userProfileUpdate = async({
         }
     }
     try {
-        const response = await axios.patch(`${base_url + api_route}users`, userData,  {  
+        const response = await axios.patch(`${base_url + api_route}users/user_update`, userData,  {  
             headers: {
           "Authorization": `Bearer ${token}`
       }})
@@ -55,10 +55,10 @@ export const userProfileUpdate = async({
         return result
     } catch (error: any) {
         if(axios.isAxiosError(error) || error.response){
-            return  error.response.data || "error occured"
+            throw new Error(error.response.data.message || "error occured")
         }
 
-        return   "something went wrong"
+        throw new Error ("something went wrong")
 
     }
 
@@ -90,8 +90,9 @@ export const userPasswordUpdate = async({
         const result =  response.data
         return result
     } catch (error: any) {
-        if(axios.isAxiosError(error) || error.response){
-            throw new Error(error.response.data || "error occured")
+        if(error?.response){
+    
+            throw new Error(error?.response.data.message || "error occured")
         }
 
         throw new Error("something went wrong")

@@ -64,7 +64,6 @@ const index = () => {
         router.push(`/airtime-top-up/confirm/${response?.data.id}`)
   
       } catch (error: any) {
-        console.log("error=",error.message)
         setLoader(false)
   
         

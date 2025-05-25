@@ -212,6 +212,22 @@ export default function RootLayout() {
                 }}
               />
 
+                  <Stack.Screen
+                name="change-password/index"
+                options={{
+                  headerShown: true,
+                  headerTitle: "Change Password" 
+                }}
+              />
+              
+              <Stack.Screen
+                name="legal/index"
+                options={{
+                  headerShown: true,
+                  headerTitle: "Legal" 
+                }}
+              />
+
 
         </Stack>
 

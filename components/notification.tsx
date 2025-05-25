@@ -14,8 +14,8 @@ const NotificationAlert = ({
     data?: any,
     onPress?: () => void
 }) => {
-    console.log(data)
-  return (
+
+    return (
     <View className='bg-primary/50 w-full'>
    {
       message && 

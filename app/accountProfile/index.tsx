@@ -7,19 +7,24 @@ import FormInput from '@/components/FormInput'
 import { icons } from '@/constants/icons'
 import { images } from '@/constants/images'
 import Loader from '@/components/Loader'
+import AppAlert from '@/components/app-notification/AppAlert'
 
 const index = () => {
-     const [errorMessage, setErrorMessage] = useState(null)
+     const [errorMessage, setErrorMessage] = useState({
+      error: false,
+      message: null,
+      data: null
+     })
      const {authState: {token}, userProfileData, loadProfile } = useAuth()
 
       
-             const [formInput, setFormInput] = useState({
-                 email: "",
-                 first_name: "",
-                 last_name: "",
-                 phone: "",
-                 user_profile_id: "" 
-             })
+      const [formInput, setFormInput] = useState({
+          email: "",
+          first_name: "",
+          last_name: "",
+          phone: "",
+          user_profile_id: "" 
+      })
            const [loading, setLoading] = useState(false)
        
            const [hidePassword, setHidePassword] = useState(true)
@@ -37,10 +42,21 @@ const index = () => {
                 }
               });
     
-              setLoading(false)          
+              setLoading(false)  
+              loadProfile()
+              setErrorMessage({
+                error: false,
+                data: result?.data,
+                message: result?.message
+              })
+
             } catch (error: any) {
               // Handle errors during the login process
-              setErrorMessage(error.message)
+
+              setErrorMessage({
+                error: true,
+                data: null,
+                message: error.message})
               setLoading(false)
     
             }
@@ -48,8 +64,6 @@ const index = () => {
 
     useEffect(()=> {
       if(userProfileData){
-        console.log("fetch user==>",userProfileData?.user_profile)
-
       setFormInput({
         ...formInput,
         first_name: userProfileData?.user_profile?.first_name,   
@@ -60,6 +74,9 @@ const index = () => {
       })
     }
     },[userProfileData])
+
+   
+
 
   return (
     <>
@@ -96,7 +113,7 @@ const index = () => {
               className='border-gray-600 border-b text-white  my-0 py-4 border-b-1 text-base font-semibold px-3 '
               />
               
-            <Text className='text-red-600'>{errorMessage} </Text>
+            <Text className='text-red-600'>{errorMessage.message} </Text>
             
             <TouchableOpacity className='py-3  flex-row items-center flex justify-center mt-10  bg-app-primary rounded-lg'
               onPress={handleUpdate}
@@ -116,6 +133,12 @@ const index = () => {
     </View>
 
     <Loader open={loading}/>
+
+    <AppAlert 
+     message={errorMessage.message} error={errorMessage.error} data={errorMessage.data}onPress={() => setErrorMessage({error: false, message: null, data: null})}
+
+     />
+   
 
     </>
   )
