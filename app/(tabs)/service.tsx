@@ -43,7 +43,7 @@ const Utilities = () => {
           <Text className='text-white'>Bill Payment</Text>
           <View className='py-4 flex-wrap gap-y-4 flex-row'>
             {items.map(item => (
-            <ViewBox link={item.link} icon={item.image} label={item.label}/>
+            <ViewBox key={item?.id} link={item.link} icon={item.image} label={item.label}/>
 
             ))}
           
