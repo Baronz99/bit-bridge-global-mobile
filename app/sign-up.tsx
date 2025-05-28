@@ -1,14 +1,15 @@
 import { ActivityIndicator, Image, KeyboardAvoidingView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import React, { useState } from 'react'
 import { icons } from '@/constants/icons'
-import { Link, router } from 'expo-router'
+import { Link, router, useRouter } from 'expo-router'
 import { Formik } from 'formik';
 import { useAuth } from '@/services/useAuth';
 import FormInput from '@/components/FormInput';
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper';
 
-const Login = () => {
+const SignUp = () => {
 
+  const router = useRouter()
       const [errorMessage, setErrorMessage] = useState(null)
   
          const [formInput, setFormInput] = useState({
@@ -16,7 +17,8 @@ const Login = () => {
              first_name: "",
              last_name: "",
              phone: "",
-             password: ""
+             password: "",
+             confirm_password: ""
          })
        const [loading, setLoading] = useState(false)
    
@@ -30,7 +32,9 @@ const Login = () => {
 
           const result = await onRegister(formInput);
 
-          setLoading(false)          
+
+          setLoading(false)  
+          router.push("/")        
         } catch (error) {
           // Handle errors during the login process
           setErrorMessage(error.message)
@@ -56,6 +60,11 @@ const Login = () => {
               className='border-gray-600 border-b text-white  my-0 py-4 border-b-1 text-base font-semibold px-3 '
               />
                 <FormInput 
+              placeholder='Phone Nuumber' 
+              onChangeText={(value) => setFormInput({...formInput, phone: value })}
+              className='border-gray-600 border-b text-white  my-0 py-4 border-b-1 text-base font-semibold px-3 '
+              />  
+               <FormInput 
               placeholder='Email Address' 
               onChangeText={(value) => setFormInput({...formInput, email: value })}
               className='border-gray-600 border-b text-white  my-0 py-4 border-b-1 text-base font-semibold px-3 '
@@ -73,7 +82,7 @@ const Login = () => {
               secureTextEntry={hidePassword}
               hidePassword={hidePassword}
               setHidePassword={setHidePassword}
-            onChangeText={(value) => setFormInput({...formInput, password: value })}
+            onChangeText={(value) => setFormInput({...formInput, confirm_password: value })}
             className='border-gray-600 text-white border-b py-4 my-0  border-b-1 text-base font-semibold px-3 '
             />
             <Text className='text-red-600'>{errorMessage} </Text>
@@ -97,6 +106,6 @@ const Login = () => {
   )
 }
 
-export default Login
+export default SignUp
 
 const styles = StyleSheet.create({})

@@ -257,11 +257,10 @@ export default function Index() {
           
           </View>
         </View>
-       
 
 
-        <View className="my-10">
-
+        <View className="my-10"
+        >
           <FlatList
           data={prevsummary}
           renderItem={({item}) => (

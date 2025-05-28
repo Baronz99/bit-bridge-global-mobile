@@ -78,11 +78,12 @@ const AuthProvider = ({ children }) => {
       const response = await fetch(`${base_url}/signup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(user),
+        body: JSON.stringify({user}),
       });
       const result = await response.json();
 
-      if (!response.ok){ throw new Error( result?.message ?? "Failed to register");}
+
+      if (!response.ok){ throw new Error( result?.status?.message ?? "Failed to register");}
 
 
 

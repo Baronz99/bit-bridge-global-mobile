@@ -1,12 +1,9 @@
 import { Image, ImageBackground, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import React, { useEffect, useState } from 'react'
 import { Tabs } from 'expo-router'
-import { images } from '@/constants/images'
 import { icons } from '@/constants/icons'
 import { useAuth } from '@/services/useAuth'
 import Login from '../login'
-import Loader from '@/components/Loader'
-import { userProfile } from '@/api/auth'
 import LoaderScreen from '../LoaderScreen'
 import AppModal from '@/components/modal/Modal'
 
@@ -37,12 +34,9 @@ const TabIcon = ({
     )
   }else{
     return(
-          <View   className=' w-full flex-1 min-w-[112px] min-h-14 mt-4 justify-center rounded-full overflow-hidden items-center'>
-            
-             <Image source={icon} tintColor="#a8b5db" className="size-5"                />
-             <Text className='text-[#a8b5db] text-base font-normal'>{title}</Text>
-  
-  
+      <View   className=' w-full flex-1 min-w-[112px] min-h-14 mt-4 justify-center rounded-full overflow-hidden items-center'>        
+        <Image source={icon} tintColor="#a8b5db" className="size-5" />
+        <Text className='text-[#a8b5db] text-base font-normal'>{title}</Text>
     </View>
     )
   }
