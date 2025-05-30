@@ -25,7 +25,7 @@ const confirm = () => {
     const receipt_type = reference?.split("-")[0]
 
 
-    const {data: {updateData}, refetch, error: {updateError} } = useFetch(()=> updateOrderStatus({
+    const {data: updateData, refetch, error: updateError } = useFetch(()=> updateOrderStatus({
       id: reference as string,
       token: token,
       orderData: {
@@ -46,6 +46,8 @@ const confirm = () => {
 
       }
     },[data])
+
+    console.log("updateData====>", updateData)
 
     
   return (

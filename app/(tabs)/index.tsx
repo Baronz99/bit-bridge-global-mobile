@@ -223,7 +223,7 @@ export default function Index() {
              <View className="flex-col my-2 items-center gap-2">
 
                 <TouchableOpacity 
-                onPress={() => router.push("/history/index") }
+                onPress={() => router.push("/history") }
                 className="gap-3 font-semibold items-center rounded-2xl flex-row py-1 px-4">
                   <Text className="text-white">
                     History
@@ -231,7 +231,7 @@ export default function Index() {
                   <Feather name="arrow-right" size={14} color="white" />
                 </TouchableOpacity>             
                 <TouchableOpacity 
-                 onPress={() => router.push("/withdrawFund") }
+                 onPress={() => router.push("/fundWallet") }
 
                 className="bg-purple-900 font-semibold rounded-2xl py-2 px-4">
                   <Text className="text-white">

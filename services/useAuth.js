@@ -65,9 +65,11 @@ const AuthProvider = ({ children }) => {
   }, []);
 
   const register = async (formData) => {
+
     const user = {
       email: formData.email.trim(),
       password: formData.password.trim(),
+      confirm_password: formData.confirm_password.trim(),
       user_profile_attributes: {
         first_name: formData.first_name.trim(),
         last_name: formData.last_name.trim(),
@@ -75,6 +77,13 @@ const AuthProvider = ({ children }) => {
       }
     }
     try {
+
+
+        if ( user.password !== user.confirm_password){
+          throw new Error("Passwords do not match")
+
+        }
+
       const response = await fetch(`${base_url}/signup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

@@ -23,9 +23,7 @@ const index = () => {
   return (
     <View className='flex-1 bg-primary'>
 
-      <View className='flex-1'>
-     
-    
+      <View className='flex-1'>    
 
         
         <View className='my-4 mx-4'>
@@ -33,8 +31,8 @@ const index = () => {
 
         </View>
        
-       <View className="flex-1 border-b mx-4  border-gray-600 pb-2 mb-2 overflow-hidden ">
-          <View className="flex-row bg-gray-800 px-4 py-3">
+       <View className="flex-1 border-b mx-4  border-gray-900 pb-2 mb-2 overflow-hidden ">
+          <View className="flex-row rounded bg-gray-800 px-4 py-3">
             <Text className="flex-1 text-gray-300 font-semibold">Service</Text>
             <Text className="flex-1 text-gray-300 text-center font-semibold">Amount (₦)</Text>
 
@@ -60,7 +58,7 @@ const index = () => {
             />
             
             : data && data?.map((item, index) => (
-              <View key={index} className="flex-row border-t border-gray-200 px-4 py-2">
+              <View key={index} className="flex-row border-t border-gray-900 px-4 py-3">
                 <Text className="flex-1 text-gray-200">{item.service_type}</Text>
 
                 

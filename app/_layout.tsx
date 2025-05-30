@@ -66,7 +66,7 @@ export default function RootLayout() {
             <Stack.Screen
               name="withdrawFund/index"
               options={{
-                headerTitle: "WithdrawFund"
+                headerTitle: "Withdraw Fund"
 
               }}
             />
@@ -175,7 +175,7 @@ export default function RootLayout() {
                     <Stack.Screen
               name="airtime-top-up/confirm/[orderId]"
               options={{
-                headerTitle: "Cornfirm Airtime" 
+                headerTitle: "Confirm Airtime" 
                }}
             />
                      <Stack.Screen

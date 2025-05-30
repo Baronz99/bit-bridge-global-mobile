@@ -64,6 +64,8 @@ const AppContent = ({
   userProfileData
 }: any) => {
 
+
+  console.log("=====>",userProfileData?.user_profile)
   
           const [toggleModal, setToggleModal] = useState(false)
       
@@ -121,7 +123,7 @@ const AppContent = ({
             header: () => <View>
 
               <View className='h-20 px-4 flex-row justify-between items-center bg-primary'>
-                <Text className='text-white font-medium'>Hello, {userProfileData?.email}</Text>
+                <Text className='text-white font-medium'>Hello, {userProfileData?.user_profile?.first_name ?? userProfileData?.email}</Text>
                 <TouchableOpacity className='' onPress={()=> setToggleModal(true)}>
                   <Image source={icons.logout} tintColor={"#ffcc00"} className='w-7 h-7'/>
 
