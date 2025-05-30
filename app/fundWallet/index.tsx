@@ -79,7 +79,7 @@ const index = () => {
          keyboardType="numeric" 
          onChangeText={(text: number) => setFormData({...formData, amount: text})}/>
 
-        <FormInput label="Coupon" name="coupon_code" value={formData.coupon_code} 
+        <FormInput label="Coupon (optional)" name="coupon_code" value={formData.coupon_code} 
          onChangeText={(text: string) => setFormData({...formData, coupon_code: text})}
        />
 
@@ -92,7 +92,7 @@ const index = () => {
 
         </View>
         </KeyboardAvoidWrapper>
-      { loading && <Loader/>}
+      <Loader  open={loading}/>
 
 
 

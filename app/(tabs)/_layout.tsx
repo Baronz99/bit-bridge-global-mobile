@@ -63,9 +63,6 @@ const AppContent = ({
   onLogout,
   userProfileData
 }: any) => {
-
-
-  console.log("=====>",userProfileData?.user_profile)
   
           const [toggleModal, setToggleModal] = useState(false)
       
