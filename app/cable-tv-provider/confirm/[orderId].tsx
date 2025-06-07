@@ -12,6 +12,7 @@ import Loader from '@/components/Loader'
 import NotificationAlert from '@/components/notification'
 import useNotification from '@/hooks/useNotification'
 import Summary from '@/components/cards/Summary'
+import AppModal from '@/components/modal/Modal'
 
 const CableetailConfirm = () => {
       const {orderId} = useLocalSearchParams()
@@ -90,8 +91,11 @@ const CableetailConfirm = () => {
           <TouchableOpacity onPress={() => handleCardConfirmation("card")} className='border rounded-md mt-4 border-green-400 py-5 '>
                           <Text className='text-green-400 text-center'>Pay from Bank </Text>
           </TouchableOpacity>
-          { loader && <Loader/>}
-          <NotificationAlert message={notification.message} error={notification.error} data={notification.data} />
+          <Loader open={loader}/>
+
+          <AppModal open={!!notification.message } onclose={() => setNotification({message: null, error: false, data: null})}>
+            <NotificationAlert onPress={() => setNotification({message: null, error: false, data: null})} message={notification.message} error={notification.error} data={notification.data} />
+          </AppModal>
 
      
 

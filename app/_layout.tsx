@@ -100,6 +100,31 @@ export default function RootLayout() {
 
               }}
             />
+
+              <Stack.Screen
+              name="electric-provider/[id]/index"
+              options={{
+                headerTitle: "Electricity"
+
+              }}
+            />
+
+
+             <Stack.Screen
+              name="electricity-provider/[id]/index"
+              options={{
+                headerTitle: "Electric Bills"
+
+              }}
+            />
+
+                 <Stack.Screen
+              name="electricity-provider/[id]/confirm/[orderId]"
+              options={{
+                headerTitle: "Confirm Electric Bills "
+
+              }}
+            />
             
             <Stack.Screen
               name="cableProviders/[id]/confirm/[orderId]"
@@ -181,7 +206,7 @@ export default function RootLayout() {
                      <Stack.Screen
               name="data-subscription/confirm/[orderId]"
               options={{
-                headerTitle: "Cornfirm Airtime" 
+                headerTitle: "Cornfirm Data" 
                }}
             />
               <Stack.Screen
@@ -225,6 +250,13 @@ export default function RootLayout() {
                 options={{
                   headerShown: true,
                   headerTitle: "Legal" 
+                }}
+              />     
+              <Stack.Screen
+                name="cable-tv-provider/confirm/[orderId]"
+                options={{
+                  headerShown: true,
+                  headerTitle: "TV Subsription" 
                 }}
               />
 

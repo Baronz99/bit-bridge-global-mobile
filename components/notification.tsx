@@ -16,7 +16,7 @@ const NotificationAlert = ({
 }) => {
 
     return (
-    <View className='bg-primary/50 w-full'>
+    <View className='bg-gray-900 rounded-xl w-full'>
    {
       message && 
       <View className='bg-al h-60 fixed w-[100%]    top-0  m justify-center items-center  '>

@@ -20,7 +20,7 @@
         "foregroundImage": "./assets/logos/logo.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.bitbridgeglobal.bitbridgeapp"
+      "package": "com.vortech.bitbridgeapp"
     },
     "web": {
       "bundler": "metro",

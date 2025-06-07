@@ -12,13 +12,16 @@ import { createPurchaseOrder, getPriceList } from '@/api/billOrder'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
 import FormInput from '@/components/FormInput'
 import Loader from '@/components/Loader'
+import AppModal from '@/components/modal/Modal'
+import NotificationAlert from '@/components/notification'
+import useNotification from '@/hooks/useNotification'
 
 const index = () => {
   const {authState: {token},userProfileData } = useAuth()  
   const router = useRouter()  
   
   const [loader, setLoader] = useState(false)
-    
+    const {notification, setNotification}  = useNotification()
     const [selectProvider, setSelectedProvider] = useState(null)
     const [selectProvision, setSelectedProvision] = useState(null)
     const [formValue, setFormValue] = useState({
@@ -50,7 +53,7 @@ const index = () => {
     
         try {
           const response =  await createPurchaseOrder({
-            orderData: {...formValue, email: userProfileData?.email, service_type: selectProvision?.service_type, biller: selectProvider?.provider.toUpperCase(), skip: true},
+            orderData: {...formValue, email: userProfileData?.email, service_type: selectProvision?.service_type, biller: selectProvider?.provider.toUpperCase()},
               token
           }
           )   
@@ -170,6 +173,10 @@ const index = () => {
 
 
         <Loader open={loader}/>
+          <AppModal open={!!notification.message } onclose={() => setNotification({message: null, error: false, data: null})}>
+          <NotificationAlert onPress={() => setNotification({message: null, error: false, data: null})} message={notification.message} error={notification.error} data={notification.data} />
+
+        </AppModal>
 
         </View>
         </ScrollView>

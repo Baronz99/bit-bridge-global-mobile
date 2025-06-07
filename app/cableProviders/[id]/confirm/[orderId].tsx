@@ -62,6 +62,8 @@ const CableetailConfirm = () => {
   
 
 }
+
+console.log('hey', data)
       
 
   return (

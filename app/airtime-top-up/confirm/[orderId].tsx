@@ -10,6 +10,8 @@ import moneyFormat from '@/utils/moneyFormat'
 import NotificationAlert from '@/components/notification'
 import useNotification from '@/hooks/useNotification'
 import Summary from '@/components/cards/Summary'
+import AppModal from '@/components/modal/Modal'
+import PurchaseDetails from '@/components/purchaseDetails/PurchaseDetails'
 
 const MobileDetailConfirm = () => {
       const {orderId} = useLocalSearchParams()
@@ -102,13 +104,7 @@ const MobileDetailConfirm = () => {
         </Text>
       </View>
 
-      <View className="bg-gray-800 rounded-2xl p-6 shadow-lg mb-8">
-        <Text className="text-lg font-semibold text-center text-gray-200 mb-4">
-          Recharge Details
-        </Text>
-
-       <Summary data={data} />
-      </View>
+      <PurchaseDetails title="Details" dtat={data}/>
 
       <View className="space-y-4">
       <TouchableOpacity onPress={() => handleCardConfirmation("wallet")} className='border rounded-md mt-4 border-alt py-5 '>
@@ -124,7 +120,10 @@ const MobileDetailConfirm = () => {
 
     
         <Loader open={loading}/>
-          <NotificationAlert message={notification.message} error={notification.error} data={notification.data} />
+          <AppModal open={!!notification.message } onclose={() => setNotification({message: null, error: false, data: null})}>
+          <NotificationAlert onPress={() => setNotification({message: null, error: false, data: null})} message={notification.message} error={notification.error} data={notification.data} />
+
+        </AppModal>
 
     </View>
   )

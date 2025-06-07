@@ -10,8 +10,9 @@ import Loader from '@/components/Loader'
 import NotificationAlert from '@/components/notification'
 import useNotification from '@/hooks/useNotification'
 import Summary from '@/components/cards/Summary'
+import AppModal from '@/components/modal/Modal'
 
-const MobileDetailConfirm = () => {
+const PowerDetailConfirm = () => {
       const {orderId} = useLocalSearchParams()
           const {authState: {token}, loadProfile} = useAuth()
               const [loader, setLoader] = useState(false)
@@ -86,8 +87,9 @@ const MobileDetailConfirm = () => {
                           <Text className='text-green-400 text-center'>Pay from Bank </Text>
           </TouchableOpacity>
          <Loader open={loader}/>
-          <NotificationAlert message={notification.message} error={notification.error} data={notification.data} />
-
+         <AppModal open={!!notification.message } onclose={() => setNotification({message: null, error: false, data: null})}>
+            <NotificationAlert onPress={() => setNotification({message: null, error: false, data: null})} message={notification.message} error={notification.error} data={notification.data} />
+          </AppModal>
      
 
 
@@ -96,6 +98,6 @@ const MobileDetailConfirm = () => {
   )
 }
 
-export default MobileDetailConfirm
+export default PowerDetailConfirm
 
 const styles = StyleSheet.create({})

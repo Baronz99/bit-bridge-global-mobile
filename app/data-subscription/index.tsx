@@ -61,9 +61,10 @@ const index = () => {
         setLoader(false)
       
   
-        router.push(`/airtime-top-up/confirm/${response?.data.id}`)
+        router.push(`/data-subscription/confirm/${response?.data.id}`)
   
       } catch (error: any) {
+        console.log(error.message)
         setLoader(false)
   
         
@@ -86,7 +87,7 @@ const index = () => {
           if(selectProvider){
     
           
-          const provision = selectProvider?.provisions?.find((item : any) => item.service_type === "VTU")
+          const provision = selectProvider?.provisions?.find((item : any) => item.service_type === "DATA")
     
           setSelectedProvision(provision)
           }
@@ -98,12 +99,28 @@ const index = () => {
           if(selectProvision?.service_type === "DATA"){
             refetch()
           }
-        }, [selectProvision])
+          
+        }, [selectProvision, selectProvider])
+
+        useEffect(() => {
+          if(priceList){
+            setFormValue(
+            {
+              ...formValue,
+              tariff_class: priceList[0].value,
+               amount: priceList[0].amount,
+               description: priceList[0].label
+            }
+          )
+          console.log(formValue, priceList[0])
+
+          }
+           
+        }, [priceList])
 
       const airtimeBillers_ = data?.filter((item: any) => item.category === "mobile provider");
 
-      
-
+        
   return (
      <>
     
