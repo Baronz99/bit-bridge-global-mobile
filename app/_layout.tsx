@@ -237,7 +237,7 @@ export default function RootLayout() {
                 }}
               />
 
-                  <Stack.Screen
+              <Stack.Screen
                 name="change-password/index"
                 options={{
                   headerShown: true,
@@ -257,6 +257,13 @@ export default function RootLayout() {
                 options={{
                   headerShown: true,
                   headerTitle: "TV Subsription" 
+                }}
+              />
+              <Stack.Screen
+                name="accountProfile/index"
+                options={{
+                  headerShown: true,
+                  headerTitle: "Update Profile" 
                 }}
               />
 
