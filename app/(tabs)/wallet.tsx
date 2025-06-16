@@ -50,25 +50,37 @@ const wallet = () => {
         </View>
         </View>
 
-        <View className="mt-7 border border-gray-600 bg-primary rounded-lg overflow-hidden h-96">
+        <View className="mt-7 border border-gray-800 bg-primary rounded-lg overflow-hidden max-h-96">
           <View className="flex-row bg-gray- px-4 py-3">
             <Text className="flex-1 font-semibold text-gray-300">Status</Text>
             <Text className="flex-1 font-semibold text-gray-300 text-center">Amount (₦)</Text>
 
             <Text className="flex-1 font-semibold text-gray-300 text-right">Time </Text>
-          </View>
+        </View>
 
+      <ScrollView className="">
 
+        {loading ? <ActivityIndicator className='mt-10' size={"large"}/> : data  && 
 
-      <ScrollView className="h-full">
-
-        {loading ? <ActivityIndicator className='mt-10' size={"large"}/> :  data && data?.data.map((item, index) => (
-          <View key={index} className="flex-row border-t border-gray-600 px-4 py-2">
-            <Text className={`${item.status === "approved" ? "text-green-500" : item.status === "initialized" ? "text-gray-200" : "text-red-600"} flex-1 `}>{item.status}</Text>
-            <Text className="flex-1 text-center text-white">{moneyFormat(item.amount)}</Text>
-            <Text className="flex-1  text-right text-white">{dateFormat(item.created_at)}</Text>
-          </View>
-        ))}
+           ( 
+            data.data.length < 1 ? <View className="flex-row border-t border-gray-600 px-4 py-4">
+                  <Text className="flex-1 text-center text-white">No transaction</Text>
+              </View> : 
+         data?.data.map((item, index) => (
+            <>
+            
+              <View className="flex-row border-t border-gray-600 bg-white px-4 py-2">
+                <Text className={`text-white`}>No Transactions. </Text>
+              </View>
+              <View key={index} className="flex-row border-t bg-red-300 border-gray-600 px-4 py-2">
+                  <Text className={`${item.status === "approved" ? "text-green-500" : item.status === "initialized" ? "text-gray-200" : "text-red-600"} flex-1 `}>{item.status}</Text>
+                  <Text className="flex-1 text-center text-white">{moneyFormat(item.amount)}</Text>
+                  <Text className="flex-1  text-right text-white">{dateFormat(item.created_at)}</Text>
+              </View>
+          </>
+        ))
+        )
+        }
       </ScrollView>
     </View>
       </ScrollView>

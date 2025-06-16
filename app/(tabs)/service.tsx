@@ -12,7 +12,7 @@ const Utilities = () => {
     id: 0,
     label: "Airtime",
     btn: "Select Provider",
-    link: "Airtime",
+    link: "airtime-top-up",
     image: icons.phone
   },{
     id: 1,
@@ -25,7 +25,7 @@ const Utilities = () => {
     id: 2,
     label: "Data",
     btn: "Select Provider",
-    link: "Airtime",
+    link: "data-subscription",
     image: icons.wifi
   },
   {
@@ -38,6 +38,7 @@ const Utilities = () => {
   return (
     <View className='flex-1 px-4 bg-primary'>
       <ScrollView>
+        {/* dfd */}
 
         <View className='bg-gray-900/60 p-4 rounded-xl'>
           <Text className='text-white'>Bill Payment</Text>
