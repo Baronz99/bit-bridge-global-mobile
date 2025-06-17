@@ -52,8 +52,9 @@
       }
     },
     "owner": "vortech-engineering",
-    "runtimeVersion": "1.0.0",
     "updates": {
+      "runtimeVersion": "1.0.0",
+      "enabled": true,
       "url": "https://u.expo.dev/2dedaba7-b1ad-4919-afd4-de6dc510ce23"
     }
   }
