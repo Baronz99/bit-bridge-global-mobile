@@ -61,10 +61,7 @@ const CableetailConfirm = () => {
       }
   
 
-}
-
-console.log('hey', data)
-      
+}      
 
   return (
     <View className='flex-1 px-4 bg-primary w-full'>

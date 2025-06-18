@@ -64,7 +64,6 @@ const index = () => {
         router.push(`/data-subscription/confirm/${response?.data.id}`)
   
       } catch (error: any) {
-        console.log(error.message)
         setLoader(false)
   
         
@@ -112,8 +111,6 @@ const index = () => {
                description: priceList[0].label
             }
           )
-          console.log(formValue, priceList[0])
-
           }
            
         }, [priceList])
