@@ -101,14 +101,6 @@ export default function RootLayout() {
               }}
             />
 
-              <Stack.Screen
-              name="electric-provider/[id]/index"
-              options={{
-                headerTitle: "Electricity"
-
-              }}
-            />
-
 
              <Stack.Screen
               name="electricity-provider/[id]/index"
