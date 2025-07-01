@@ -93,15 +93,6 @@ const AuthProvider = ({ children }) => {
 
 
       if (!response.ok){ throw new Error( result?.status?.message ?? "Failed to register");}
-      console.log(result)   
-      // const token = authheader.split(" ")[1];
-
-      // if(!token){
-      //         throw new Error("No token returned")
-      //       }
-
-      console.log("response email ==>", user.email)
-
       await SecureStore.setItemAsync("email", user?.email);
       // setAuthState({ token: token, authenticated: true });
 
@@ -109,7 +100,7 @@ const AuthProvider = ({ children }) => {
     } catch (error) {
       if (error instanceof Error) {
               throw error;
-            } else {
+          } else {
               throw new Error("Something went wrong");
             }        }
   };
