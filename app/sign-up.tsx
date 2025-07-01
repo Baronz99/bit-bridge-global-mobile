@@ -28,13 +28,14 @@ const SignUp = () => {
 
     const handleLogin = async () => {
         setLoading(true)
+        console.log(formInput)
         try {
 
           const result = await onRegister(formInput);
 
 
           setLoading(false)  
-          router.push("/")        
+          router.push("/confirmEmail")        
         } catch (error) {
           // Handle errors during the login process
           setErrorMessage(error.message)

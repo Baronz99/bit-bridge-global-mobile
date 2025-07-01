@@ -128,3 +128,24 @@ export const userProfileDel = async({
     }
 
 }
+
+
+
+
+
+export const sendUserConfirmation = async(email: string) => {
+    
+    try {
+        const response = await axios.get(`${base_url + api_route}users/resend_confirmation_token?email=${email}`);
+
+        const data = response.data;
+        console.log(data)
+        return data;
+    } catch (error: any) {
+        if (error.response) {
+            throw new Error(error.response.data.message );
+        }
+        console.error(error);
+        throw new Error ( "Something went wrong");
+    }
+};

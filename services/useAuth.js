@@ -93,19 +93,17 @@ const AuthProvider = ({ children }) => {
 
 
       if (!response.ok){ throw new Error( result?.status?.message ?? "Failed to register");}
+      console.log(result)   
+      // const token = authheader.split(" ")[1];
 
+      // if(!token){
+      //         throw new Error("No token returned")
+      //       }
 
+      console.log("response email ==>", user.email)
 
-      const authheader = response.headers.get('Authorization')      
-      const token = authheader.split(" ")[1];
-
-      if(!token){
-              throw new Error("No token returned")
-            }
-           
-
-      await SecureStore.setItemAsync(token_key, token);
-      setAuthState({ token: token, authenticated: true });
+      await SecureStore.setItemAsync("email", user?.email);
+      // setAuthState({ token: token, authenticated: true });
 
       return result;
     } catch (error) {

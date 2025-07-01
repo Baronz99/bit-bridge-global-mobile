@@ -57,28 +57,28 @@ const wallet = () => {
             <Text className="flex-1 font-semibold text-gray-300 text-right">Time </Text>
         </View>
 
-      <ScrollView className="">
+        <ScrollView className="">
 
-        {loading ? <ActivityIndicator className='mt-10' size={"large"}/> : data  && 
+          {loading ? <ActivityIndicator className='mt-10' size={"large"}/> : data  && 
 
-           ( 
-            data.data.length < 1 ? <View className="flex-row border-t border-gray-600 px-4 py-4">
-                  <Text className="flex-1 text-center text-white">No transaction</Text>
-              </View> : 
-         data?.data.map((item, index) => (
-            <>
-            
+            ( 
+              data.data.length < 1 ? <View className="flex-row border-t border-gray-600 px-4 py-4">
+                    <Text className="flex-1 text-center text-white">No transaction</Text>
+                </View> : 
+          data?.data.map((item, index) => (
+              <>
               
-              <View key={index} className="flex-row border-t border-gray-600 px-4 py-2">
-                  <Text className={`${item.status === "approved" ? "text-green-500" : item.status === "initialized" ? "text-gray-200" : "text-red-600"} flex-1 `}>{item.status}</Text>
-                  <Text className="flex-1 text-center text-white">{moneyFormat(item.amount)}</Text>
-                  <Text className="flex-1  text-right text-white">{dateFormat(item.created_at)}</Text>
-              </View>
-          </>
-        ))
-        )
-        }
-      </ScrollView>
+                
+                <View key={index} className="flex-row border-t border-gray-600 px-4 py-2">
+                    <Text className={`${item.status === "approved" ? "text-green-500" : item.status === "initialized" ? "text-gray-200" : "text-red-600"} flex-1 `}>{item.status}</Text>
+                    <Text className="flex-1 text-center text-white">{moneyFormat(item.amount)}</Text>
+                    <Text className="flex-1  text-right text-white">{dateFormat(item.created_at)}</Text>
+                </View>
+            </>
+          ))
+          )
+          }
+        </ScrollView>
     </View>
       </ScrollView>
     </View>

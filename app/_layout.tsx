@@ -259,6 +259,14 @@ export default function RootLayout() {
                 }}
               />
 
+                <Stack.Screen
+                name="confirmEmail"
+                options={{
+                  headerShown: true,
+                  headerTitle: "Email Confirmation" 
+                }}
+              />
+
 
         </Stack>
 

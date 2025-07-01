@@ -25,6 +25,7 @@ import legal from "@/assets/icons/legal-document.png"
 import wifi from "@/assets/icons/wi-fi.png"
 import electricity from "@/assets/icons/power.png"
 import television from "@/assets/icons/television.png"
+import email from "@/assets/icons/email.png"
 
 import appLogo from "@/assets/logos/logo.png"
 
@@ -56,6 +57,7 @@ export const icons = {
   phone,
   wifi,
   electricity,
-  television
+  television,
+  email
 
 };
