@@ -112,7 +112,7 @@ const MobileDetailConfirm = () => {
       </View>
       <Text className='text-white text-center'>{textInfo}</Text>
 
-      <View className="flex-row gap-4  bg-red-900/40 px-4 rounded-lg py-2 ">
+      <View className="flex-row gap-4  bg-gray-900 px-4 rounded-lg py-2 ">
         <Pressable onPress={() => handleCardConfirmation("wallet")} className='border rounded-md flex-1  border-alt py-5 '>
               <Text className='text-alt text-center'>Pay from Wallet </Text>
           </Pressable>
