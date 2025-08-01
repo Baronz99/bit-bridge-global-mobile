@@ -21,6 +21,9 @@ import { AntDesign, Feather } from "@expo/vector-icons";
 import ViewBox from "@/components/view-box/ViewBoxIcon";
 import FormInput from "@/components/FormInput";
 import { createBankAccount } from "@/api/account";
+import Constants from 'expo-constants';
+import * as Updates from 'expo-updates';
+
 export default function Index() {
   const router = useRouter()
   const {authState: {token}, userProfileData, loadProfile} = useAuth()
@@ -35,7 +38,7 @@ export default function Index() {
     token,
   }))
 
-
+console.log("Runtime Version:", Constants.manifest2?.runtimeVersion);
 
   const {data: recentTransaction } = useFetch(() => getRescentPurchaseOrder({token}))
   
@@ -266,6 +269,12 @@ console.log(bvnNumber, bvnNumber.length)
             </TouchableOpacity>
         )}
 
+        <Text className="text-white">{Constants.manifest2?.runtimeVersion}</Text>
+  <View style={{ padding: 20 }}>
+      <Text className="text-white">Runtime: {Constants.manifest2?.runtimeVersion}</Text>
+      <Text className="text-white">Update ID: {Updates.updateId ?? 'No update applied'}</Text>
+      <Text className="text-white">Is Embedded: {Updates.isEmbeddedUpdate ? 'Yes' : 'No'}</Text>
+    </View>
 
         <View className='bg-gray-900/60 p-4 rounded-xl'>
           {/* <Text className='text-white'>Bill Payment</Text> */}
