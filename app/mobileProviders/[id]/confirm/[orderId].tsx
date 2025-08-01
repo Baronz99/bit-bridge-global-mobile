@@ -110,10 +110,10 @@ const MobileDetailConfirm = () => {
        <Summary data={data} />
       </View>
 
-      <View className="space-y-4">
-      <TouchableOpacity onPress={() => handleCardConfirmation("wallet")} className='border rounded-md mt-4 border-alt py-5 '>
-                          <Text className='text-alt text-center'>Pay from Wallet </Text>
-          </TouchableOpacity>
+      <View className="space-y-4 bg-gray-900 px-4 rounded-lg py-2">
+        <TouchableOpacity onPress={() => handleCardConfirmation("wallet")} className='border rounded-md mt-4 border-alt py-5 '>
+                            <Text className='text-alt text-center'>Pay from Wallet </Text>
+            </TouchableOpacity>
 
           <TouchableOpacity onPress={() => handleCardConfirmation("card")} className='border rounded-md mt-4 border-green-400 py-5 '>
                           <Text className='text-green-400 text-center'>Pay from Bank </Text>
