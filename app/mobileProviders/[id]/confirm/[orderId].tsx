@@ -110,12 +110,12 @@ const MobileDetailConfirm = () => {
 
        <Summary data={data} />
       </View>
+      <Text className='text-white text-center'>{textInfo}</Text>
 
       <View className="flex-row gap-4  bg-red-900 px-4 rounded-lg py-2 ">
-        <Text className='text-white text-center'>{textInfo}</Text>
         <TouchableOpacity onPress={() => handleCardConfirmation("wallet")} className='border rounded-md flex-1  border-alt py-5 '>
-                            <Text className='text-alt text-center'>Pay from Wallet </Text>
-            </TouchableOpacity>
+              <Text className='text-alt text-center'>Pay from Wallet </Text>
+          </TouchableOpacity>
 
           <TouchableOpacity onPress={() => handleCardConfirmation("card")} className='border rounded-md  flex-1 border-green-400 py-5 '>
                           <Text className='text-green-400 text-center'>Pay from Bank </Text>
@@ -126,7 +126,7 @@ const MobileDetailConfirm = () => {
 
     
         <Loader open={loading}/>
-          <NotificationAlert message={notification.message} error={notification.error} data={notification.data} />
+          {/* <NotificationAlert message={notification.message} error={notification.error} data={notification.data} /> */}
 
     </View>
   )
