@@ -17,7 +17,7 @@ const MobileDetailConfirm = () => {
           const {notification, setNotification} = useNotification()
       
           const {authState: {token},loadProfile } = useAuth()
-
+          const [textInfo, setTextInfo] = useState("")
 
           const {data, refetch, loading, error, reset} = useFetch(()=> getPurchaseOrder({
             id: orderId,
@@ -56,6 +56,7 @@ const MobileDetailConfirm = () => {
     }
 
     const handleCardConfirmation = async (payment_method: string) => {
+      setTextInfo("Please wait while we process your payment")
       setLoader(true)
 
       try {
@@ -110,12 +111,13 @@ const MobileDetailConfirm = () => {
        <Summary data={data} />
       </View>
 
-      <View className="space-y-4 bg-gray-900 px-4 rounded-lg py-2">
-        <TouchableOpacity onPress={() => handleCardConfirmation("wallet")} className='border rounded-md mt-4 border-alt py-5 '>
+      <View className="space-y-4 flex-row gap-4  bg-gray-900 px-4 rounded-lg py-2">
+        <Text className='text-white text-center'>{textInfo}</Text>
+        <TouchableOpacity onPress={() => handleCardConfirmation("wallet")} className='border rounded-md flex-1 mt-4 border-alt py-5 '>
                             <Text className='text-alt text-center'>Pay from Wallet </Text>
             </TouchableOpacity>
 
-          <TouchableOpacity onPress={() => handleCardConfirmation("card")} className='border rounded-md mt-4 border-green-400 py-5 '>
+          <TouchableOpacity onPress={() => handleCardConfirmation("card")} className='border rounded-md mt-4 flex-1 border-green-400 py-5 '>
                           <Text className='text-green-400 text-center'>Pay from Bank </Text>
           </TouchableOpacity>
       </View>
