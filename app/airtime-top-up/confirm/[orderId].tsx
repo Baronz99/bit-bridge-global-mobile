@@ -104,7 +104,7 @@ const MobileDetailConfirm = () => {
         </Text>
       </View>
 
-      <PurchaseDetails title="Details" dtat={data}/>
+      <PurchaseDetails title="Purchase Details" data={data}/>
 
       <View className="space-y-4">
       <TouchableOpacity onPress={() => handleCardConfirmation("wallet")} className='border rounded-md mt-4 border-alt py-5 '>

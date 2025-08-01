@@ -38,6 +38,8 @@ export default function Index() {
     token,
   }))
 
+  const [getstarted, setOpenStarted] = useState(false)
+
 console.log("Runtime Version:", Constants.manifest2?.runtimeVersion);
 
   const {data: recentTransaction } = useFetch(() => getRescentPurchaseOrder({token}))
@@ -199,8 +201,6 @@ console.log("Runtime Version:", Constants.manifest2?.runtimeVersion);
     loadProfile(token)
   },[])
 
-console.log(bvnNumber, bvnNumber.length)
-
   return (
     <>
     <View
@@ -258,6 +258,12 @@ console.log(bvnNumber, bvnNumber.length)
              
 
         </View>
+
+        <TouchableOpacity onPress={() => {
+          setOpenStarted(true)
+          console.log("first")}} className='border rounded-md mt-4 border-green-400 py-5 '>
+                                  <Text className='text-green-400 text-center'>Pay from Bank </Text>
+                  </TouchableOpacity>
 
         {userProfileData?.account && (
 
@@ -485,6 +491,24 @@ console.log(bvnNumber, bvnNumber.length)
      </View>
 
      </AppModal>
+
+      <AppModal open={getstarted} onclose={()=> setOpenStarted(false)}>
+        <View className="bg-gray-900 p-6 rounded-2xl w-full max-w-md">
+          <Text className="text-white text-xl font-semibold text-center mb-4">
+            Welcome to BitBridge
+          </Text>
+          <Text className="text-gray-300 text-center mb-6">
+            Explore our services and enjoy seamless transactions.
+          </Text>
+
+          <TouchableOpacity
+            onPress={() => router.push("/airtime-top-up")}
+            className="bg-app-primary py-3 rounded-xl items-center"
+          >
+            <Text className="text-white font-medium">Get Started</Text>
+          </TouchableOpacity>
+        </View>
+      </AppModal>
 
      <Loader open={loader} />
 
