@@ -273,7 +273,7 @@ console.log(bvnNumber, bvnNumber.length)
   <View style={{ padding: 20 }}>
       <Text className="text-white">Runtime: {Constants.manifest2?.runtimeVersion}</Text>
       <Text className="text-white">Update ID: {Updates.updateId ?? 'No update applied'}</Text>
-      <Text className="text-white">Is Embedded: {Updates.isEmbeddedUpdate ? 'Yes' : 'No'}</Text>
+      <Text className="text-white">Is Embedded:: {Updates.isEmbeddedUpdate ? 'Yes' : 'No'}</Text>
     </View>
 
         <View className='bg-gray-900/60 p-4 rounded-xl'>
