@@ -8,24 +8,23 @@ const AppModal = ({
 }: any) => {
   return (
     
-          <Modal
-          
-          visible={open}
-          transparent={true}
-          animationType='fade'
-          onRequestClose={()=> onclose}
-    
+          <Modal          
+            visible={open}
+            transparent={true}
+            animationType='fade'
+            onRequestClose={()=> onclose}      
           >
             <Pressable
             onPress={onclose}
-            className='flex-1 bg-primary/50 justify-center items-center'>
-            <Pressable 
-            className=' px-4 w-full'
-            // onPress={()=> {}}
+            className='flex-1 bg-primary/50 justify-center items-center'
             >
-            {children}
-    
-            </Pressable>
+              <Pressable 
+              className=' px-4 w-full'
+              // onPress={()=> {}}
+              >
+              {children}
+      
+              </Pressable>
             </Pressable>
 
         

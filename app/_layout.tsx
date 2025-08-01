@@ -267,6 +267,14 @@ export default function RootLayout() {
                 }}
               />
 
+               <Stack.Screen
+                name="accountDetails/index"
+                options={{
+                  headerShown: true,
+                  headerTitle: "Account Details" 
+                }}
+              />
+
 
         </Stack>
 

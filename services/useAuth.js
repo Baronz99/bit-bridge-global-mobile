@@ -167,7 +167,8 @@ const AuthProvider = ({ children }) => {
 
           } catch (error) {
               if(error.response){
-                // setAuthState({token: null, authenticated: false })
+                // console.log(error.response.status, error.response.data, "error response")
+                setAuthState({token: null, authenticated: false })
                   return  error.response.data || "error occured"
               }
       

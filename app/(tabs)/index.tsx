@@ -17,16 +17,20 @@ import Loader from "@/components/Loader";
 import { getRescentPurchaseOrder, repurchaseOrder } from "@/api/billOrder";
 import NotificationAlert from "@/components/notification";
 import useNotification from "@/hooks/useNotification";
-import { Feather } from "@expo/vector-icons";
+import { AntDesign, Feather } from "@expo/vector-icons";
 import ViewBox from "@/components/view-box/ViewBoxIcon";
+import FormInput from "@/components/FormInput";
+import { createBankAccount } from "@/api/account";
 export default function Index() {
   const router = useRouter()
   const {authState: {token}, userProfileData, loadProfile} = useAuth()
   const [selectedService, setSelectedService] = useState<string>("Top Up")
+  const [bvnNumber, setBvnNumber] = useState<string>("")
   const [billOrder, setBillOrder] = useState<any | null>(null)
   const [openModal, setOpenModal] = useState(false)
   const {notification, setNotification} = useNotification()
   const [toggleAlert, setToggleAlert] = useState(false)
+  const [toggleBvn, setToggleBvn] = useState(false)
   const {data, loading, error } = useFetch(() => getProducts({
     token,
   }))
@@ -65,6 +69,9 @@ export default function Index() {
       image: icons.television
     }]
 
+    useEffect(() => {
+      setToggleBvn(!userProfileData?.account)
+    },[userProfileData])
 
   const datalist = data?.flatMap((item: any) => {
     return item.provisions.flatMap((provision : any) =>  {
@@ -189,7 +196,7 @@ export default function Index() {
     loadProfile(token)
   },[])
 
-
+console.log(bvnNumber, bvnNumber.length)
 
   return (
     <>
@@ -213,12 +220,14 @@ export default function Index() {
                  <Text className="text-white text-base text-left font-bold mt-2">Wallet Balance</Text>
                 <Text className="text-white text-left text-lg  font-bold">{moneyFormat(userProfileData?.wallet?.balance)}</Text>
              
-             
+              
              <View className="flex-row my-1 items-center gap-2">
               <Image source={icons.trophy} className="w-5 h-5" />
                 <Text className="text-white">0.00</Text>
               </View>  
+
             </View>
+         
 
              <View className="flex-col my-2 items-center gap-2">
 
@@ -246,6 +255,17 @@ export default function Index() {
              
 
         </View>
+
+        {userProfileData?.account && (
+
+           <TouchableOpacity
+           onPress={() => router.push("/accountDetails")} className="my-4 bg-gray-900   py-2 w-48 flex flex-row gap-4 items-center rounded-2xl px-4">
+                 <Text className="text-white -900 text-lg text-left font-bold ">Moniepoint</Text>
+                 <AntDesign name="caretdown" size={14} color="gray" />
+
+            </TouchableOpacity>
+        )}
+
 
         <View className='bg-gray-900/60 p-4 rounded-xl'>
           {/* <Text className='text-white'>Bill Payment</Text> */}
@@ -389,6 +409,71 @@ export default function Index() {
      </AppModal>
      <AppModal open={toggleAlert} onclose={()=> setToggleAlert(false)}>
       <NotificationAlert onPress={()=> setToggleAlert(false)} message={notification?.message} error={notification.error} data={notification.data}/>
+
+     </AppModal>
+
+     <AppModal open={toggleBvn} onclose={()=> {setToggleBvn(false)}}>
+      <View className="bg-gray-900 p-6 rounded-2xl w-full max-w-md">
+        <Text className="text-white text-xl font-semibold text-center mb-2">
+          BVN Verification
+        </Text>
+        <Text className="text-gray-300 text-center mb-6">
+          Please enter your BVN number to continue
+        </Text>
+
+        <View className="mb-4">
+          <Text className="text-white mb-0">BVN Number</Text>
+
+          <FormInput required={true} placeHolder="Enter BVN Number"  onChangeText={(value: string)=> setBvnNumber(value)} className="border border-gray-600 text-white rounded-lg mt-4 py-2 px-3" name="bvn" type='text'/>
+                 {notification?.error && 
+                 <Text className="text-red-600 mb-2">{notification?.message}</Text>
+
+                 }   
+            <TouchableOpacity
+              onPress={() => {
+                if(bvnNumber.length === 11){
+                  setLoader(true)
+                  createBankAccount({
+                    account: {
+                      bvn: bvnNumber,
+                       currency: "ngn",
+                       vendor: "moniepoint",
+                    },
+                    
+                  }, token).then((response: any) => {
+                    setLoader(false)
+                    setToggleBvn(false)
+                    setNotification({
+                      error: false,
+                      message: response.message,
+                      data: response.data
+                    })
+                    loadProfile(token)
+                  }).catch((error: any) => {
+                    setLoader(false)
+                    setNotification({
+                      error: true,
+                      message: error?.message || "Failed  to verify BVN",
+                      data: null
+                    })
+                  })
+
+
+                }else{
+                  setToggleBvn(true)
+                  setNotification({
+                    error: true,
+                    message: "BVN number must be 11 digits",
+                    data: null
+                  })
+                }
+              }}
+              className="bg-app-primary py-3 rounded-xl items-center">
+              <Text className="text-white font-medium">Verify BVN</Text>
+              </TouchableOpacity>
+          
+           </View>
+     </View>
 
      </AppModal>
 
