@@ -111,7 +111,7 @@ const MobileDetailConfirm = () => {
        <Summary data={data} />
       </View>
 
-      <View className="flex-row gap-4  bg-gray-900/60 px-4 rounded-lg py-2 ">
+      <View className="flex-row gap-4  bg-red-900 px-4 rounded-lg py-2 ">
         <Text className='text-white text-center'>{textInfo}</Text>
         <TouchableOpacity onPress={() => handleCardConfirmation("wallet")} className='border rounded-md flex-1  border-alt py-5 '>
                             <Text className='text-alt text-center'>Pay from Wallet </Text>
