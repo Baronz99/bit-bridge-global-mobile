@@ -59,43 +59,43 @@ const MobileDetailConfirm = () => {
     }
 
     const handleCardConfirmation = async (payment_method: string) => {
-      setTextInfo("Please wait while we process your payment")
+      // setTextInfo("Please wait while we process your payment")
       setLoader(true)
-      setNotification({
-        error: false,
-        message: "Recharge Successful",
-        data: null
-      })
-
-      // try {
-
-      //  const response = await  confirmBillPayment({queryId: orderId, payment_method, token})
-      //  setLoader(false)
-
-      //  if(payment_method === "card"){
-      //   Linking.openURL(response.responseBody.checkoutUrl)
-
-      //  }
-
-      //  setNotification({
+      // setNotification({
       //   error: false,
-      //   message: response?.message || "Recharge Successful",
+      //   message: "Recharge Successful",
       //   data: null
       // })
 
-      // loadProfile(token)
+      try {
+
+       const response = await  confirmBillPayment({queryId: orderId, payment_method, token})
+       setLoader(false)
+
+       if(payment_method === "card"){
+        Linking.openURL(response.responseBody.checkoutUrl)
+
+       }
+
+       setNotification({
+        error: false,
+        message: response?.message || "Recharge Successful",
+        data: null
+      })
+
+      loadProfile(token)
        
   
         
-      // } catch (error: any) {
-      //   setLoader(false)
-      //   setNotification({
-      //     error: true,
-      //     message: error.message || "something went wrong",
-      //     data: null
-      //   })
+      } catch (error: any) {
+        setLoader(false)
+        setNotification({
+          error: true,
+          message: error.message || "something went wrong",
+          data: null
+        })
         
-      // }
+      }
   
 
 }
@@ -120,7 +120,7 @@ const MobileDetailConfirm = () => {
       </View>
       <Text className='text-white text-center'>{textInfo}</Text>
 
-      <View className="flex-row gap-4  bg-gray-600 px-4 rounded-lg py-2 ">
+      <View className="flex-row gap-4  bg-gray-900 px-4 rounded-lg py-2 ">
         <TouchableOpacity onPress={() => handleCardConfirmation("wallet")} className='border rounded-md flex-1  border-alt py-5 '>
               <Text className='text-alt text-center'>Pay from Wallet </Text>
           </TouchableOpacity>
@@ -130,11 +130,11 @@ const MobileDetailConfirm = () => {
           </TouchableOpacity>
       </View>
 
-        <TouchableOpacity onPress={() => {
+        {/* <TouchableOpacity onPress={() => {
                 setOpenStarted(true)
                 console.log("first")}} className='border rounded-md mt-4 border-green-400 py-5 '>
                                         <Text className='text-green-400 text-center'>Pay from Bank </Text>
-                        </TouchableOpacity>
+                        </TouchableOpacity> */}
 
    
 
