@@ -10,6 +10,7 @@ import moneyFormat from '@/utils/moneyFormat'
 import NotificationAlert from '@/components/notification'
 import useNotification from '@/hooks/useNotification'
 import Summary from '@/components/cards/Summary'
+import AppModal from '@/components/modal/Modal'
 
 const MobileDetailConfirm = () => {
       const {orderId} = useLocalSearchParams()
@@ -58,36 +59,41 @@ const MobileDetailConfirm = () => {
     const handleCardConfirmation = async (payment_method: string) => {
       setTextInfo("Please wait while we process your payment")
       setLoader(true)
-
-      try {
-
-       const response = await  confirmBillPayment({queryId: orderId, payment_method, token})
-       setLoader(false)
-
-       if(payment_method === "card"){
-        Linking.openURL(response.responseBody.checkoutUrl)
-
-       }
-
-       setNotification({
+      setNotification({
         error: false,
-        message: response?.message || "Recharge Successful",
+        message: "Recharge Successful",
         data: null
       })
 
-      loadProfile(token)
+      // try {
+
+      //  const response = await  confirmBillPayment({queryId: orderId, payment_method, token})
+      //  setLoader(false)
+
+      //  if(payment_method === "card"){
+      //   Linking.openURL(response.responseBody.checkoutUrl)
+
+      //  }
+
+      //  setNotification({
+      //   error: false,
+      //   message: response?.message || "Recharge Successful",
+      //   data: null
+      // })
+
+      // loadProfile(token)
        
   
         
-      } catch (error: any) {
-        setLoader(false)
-        setNotification({
-          error: true,
-          message: error.message || "something went wrong",
-          data: null
-        })
+      // } catch (error: any) {
+      //   setLoader(false)
+      //   setNotification({
+      //     error: true,
+      //     message: error.message || "something went wrong",
+      //     data: null
+      //   })
         
-      }
+      // }
   
 
 }
@@ -126,7 +132,11 @@ const MobileDetailConfirm = () => {
 
     
         <Loader open={loading}/>
-          <NotificationAlert message={notification.message} error={notification.error} data={notification.data} />
+
+          <AppModal open={!!notification?.message} onclose={()=> setNotification({message: null, error: false, data: null})}>
+      <NotificationAlert onPress={()=> setNotification({message: null, error: false, data: null})} message={notification?.message} error={notification.error} data={notification.data}/>
+
+     </AppModal>
 
     </View>
   )
