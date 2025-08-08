@@ -1,4 +1,4 @@
-import { Linking, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import React, { useState } from 'react'
 import { useLocalSearchParams } from 'expo-router'
 import useFetch from '@/services/useFetch'
@@ -135,6 +135,14 @@ const MobileDetailConfirm = () => {
                 console.log("first")}} className='border rounded-md mt-4 border-green-400 py-5 '>
                                         <Text className='text-green-400 text-center'>Pay from Bank </Text>
                         </TouchableOpacity>  */}
+
+                         <TouchableOpacity className='py-3  flex-row items-center flex justify-center mt-10  bg-app-primary rounded-lg'
+                                      onPress={() => handleCardConfirmation("wallet")}
+                                      >
+                                        {loading ? <ActivityIndicator/> :
+                                          <Text className=' font-semibold text-base text-gray-100'>Update from wallet</Text>
+                                        }
+                                    </TouchableOpacity> 
 
    
 
