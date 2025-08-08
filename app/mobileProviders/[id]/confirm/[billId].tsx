@@ -100,16 +100,16 @@ const confirm = () => {
             onPress={() => setTextInfo("wallet")}
             >
             
-            <Text className=' font-semibold text-base text-gray-100'>Button with components {textInfo}</Text>
+            <Text className=' font-semibold text-base text-gray-100'>Button without notification {textInfo}</Text>
             
         </TouchableOpacity>    
         
         <Loader open={loading}/>
 
-      <AppModal open={!!notification?.message} onclose={()=> setNotification({message: null, error: false, data: null})}>
+      {/* <AppModal open={!!notification?.message} onclose={()=> setNotification({message: null, error: false, data: null})}>
       <NotificationAlert onPress={()=> setNotification({message: null, error: false, data: null})} message={notification?.message} error={notification.error} data={notification.data}/>
 
-     </AppModal>
+     </AppModal> */}
     </View>
   )
 }
