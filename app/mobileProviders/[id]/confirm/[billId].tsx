@@ -89,7 +89,7 @@ const confirm = () => {
             onPress={() => setTextInfo("wallet")}
             >
             
-            <Text className=' font-semibold text-base text-gray-100'>Button for bill pay for dark mode {textInfo}</Text>
+            <Text className=' font-semibold text-base text-gray-100'>Button for bill pay for dark with summary {textInfo}</Text>
             
         </TouchableOpacity>    
     </View>
