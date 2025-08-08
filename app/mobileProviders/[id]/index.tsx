@@ -63,7 +63,8 @@ useEffect(()=> {
 
         setLoader(false)
 
-        if(response)  router.push(`/mobileProviders/${id}/confirm/${response?.data.id}`)
+        // if(response)  router.push(`/mobileProviders/${id}/confirm/${response?.data.id}`)
+        if(response)  router.push(`/mobileProviders//confirm`)
 
       } catch (error: any) {
         setLoader(false)
