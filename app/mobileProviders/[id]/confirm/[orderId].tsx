@@ -1,19 +1,18 @@
-import { ActivityIndicator, Linking, Pressable, StyleSheet, Text,  TouchableOpacity,  View } from 'react-native'
+import { View, Text, TouchableOpacity, Linking } from 'react-native'
 import React, { useState } from 'react'
 import { useLocalSearchParams } from 'expo-router'
-import useFetch from '@/services/useFetch'
-import { getProvision } from '@/api/products'
-import { confirmBillPayment, confirmPayment, getPurchaseOrder } from '@/api/billOrder'
-import { useAuth } from '@/services/useAuth'
-import Loader from '@/components/Loader'
-import moneyFormat from '@/utils/moneyFormat'
-import NotificationAlert from '@/components/notification'
 import useNotification from '@/hooks/useNotification'
-import Summary from '@/components/cards/Summary'
-import AppModal from '@/components/modal/Modal'
 import { useIsFocused } from '@react-navigation/native'
-const MobileDetailConfirm = () => {
-      const {orderId} = useLocalSearchParams()
+import useFetch from '@/services/useFetch'
+import { useAuth } from '@/services/useAuth'
+import { confirmBillPayment, getPurchaseOrder } from '@/api/billOrder'
+import Summary from '@/components/cards/Summary'
+import Loader from '@/components/Loader'
+import AppModal from '@/components/modal/Modal'
+import NotificationAlert from '@/components/notification'
+
+const confirm = () => {
+   const {orderId} = useLocalSearchParams()
           const [loader, setLoader] = useState(false)
           const {notification, setNotification} = useNotification()
       
@@ -24,88 +23,54 @@ const MobileDetailConfirm = () => {
             id: orderId,
             token
           }))
+          console.log(loader, loading, orderId, "hey=111======?>")
           const isFocused = useIsFocused()
             const [getstarted, setOpenStarted] = useState(false)
+
+
+            
+                const handleConfirmation = async (payment_method: string) => {
+                  // setTextInfo("Please wait while we process your payment")
+                  setLoader(true)
+        
+                  try {
+            
+                   const response = await  confirmBillPayment({queryId: orderId, payment_method, token})
+                   setLoader(false)
+            
+                   if(payment_method === "card"){
+                    Linking.openURL(response.responseBody.checkoutUrl)
+            
+                   }
+            
+                   setNotification({
+                    error: false,
+                    message: response?.message || "Recharge Successful",
+                    data: null
+                  })
+            
+                  loadProfile(token)
+                   
+              
+                    
+                  } catch (error: any) {
+                    setLoader(false)
+                    setNotification({
+                      error: true,
+                      message: error.message || "something went wrong",
+                      data: null
+                    })
+                    
+                  }
+              
+            
+            }
           
      
-          
-
-          
-          const handleConfirmation = async (payment_method: string) => {
-            setLoader(true)
-
-            try {
-
-             const response = await  confirmPayment({queryId: orderId, payment_method, token})
-             setLoader(false)
-             setNotification({
-              error: false,
-              message: response?.message || "Data Purchased",
-              data: null
-            })
-             
-        
-              
-            } catch (error: any) {
-              setLoader(false)
-              setNotification({
-                error: true,
-                message: error.message || "something went wrong",
-                data: null
-              })
-              
-            }
-        
- 
-    }
-
-    const handleCardConfirmation = async (payment_method: string) => {
-      // setTextInfo("Please wait while we process your payment")
-      setLoader(true)
-      // setNotification({
-      //   error: false,
-      //   message: "Recharge Successful",
-      //   data: null
-      // })
-
-      try {
-
-       const response = await  confirmBillPayment({queryId: orderId, payment_method, token})
-       setLoader(false)
-
-       if(payment_method === "card"){
-        Linking.openURL(response.responseBody.checkoutUrl)
-
-       }
-
-       setNotification({
-        error: false,
-        message: response?.message || "Recharge Successful",
-        data: null
-      })
-
-      loadProfile(token)
-       
-  
-        
-      } catch (error: any) {
-        setLoader(false)
-        setNotification({
-          error: true,
-          message: error.message || "something went wrong",
-          data: null
-        })
-        
-      }
-  
-
-}
-      
+            
   return (
     <View className='flex-1 p-4 bg-primary'>
-      
-      
-      <View className="mb-6">
+       <View className="mb-6">
         <Text className="text-2xl font-bold text-white text-center">Confirm Recharge</Text>
         <Text className="text-sm text-white text-center mt-1">
           Please verify the transaction details below.
@@ -119,63 +84,26 @@ const MobileDetailConfirm = () => {
 
        <Summary data={data} />
       </View>
-      <Text className='text-white text-center'>{textInfo}</Text>
-
-      <View className="flex-row gap-4  bg-gray-900 px-4 rounded-lg py-2 ">
-        <TouchableOpacity onPress={() => handleCardConfirmation("wallet")} className='border rounded-md flex-1  border-alt py-5 '>
-              <Text className='text-alt text-center'>Pay from Wallet </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={() => handleCardConfirmation("card")} className='border rounded-md  flex-1 border-green-400 py-5 '>
-                          <Text className='text-green-400 text-center'>Pay from Bank </Text>
-          </TouchableOpacity>
-      </View>
-
-   
-
-                         <TouchableOpacity className='py-3  flex-row items-center flex justify-center mt-10  bg-app-primary rounded-lg'
-                                      onPress={() => setTextInfo("wallet")}
-                                      >
-                                        {loading ? <ActivityIndicator/> :
-                                          <Text className=' font-semibold text-base text-gray-100'>Button {textInfo}</Text>
-                                        }
-                                    </TouchableOpacity> 
-
-                                    <Text className="text-white text-xl font-semibold text-center mb-4">
-           {"Focused " + isFocused}
-          </Text>
-
-   
-
-    
-        <Loader open={loading}/>
+          <Text className='text-white text-center'>{textInfo}</Text>
+      
+            <View className="flex-row gap-4  bg-gray-900 px-4 rounded-lg py-2 ">
+              <TouchableOpacity onPress={() => handleConfirmation("wallet")} className='border rounded-md flex-1  border-alt py-5 '>
+                    <Text className='text-alt text-center'>Pay from Wallet </Text>
+                </TouchableOpacity>
+      
+                <TouchableOpacity onPress={() => handleConfirmation("card")} className='border rounded-md  flex-1 border-green-400 py-5 '>
+                                <Text className='text-green-400 text-center'>Pay from Bank </Text>
+                </TouchableOpacity>
+            </View>  
+        
+        <Loader open={loader}/>
 
       <AppModal open={!!notification?.message} onclose={()=> setNotification({message: null, error: false, data: null})}>
       <NotificationAlert onPress={()=> setNotification({message: null, error: false, data: null})} message={notification?.message} error={notification.error} data={notification.data}/>
 
      </AppModal>
-
-       {/* <AppModal open={getstarted} onclose={()=> setOpenStarted(false)}>
-        <View className="bg-gray-900 p-6 rounded-2xl w-full max-w-md">
-          <Text className="text-white text-xl font-semibold text-center mb-4">
-            Welcome to BitBridge
-          </Text>
-          <Text className="text-gray-300 text-center mb-6">
-            Explore our services and enjoy seamless transactions.
-          </Text>
-
-          <TouchableOpacity
-            onPress={() => router.push("/airtime-top-up")}
-            className="bg-app-primary py-3 rounded-xl items-center"
-          >
-            <Text className="text-white font-medium">Get Started</Text>
-          </TouchableOpacity>
-        </View>
-      </AppModal> */}
-
     </View>
   )
 }
 
-export default MobileDetailConfirm
-
+export default confirm

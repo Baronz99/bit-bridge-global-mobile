@@ -63,9 +63,7 @@ useEffect(()=> {
 
         setLoader(false)
 
-        // if(response)  router.push(`/mobileProviders/${id}/confirm/${response?.data.id}`)
         if(response)  router.push(`/mobileProviders/${id}/confirm/${response?.data.id}`)
-        // if(response)  router.push(`/mobileProviders/${id}/confirm`)
 
       } catch (error: any) {
         setLoader(false)
@@ -140,16 +138,8 @@ useEffect(()=> {
                     <Text className='text-alt text-center'>Proceed</Text>
                 </TouchableOpacity>
 
-                 <TouchableOpacity className='py-3  flex-row items-center flex justify-center mt-10  bg-app-primary rounded-lg'
-                                                      onPress={() => handleFormSubmit()}
-                                                      >
-                                                          <Text className=' font-semibold text-base text-gray-100'>Update from wallet</Text>
-                                                        
-                                                    </TouchableOpacity> 
-                                                                              <Text className="text-white text-xl font-semibold text-center mb-4">
-                                                               {"Focused " + isFocused}
-                                                              </Text>
-
+        
+                                          
             </View>
 
 
