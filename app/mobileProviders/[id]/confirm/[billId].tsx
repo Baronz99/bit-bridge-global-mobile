@@ -20,6 +20,7 @@ const confirm = () => {
             id: billId,
             token
           }))
+          console.log(data, billId, "hey=111======?>")
           const isFocused = useIsFocused()
             const [getstarted, setOpenStarted] = useState(false)
 
