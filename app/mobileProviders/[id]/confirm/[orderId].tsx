@@ -1,4 +1,4 @@
-import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { ActivityIndicator, Linking, Pressable, StyleSheet, Text,  TouchableOpacity,  View } from 'react-native'
 import React, { useState } from 'react'
 import { useLocalSearchParams } from 'expo-router'
 import useFetch from '@/services/useFetch'
@@ -12,7 +12,6 @@ import useNotification from '@/hooks/useNotification'
 import Summary from '@/components/cards/Summary'
 import AppModal from '@/components/modal/Modal'
 import { useIsFocused } from '@react-navigation/native'
-
 const MobileDetailConfirm = () => {
       const {orderId} = useLocalSearchParams()
           const [loader, setLoader] = useState(false)
@@ -132,17 +131,13 @@ const MobileDetailConfirm = () => {
           </TouchableOpacity>
       </View>
 
-        {/* <TouchableOpacity onPress={() => {
-                setOpenStarted(true)
-                console.log("first")}} className='border rounded-md mt-4 border-green-400 py-5 '>
-                                        <Text className='text-green-400 text-center'>Pay from Bank </Text>
-                        </TouchableOpacity>  */}
+   
 
                          <TouchableOpacity className='py-3  flex-row items-center flex justify-center mt-10  bg-app-primary rounded-lg'
-                                      onPress={() => handleCardConfirmation("wallet")}
+                                      onPress={() => setTextInfo("wallet")}
                                       >
                                         {loading ? <ActivityIndicator/> :
-                                          <Text className=' font-semibold text-base text-gray-100'>Update from wallet</Text>
+                                          <Text className=' font-semibold text-base text-gray-100'>Button {textInfo}</Text>
                                         }
                                     </TouchableOpacity> 
 
@@ -155,12 +150,12 @@ const MobileDetailConfirm = () => {
     
         <Loader open={loading}/>
 
-          <AppModal open={!!notification?.message} onclose={()=> setNotification({message: null, error: false, data: null})}>
+      <AppModal open={!!notification?.message} onclose={()=> setNotification({message: null, error: false, data: null})}>
       <NotificationAlert onPress={()=> setNotification({message: null, error: false, data: null})} message={notification?.message} error={notification.error} data={notification.data}/>
 
      </AppModal>
 
-       <AppModal open={getstarted} onclose={()=> setOpenStarted(false)}>
+       {/* <AppModal open={getstarted} onclose={()=> setOpenStarted(false)}>
         <View className="bg-gray-900 p-6 rounded-2xl w-full max-w-md">
           <Text className="text-white text-xl font-semibold text-center mb-4">
             Welcome to BitBridge
@@ -176,7 +171,7 @@ const MobileDetailConfirm = () => {
             <Text className="text-white font-medium">Get Started</Text>
           </TouchableOpacity>
         </View>
-      </AppModal>
+      </AppModal> */}
 
     </View>
   )
