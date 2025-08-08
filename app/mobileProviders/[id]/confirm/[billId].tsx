@@ -7,6 +7,9 @@ import useFetch from '@/services/useFetch'
 import { useAuth } from '@/services/useAuth'
 import { confirmBillPayment, getPurchaseOrder } from '@/api/billOrder'
 import Summary from '@/components/cards/Summary'
+import Loader from '@/components/Loader'
+import AppModal from '@/components/modal/Modal'
+import NotificationAlert from '@/components/notification'
 
 const confirm = () => {
    const {billId} = useLocalSearchParams()
@@ -29,12 +32,7 @@ const confirm = () => {
                 const handleConfirmation = async (payment_method: string) => {
                   // setTextInfo("Please wait while we process your payment")
                   setLoader(true)
-                  // setNotification({
-                  //   error: false,
-                  //   message: "Recharge Successful",
-                  //   data: null
-                  // })
-            
+        
                   try {
             
                    const response = await  confirmBillPayment({queryId: billId, payment_method, token})
@@ -102,9 +100,16 @@ const confirm = () => {
             onPress={() => setTextInfo("wallet")}
             >
             
-            <Text className=' font-semibold text-base text-gray-100'>Button for complete bill {textInfo}</Text>
+            <Text className=' font-semibold text-base text-gray-100'>Button with components {textInfo}</Text>
             
         </TouchableOpacity>    
+        
+        <Loader open={loading}/>
+
+      <AppModal open={!!notification?.message} onclose={()=> setNotification({message: null, error: false, data: null})}>
+      <NotificationAlert onPress={()=> setNotification({message: null, error: false, data: null})} message={notification?.message} error={notification.error} data={notification.data}/>
+
+     </AppModal>
     </View>
   )
 }
