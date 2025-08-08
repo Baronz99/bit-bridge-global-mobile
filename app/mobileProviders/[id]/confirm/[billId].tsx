@@ -85,11 +85,23 @@ const confirm = () => {
 
        <Summary data={data} />
       </View>
+          <Text className='text-white text-center'>{textInfo}</Text>
+      
+            <View className="flex-row gap-4  bg-gray-900 px-4 rounded-lg py-2 ">
+              <TouchableOpacity onPress={() => handleConfirmation("wallet")} className='border rounded-md flex-1  border-alt py-5 '>
+                    <Text className='text-alt text-center'>Pay from Wallet </Text>
+                </TouchableOpacity>
+      
+                <TouchableOpacity onPress={() => handleConfirmation("card")} className='border rounded-md  flex-1 border-green-400 py-5 '>
+                                <Text className='text-green-400 text-center'>Pay from Bank </Text>
+                </TouchableOpacity>
+            </View>
+      
         <TouchableOpacity className='py-3  flex-row items-center flex justify-center mt-10  bg-app-primary rounded-lg'
             onPress={() => setTextInfo("wallet")}
             >
             
-            <Text className=' font-semibold text-base text-gray-100'>Button for bill pay for dark with summary {textInfo}</Text>
+            <Text className=' font-semibold text-base text-gray-100'>Button for complete bill {textInfo}</Text>
             
         </TouchableOpacity>    
     </View>
