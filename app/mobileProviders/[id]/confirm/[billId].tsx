@@ -6,6 +6,7 @@ import { useIsFocused } from '@react-navigation/native'
 import useFetch from '@/services/useFetch'
 import { useAuth } from '@/services/useAuth'
 import { confirmBillPayment, getPurchaseOrder } from '@/api/billOrder'
+import Summary from '@/components/cards/Summary'
 
 const confirm = () => {
    const {billId} = useLocalSearchParams()
@@ -70,6 +71,20 @@ const confirm = () => {
             
   return (
     <View className='flex-1 p-4 bg-primary'>
+       <View className="mb-6">
+        <Text className="text-2xl font-bold text-white text-center">Confirm Recharge</Text>
+        <Text className="text-sm text-white text-center mt-1">
+          Please verify the transaction details below.
+        </Text>
+      </View>
+
+      <View className="bg-gray-800 rounded-2xl p-6 shadow-lg mb-8">
+        <Text className="text-lg font-semibold text-center text-gray-200 mb-4">
+          Recharge Details
+        </Text>
+
+       <Summary data={data} />
+      </View>
         <TouchableOpacity className='py-3  flex-row items-center flex justify-center mt-10  bg-app-primary rounded-lg'
             onPress={() => setTextInfo("wallet")}
             >
