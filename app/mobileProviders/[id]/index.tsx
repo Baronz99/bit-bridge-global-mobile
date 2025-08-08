@@ -11,9 +11,11 @@ import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoi
 import { createPurchaseOrder, getPriceList } from '@/api/billOrder'
 import FormSelect from '@/components/FormSelect'
 import Loader from '@/components/Loader'
+import { useIsFocused } from '@react-navigation/native'
 const ProvideDertails = () => {
     const {id} = useLocalSearchParams()
     const [loader, setLoader] = useState(false)
+              const isFocused = useIsFocused()
     
     const router = useRouter()
     const {authState: {token},userProfileData } = useAuth()
@@ -142,6 +144,9 @@ useEffect(()=> {
                                                           <Text className=' font-semibold text-base text-gray-100'>Update from wallet</Text>
                                                         
                                                     </TouchableOpacity> 
+                                                                              <Text className="text-white text-xl font-semibold text-center mb-4">
+                                                               {"Focused " + isFocused}
+                                                              </Text>
 
             </View>
 

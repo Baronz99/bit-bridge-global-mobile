@@ -11,6 +11,7 @@ import NotificationAlert from '@/components/notification'
 import useNotification from '@/hooks/useNotification'
 import Summary from '@/components/cards/Summary'
 import AppModal from '@/components/modal/Modal'
+import { useIsFocused } from '@react-navigation/native'
 
 const MobileDetailConfirm = () => {
       const {orderId} = useLocalSearchParams()
@@ -24,6 +25,7 @@ const MobileDetailConfirm = () => {
             id: orderId,
             token
           }))
+          const isFocused = useIsFocused()
             const [getstarted, setOpenStarted] = useState(false)
           
      
@@ -143,6 +145,10 @@ const MobileDetailConfirm = () => {
                                           <Text className=' font-semibold text-base text-gray-100'>Update from wallet</Text>
                                         }
                                     </TouchableOpacity> 
+
+                                    <Text className="text-white text-xl font-semibold text-center mb-4">
+           {"Focused " + isFocused}
+          </Text>
 
    
 
