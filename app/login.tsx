@@ -20,6 +20,8 @@ const Login = () => {
 
     const {onLogin} = useAuth()
 
+    console.log(formInput)
+
     const handleLogin = async () => {
 
         try {
@@ -49,11 +51,17 @@ const Login = () => {
           <View>
           <FormInput 
             placeholder='Enter Email Address' 
+            value={formInput.email}
+            autoComplete="email"
+            textContentType="emailAddress"
+            keyboardType="email-address"
             onChangeText={(value) => setFormInput({...formInput, email: value })}
             className='border-gray-600 border-b text-white  my-0 py-4 border-b-1 text-base font-semibold px-3 '
             />
             <FormInput  placeholder='Enter Password' 
                 isPassword={true}
+                // value={formInput.password}
+
                 secureTextEntry={hidePassword}
                 hidePassword={hidePassword}
                 setHidePassword={setHidePassword}
@@ -73,7 +81,7 @@ const Login = () => {
           <Text className='text-red-600'>{errorMessage} </Text>
            <TouchableOpacity className='w-full m-auto mt-auto py-3 flex-row' >
 
-              <Text className='text-white  w-full border-gray-800 border-b py-2 text-center'>Dont have an account?  <Link href={"/sign-up"} className=' text-center border-gray-100 border-b text-alt py-2 '>  Sign Up</Link></Text>
+              <Text className='text-white  w-full border-gray-800 border-b py-2 text-center'>Don't have an account?  <Link href={"/sign-up"} className=' text-center border-gray-100 border-b text-alt py-2 '>  Sign Up</Link></Text>
             
             </TouchableOpacity>       
       

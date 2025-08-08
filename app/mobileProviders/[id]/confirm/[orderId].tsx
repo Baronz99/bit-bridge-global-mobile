@@ -134,7 +134,7 @@ const MobileDetailConfirm = () => {
                 setOpenStarted(true)
                 console.log("first")}} className='border rounded-md mt-4 border-green-400 py-5 '>
                                         <Text className='text-green-400 text-center'>Pay from Bank </Text>
-                        </TouchableOpacity> */}
+                        </TouchableOpacity>  */}
 
    
 

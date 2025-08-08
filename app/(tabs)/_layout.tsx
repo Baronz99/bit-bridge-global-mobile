@@ -185,7 +185,7 @@ const AppContent = ({
          <Tabs.Screen
         name='profile'
         options={{
-            title: "Transactions",
+            title: "Settings",
             headerShown: true,
             tabBarIcon: ({ focused} :any) => (
               <>

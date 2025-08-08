@@ -87,7 +87,7 @@ const index = () => {
 
         <NotificationAlert message={notice.message} data={notice.data} error={notice.error}/>
         <TouchableOpacity onPress={handleSubmit} className='bg-theme-primary py-6 mt-10 mb-10 rounded-xl'>
-            <Text className='text-alt font-medium text-center'> Pay With Bank</Text>
+            <Text className='text-alt font-medium text-center'> Pay With Bank?</Text>
         </TouchableOpacity>
 
         </View>

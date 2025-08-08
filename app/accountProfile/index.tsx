@@ -116,10 +116,10 @@ const index = () => {
             <Text className='text-red-600'>{errorMessage.message} </Text>
             
             <TouchableOpacity className='py-3  flex-row items-center flex justify-center mt-10  bg-app-primary rounded-lg'
-              onPress={handleUpdate}
+              onPress={() => handleUpdate()}
               >
                 {loading ? <ActivityIndicator/> :
-                  <Text className=' font-semibold text-base text-gray-100'>Update</Text>
+                  <Text className=' font-semibold text-base text-gray-100'>Update Profile</Text>
                 }
             </TouchableOpacity> 
 
