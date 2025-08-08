@@ -69,12 +69,12 @@ const confirm = () => {
      
             
   return (
-    <View>
+    <View className='flex-1 p-4 bg-primary'>
         <TouchableOpacity className='py-3  flex-row items-center flex justify-center mt-10  bg-app-primary rounded-lg'
             onPress={() => setTextInfo("wallet")}
             >
             
-            <Text className=' font-semibold text-base text-gray-100'>Button for bill pay {textInfo}</Text>
+            <Text className=' font-semibold text-base text-gray-100'>Button for bill pay for dark mode {textInfo}</Text>
             
         </TouchableOpacity>    
     </View>
