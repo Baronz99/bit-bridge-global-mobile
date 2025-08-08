@@ -136,6 +136,13 @@ useEffect(()=> {
                     <Text className='text-alt text-center'>Proceed</Text>
                 </TouchableOpacity>
 
+                 <TouchableOpacity className='py-3  flex-row items-center flex justify-center mt-10  bg-app-primary rounded-lg'
+                                                      onPress={() => handleFormSubmit()}
+                                                      >
+                                                          <Text className=' font-semibold text-base text-gray-100'>Update from wallet</Text>
+                                                        
+                                                    </TouchableOpacity> 
+
             </View>
 
 
