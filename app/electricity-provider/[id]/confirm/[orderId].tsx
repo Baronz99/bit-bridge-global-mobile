@@ -12,6 +12,7 @@ import useNotification from '@/hooks/useNotification'
 import Summary from '@/components/cards/Summary'
 import AppModal from '@/components/modal/Modal'
 import PurchaseDetails from '@/components/purchaseDetails/PurchaseDetails'
+import TransactionButtons from '@/components/transactionButtons/TransactionButtons'
 
 const MobileDetailConfirm = () => {
       const {orderId} = useLocalSearchParams()
@@ -73,17 +74,12 @@ const MobileDetailConfirm = () => {
 
       <PurchaseDetails title={"Meter Details"} data={data}/>
 
-      <TouchableOpacity onPress={() => handleCardConfirmation("wallet")} className='border rounded-md mt-4 border-alt py-5 '>
-                          <Text className='text-alt text-center'>Pay from Wallet </Text>
-          </TouchableOpacity>
 
-          <TouchableOpacity onPress={() => handleCardConfirmation("card")} className='border rounded-md mt-4 border-green-400 py-5 '>
-                          <Text className='text-green-400 text-center'>Pay from Bank </Text>
-          </TouchableOpacity>
-         <Loader open={loader}/>
-           <AppModal open={!!notification.message } onclose={() => setNotification({message: null, error: false, data: null})}>
-            <NotificationAlert onPress={() => setNotification({message: null, error: false, data: null})} message={notification.message} error={notification.error} data={notification.data} />
-          </AppModal>
+      <TransactionButtons handleConfirmation={handleCardConfirmation}/> 
+      <Loader open={loader}/>
+      <AppModal open={!!notification.message } onclose={() => setNotification({message: null, error: false, data: null})}>
+          <NotificationAlert onPress={() => setNotification({message: null, error: false, data: null})} message={notification.message} error={notification.error} data={notification.data} />
+      </AppModal>
 
      
 

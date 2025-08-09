@@ -1,5 +1,5 @@
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Link, useLocalSearchParams } from 'expo-router'
 import { icons } from '@/constants/icons'
 import { images } from '@/constants/images'
@@ -11,6 +11,7 @@ import { updateOrderStatus } from '@/api/billOrder'
 
 const confirm = () => {
   const {authState: {token}, loadProfile} = useAuth()
+  // const [loading, setLoading] = useState(true)
   
     const {reference} = useLocalSearchParams()
 
@@ -71,7 +72,7 @@ const confirm = () => {
           <Text className='text-alt text-center my-3 text-3xl'>Wallet Funded</Text>
         </View>
        
-        </View> :
+      </View> :
       
       <View className='m-auto w-full px bg-r'>
         <View className='my-10'> 

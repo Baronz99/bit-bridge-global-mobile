@@ -10,7 +10,7 @@ import Summary from '@/components/cards/Summary'
 import Loader from '@/components/Loader'
 import AppModal from '@/components/modal/Modal'
 import NotificationAlert from '@/components/notification'
-
+import TransactionButtons from "@/components/transactionButtons/TransactionButtons"
 const confirm = () => {
    const {orderId} = useLocalSearchParams()
           const [loader, setLoader] = useState(false)
@@ -86,15 +86,7 @@ const confirm = () => {
       </View>
           <Text className='text-white text-center'>{textInfo}</Text>
       
-            <View className="flex-row gap-4  bg-gray-900 px-4 rounded-lg py-2 ">
-              <TouchableOpacity onPress={() => handleConfirmation("wallet")} className='border rounded-md flex-1  border-alt py-5 '>
-                    <Text className='text-alt text-center'>Pay from Wallet </Text>
-                </TouchableOpacity>
-      
-                <TouchableOpacity onPress={() => handleConfirmation("card")} className='border rounded-md  flex-1 border-green-400 py-5 '>
-                                <Text className='text-green-400 text-center'>Pay from Bank </Text>
-                </TouchableOpacity>
-            </View>  
+          <TransactionButtons handleConfirmation={handleConfirmation}/> 
         
         <Loader open={loader}/>
 

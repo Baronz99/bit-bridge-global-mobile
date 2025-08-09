@@ -12,6 +12,7 @@ import Loader from '@/components/Loader'
 import NotificationAlert from '@/components/notification'
 import useNotification from '@/hooks/useNotification'
 import Summary from '@/components/cards/Summary'
+import TransactionButtons from '@/components/transactionButtons/TransactionButtons'
 
 const CableetailConfirm = () => {
       const {orderId} = useLocalSearchParams()
@@ -81,15 +82,8 @@ const CableetailConfirm = () => {
        <Summary data={data} />
 
       </View>
-
-      <TouchableOpacity onPress={() => handleCardConfirmation("wallet")} className='border rounded-md mt-4 border-alt py-5 '>
-                          <Text className='text-alt text-center'>Pay from Wallet </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={() => handleCardConfirmation("card")} className='border rounded-md mt-4 border-green-400 py-5 '>
-                          <Text className='text-green-400 text-center'>Pay from Bank </Text>
-          </TouchableOpacity>
-          { loader && <Loader/>}
+      <TransactionButtons handleConfirmation={handleCardConfirmation}/> 
+         { loader && <Loader open={loader}/>}
           <NotificationAlert message={notification.message} error={notification.error} data={notification.data} />
 
      
