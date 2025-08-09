@@ -572,7 +572,7 @@ const MobileService = ({
 
 
             <View className="mt-10">
-            <Text className="text-lg text-white font-bold mb-3">Mobile Data Top Up Movies </Text>
+            <Text className="text-lg text-white font-bold mb-3">Data Top Up </Text>
 
             <FlatList
             horizontal
