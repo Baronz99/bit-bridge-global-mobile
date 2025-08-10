@@ -50,20 +50,20 @@ console.log("Runtime Version:", Constants.manifest2?.runtimeVersion);
       label: "Airtime",
       btn: "Select Provider",
       link: "/airtime-top-up",
-      image: icons.phone
+      image: icons.call
     }, 
     {
       id: 2,
       label: "Data",
       btn: "Select Provider",
       link: "/data-subscription",
-      image: icons.wifi
+      image: icons.data
     },{
       id: 1,
       label: "Electricity",
       btn: "Select Probider",
       link: "/electricity-provider",
-      image: icons.electricity
+      image: icons.power
     },
    
     {
@@ -71,7 +71,7 @@ console.log("Runtime Version:", Constants.manifest2?.runtimeVersion);
       label: "Cable Tv",
       btn: "Select TV",
       link: "/cable-tv-provider",
-      image: icons.television
+      image: icons.tv
     }]
 
     useEffect(() => {
@@ -293,11 +293,9 @@ console.log("Runtime Version:", Constants.manifest2?.runtimeVersion);
           </View>
         </View>
         <View className='w-14 h-14 bg-white/20 rounded-full justify-center items-center'>
-            <Image source={icons.phone} tintColor={"#ffcc00"} className='w-6 h-6 text-alt rounded-full p-4'  resizeMode='contain' />
+            <Image source={icons.tv} tintColor={"#ffcc00"} className='w-6 h-6 text-alt rounded-full p-4'  resizeMode='contain' />
             </View>
-               <View className=' bg-white/20 rounded-full justify-center items-center'>
-            <Image source={icons.phone} tintColor={"#ffcc00"} className='w-6 h-6 text-alt rounded-full p-4'  resizeMode='contain' />
-            </View>
+            
 
 
         <View className="my-10"

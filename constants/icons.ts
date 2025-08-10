@@ -26,6 +26,10 @@ import wifi from "@/assets/icons/wi-fi.png"
 import electricity from "@/assets/icons/power.png"
 import television from "@/assets/icons/television.png"
 import email from "@/assets/icons/email.png"
+import data from "@/assets/icons/data.png"
+import power from "@/assets/icons/electricity.png"
+import call from "@/assets/icons/phone.png"
+import tv from "@/assets/icons/tv.png"
 
 import appLogo from "@/assets/logos/logo.png"
 
@@ -58,6 +62,7 @@ export const icons = {
   wifi,
   electricity,
   television,
-  email
+  email,
+  call, power, tv, data
 
 };

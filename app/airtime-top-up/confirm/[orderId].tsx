@@ -12,6 +12,7 @@ import useNotification from '@/hooks/useNotification'
 import Summary from '@/components/cards/Summary'
 import AppModal from '@/components/modal/Modal'
 import PurchaseDetails from '@/components/purchaseDetails/PurchaseDetails'
+import TransactionButtons from '@/components/transactionButtons/TransactionButtons'
 
 const MobileDetailConfirm = () => {
       const {orderId} = useLocalSearchParams()
@@ -29,34 +30,6 @@ const MobileDetailConfirm = () => {
           
 
           
-          const handleConfirmation = async (payment_method: string) => {
-            setLoader(true)
-
-            try {
-
-             const response = await  confirmPayment({queryId: orderId, payment_method, token})
-             setLoader(false)
-             setNotification({
-              error: false,
-              message: response?.message || "Data Purchased",
-              data: null
-            })
-             
-        
-              
-            } catch (error: any) {
-              setLoader(false)
-              setNotification({
-                error: true,
-                message: error.message || "something went wrong",
-                data: null
-              })
-              
-            }
-        
- 
-    }
-
     const handleCardConfirmation = async (payment_method: string) => {
       setLoader(true)
 
@@ -106,15 +79,8 @@ const MobileDetailConfirm = () => {
 
       <PurchaseDetails title="Purchase Details" data={data}/>
 
-      <View className="space-y-4">
-      <TouchableOpacity onPress={() => handleCardConfirmation("wallet")} className='border rounded-md mt-4 border-alt py-5 '>
-                          <Text className='text-alt text-center'>Pay from Wallet </Text>
-          </TouchableOpacity>
+               <TransactionButtons handleConfirmation={handleCardConfirmation}/> 
 
-          <TouchableOpacity onPress={() => handleCardConfirmation("card")} className='border rounded-md mt-4 border-green-400 py-5 '>
-                          <Text className='text-green-400 text-center'>Pay from Bank </Text>
-          </TouchableOpacity>
-      </View>
 
    
 
