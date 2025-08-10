@@ -295,14 +295,8 @@ console.log("Runtime Version:", Constants.manifest2?.runtimeVersion);
         <View className='w-14 h-14 bg-white/20 rounded-full justify-center items-center'>
             <Image source={icons.tv} className='w-6 h-6 rounded-full'  />
             </View>
-            <View className="flex-row my-1 items-center gap-2">
-              <Image source={icons.trophy} className="w-5 h-5" />
-                <Text className="text-white">0.00</Text>
-              </View> 
-            <View className="flex-row my-1 items-center gap-2">
-              <Image source={icons.tv} className="w-5 h-5" />
-                <Text className="text-white">1222</Text>
-              </View>  
+            
+             
 
 
         <View className="my-10"
