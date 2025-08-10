@@ -293,7 +293,7 @@ console.log("Runtime Version:", Constants.manifest2?.runtimeVersion);
           </View>
         </View>
         <View className='w-14 h-14 bg-white/20 rounded-full justify-center items-center'>
-            <Image source={icons.tv} className='w-6 h-6 rounded-full p-4'  />
+            <Image source={icons.tv} className='w-6 h-6 rounded-full'  />
             </View>
             
 
