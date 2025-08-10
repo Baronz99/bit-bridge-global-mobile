@@ -299,7 +299,10 @@ console.log("Runtime Version:", Constants.manifest2?.runtimeVersion);
               <Image source={icons.trophy} className="w-5 h-5" />
                 <Text className="text-white">0.00</Text>
               </View> 
-            
+            <View className="flex-row my-1 items-center gap-2">
+              <Image source={icons.tv} className="w-5 h-5" />
+                <Text className="text-white">0.00</Text>
+              </View>  
 
 
         <View className="my-10"
