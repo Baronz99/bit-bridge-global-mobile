@@ -85,7 +85,7 @@ const MobileDetailConfirm = () => {
    
 
     
-        <Loader open={loading}/>
+        <Loader open={loader}/>
           <AppModal open={!!notification.message } onclose={() => setNotification({message: null, error: false, data: null})}>
           <NotificationAlert onPress={() => setNotification({message: null, error: false, data: null})} message={notification.message} error={notification.error} data={notification.data} />
 
