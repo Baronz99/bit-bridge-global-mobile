@@ -1,14 +1,15 @@
 import { ActivityIndicator, Image, KeyboardAvoidingView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import React, { useState } from 'react'
 import { icons } from '@/constants/icons'
-import { Link, router } from 'expo-router'
+import { Link, router, useRouter } from 'expo-router'
 import { Formik } from 'formik';
 import { useAuth } from '@/services/useAuth';
 import FormInput from '@/components/FormInput';
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper';
 
 const Login = () => {
-    const [errorMessage, setErrorMessage] = useState(null)
+    const [errorMessage, setErrorMessage] = useState<null | string>(null)
+    const router = useRouter()
 
     const [formInput, setFormInput] = useState({
         email: "",
@@ -28,10 +29,16 @@ const Login = () => {
           setLoading(true)
 
           const result = await onLogin(formInput);
+          if (result) {
+            router.push("/");
+          } else {
+            setErrorMessage("Invalid email or password");
+          }
 
           setLoading(false)
 
-        } catch (error) {
+
+        } catch (error: any) {
           setLoading(false)
           setErrorMessage(error.message)
           console.error("Login error:", error.message);

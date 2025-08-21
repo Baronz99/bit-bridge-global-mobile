@@ -6,9 +6,9 @@ import { useAuth } from "@/services/useAuth";
 import useFetch from "@/services/useFetch";
 import moneyFormat from "@/utils/moneyFormat";
 import { Link, useRouter } from "expo-router";
-import { ActivityIndicator, FlatList, Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, FlatList, Image, RefreshControl, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import {splitString} from "@/utils/index"
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import powerDistribution from "../../data/powerDistributions.json"
 import PowerProviderCard from "@/components/ProviderCard";
 import ProviderCard from "@/components/Card";
@@ -37,6 +37,16 @@ export default function Index() {
   const {data, loading, error } = useFetch(() => getProducts({
     token,
   }))
+
+  const [refreshing, setRefreshing] = useState(false)
+
+  const onRefresh = useCallback(()=> {
+    setRefreshing(true)
+    loadProfile()
+    setTimeout(() => {
+      setRefreshing(false)
+    }, 1000)
+  },[])
 
   const [getstarted, setOpenStarted] = useState(false)
 
@@ -206,12 +216,21 @@ console.log("Runtime Version:", Constants.manifest2?.runtimeVersion);
     <View
     className="flex-1 bg-primary" 
     >
+      {/* <Text className="text-[#2f3b69] text-2xl font-bold text-center mt-10 mb-4">Welcome {refreshing ? "refreshing" : "fetched"}</Text> */}
       <Image  source={images.bg} className="absolute top-0 w-full z-0" />
       <ScrollView className="flex-1 px-5"
       contentContainerStyle={{
         minHeight: "100%",
         paddingBottom: 100
       }}
+      refreshControl={
+        <RefreshControl
+           refreshing={refreshing}
+          onRefresh={onRefresh}
+          colors={["#f3f3f3", "#2f3b69", "#ffcc00"]}
+          progressBackgroundColor={"#111827"}
+        />
+      }
       showsVerticalScrollIndicator={false}
       >
         {/* <Image source={icons.logo} className="w-12 h-10 mt-20 mb-5 mx-auto"/> */}
