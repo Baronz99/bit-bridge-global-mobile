@@ -1,77 +1,57 @@
-// track searches by user 
-import { Client, Account, ID, Databases, Query } from 'react-native-appwrite';
+// track searches by user
+import { Client, Account, ID, Databases, Query } from 'react-native-appwrite'
 
 const DATABASE_ID = process.env.EXPO_PUBLIC_APPWRITE_DATABASE_ID!
 const COLLECTION_ID = process.env.EXPO_PUBLIC_APPWRITE_COLLECTION_ID!
 
-
 const client = new Client()
-.setEndpoint("https://cloud.appwrite.io/v1")
-.setProject(process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID!)
-.setPlatform('com.vortect.movie-menia');
-
+  .setEndpoint('https://cloud.appwrite.io/v1')
+  .setProject(process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID!)
+  .setPlatform('com.vortect.movie-menia')
 
 const database = new Databases(client)
 
-
 export const updateSearchCount = async (query: string, movie: Movie) => {
-
-    try{
-
-    const result= await database.listDocuments(DATABASE_ID, COLLECTION_ID, [
-        Query.equal("searchTerm", query)
+  try {
+    const result = await database.listDocuments(DATABASE_ID, COLLECTION_ID, [
+      Query.equal('searchTerm', query),
     ])
 
-    if(result.documents.length > 0){
-        const existingMovie = result.documents[0];
-        await database.updateDocument(
-            DATABASE_ID,
-            COLLECTION_ID,
-            existingMovie.$id,
-            {
-                count: existingMovie.count + 1
-            }
-        )
-    }else{
-        await database.createDocument(
-            DATABASE_ID,
-            COLLECTION_ID,
-            ID.unique(),
-            {
-                searchTerm: query,
-                movie_id: movie.id,
-                count: 1,
-                title: movie.title,
-                poster_url: `https://image.tmdb.org/t/p/w500${movie.poster_path}`
-            }
-        )
+    if (result.documents.length > 0) {
+      const existingMovie = result.documents[0]
+      await database.updateDocument(DATABASE_ID, COLLECTION_ID, existingMovie.$id, {
+        count: existingMovie.count + 1,
+      })
+    } else {
+      await database.createDocument(DATABASE_ID, COLLECTION_ID, ID.unique(), {
+        searchTerm: query,
+        movie_id: movie.id,
+        count: 1,
+        title: movie.title,
+        poster_url: `https://image.tmdb.org/t/p/w500${movie.poster_path}`,
+      })
     }
-
-
-}catch(error){
+  } catch (error) {
     throw error
+  }
+  // check if a record of that search has already been stored
+  // if a document is found increament the search field
+  // if mo document id found add to count
+  //     create a new document in Appwrite database -> 1
 }
-    // check if a record of that search has already been stored 
-    // if a document is found increament the search field 
-    // if mo document id found add to count 
-    //     create a new document in Appwrite database -> 1
-}
 
-export const getTrendingMovies = async() : Promise<TrendingMovie[] | undefined> => {
-    try {
-        const result = await  database.listDocuments(DATABASE_ID, COLLECTION_ID, [
-            Query.limit(5),
-            Query.orderDesc("count")
-        ])
+export const getTrendingMovies = async (): Promise<TrendingMovie[] | undefined> => {
+  try {
+    const result = await database.listDocuments(DATABASE_ID, COLLECTION_ID, [
+      Query.limit(5),
+      Query.orderDesc('count'),
+    ])
 
-        console.log("get trrending movies", result)
+    console.log('get trrending movies', result)
 
-        return result.documents as unknown as TrendingMovie[]
-        
-    } catch (error) {
-        console.log(error)
-        return undefined
-        
-    }
-
+    return result.documents as unknown as TrendingMovie[]
+  } catch (error) {
+    console.log(error)
+    return undefined
+  }
 }

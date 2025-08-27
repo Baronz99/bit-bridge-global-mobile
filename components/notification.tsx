@@ -4,48 +4,44 @@ import { AntDesign } from '@expo/vector-icons'
 import { images } from '@/constants/images'
 
 const NotificationAlert = ({
-    message,
-    error,
-    data,
-    onPress
+  message,
+  error,
+  data,
+  onPress,
 }: {
-    message?: string | null,
-    error: boolean,
-    data?: any,
-    onPress?: () => void
+  message?: string | null
+  error: boolean
+  data?: any
+  onPress?: () => void
 }) => {
+  return (
+    <View className="bg-gray-900 rounded-xl w-full">
+      {message && (
+        <View className="bg-al h-60 fixed w-[100%]    top-0  m justify-center items-center  ">
+          <AntDesign onPress={onPress} name="close" size={24} color="gray" className="ml-auto" />
 
-    return (
-    <View className='bg-gray-900 rounded-xl w-full'>
-   {
-      message && 
-      <View className='bg-al h-60 fixed w-[100%]    top-0  m justify-center items-center  '>
-        <AntDesign onPress={onPress} name="close" size={24} color="gray" className='ml-auto'/>
-
-        {error ?
+          {error ? (
             <View>
-            <Image source={images.sorry} className='w-40  h-40 m-auto'/>
-            <Text className='text-white text-center'>{message}</Text>
-
+              <Image source={images.sorry} className="w-40  h-40 m-auto" />
+              <Text className="text-white text-center">{message}</Text>
             </View>
-
-        :    
-        
-        <View>
-            <Image source={images.success} className='w-32  h-32 m-auto'/>
-            <Text className='text-white text-center mt-3'>{message}</Text>
-            { data && 
+          ) : (
             <View>
-                <Text className='text-alt text-center font-medium text-xl'> {data.token ?? "N/A"}</Text>
-                
-                
-            </View>}
-
+              <Image source={images.success} className="w-32  h-32 m-auto" />
+              <Text className="text-white text-center mt-3">{message}</Text>
+              {data && (
+                <View>
+                  <Text className="text-alt text-center font-medium text-xl">
+                    {' '}
+                    {data.token ?? 'N/A'}
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
         </View>
-    }
+      )}
     </View>
-    }   
- </View>
   )
 }
 

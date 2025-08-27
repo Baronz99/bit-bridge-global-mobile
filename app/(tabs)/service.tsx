@@ -8,46 +8,46 @@ import ViewBox from '@/components/view-box/ViewBoxIcon'
 
 const Utilities = () => {
   const items = [
-     {
-    id: 0,
-    label: "Airtime",
-    btn: "Select Provider",
-    link: "airtime-top-up",
-    image: icons.phone
-  },{
-    id: 1,
-    label: "Electricity",
-    btn: "Select Probider",
-    link: "powerProviders",
-    image: icons.electricity
-  },
-  {
-    id: 2,
-    label: "Data",
-    btn: "Select Provider",
-    link: "data-subscription",
-    image: icons.wifi
-  },
-  {
-    id: 3,
-    label: "Cable Tv",
-    btn: "Select TV",
-    link: "cableProviders",
-    image: icons.television
-  }]
+    {
+      id: 0,
+      label: 'Airtime',
+      btn: 'Select Provider',
+      link: 'airtime-top-up',
+      image: icons.phone,
+    },
+    {
+      id: 1,
+      label: 'Electricity',
+      btn: 'Select Probider',
+      link: 'powerProviders',
+      image: icons.electricity,
+    },
+    {
+      id: 2,
+      label: 'Data',
+      btn: 'Select Provider',
+      link: 'data-subscription',
+      image: icons.wifi,
+    },
+    {
+      id: 3,
+      label: 'Cable Tv',
+      btn: 'Select TV',
+      link: 'cableProviders',
+      image: icons.television,
+    },
+  ]
   return (
-    <View className='flex-1 px-4 bg-primary'>
+    <View className="flex-1 px-4 bg-primary">
       <ScrollView>
         {/* dfd */}
 
-        <View className='bg-gray-900/60 p-4 rounded-xl'>
-          <Text className='text-white'>Bill Payment</Text>
-          <View className='py-4 flex-wrap gap-y-4 flex-row'>
-            {items.map(item => (
-            <ViewBox key={item?.id} link={item.link} icon={item.image} label={item.label}/>
-
+        <View className="bg-gray-900/60 p-4 rounded-xl">
+          <Text className="text-white">Bill Payment</Text>
+          <View className="py-4 flex-wrap gap-y-4 flex-row">
+            {items.map((item) => (
+              <ViewBox key={item?.id} link={item.link} icon={item.image} label={item.label} />
             ))}
-          
           </View>
         </View>
         {/* <View className='mt-10'>
@@ -78,16 +78,10 @@ const Utilities = () => {
           
           />
         </View> */}
-
-
       </ScrollView>
     </View>
   )
-
-
 }
-
-
 
 export default Utilities
 

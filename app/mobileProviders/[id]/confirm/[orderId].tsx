@@ -10,67 +10,60 @@ import Summary from '@/components/cards/Summary'
 import Loader from '@/components/Loader'
 import AppModal from '@/components/modal/Modal'
 import NotificationAlert from '@/components/notification'
-import TransactionButtons from "@/components/transactionButtons/TransactionButtons"
+import TransactionButtons from '@/components/transactionButtons/TransactionButtons'
 const confirm = () => {
-   const {orderId} = useLocalSearchParams()
-          const [loader, setLoader] = useState(false)
-          const {notification, setNotification} = useNotification()
-      
-          const {authState: {token},loadProfile } = useAuth()
-          const [textInfo, setTextInfo] = useState("")
+  const { orderId } = useLocalSearchParams()
+  const [loader, setLoader] = useState(false)
+  const { notification, setNotification } = useNotification()
 
-          const {data, refetch, loading, error, reset} = useFetch(()=> getPurchaseOrder({
-            id: orderId,
-            token
-          }))
-          console.log(loader, loading, orderId, "hey=111======?>")
-          const isFocused = useIsFocused()
-            const [getstarted, setOpenStarted] = useState(false)
+  const {
+    authState: { token },
+    loadProfile,
+  } = useAuth()
+  const [textInfo, setTextInfo] = useState('')
 
+  const { data, refetch, loading, error, reset } = useFetch(() =>
+    getPurchaseOrder({
+      id: orderId,
+      token,
+    })
+  )
+  console.log(loader, loading, orderId, 'hey=111======?>')
+  const isFocused = useIsFocused()
+  const [getstarted, setOpenStarted] = useState(false)
 
-            
-                const handleConfirmation = async (payment_method: string) => {
-                  // setTextInfo("Please wait while we process your payment")
-                  setLoader(true)
-        
-                  try {
-            
-                   const response = await  confirmBillPayment({queryId: orderId, payment_method, token})
-                   setLoader(false)
-            
-                   if(payment_method === "card"){
-                    Linking.openURL(response.responseBody.checkoutUrl)
-            
-                   }
-            
-                   setNotification({
-                    error: false,
-                    message: response?.message || "Recharge Successful",
-                    data: null
-                  })
-            
-                  loadProfile(token)
-                   
-              
-                    
-                  } catch (error: any) {
-                    setLoader(false)
-                    setNotification({
-                      error: true,
-                      message: error.message || "something went wrong",
-                      data: null
-                    })
-                    
-                  }
-              
-            
-            }
-          
-     
-            
+  const handleConfirmation = async (payment_method: string) => {
+    // setTextInfo("Please wait while we process your payment")
+    setLoader(true)
+
+    try {
+      const response = await confirmBillPayment({ queryId: orderId, payment_method, token })
+      setLoader(false)
+
+      if (payment_method === 'card') {
+        Linking.openURL(response.responseBody.checkoutUrl)
+      }
+
+      setNotification({
+        error: false,
+        message: response?.message || 'Recharge Successful',
+        data: null,
+      })
+
+      loadProfile(token)
+    } catch (error: any) {
+      setLoader(false)
+      setNotification({
+        error: true,
+        message: error.message || 'something went wrong',
+        data: null,
+      })
+    }
+  }
+
   return (
-    <View className='flex-1 p-4 bg-primary'>
-       <View className="mb-6">
+    <View className="flex-1 p-4 bg-primary">
+      <View className="mb-6">
         <Text className="text-2xl font-bold text-white text-center">Confirm Recharge</Text>
         <Text className="text-sm text-white text-center mt-1">
           Please verify the transaction details below.
@@ -82,18 +75,25 @@ const confirm = () => {
           Recharge Details
         </Text>
 
-       <Summary data={data} />
+        <Summary data={data} />
       </View>
-          <Text className='text-white text-center'>{textInfo}</Text>
-      
-          <TransactionButtons handleConfirmation={handleConfirmation}/> 
-        
-        <Loader open={loader}/>
+      <Text className="text-white text-center">{textInfo}</Text>
 
-      <AppModal open={!!notification?.message} onclose={()=> setNotification({message: null, error: false, data: null})}>
-      <NotificationAlert onPress={()=> setNotification({message: null, error: false, data: null})} message={notification?.message} error={notification.error} data={notification.data}/>
+      <TransactionButtons handleConfirmation={handleConfirmation} />
 
-     </AppModal>
+      <Loader open={loader} />
+
+      <AppModal
+        open={!!notification?.message}
+        onclose={() => setNotification({ message: null, error: false, data: null })}
+      >
+        <NotificationAlert
+          onPress={() => setNotification({ message: null, error: false, data: null })}
+          message={notification?.message}
+          error={notification.error}
+          data={notification.data}
+        />
+      </AppModal>
     </View>
   )
 }

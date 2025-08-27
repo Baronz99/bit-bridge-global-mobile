@@ -3,9 +3,7 @@ import React from 'react'
 
 const onboarding = () => {
   return (
-    <View
-        className='flex-1'
-    >
+    <View className="flex-1">
       <Text>onboarding</Text>
     </View>
   )

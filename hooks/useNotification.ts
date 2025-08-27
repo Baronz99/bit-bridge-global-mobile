@@ -1,13 +1,13 @@
-import { useState } from "react"
+import { useState } from 'react'
 
 const useNotification = () => {
-    const [notification, setNotification] = useState({
-        error: false,
-        message: null,
-        data: null
-      })
+  const [notification, setNotification] = useState({
+    error: false,
+    message: null,
+    data: null,
+  })
 
-      return {notification, setNotification}
+  return { notification, setNotification }
 }
 
 export default useNotification

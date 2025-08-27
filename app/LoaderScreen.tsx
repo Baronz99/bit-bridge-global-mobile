@@ -3,8 +3,8 @@ import React from 'react'
 
 const LoaderScreen = () => {
   return (
-    <View className='bg-primary flex-1 justify-center items-center'>
-      <ActivityIndicator/>
+    <View className="bg-primary flex-1 justify-center items-center">
+      <ActivityIndicator />
     </View>
   )
 }

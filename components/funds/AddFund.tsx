@@ -5,7 +5,7 @@ import FormInput from '../FormInput'
 const AddFund = () => {
   return (
     <View>
-      <FormInput/>
+      <FormInput />
     </View>
   )
 }

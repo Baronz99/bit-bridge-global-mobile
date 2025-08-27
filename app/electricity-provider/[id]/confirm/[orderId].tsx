@@ -15,76 +15,72 @@ import PurchaseDetails from '@/components/purchaseDetails/PurchaseDetails'
 import TransactionButtons from '@/components/transactionButtons/TransactionButtons'
 
 const MobileDetailConfirm = () => {
-      const {orderId} = useLocalSearchParams()
-          const {authState: {token}, loadProfile} = useAuth()
-              const [loader, setLoader] = useState(false)
-              const {notification, setNotification} = useNotification()
-       
-          const {data, refetch, loading, error, reset} = useFetch(()=> getPurchaseOrder({
-            id: orderId,
-            token
-          }))
-     
-                  
-    
-        const handleCardConfirmation = async (payment_method: string) => {
-          setLoader(true)
-    
-          try {
-    
-           const response = await  confirmBillPayment({queryId: orderId, payment_method, token})
-           setLoader(false)
-    
-           if(payment_method === "card"){
-            Linking.openURL(response.responseBody.checkoutUrl)
-    
-           }
-    
-           loadProfile(token)
-           setNotification({
-            error: false,
-            message: response?.message || "Recharge Successful",
-            data: null
-          })
-           
-      
-            
-          } catch (error: any) {
-            setLoader(false)
-            setNotification({
-              error: true,
-              message: error.message || "something went wrong",
-              data: null
-            })
-            
-          }
-      
-    
+  const { orderId } = useLocalSearchParams()
+  const {
+    authState: { token },
+    loadProfile,
+  } = useAuth()
+  const [loader, setLoader] = useState(false)
+  const { notification, setNotification } = useNotification()
+
+  const { data, refetch, loading, error, reset } = useFetch(() =>
+    getPurchaseOrder({
+      id: orderId,
+      token,
+    })
+  )
+
+  const handleCardConfirmation = async (payment_method: string) => {
+    setLoader(true)
+
+    try {
+      const response = await confirmBillPayment({ queryId: orderId, payment_method, token })
+      setLoader(false)
+
+      if (payment_method === 'card') {
+        Linking.openURL(response.responseBody.checkoutUrl)
+      }
+
+      loadProfile(token)
+      setNotification({
+        error: false,
+        message: response?.message || 'Recharge Successful',
+        data: null,
+      })
+    } catch (error: any) {
+      setLoader(false)
+      setNotification({
+        error: true,
+        message: error.message || 'something went wrong',
+        data: null,
+      })
     }
+  }
 
   return (
-    <View className='flex-1 p-4 bg-primary relative'>
-
+    <View className="flex-1 p-4 bg-primary relative">
       <View className="mb-6">
         <Text className="text-2xl font-bold text-white text-center">Confirm Meter Details</Text>
         <Text className="text-sm text-white text-center mt-1">
           Please verify the transaction details below.
         </Text>
-      </View>    
+      </View>
 
-      <PurchaseDetails title={"Meter Details"} data={data}/>
+      <PurchaseDetails title={'Meter Details'} data={data} />
 
-
-      <TransactionButtons handleConfirmation={handleCardConfirmation}/> 
-      <Loader open={loader}/>
-      <AppModal open={!!notification.message } onclose={() => setNotification({message: null, error: false, data: null})}>
-          <NotificationAlert onPress={() => setNotification({message: null, error: false, data: null})} message={notification.message} error={notification.error} data={notification.data} />
+      <TransactionButtons handleConfirmation={handleCardConfirmation} />
+      <Loader open={loader} />
+      <AppModal
+        open={!!notification.message}
+        onclose={() => setNotification({ message: null, error: false, data: null })}
+      >
+        <NotificationAlert
+          onPress={() => setNotification({ message: null, error: false, data: null })}
+          message={notification.message}
+          error={notification.error}
+          data={notification.data}
+        />
       </AppModal>
-
-     
-
-
-
     </View>
   )
 }

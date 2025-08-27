@@ -3,7 +3,7 @@ import React from 'react'
 import { useLocalSearchParams } from 'expo-router'
 
 const CabledDetails = () => {
-  const {service} = useLocalSearchParams()
+  const { service } = useLocalSearchParams()
   return (
     <View>
       <Text>Cabled: {service}</Text>

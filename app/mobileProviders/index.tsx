@@ -9,19 +9,20 @@ import { splitString } from '@/utils'
 import MobileProviderView from '@/components/mobileProviderView/mobileProviderView'
 
 const index = () => {
-    const {authState: {token}} = useAuth()
-    const {data} = useFetch(() => getProducts({
-        token,
-        params: {
-            category: "mobile provider"
-        }
-
-    }))
-
-
+  const {
+    authState: { token },
+  } = useAuth()
+  const { data } = useFetch(() =>
+    getProducts({
+      token,
+      params: {
+        category: 'mobile provider',
+      },
+    })
+  )
 
   return (
-    <View className='flex-1 bg-primary px-4'>
+    <View className="flex-1 bg-primary px-4">
       <MobileProviderView data={data} />
     </View>
   )

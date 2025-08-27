@@ -15,79 +15,72 @@ import Summary from '@/components/cards/Summary'
 import TransactionButtons from '@/components/transactionButtons/TransactionButtons'
 
 const CableetailConfirm = () => {
-      const {orderId} = useLocalSearchParams()
-      const [loader, setLoader] = useState(false)
-          const {authState: {token}, loadProfile} = useAuth()
-          const {notification, setNotification} = useNotification()
+  const { orderId } = useLocalSearchParams()
+  const [loader, setLoader] = useState(false)
+  const {
+    authState: { token },
+    loadProfile,
+  } = useAuth()
+  const { notification, setNotification } = useNotification()
 
+  const { data, refetch, loading, error, reset } = useFetch(() =>
+    getPurchaseOrder({
+      id: orderId,
+      token,
+    })
+  )
 
-          const {data, refetch, loading, error, reset} = useFetch(()=> getPurchaseOrder({
-            id: orderId,
-            token
-          }))
-     
-          
+  const handleCardConfirmation = async (payment_method: string) => {
+    setLoader(true)
 
-    const handleCardConfirmation = async (payment_method: string) => {
-      setLoader(true)
+    try {
+      const response = await confirmBillPayment({ queryId: orderId, payment_method, token })
+      setLoader(false)
 
-      try {
-
-       const response = await  confirmBillPayment({queryId: orderId, payment_method, token})
-       setLoader(false)
-
-       if(payment_method === "card"){
+      if (payment_method === 'card') {
         Linking.openURL(response.responseBody.checkoutUrl)
+      }
 
-       }
-
-       setNotification({
+      setNotification({
         error: false,
-        message: response?.message || "Recharge Successful",
-        data: null
+        message: response?.message || 'Recharge Successful',
+        data: null,
       })
-       
 
       loadProfile(token)
-  
-        
-      } catch (error: any) {
-        setLoader(false)
-        setNotification({
-          error: true,
-          message: error.message || "something went wrong",
-          data: null
-        })
-        
-      }
-  
-
-}      
+    } catch (error: any) {
+      setLoader(false)
+      setNotification({
+        error: true,
+        message: error.message || 'something went wrong',
+        data: null,
+      })
+    }
+  }
 
   return (
-    <View className='flex-1 px-4 bg-primary w-full'>
-
-    <View className="mb-6">
-        <Text className="text-2xl font-bold text-white text-center">Confirm Cable Subsccription</Text>
+    <View className="flex-1 px-4 bg-primary w-full">
+      <View className="mb-6">
+        <Text className="text-2xl font-bold text-white text-center">
+          Confirm Cable Subsccription
+        </Text>
         <Text className="text-sm text-white text-center mt-1">
           Please verify the transaction details below.
         </Text>
       </View>
 
       <View className="bg-gray-800 rounded-2xl p-6 shadow-lg mb-8">
-        <Text className="text-lg font-semibold text-center text-gray-200 mb-4">
-          TV Details
-        </Text>
+        <Text className="text-lg font-semibold text-center text-gray-200 mb-4">TV Details</Text>
 
-       <Summary data={data} />
-
+        <Summary data={data} />
       </View>
-      <TransactionButtons handleConfirmation={handleCardConfirmation}/> 
-         { loader && <Loader open={loader}/>}
-          <NotificationAlert message={notification.message} error={notification.error} data={notification.data} />
-
-     
-
+      <TransactionButtons handleConfirmation={handleCardConfirmation} />
+      {loader && <Loader open={loader} />}
+      <NotificationAlert
+        message={notification.message}
+        error={notification.error}
+        data={notification.data}
+      />
     </View>
   )
 }

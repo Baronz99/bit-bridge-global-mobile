@@ -13,7 +13,6 @@
     "plugin:import/errors",
     "plugin:import/warnings",
     "plugin:prettier/recommended"
-
   ],
   "parser": "@typescript-eslint/parser",
   "parserOptions": {
@@ -23,12 +22,7 @@
       "jsx": true
     }
   },
-  "plugins": [
-    "@typescript-eslint",
-    "react",
-    "react-native",
-    "import"
-  ],
+  "plugins": ["@typescript-eslint", "react", "react-native", "import"],
   "rules": {
     "@typescript-eslint/no-unused-vars": "warn",
     "react/prop-types": "off",

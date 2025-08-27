@@ -1,23 +1,26 @@
 import React from 'react'
-import { Keyboard, KeyboardAvoidingView, Platform, ScrollView, Text, TouchableNativeFeedback, View } from 'react-native'
+import {
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Text,
+  TouchableNativeFeedback,
+  View,
+} from 'react-native'
 
-const KeyboardAvoidWrapper = ({children}) => {
+const KeyboardAvoidWrapper = ({ children }) => {
   return (
-    <KeyboardAvoidingView 
-    style={{flex: 1}} 
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <View className="flex-1 p-2">
-       <ScrollView
-       showsVerticalScrollIndicator={false}
-        className=''>
-            <TouchableNativeFeedback onPress={Keyboard.dismiss}>
-                {children}
-            </TouchableNativeFeedback>
-        </ScrollView> 
-        </View>
-
-     </KeyboardAvoidingView>
+        <ScrollView showsVerticalScrollIndicator={false} className="">
+          <TouchableNativeFeedback onPress={Keyboard.dismiss}>{children}</TouchableNativeFeedback>
+        </ScrollView>
+      </View>
+    </KeyboardAvoidingView>
   )
 }
 

@@ -15,61 +15,52 @@ import PurchaseDetails from '@/components/purchaseDetails/PurchaseDetails'
 import TransactionButtons from '@/components/transactionButtons/TransactionButtons'
 
 const MobileDetailConfirm = () => {
-      const {orderId} = useLocalSearchParams()
-          const [loader, setLoader] = useState(false)
-          const {notification, setNotification} = useNotification()
-      
-          const {authState: {token},loadProfile } = useAuth()
+  const { orderId } = useLocalSearchParams()
+  const [loader, setLoader] = useState(false)
+  const { notification, setNotification } = useNotification()
 
+  const {
+    authState: { token },
+    loadProfile,
+  } = useAuth()
 
-          const {data, refetch, loading, error, reset} = useFetch(()=> getPurchaseOrder({
-            id: orderId,
-            token
-          }))
-     
-          
+  const { data, refetch, loading, error, reset } = useFetch(() =>
+    getPurchaseOrder({
+      id: orderId,
+      token,
+    })
+  )
 
-          
-    const handleCardConfirmation = async (payment_method: string) => {
-      setLoader(true)
+  const handleCardConfirmation = async (payment_method: string) => {
+    setLoader(true)
 
-      try {
+    try {
+      const response = await confirmBillPayment({ queryId: orderId, payment_method, token })
+      setLoader(false)
 
-       const response = await  confirmBillPayment({queryId: orderId, payment_method, token})
-       setLoader(false)
-
-       if(payment_method === "card"){
+      if (payment_method === 'card') {
         Linking.openURL(response.responseBody.checkoutUrl)
+      }
 
-       }
-
-       setNotification({
+      setNotification({
         error: false,
-        message: response?.message || "Recharge Successful",
-        data: null
+        message: response?.message || 'Recharge Successful',
+        data: null,
       })
 
       loadProfile(token)
-       
-  
-        
-      } catch (error: any) {
-        setLoader(false)
-        setNotification({
-          error: true,
-          message: error.message || "something went wrong",
-          data: null
-        })
-        
-      }
-  
+    } catch (error: any) {
+      setLoader(false)
+      setNotification({
+        error: true,
+        message: error.message || 'something went wrong',
+        data: null,
+      })
+    }
+  }
 
-}
-      
   return (
-    <View className='flex-1 p-4 bg-primary'>
-      
-      
+    <View className="flex-1 p-4 bg-primary">
       <View className="mb-6">
         <Text className="text-2xl font-bold text-white text-center">Confirm Recharge</Text>
         <Text className="text-sm text-white text-center mt-1">
@@ -77,23 +68,24 @@ const MobileDetailConfirm = () => {
         </Text>
       </View>
 
-      <PurchaseDetails title="Purchase Details" data={data}/>
+      <PurchaseDetails title="Purchase Details" data={data} />
 
-               <TransactionButtons handleConfirmation={handleCardConfirmation}/> 
+      <TransactionButtons handleConfirmation={handleCardConfirmation} />
 
-
-   
-
-    
-        <Loader open={loader}/>
-          <AppModal open={!!notification.message } onclose={() => setNotification({message: null, error: false, data: null})}>
-          <NotificationAlert onPress={() => setNotification({message: null, error: false, data: null})} message={notification.message} error={notification.error} data={notification.data} />
-
-        </AppModal>
-
+      <Loader open={loader} />
+      <AppModal
+        open={!!notification.message}
+        onclose={() => setNotification({ message: null, error: false, data: null })}
+      >
+        <NotificationAlert
+          onPress={() => setNotification({ message: null, error: false, data: null })}
+          message={notification.message}
+          error={notification.error}
+          data={notification.data}
+        />
+      </AppModal>
     </View>
   )
 }
 
 export default MobileDetailConfirm
-
