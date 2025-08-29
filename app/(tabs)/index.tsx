@@ -254,7 +254,7 @@ export default function Index() {
 
                     <View className="flex-row my-1 items-center gap-2">
                       <Image source={icons.trophy} className="w-5 h-5" />
-                      <Text className="text-white">0.00</Text>
+                      <Text className="text-white"> {moneyFormat(userProfileData?.wallet?.commission ?? 0)}</Text>
                     </View>
                   </View>
 
