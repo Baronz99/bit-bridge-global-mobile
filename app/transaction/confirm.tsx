@@ -47,6 +47,7 @@ const Row = ({ label, value }: { label: string; value?: string | number }) => (
 
 export default function TransactionSuccessScreen() {
   const { reference } = useLocalSearchParams()
+  // const reference  = "bbg-1757381050"
   const {
     authState: { token },
     loadProfile,
@@ -165,7 +166,7 @@ export default function TransactionSuccessScreen() {
         {data?.service_type === 'ELECTRICITY' && (
           <View className="border border-slate-600 -200 rounded-xl p-4 mb-4 bg-slate-900">
             <Text className="text-slate-200 text-xs mb-1">{data?.biller} Token</Text>
-            <View className="flex-row items-center justify-between">
+            <View className="flex-row items-center justify-between flex-wrap">
               <Text selectable className="text-lg font-semibold tracking-widest text-slate-200">
                 {data?.token}
               </Text>

@@ -220,7 +220,9 @@ export default function Index() {
     <>
       <View className="flex-1 bg-primary">
         <Image source={images.bg} className="absolute top-0 w-full z-0" />
-
+        {/* <TouchableOpacity onPress={() => router.push('/transaction/confirm')}>
+          <Text className="text-red-200 text-2xl font-bold text-center mt-10 mb-4">Welcome </Text>
+        </TouchableOpacity> */}
         <ScrollView
           className="flex-1 px-5"
           contentContainerStyle={{
