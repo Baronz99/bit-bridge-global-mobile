@@ -29,11 +29,11 @@ const Login = () => {
   const [loading, setLoading] = useState(false)
 
   const { onLogin } = useAuth()
-
-  console.log(formInput)
-
   const handleLogin = async () => {
     try {
+      if (formInput.email.trim() === '' || formInput.password.trim() === '') {
+        throw new Error('Enter Login Details')
+      }
       setLoading(true)
 
       const result = await onLogin(formInput)

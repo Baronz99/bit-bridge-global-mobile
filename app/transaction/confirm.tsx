@@ -1,5 +1,14 @@
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
-import React, { useEffect, useState } from 'react'
+import {
+  Alert,
+  Image,
+  Pressable,
+  Share,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native'
+import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useLocalSearchParams } from 'expo-router'
 import { icons } from '@/constants/icons'
 import { images } from '@/constants/images'
@@ -8,17 +17,44 @@ import { getTransactionRecord } from '@/api/transactions'
 import { useAuth } from '@/services/useAuth'
 import moneyFormat from '@/utils/moneyFormat'
 import { updateOrderStatus } from '@/api/billOrder'
+// import * as Clipboard from 'expo-clipboard';
+import { Ionicons } from '@expo/vector-icons'
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native'
+import LoadingIndicator from '@/components/loadingIndicator'
 
-const confirm = () => {
+type RootStackParamList = {
+  TransactionSuccess: {
+    amount: number
+    meterNumber: string
+    customerName?: string
+    address?: string
+    disco: 'AEDC'
+    token: string // AEDC token
+    unitsKwh?: number
+    ref: string // transaction reference
+    date: string // ISO string or formatted date
+    paymentMethod?: string // e.g., "Card •••• 1234"
+  }
+}
+
+type SuccessRouteProp = RouteProp<RootStackParamList, 'TransactionSuccess'>
+
+const Row = ({ label, value }: { label: string; value?: string | number }) => (
+  <View className="flex-row justify-between items-start py-2">
+    <Text className="text-slate-400 text-sm">{label}</Text>
+    <Text className="text-slate-200 text-right font-medium">{String(value ?? '—')}</Text>
+  </View>
+)
+
+export default function TransactionSuccessScreen() {
+  const { reference } = useLocalSearchParams()
   const {
     authState: { token },
     loadProfile,
   } = useAuth()
-  // const [loading, setLoading] = useState(true)
+  const navigation = useNavigation<any>()
+  const route = useRoute<SuccessRouteProp>()
 
-  const { reference } = useLocalSearchParams()
-
-  // const reference = "bbg-1746604425"
   const { data, loading } = useFetch(() =>
     getTransactionRecord({
       id: reference as string,
@@ -54,72 +90,190 @@ const confirm = () => {
     }
   }, [data])
 
+  const handleCopyToken = async () => {
+    try {
+      // await Clipboard.setStringAsync(token);
+      Alert.alert('Copied', 'AEDC token copied to clipboard.')
+    } catch {
+      Alert.alert('Copy failed', 'Please try again.')
+    }
+  }
+
+  const handleShare = async () => {
+    try {
+      await Share.share({
+        message:
+          `AEDC Payment Successful\n` +
+          `Amount: ${moneyFormat(data?.amount.toLocaleString())}\n` +
+          `Meter: ${data?.meter_number}\n` +
+          `Units: ${data?.units ?? '-'} kWh\n` +
+          `Token: ${data?.token}\n` +
+          `Ref: ${data?.id}\n` +
+          `Date: ${data?.created_at}`,
+      })
+    } catch {
+      /* user canceled */
+    }
+  }
+
+  const goHome = () => {
+    // Use reset so Back doesn't return to this screen
+    navigation.reset({
+      index: 0,
+      routes: [{ name: 'Home' }],
+    })
+  }
+
+  console.log(data, 'DATA: bill order data fetched on confirm screen')
+
+  const billContent = (
+    <>
+      {/* Header / Success badge */}
+      {data?.status === 'completed' ? (
+        <View className="items-center pt-14 pb-8 px-6">
+          <View className="w-16 h-16 rounded-full bg-green-100 items-center justify-center mb-4">
+            <Ionicons name="checkmark" size={36} color="#16a34a" />
+          </View>
+          <Text className="text-2xl font-bold text-slate-100">Payment Successful</Text>
+          <Text className="text-slate-400 mt-1">
+            Your {data?.biller} {data?.service_types} purchase is complete.
+          </Text>
+        </View>
+      ) : (
+        <View className="items-center pt-14 pb-8 px-6">
+          <View className="w-16 h-16 rounded-full bg-red-900 items-center justify-center mb-4">
+            <Ionicons name="close" size={36} color="#ef4444" />
+          </View>
+          <Text className="text-2xl font-bold text-white">Payment Declined {data?.status}</Text>
+          <Text className="text-gray-400 mt-1">Your transaction could not be processed.</Text>
+        </View>
+      )}
+
+      {/* Card */}
+      <View className="mx-4 rounded-2xl p-5 shadow-sm">
+        {/* Amount */}
+        <View className="items-center mb-4">
+          <Text className="text-slate-200">Amount Paid</Text>
+          <Text className="text-3xl font-extrabold text-slate-100 mt-1">
+            ₦{data?.total_amount?.toLocaleString()}
+          </Text>
+        </View>
+
+        {/* AEDC Token */}
+
+        {data?.service_type === 'ELECTRICITY' && (
+          <View className="border border-slate-600 -200 rounded-xl p-4 mb-4 bg-slate-900">
+            <Text className="text-slate-200 text-xs mb-1">{data?.biller} Token</Text>
+            <View className="flex-row items-center justify-between">
+              <Text selectable className="text-lg font-semibold tracking-widest text-slate-200">
+                {data?.token}
+              </Text>
+              <Pressable
+                onPress={handleCopyToken}
+                accessibilityRole="button"
+                accessibilityLabel="Copy AEDC token"
+                className="px-3 py-2 rounded-lg bg-gray-900 border border-slate-600 -200"
+              >
+                <View className="flex-row  items-center">
+                  <Ionicons name="copy-outline" size={18} color={'gray'} />
+                  <Text className="ml-1 font-medium text-slate-400">Copy</Text>
+                </View>
+              </Pressable>
+            </View>
+            <Pressable
+              onPress={handleShare}
+              className="self-start mt-3"
+              accessibilityRole="button"
+              accessibilityLabel="Share token"
+            >
+              <View className="flex-row items-center">
+                <Ionicons name="share-outline" color={'white'} size={18} />
+                <Text className="ml-1 text-slate-300 font-medium">Share</Text>
+              </View>
+            </Pressable>
+          </View>
+        )}
+
+        {/* Details */}
+        <Row label="Meter Number" value={data?.meter_number} />
+        {!!data?.customerName && <Row label="Customer Name" value={data?.customerName} />}
+        {!!data?.address && <Row label="Address" value={data?.address} />}
+        <Row label="Disco" value={data?.biller} />
+        {data?.units && <Row label="Units (kWh)" value={data?.units ?? '-'} />}
+        <Row label="Payment Method" value={data?.payment_method ?? '—'} />
+        <Row label="Reference" value={data?.id} />
+        <Row label="Date" value={data?.created_at} />
+      </View>
+
+      {/* Footer actions */}
+    </>
+  )
+
+  const transactionContent = (
+    <>
+      {/* Success Header */}
+      <View className="flex-1 bg-gray-900">
+        {/* Success Header */}
+
+        {data?.status == 'approved' ? (
+          <View className="items-center pt-14 pb-8 px-6">
+            <View className="w-16 h-16 rounded-full bg-green-900 items-center justify-center mb-4">
+              <Ionicons name="checkmark" size={36} color="#22c55e" />
+            </View>
+            <Text className="text-2xl font-bold text-white">Deposit Successful</Text>
+            <Text className="text-gray-400 mt-1">Your deposit has been credited.</Text>
+          </View>
+        ) : (
+          <View className="items-center pt-14 pb-8 px-6">
+            <View className="w-16 h-16 rounded-full bg-red-900 items-center justify-center mb-4">
+              <Ionicons name="close" size={36} color="#ef4444" />
+            </View>
+            <Text className="text-2xl font-bold text-white">Transaction Declined</Text>
+            <Text className="text-gray-400 mt-1">Your transaction could not be processed.</Text>
+          </View>
+        )}
+
+        {/* Card with details */}
+        <View className="bg-gray-800 mx-4 rounded-2xl p-5 shadow-sm">
+          {/* Amount */}
+          <View className="items-center mb-4">
+            <Text className="text-gray-400">Amount Deposited</Text>
+            <Text className="text-3xl font-extrabold text-white mt-1">
+              ₦{data?.amount.toLocaleString()}
+            </Text>
+          </View>
+
+          {/* Transaction Details */}
+          <Row label="Reference" value={data?.id} />
+          <Row label="Date" value={data?.created_at} />
+          <Row label="Payment Method" value={data?.payment_method ?? '—'} />
+        </View>
+      </View>
+    </>
+  )
+
   return (
     <View className="flex-1 px-4 bg-primary">
-      {!loading && data ? (
-        data?.status === 'approved' || data?.status === 'completed' ? (
-          <Text className="text-green-600  font-semibold text-xl mt-10 text-center">
-            Transaction completed
-          </Text>
-        ) : (
-          <Text className="text-red-600  font-semibold text-xl mt-10 text-center">
-            Failed transaction
-          </Text>
-        )
-      ) : (
-        <Text className="text-center text-white"> Loading...</Text>
-      )}
+      {loading ? <LoadingIndicator /> : receipt_type === 'fbg' ? transactionContent : billContent}
+      <View className="mt-auto px-4 pb-8 pt-6">
+        <Pressable
+          onPress={goHome}
+          className="w-full h-14 rounded-2xl bg-theme-primary  items-center justify-center"
+          accessibilityRole="button"
+          accessibilityLabel="Go back to Home"
+        >
+          <Text className="text-white font-semibold text-base">Back to Home</Text>
+        </Pressable>
 
-      {!loading &&
-        data &&
-        (data?.status === 'approved' || data?.status === 'completed' ? (
-          <Image source={images.success} className="w-40 m-auto h-40" />
-        ) : (
-          <Image source={images.fail} className="w-40 m-auto h-40" />
-        ))}
-
-      {receipt_type === 'fbg' ? (
-        <View className="m-auto w-full px bg-r">
-          <View className="my-20">
-            <Text className="text-white text-center my-3 text-3xl">
-              {moneyFormat(data?.amount)}
-            </Text>
-            <Text className="text-alt text-center my-3 text-3xl">Wallet Funded</Text>
-          </View>
-        </View>
-      ) : (
-        <View className="m-auto w-full px bg-r">
-          <View className="my-10">
-            <Text className="text-white text-center my-0 text-3xl">
-              {moneyFormat(data?.amount)}
-            </Text>
-          </View>
-          <Text className="text-white text-center my-8 text-2xl">
-            {data?.description ?? 'Mobile Top Up'}
-          </Text>
-          <Text className="text-white text-center my-4 text-3xl">{data?.meter_number}</Text>
-
-          {data?.token && (
-            <View>
-              <Text className="text-xl text-center text-alt my-4">Token </Text>
-              <Text className="text-white text-3xl font-medium text-center">
-                {data?.token ?? 'ttrr657687879999977878'}{' '}
-              </Text>
-            </View>
-          )}
-        </View>
-      )}
-      <Text className="text-center text-white">{updateData?.message ?? updateError?.message}</Text>
-
-      <Link href={'/'} asChild>
-        <TouchableOpacity className="bg-alt rounded w-full py-3 mt-5">
-          <Text className=" border-primary rounded-lg py-2 font-semibold text-xl text-center">
-            confirm
-          </Text>
-        </TouchableOpacity>
-      </Link>
+        {/* <Pressable
+          onPress={() => navigation.goBack()}
+          className="w-full h-12 mt-3 rounded-2xl border border-slate-300 items-center justify-center"
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
+          <Text className="text-slate-700 font-medium">Go Back</Text>
+        </Pressable> */}
+      </View>
     </View>
   )
 }
-
-export default confirm

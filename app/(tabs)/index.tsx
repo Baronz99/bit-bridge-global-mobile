@@ -65,7 +65,7 @@ export default function Index() {
 
   const [getstarted, setOpenStarted] = useState(false)
 
-  console.log('Runtime Version:', Constants.manifest2?.runtimeVersion)
+  console.log('Runtime Versions:', Constants.manifest2?.runtimeVersion)
 
   const { data: recentTransaction } = useFetch(() => getRescentPurchaseOrder({ token }))
 
@@ -219,8 +219,10 @@ export default function Index() {
   return (
     <>
       <View className="flex-1 bg-primary">
-        {/* <Text className="text-[#2f3b69] text-2xl font-bold text-center mt-10 mb-4">Welcome {refreshing ? "refreshing" : "fetched"}</Text> */}
         <Image source={images.bg} className="absolute top-0 w-full z-0" />
+        <TouchableOpacity onPress={() => router.push('/transaction/confirm')}>
+          <Text className="text-red-200 text-2xl font-bold text-center mt-10 mb-4">Welcome </Text>
+        </TouchableOpacity>
         <ScrollView
           className="flex-1 px-5"
           contentContainerStyle={{
@@ -254,7 +256,10 @@ export default function Index() {
 
                     <View className="flex-row my-1 items-center gap-2">
                       <Image source={icons.trophy} className="w-5 h-5" />
-                      <Text className="text-white"> {moneyFormat(userProfileData?.wallet?.commission ?? 0)}</Text>
+                      <Text className="text-white">
+                        {' '}
+                        {moneyFormat(userProfileData?.wallet?.commission ?? 0)}
+                      </Text>
                     </View>
                   </View>
 
@@ -276,12 +281,6 @@ export default function Index() {
                 </>
               )}
             </View>
-
-            {/* <TouchableOpacity onPress={() => {
-          setOpenStarted(true)
-          console.log("first")}} className='border rounded-md mt-4 border-green-400 py-5 '>
-                                  <Text className='text-green-400 text-center'>Pay from Bank </Text>
-                  </TouchableOpacity> */}
 
             {userProfileData?.account && (
               <TouchableOpacity

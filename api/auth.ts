@@ -107,7 +107,6 @@ export const sendUserConfirmation = async (email: string) => {
     )
 
     const data = response.data
-    console.log(data)
     return data
   } catch (error: any) {
     if (error.response) {

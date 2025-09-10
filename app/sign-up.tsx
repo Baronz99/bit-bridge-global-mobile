@@ -36,7 +36,6 @@ const SignUp = () => {
 
   const handleLogin = async () => {
     setLoading(true)
-    console.log(formInput)
     try {
       const result = await onRegister(formInput)
 

@@ -13,9 +13,9 @@ export const userWallet = async ({ token }: { token: string }) => {
 
     return result
   } catch (error: any) {
-    if (axios.isAxiosError(error) || error.response){
-      return error.response.data ||'error occured'
-    } 
+    if (axios.isAxiosError(error) || error.response) {
+      return error.response.data || 'error occured'
+    }
 
     return 'something went wrong'
   }

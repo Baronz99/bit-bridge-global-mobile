@@ -1,8 +1,6 @@
-import ViewBox from '@/components/view-box/ViewBoxIcon'
-import { icons } from '@/constants/icons'
 import { useAuth } from '@/services/useAuth'
 import moneyFormat from '@/utils/moneyFormat'
-import { AntDesign, Feather } from '@expo/vector-icons'
+import { Feather } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import { ActivityIndicator, Image, Text, TouchableOpacity, View } from 'react-native'
 
@@ -13,8 +11,6 @@ const AccouuntDetails = () => {
     loadProfile,
   } = useAuth()
   const router = useRouter()
-
-  console.log(userProfileData, 'userProfileData')
 
   return (
     <View className="flex-1 bg-primary">

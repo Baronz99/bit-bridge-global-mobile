@@ -38,7 +38,6 @@ const TabIcon = ({ focused, icon, title }: any) => {
 }
 const _layout = () => {
   const { authState, onLogout, userProfileData, loading } = useAuth()
-  console.log(userProfileData, 'userProfileData')
 
   if (loading) return <LoaderScreen />
 
