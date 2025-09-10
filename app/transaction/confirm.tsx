@@ -9,9 +9,8 @@ import {
   View,
 } from 'react-native'
 import React, { useEffect, useMemo, useState } from 'react'
-import { Link, useLocalSearchParams } from 'expo-router'
-import { icons } from '@/constants/icons'
-import { images } from '@/constants/images'
+import { Link, useLocalSearchParams, useRouter } from 'expo-router'
+
 import useFetch from '@/services/useFetch'
 import { getTransactionRecord } from '@/api/transactions'
 import { useAuth } from '@/services/useAuth'
@@ -54,6 +53,8 @@ export default function TransactionSuccessScreen() {
   } = useAuth()
   const navigation = useNavigation<any>()
   const route = useRoute<SuccessRouteProp>()
+    const router = useRouter()
+  
 
   const { data, loading } = useFetch(() =>
     getTransactionRecord({
@@ -253,11 +254,12 @@ export default function TransactionSuccessScreen() {
   )
 
   return (
-    <View className="flex-1 px-4 bg-primary">
+    <View className="flex-1 px-1 bg-primary">
       {loading ? <LoadingIndicator /> : receipt_type === 'fbg' ? transactionContent : billContent}
       <View className="mt-auto px-4 pb-8 pt-6">
         <Pressable
-          onPress={goHome}
+                      onPress={() => router.push('/')}
+
           className="w-full h-14 rounded-2xl bg-theme-primary  items-center justify-center"
           accessibilityRole="button"
           accessibilityLabel="Go back to Home"
