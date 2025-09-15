@@ -1,4 +1,12 @@
-import { View, Text, TouchableOpacity, Linking, Pressable, Animated, ActivityIndicator } from 'react-native'
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  Linking,
+  Pressable,
+  Animated,
+  ActivityIndicator,
+} from 'react-native'
 import React, { useMemo, useRef, useState } from 'react'
 import { useLocalSearchParams } from 'expo-router'
 import useNotification from '@/hooks/useNotification'
@@ -16,20 +24,20 @@ const confirm = () => {
   const { orderId } = useLocalSearchParams()
   const [loader, setLoader] = useState(false)
   const { notification, setNotification } = useNotification()
-    const [applyCommission, setApplyCommission] = useState(false)
+  const [applyCommission, setApplyCommission] = useState(false)
   const translateX = useRef(new Animated.Value(0)).current
 
   const toggleSwitch = () => {
     Animated.timing(translateX, {
       toValue: applyCommission ? 50 : 0,
       duration: 300,
-      useNativeDriver: true
-    }).start();
+      useNativeDriver: true,
+    }).start()
     setApplyCommission(!applyCommission)
   }
 
   const {
-        userProfileData,
+    userProfileData,
 
     authState: { token },
     loadProfile,
@@ -74,14 +82,13 @@ const confirm = () => {
     }
   }
 
- 
-
-  const commissionValue = useMemo(() => Number((data?.amount * data?.commissionRate).toFixed(2)),
+  const commissionValue = useMemo(
+    () => Number((data?.amount * data?.commissionRate).toFixed(2)),
     [data]
-  );
+  )
 
   const handlePress = async () => {
-    if (loading) return;
+    if (loading) return
     // try {
     //   setLoader(true);
     //   // pass a small object in case parent needs more info
@@ -91,7 +98,7 @@ const confirm = () => {
     // } finally {
     //   setLoading(false);
     // }
-  };
+  }
 
   return (
     <View className="flex-1 p-4 bg-primary">
@@ -110,8 +117,7 @@ const confirm = () => {
         <Summary data={data} />
       </View>
 
-
-       <View className="flex-row justify-between items-center mb-3">
+      <View className="flex-row justify-between items-center mb-3">
         <View>
           <Text className="text-sm text-gray-200">Balance</Text>
           <Text className="text-2xl font-bold mt-1 text-white">
@@ -121,46 +127,48 @@ const confirm = () => {
 
         {/* Commission badge */}
         <View className="flex-row items-center bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
-          <Text className="text-xs text-amber-600 font-semibold mr-2">
-            Bonus
-          </Text>
+          <Text className="text-xs text-amber-600 font-semibold mr-2">Bonus</Text>
           <Text className="text-sm font-medium text-amber-800">
             {moneyFormat(userProfileData?.wallet?.commission ?? 0)}
           </Text>
         </View>
       </View>
 
-  
-
       {/* Action row */}
 
-      {data?.service_type === "VTU" || data?.service_type === "DATA" && 
-      <View className="flex-row items-center justify-between">
-        <View className="flex-1">
-          <Text className="text-xs text-gray-200">Use Commission?</Text>
-          <Text className="text-sm font-medium text-alt -800">
-            {moneyFormat(data?.bill_commission)} Amount to pay
-          </Text>
-        </View>
+      {data?.service_type === 'VTU' ||
+        (data?.service_type === 'DATA' && (
+          <View className="flex-row items-center justify-between">
+            <View className="flex-1">
+              <Text className="text-xs text-gray-200">Use Commission?</Text>
+              <Text className="text-sm font-medium text-alt -800">
+                {moneyFormat(data?.bill_commission)} Amount to pay
+              </Text>
+            </View>
 
-        
-
-        <Pressable activeOpacity={0.8}
-          accessibilityLabel="Trigger commission"
-          accessibilityRole="button"
-          disabled={loading} onPress={toggleSwitch} className=' relative border' style={{
-        height: 30,
-        width: 100,
-        borderRadius: 25,
-        backgroundColor: applyCommission ? "green" : "gray",
-        justifyContent: "center",
-        padding: 5,
-      }}>
-        <Animated.View className="h-6 w-10  rounded-full bg-blue-500 top-0 relative translate-x-0" style={{transform: [{translateX}] }}/>
-
-        </Pressable>
-      </View>
-}
+            <Pressable
+              activeOpacity={0.8}
+              accessibilityLabel="Trigger commission"
+              accessibilityRole="button"
+              disabled={loading}
+              onPress={toggleSwitch}
+              className=" relative border"
+              style={{
+                height: 30,
+                width: 100,
+                borderRadius: 25,
+                backgroundColor: applyCommission ? 'green' : 'gray',
+                justifyContent: 'center',
+                padding: 5,
+              }}
+            >
+              <Animated.View
+                className="h-6 w-10  rounded-full bg-blue-500 top-0 relative translate-x-0"
+                style={{ transform: [{ translateX }] }}
+              />
+            </Pressable>
+          </View>
+        ))}
       <Text className="text-white text-center">{textInfo}</Text>
 
       <TransactionButtons handleConfirmation={handleConfirmation} />

@@ -1,12 +1,6 @@
-import {
-  Alert,
-  Pressable,
-  Share,
-  Text,
-  View,
-} from 'react-native'
+import { Alert, Pressable, Share, Text, View } from 'react-native'
 import React, { useEffect } from 'react'
-import {  useLocalSearchParams, useRouter } from 'expo-router'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 
 import useFetch from '@/services/useFetch'
 import { getTransactionRecord } from '@/api/transactions'
@@ -18,9 +12,6 @@ import { Ionicons } from '@expo/vector-icons'
 import { RouteProp, useNavigation } from '@react-navigation/native'
 import LoadingIndicator from '@/components/loadingIndicator'
 
-
-
-
 const Row = ({ label, value }: { label: string; value?: string | number }) => (
   <View className="flex-row justify-between items-start py-2">
     <Text className="text-slate-400 text-sm">{label}</Text>
@@ -29,36 +20,32 @@ const Row = ({ label, value }: { label: string; value?: string | number }) => (
 )
 
 export default function TransactionSuccessScreen() {
-const { reference, orderId } = useLocalSearchParams<{
-  reference?: string  
-  orderId?: string}>();  
+  const { reference, orderId } = useLocalSearchParams<{
+    reference?: string
+    orderId?: string
+  }>()
   // const reference  = "bbg-1757381050"
   const {
     authState: { token },
     loadProfile,
   } = useAuth()
-    const router = useRouter()
-  
+  const router = useRouter()
 
-  const { data, loading } = useFetch(() => { 
-    if(reference){
+  const { data, loading } = useFetch(() => {
+    if (reference) {
       return getTransactionRecord({
-          id: reference as string,
-          token: token,
-        }) 
-     }
-    else if(orderId ){
-      return getPurchaseOrder({
-          id: orderId as string,
-          token,
-        })}
-
-        else{
-          return undefined
-        }
+        id: reference as string,
+        token: token,
       })
-      
-  
+    } else if (orderId) {
+      return getPurchaseOrder({
+        id: orderId as string,
+        token,
+      })
+    } else {
+      return undefined
+    }
+  })
 
   const receipt_type = reference?.split('-')[0]
 
@@ -113,7 +100,6 @@ const { reference, orderId } = useLocalSearchParams<{
       /* user canceled */
     }
   }
-
 
   console.log(data, 'DATA: bill order data fetched on confirm screen')
 
@@ -245,11 +231,16 @@ const { reference, orderId } = useLocalSearchParams<{
 
   return (
     <View className="flex-1 px-1 bg-primary">
-      {loading ? <LoadingIndicator /> : receipt_type === 'fbg' ? transactionContent : billContent}
+      {loading ? (
+        <LoadingIndicator />
+      ) : reference && receipt_type === 'fbg' ? (
+        transactionContent
+      ) : (
+        billContent
+      )}
       <View className="mt-auto px-4 pb-8 pt-6">
         <Pressable
-                      onPress={() => router.push('/')}
-
+          onPress={() => router.push('/')}
           className="w-full h-14 rounded-2xl bg-theme-primary  items-center justify-center"
           accessibilityRole="button"
           accessibilityLabel="Go back to Home"

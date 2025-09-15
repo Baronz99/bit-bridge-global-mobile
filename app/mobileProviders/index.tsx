@@ -1,4 +1,4 @@
-import {  View } from 'react-native'
+import { View } from 'react-native'
 import React from 'react'
 import useFetch from '@/services/useFetch'
 import { getProducts } from '@/api/products'

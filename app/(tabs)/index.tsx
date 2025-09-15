@@ -453,7 +453,7 @@ export default function Index() {
             setToggleBvn(false)
           }}
         >
-          <View className="bg-gray-900 p-6 rounded-2xl w-full max-w-md">
+          <View className="bg-gray-900 p-6 rounded-2xl w-full max-w-md m-auto">
             <Text className="text-white text-xl font-semibold text-center mb-2">
               BVN Verification
             </Text>

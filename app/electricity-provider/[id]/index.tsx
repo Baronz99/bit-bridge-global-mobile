@@ -51,7 +51,13 @@ const ProvideDertails = () => {
 
       setLoader(false)
 
-      if (response) router.push(`/electricity-provider/${id}/confirm/${response?.data.id}`)
+      if (response)
+        router.push({
+          pathname: `/transaction/details`,
+          params: {
+            orderId: response?.data?.id,
+          },
+        })
     } catch (error: any) {
       setLoader(false)
     }

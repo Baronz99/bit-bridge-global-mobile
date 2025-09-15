@@ -70,7 +70,13 @@ const index = () => {
 
       setLoader(false)
 
-      router.push(`/data-subscription/confirm/${response?.data.id}`)
+      if (response)
+        router.push({
+          pathname: `/transaction/details`,
+          params: {
+            orderId: response?.data?.id,
+          },
+        })
     } catch (error: any) {
       setLoader(false)
     }

@@ -1,4 +1,13 @@
-import { View, Text, TouchableOpacity, Linking, Pressable, Animated, ActivityIndicator, Switch } from 'react-native'
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  Linking,
+  Pressable,
+  Animated,
+  ActivityIndicator,
+  Switch,
+} from 'react-native'
 import React, { useMemo, useRef, useState } from 'react'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import useNotification from '@/hooks/useNotification'
@@ -16,7 +25,7 @@ const confirmDetails = () => {
   const { orderId } = useLocalSearchParams()
   const [loader, setLoader] = useState(false)
   const { notification, setNotification } = useNotification()
-    const [applyCommission, setApplyCommission] = useState(false)
+  const [applyCommission, setApplyCommission] = useState(false)
   const translateX = useRef(new Animated.Value(0)).current
   const router = useRouter()
   const toggleSwitch = () => {
@@ -25,11 +34,11 @@ const confirmDetails = () => {
     //   duration: 300,
     //   useNativeDriver: true
     // }).start();
-    setApplyCommission(prev => !prev)
+    setApplyCommission((prev) => !prev)
   }
 
   const {
-        userProfileData,
+    userProfileData,
 
     authState: { token },
     loadProfile,
@@ -50,19 +59,23 @@ const confirmDetails = () => {
     setLoader(true)
 
     try {
-      const response = await confirmOrderPayment({ queryId: orderId, token, data: {payment_method, use_commission: applyCommission}  })
+      const response = await confirmOrderPayment({
+        queryId: orderId,
+        token,
+        data: { payment_method, use_commission: applyCommission },
+      })
       setLoader(false)
 
       if (payment_method === 'card') {
         Linking.openURL(response.responseBody.checkoutUrl)
       }
 
-      if(response){
+      if (response) {
         router.push({
-          pathname: "/transaction/confirm", params: {
-          orderId: response.data.id 
-
-          }
+          pathname: '/transaction/confirm',
+          params: {
+            orderId: response.data.id,
+          },
         })
       }
 
@@ -82,7 +95,7 @@ const confirmDetails = () => {
       })
     }
   }
-console.log(applyCommission, "[Data info]")
+  console.log(applyCommission, '[Data info]')
   return (
     <View className="flex-1 p-4 bg-primary">
       <View className="mb-6">
@@ -97,11 +110,10 @@ console.log(applyCommission, "[Data info]")
           Recharge Details
         </Text>
 
-        <Summary data={data} applyCommission={applyCommission}/>
+        <Summary data={data} applyCommission={applyCommission} />
       </View>
 
-
-       <View className="flex-row justify-between items-center mb-3">
+      <View className="flex-row justify-between items-center mb-3">
         <View>
           <Text className="text-sm text-gray-200">Balance</Text>
           <Text className="text-2xl font-bold mt-1 text-white">
@@ -111,39 +123,32 @@ console.log(applyCommission, "[Data info]")
 
         {/* Commission badge */}
         <View className="flex-row items-center bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
-          <Text className="text-xs text-amber-600 font-semibold mr-2">
-            Bonus
-          </Text>
+          <Text className="text-xs text-amber-600 font-semibold mr-2">Bonus</Text>
           <Text className="text-sm font-medium text-amber-800">
             {moneyFormat(userProfileData?.wallet?.commission ?? 0)}
           </Text>
         </View>
       </View>
 
-  
-
       {/* Action row */}
 
-      {(data?.service_type === "VTU" || data?.service_type === "DATA") && 
-      <View className="flex-row items-center justify-between">
-        <View className="flex-1">
-          <Text className="text-xs text-gray-200">Use Commission?</Text>
-          <Text className="text-sm font-medium text-alt -800">
-            {moneyFormat(data?.bill_commission)} Amount to pay
-          </Text>
+      {(data?.service_type === 'VTU' || data?.service_type === 'DATA') && (
+        <View className="flex-row items-center justify-between">
+          <View className="flex-1">
+            <Text className="text-xs text-gray-200">Use Commission?</Text>
+            <Text className="text-sm font-medium text-alt -800">
+              {moneyFormat(data?.bill_commission)} Amount to pay
+            </Text>
+          </View>
+
+          <Switch
+            value={applyCommission}
+            onValueChange={toggleSwitch}
+            trackColor={{ false: '#767577', true: '#34d399' }} // gray → green
+            thumbColor={applyCommission ? '#fff' : '#f4f3f4'}
+          />
         </View>
-
-        
-
-   
-         <Switch
-        value={applyCommission}
-        onValueChange={toggleSwitch}
-        trackColor={{ false: "#767577", true: "#34d399" }} // gray → green
-        thumbColor={applyCommission ? "#fff" : "#f4f3f4"}
-      />
-      </View>
-}
+      )}
       <Text className="text-white text-center">{textInfo}</Text>
 
       <TransactionButtons handleConfirmation={handleConfirmation} />

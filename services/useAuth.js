@@ -1,4 +1,4 @@
-import React,{ createContext, useContext, useEffect, useState, ReactNode } from 'react'
+import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import * as SecureStore from 'expo-secure-store'
 import APP_CONFIG from '@/api/baseUrl'
 import axios from 'axios'
@@ -51,7 +51,7 @@ const AuthProvider = ({ children }) => {
 
     ;(async () => {
       const token = await SecureStore.getItemAsync(token_key)
-      console.log(token, "[Token Fetched] REceived token")
+      console.log(token, '[Token Fetched] REceived token')
       if (token) {
         setAuthState({ token, authenticated: true })
         await userProfile(token)

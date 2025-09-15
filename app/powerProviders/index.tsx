@@ -1,13 +1,9 @@
-import { FlatList, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { FlatList, Text, View } from 'react-native'
 import React from 'react'
-import useFetch from '@/services/useFetch'
-import { getProducts } from '@/api/products'
+
 import { useAuth } from '@/services/useAuth'
-import { Link } from 'expo-router'
-import { images } from '@/constants/images'
-import { splitString } from '@/utils'
+
 import powerDistribution from '../../data/powerDistributions.json'
-import { PowerService } from '../(tabs)'
 import PowerProviderCard from '@/components/ProviderCard'
 
 const Index = () => {
