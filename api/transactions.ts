@@ -69,6 +69,8 @@ export const initiateMonnifyTransaction = async ({ data, token }: { data: any; t
     },
   }
 
+  console.log(formdata)
+
   try {
     const response = await axios.post(
       `${base_url + api_route}transactions/initialize_transaction`,

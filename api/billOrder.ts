@@ -88,7 +88,7 @@ export const confirmPayment = async ({ token, queryId, payment_method }: any) =>
   }
 }
 
-export const confirmBillPayment = async ({ token, queryId, payment_method }: any) => {
+export const confirmBillPayment = async ({ token, queryId, payment_method, use_commission }: any) => {
   try {
     const response = await axios.get(
       `${base_url + api_route}bill_orders/${queryId}/initialize_confirm_payment?payment_method=${payment_method}`,
@@ -110,6 +110,29 @@ export const confirmBillPayment = async ({ token, queryId, payment_method }: any
   }
 }
 
+export const confirmOrderPayment = async ({ token, queryId, data }: any) => {
+  
+  try {
+    const response = await axios.patch(
+      `${base_url + api_route}bill_orders/${queryId}/confirm_bill_payment`, {bill_order: data},
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    )
+
+    const responseData = response.data
+
+    return responseData
+  } catch (error: any) {
+    console.log(error, token, "[Error for Order]: Error retrieved from confirmation")
+    if (error.response) {
+      throw new Error(error.response.data.message)
+    }
+    throw new Error('Something went wrong')
+  }
+}
 export const repurchaseOrder = async ({ id, token }: any) => {
   try {
     const response = await axios.get(

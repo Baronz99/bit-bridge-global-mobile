@@ -1,11 +1,9 @@
-import { FlatList, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import {  View } from 'react-native'
 import React from 'react'
 import useFetch from '@/services/useFetch'
 import { getProducts } from '@/api/products'
 import { useAuth } from '@/services/useAuth'
-import { Link } from 'expo-router'
-import { images } from '@/constants/images'
-import { splitString } from '@/utils'
+
 import MobileProviderView from '@/components/mobileProviderView/mobileProviderView'
 
 const index = () => {

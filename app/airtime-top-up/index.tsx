@@ -6,9 +6,7 @@ import { useAuth } from '@/services/useAuth'
 import { Link, useRouter } from 'expo-router'
 import { images } from '@/constants/images'
 import { splitString } from '@/utils'
-import MobileProviderView from '@/components/mobileProviderView/mobileProviderView'
-import ViewBox from '@/components/view-box/ViewBoxIcon'
-import { icons } from '@/constants/icons'
+
 import SelectBoxIcon from '@/components/select-box/SelectBoxIcon'
 import { createPurchaseOrder } from '@/api/billOrder'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
@@ -52,7 +50,11 @@ const index = () => {
 
       setLoader(false)
 
-      router.push(`/airtime-top-up/confirm/${response?.data.id}`)
+      
+      if (response) router.push({pathname: `/transaction/details`, params: {
+        orderId: response?.data?.id
+      }
+      })
     } catch (error: any) {
       setLoader(false)
     }

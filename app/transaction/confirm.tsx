@@ -1,42 +1,25 @@
 import {
   Alert,
-  Image,
   Pressable,
   Share,
-  StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native'
-import React, { useEffect, useMemo, useState } from 'react'
-import { Link, useLocalSearchParams, useRouter } from 'expo-router'
+import React, { useEffect } from 'react'
+import {  useLocalSearchParams, useRouter } from 'expo-router'
 
 import useFetch from '@/services/useFetch'
 import { getTransactionRecord } from '@/api/transactions'
 import { useAuth } from '@/services/useAuth'
 import moneyFormat from '@/utils/moneyFormat'
-import { updateOrderStatus } from '@/api/billOrder'
+import { getPurchaseOrder, updateOrderStatus } from '@/api/billOrder'
 // import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons'
-import { RouteProp, useNavigation, useRoute } from '@react-navigation/native'
+import { RouteProp, useNavigation } from '@react-navigation/native'
 import LoadingIndicator from '@/components/loadingIndicator'
 
-type RootStackParamList = {
-  TransactionSuccess: {
-    amount: number
-    meterNumber: string
-    customerName?: string
-    address?: string
-    disco: 'AEDC'
-    token: string // AEDC token
-    unitsKwh?: number
-    ref: string // transaction reference
-    date: string // ISO string or formatted date
-    paymentMethod?: string // e.g., "Card •••• 1234"
-  }
-}
 
-type SuccessRouteProp = RouteProp<RootStackParamList, 'TransactionSuccess'>
+
 
 const Row = ({ label, value }: { label: string; value?: string | number }) => (
   <View className="flex-row justify-between items-start py-2">
@@ -46,23 +29,36 @@ const Row = ({ label, value }: { label: string; value?: string | number }) => (
 )
 
 export default function TransactionSuccessScreen() {
-  const { reference } = useLocalSearchParams()
+const { reference, orderId } = useLocalSearchParams<{
+  reference?: string  
+  orderId?: string}>();  
   // const reference  = "bbg-1757381050"
   const {
     authState: { token },
     loadProfile,
   } = useAuth()
-  const navigation = useNavigation<any>()
-  const route = useRoute<SuccessRouteProp>()
     const router = useRouter()
   
 
-  const { data, loading } = useFetch(() =>
-    getTransactionRecord({
-      id: reference as string,
-      token: token,
-    })
-  )
+  const { data, loading } = useFetch(() => { 
+    if(reference){
+      return getTransactionRecord({
+          id: reference as string,
+          token: token,
+        }) 
+     }
+    else if(orderId ){
+      return getPurchaseOrder({
+          id: orderId as string,
+          token,
+        })}
+
+        else{
+          return undefined
+        }
+      })
+      
+  
 
   const receipt_type = reference?.split('-')[0]
 
@@ -118,13 +114,6 @@ export default function TransactionSuccessScreen() {
     }
   }
 
-  const goHome = () => {
-    // Use reset so Back doesn't return to this screen
-    navigation.reset({
-      index: 0,
-      routes: [{ name: 'Home' }],
-    })
-  }
 
   console.log(data, 'DATA: bill order data fetched on confirm screen')
 

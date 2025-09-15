@@ -72,7 +72,11 @@ const ProvideDertails = () => {
 
       setLoader(false)
 
-      if (response) router.push(`/mobileProviders/${id}/confirm/${response?.data.id}`)
+      if (response) router.push({pathname: `/transaction/details`, params: {
+        id: id, 
+        orderId: response?.data?.id
+      }
+      })
     } catch (error: any) {
       setLoader(false)
     }

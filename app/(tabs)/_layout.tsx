@@ -41,6 +41,8 @@ const _layout = () => {
 
   if (loading) return <LoaderScreen />
 
+  console.log(authState, "[Authstate]:= Get Auth state")
+
   if (authState?.authenticated) {
     return <AppContent userProfileData={userProfileData} onLogout={onLogout} />
   }

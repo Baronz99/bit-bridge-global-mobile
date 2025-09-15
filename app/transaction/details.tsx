@@ -1,31 +1,31 @@
-import { View, Text, TouchableOpacity, Linking, Pressable, Animated, ActivityIndicator } from 'react-native'
+import { View, Text, TouchableOpacity, Linking, Pressable, Animated, ActivityIndicator, Switch } from 'react-native'
 import React, { useMemo, useRef, useState } from 'react'
-import { useLocalSearchParams } from 'expo-router'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import useNotification from '@/hooks/useNotification'
 import { useIsFocused } from '@react-navigation/native'
 import useFetch from '@/services/useFetch'
 import { useAuth } from '@/services/useAuth'
-import { confirmBillPayment, getPurchaseOrder } from '@/api/billOrder'
+import { confirmBillPayment, confirmOrderPayment, getPurchaseOrder } from '@/api/billOrder'
 import Summary from '@/components/cards/Summary'
 import Loader from '@/components/Loader'
 import AppModal from '@/components/modal/Modal'
 import NotificationAlert from '@/components/notification'
 import TransactionButtons from '@/components/transactionButtons/TransactionButtons'
 import moneyFormat from '@/utils/moneyFormat'
-const confirm = () => {
+const confirmDetails = () => {
   const { orderId } = useLocalSearchParams()
   const [loader, setLoader] = useState(false)
   const { notification, setNotification } = useNotification()
     const [applyCommission, setApplyCommission] = useState(false)
   const translateX = useRef(new Animated.Value(0)).current
-
+  const router = useRouter()
   const toggleSwitch = () => {
-    Animated.timing(translateX, {
-      toValue: applyCommission ? 50 : 0,
-      duration: 300,
-      useNativeDriver: true
-    }).start();
-    setApplyCommission(!applyCommission)
+    // Animated.timing(translateX, {
+    //   toValue: applyCommission ? 60 : 0,
+    //   duration: 300,
+    //   useNativeDriver: true
+    // }).start();
+    setApplyCommission(prev => !prev)
   }
 
   const {
@@ -50,11 +50,20 @@ const confirm = () => {
     setLoader(true)
 
     try {
-      const response = await confirmBillPayment({ queryId: orderId, payment_method, token })
+      const response = await confirmOrderPayment({ queryId: orderId, token, data: {payment_method, use_commission: applyCommission}  })
       setLoader(false)
 
       if (payment_method === 'card') {
         Linking.openURL(response.responseBody.checkoutUrl)
+      }
+
+      if(response){
+        router.push({
+          pathname: "/transaction/confirm", params: {
+          orderId: response.data.id 
+
+          }
+        })
       }
 
       setNotification({
@@ -73,26 +82,7 @@ const confirm = () => {
       })
     }
   }
-
- 
-
-  const commissionValue = useMemo(() => Number((data?.amount * data?.commissionRate).toFixed(2)),
-    [data]
-  );
-
-  const handlePress = async () => {
-    if (loading) return;
-    // try {
-    //   setLoader(true);
-    //   // pass a small object in case parent needs more info
-    //   await onTrigger({ amount, commissionRate, commissionValue });
-    // } catch (e) {
-    //   console.error("Commission trigger failed", e);
-    // } finally {
-    //   setLoading(false);
-    // }
-  };
-
+console.log(applyCommission, "[Data info]")
   return (
     <View className="flex-1 p-4 bg-primary">
       <View className="mb-6">
@@ -107,7 +97,7 @@ const confirm = () => {
           Recharge Details
         </Text>
 
-        <Summary data={data} />
+        <Summary data={data} applyCommission={applyCommission}/>
       </View>
 
 
@@ -134,7 +124,7 @@ const confirm = () => {
 
       {/* Action row */}
 
-      {data?.service_type === "VTU" || data?.service_type === "DATA" && 
+      {(data?.service_type === "VTU" || data?.service_type === "DATA") && 
       <View className="flex-row items-center justify-between">
         <View className="flex-1">
           <Text className="text-xs text-gray-200">Use Commission?</Text>
@@ -145,20 +135,13 @@ const confirm = () => {
 
         
 
-        <Pressable activeOpacity={0.8}
-          accessibilityLabel="Trigger commission"
-          accessibilityRole="button"
-          disabled={loading} onPress={toggleSwitch} className=' relative border' style={{
-        height: 30,
-        width: 100,
-        borderRadius: 25,
-        backgroundColor: applyCommission ? "green" : "gray",
-        justifyContent: "center",
-        padding: 5,
-      }}>
-        <Animated.View className="h-6 w-10  rounded-full bg-blue-500 top-0 relative translate-x-0" style={{transform: [{translateX}] }}/>
-
-        </Pressable>
+   
+         <Switch
+        value={applyCommission}
+        onValueChange={toggleSwitch}
+        trackColor={{ false: "#767577", true: "#34d399" }} // gray → green
+        thumbColor={applyCommission ? "#fff" : "#f4f3f4"}
+      />
       </View>
 }
       <Text className="text-white text-center">{textInfo}</Text>
@@ -182,4 +165,4 @@ const confirm = () => {
   )
 }
 
-export default confirm
+export default confirmDetails

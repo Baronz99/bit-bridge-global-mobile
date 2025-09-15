@@ -1,8 +1,8 @@
-import { StyleSheet, Text, View } from 'react-native'
+import { Text, View } from 'react-native'
 import React from 'react'
 import moneyFormat from '@/utils/moneyFormat'
 
-const Summary = ({ data }: any) => {
+const Summary = ({ data , applyCommission}: {data: any; applyCommission: boolean}) => {
   return (
     <View className="space-y-3 overflow-hidden">
       <SummaryRow label="Service Type" value={data?.service_type || 'N/A'} />
@@ -10,7 +10,7 @@ const Summary = ({ data }: any) => {
         label={`${data?.service_type == 'VTU' ? 'Phone Number' : 'Meter Number'}`}
         value={data?.meter_number || 'N/A'}
       />
-      <SummaryRow label="Amount" value={moneyFormat(data?.amount) || '₦0.00'} />
+      <SummaryRow label="Amount" applyCommission={applyCommission} value={moneyFormat(data?.amount) || '₦0.00'} commission={moneyFormat(data?.bill_commission)} />
       <SummaryRow label="Description" value={data?.description || 'No description'} />
       {data?.name && <SummaryRow label="Name" value={data?.name || 'No description'} />}
       {data?.address && <SummaryRow label="Address" value={data?.address || 'No description'} />}
@@ -18,13 +18,19 @@ const Summary = ({ data }: any) => {
   )
 }
 
-function SummaryRow({ label, value }: { label: string; value: string }) {
+function SummaryRow({ label, value, commission, applyCommission = false }: { label: string; value: string; commission?: string;  applyCommission?: boolean  }) {
   return (
     <View className="flex-row gap-4 justify-between items-center">
       <Text className="text-gray-100 ">{label}</Text>
-      <Text ellipsizeMode="tail" numberOfLines={2} className="font-medium text-gray-100">
+      <View className=' flex-row gap-4'>
+      {applyCommission && 
+      <Text ellipsizeMode="tail" numberOfLines={2} className="font-medium text-alt " style={{textDecorationColor: 'line-through'}}>
+      {commission} 
+      </Text>}
+       <Text ellipsizeMode="tail" numberOfLines={2} className="font-medium text-gray-100" style={{textDecorationLine: applyCommission ?  'line-through' : "none"}} >
         {value}
       </Text>
+      </View>
     </View>
   )
 }

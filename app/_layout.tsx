@@ -2,7 +2,7 @@ import { Stack } from 'expo-router'
 import './globals.css'
 import { StatusBar } from 'react-native'
 import AuthProvider from '@/services/useAuth'
-import { useEffect } from 'react'
+import React from 'react'
 import * as Updates from 'expo-updates'
 
 export default function RootLayout() {
@@ -257,6 +257,13 @@ export default function RootLayout() {
             options={{
               headerShown: true,
               headerTitle: 'Account Details',
+            }}
+          />
+          <Stack.Screen
+            name="transaction/details"
+            options={{
+              headerShown: true,
+              headerTitle: 'Transaction Details',
             }}
           />
         </Stack>

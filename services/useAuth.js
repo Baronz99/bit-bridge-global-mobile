@@ -1,8 +1,7 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
+import React,{ createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import * as SecureStore from 'expo-secure-store'
 import APP_CONFIG from '@/api/baseUrl'
 import axios from 'axios'
-import { Flag } from 'react-native-appwrite'
 
 // interface AuthState {
 //   token: string | null;
@@ -52,6 +51,7 @@ const AuthProvider = ({ children }) => {
 
     ;(async () => {
       const token = await SecureStore.getItemAsync(token_key)
+      console.log(token, "[Token Fetched] REceived token")
       if (token) {
         setAuthState({ token, authenticated: true })
         await userProfile(token)
@@ -148,7 +148,7 @@ const AuthProvider = ({ children }) => {
     try {
       const response = await axios.get(`${base_url + api_route}users/user_profile`, {
         headers: {
-          Authorization: `Bearer ${authState?.token}`,
+          Authorization: `Bearer ${token}`,
         },
       })
       const { data } = response.data

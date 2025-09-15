@@ -27,6 +27,7 @@ const index = () => {
 
   const handleSubmit = async () => {
     setLoading(true)
+    console.log(formData)
     try {
       const response = await initiateMonnifyTransaction({
         data: {
@@ -53,6 +54,7 @@ const index = () => {
       Linking.openURL(response.responseBody.checkoutUrl)
     } catch (error: any) {
       setLoading(false)
+      console.log(error)
 
       setNotice({
         error: true,
