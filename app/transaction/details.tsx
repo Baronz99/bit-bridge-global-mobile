@@ -59,9 +59,10 @@ const confirmDetails = () => {
     setLoader(true)
 
     try {
-      const response = await confirmOrderPayment({
+      const response = await confirmBillPayment({
         queryId: orderId,
         token,
+        payment_method,
         data: { payment_method, use_commission: applyCommission },
       })
       setLoader(false)
