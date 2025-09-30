@@ -30,8 +30,8 @@ const SignUp = () => {
     password: '',
     confirm_password: '',
   })
-    
-  const [checked, setChecked] = useState(false);
+
+  const [checked, setChecked] = useState(false)
 
   const [loading, setLoading] = useState(false)
 
@@ -42,8 +42,8 @@ const SignUp = () => {
   const handleLogin = async () => {
     setLoading(true)
     try {
-      if(!checked){
-        setErrorMessage("You must consent before signing up")
+      if (!checked) {
+        setErrorMessage('You must consent before signing up')
         return
       }
       const result = await onRegister(formInput)
@@ -101,19 +101,19 @@ const SignUp = () => {
               onChangeText={(value) => setFormInput({ ...formInput, confirm_password: value })}
               className="border-gray-600 text-white border-b py-4 my-0  border-b-1 text-base font-semibold px-3 "
             />
-            <View className='flex flex-row items-center'>
-                <ConsentCheckbox checked={checked} setChecked={setChecked}/>
+            <View className="flex flex-row items-center">
+              <ConsentCheckbox checked={checked} setChecked={setChecked} />
 
-              <Text   className="text-gray-400">
-                      I hereby give my e-signature and consent to use this platform in accordance with the{" "}
-                      <Text
-                      className='text-white '
-                      onPress={() => Linking.openURL("https://yourapp.com/terms")}
-                      >
-                        Terms & Conditions
-                      </Text>
-                      .
-                    </Text>
+              <Text className="text-gray-400">
+                I hereby give my e-signature and consent to use this platform in accordance with the{' '}
+                <Text
+                  className="text-white "
+                  onPress={() => Linking.openURL('https://yourapp.com/terms')}
+                >
+                  Terms & Conditions
+                </Text>
+                .
+              </Text>
             </View>
             <Text className="text-red-600">{errorMessage} </Text>
 
