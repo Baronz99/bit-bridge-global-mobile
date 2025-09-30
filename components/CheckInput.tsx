@@ -1,0 +1,18 @@
+import React, { useState } from "react";
+import {  Text, Pressable } from "react-native";
+
+export default function ConsentCheckbox({checked, setChecked}) {
+
+  return (
+      <Pressable
+      className={`border-2 items-center justify-center border-gray-600 w-6 h-6 mr-4 ${checked && "bg-[#2563e" }`}
+      
+        // style={[styles.checkbox, checked && styles.checkedBox]}
+        onPress={() => setChecked(!checked)}
+      >
+        {checked && <Text className="bg-alt  text-primary w-full h-full items-center justify-center">✓</Text>}
+      </Pressable>
+
+      
+  );
+}
