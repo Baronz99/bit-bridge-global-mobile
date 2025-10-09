@@ -145,13 +145,15 @@ const AuthProvider = ({ children }) => {
   }
 
   const userProfile = async (token) => {
+    const rawToken = token ?? authState?.token 
     try {
       const response = await axios.get(`${base_url + api_route}users/user_profile`, {
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${rawToken}`,
         },
       })
       const { data } = response.data
+      console.log(data, 'FETCHED DATA PROFILE')
       setAuthProfile(data)
       return data
     } catch (error) {
