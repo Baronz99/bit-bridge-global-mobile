@@ -54,6 +54,14 @@ const index = () => {
   )
 
   const handleFormSubmit = async () => {
+    if(!formValue.billersCode || !formValue.amount || !formValue.tariff_class){
+      setNotification({
+        message: 'Please fill all required fields',
+        error: true,
+        data: null,
+      })
+      return
+    }
     setLoader(true)
     const data = {
         orderData: {

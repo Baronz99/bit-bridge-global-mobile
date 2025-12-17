@@ -49,6 +49,7 @@ const CableetailConfirm = () => {
 
       loadProfile(token)
     } catch (error: any) {
+
       setLoader(false)
       setNotification({
         error: true,
