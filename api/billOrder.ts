@@ -228,7 +228,7 @@ export const getPriceList = async ({ provider, service_type, token }: any) => {
       }
     })
 
-    return priceListOptions
+    return [{label: 'Select Data Plan', value: "Select Data Plan", amount: 0}, ...priceListOptions]
   } catch (error: any) {
     if (error.response) {
       throw new Error(error.response.data.message)

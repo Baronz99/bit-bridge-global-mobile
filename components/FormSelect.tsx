@@ -10,7 +10,6 @@ const FormSelect = ({ label, selectedValue, onValueChange, options, placeholder 
       <View
         style={{
           borderRadius: 4,
-          // borderWidth: 1,
           // borderColor: '#ffcc00', // <-- ORANGE border color
           overflow: 'hidden',
         }}
@@ -22,7 +21,7 @@ const FormSelect = ({ label, selectedValue, onValueChange, options, placeholder 
           style={{ color: 'white', backgroundColor: '#ffcc0018' }}
         >
           {options.map((option: any) => (
-            <Picker.Item key={option.label} label={option.label} value={option.value} />
+            <Picker.Item key={option.label} label={option?.label} value={option?.value} />
           ))}
         </Picker>
       </View>

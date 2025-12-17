@@ -55,9 +55,7 @@ const index = () => {
 
   const handleFormSubmit = async () => {
     setLoader(true)
-
-    try {
-      const response = await createPurchaseOrder({
+    const data = {
         orderData: {
           ...formValue,
           email: userProfileData?.email,
@@ -65,12 +63,21 @@ const index = () => {
           biller: selectProvider?.provider.toUpperCase(),
         },
         token,
-      })
+      }
+
+    try {
+      const response = await createPurchaseOrder(data)
+      console.log(response, "response data")
 
       setLoader(false)
 
       router.push(`/cable-tv-provider/confirm/${response?.data.id}`)
     } catch (error: any) {
+      setNotification({
+        message: error.message || 'Something went wrong',
+        error: true,
+        data: null,
+      })
       setLoader(false)
     }
   }
@@ -102,6 +109,8 @@ const index = () => {
       return item
     }
   })
+
+  const priceListData = priceList  || [{label: 'Select Data Plan', value: "Select Data Plan", amount: 0},{label: 'Loading', value: "Loading", amount: 0}]
 
   return (
     <View className="flex-1 bg-primary px-4">
@@ -151,13 +160,13 @@ const index = () => {
                 )}
 
                 <FormSelect
-                  options={priceList ?? []}
+                  options={priceListData}
                   selectedValue={formValue.tariff_class}
                   name="tarrif_class"
                   label="Data Plan"
                   placeHolder="Data Plan"
                   onValueChange={(value: string) => {
-                    const newAmountdata = priceList.find((price: any) => price.value === value)
+                    const newAmountdata = priceListData.find((price: any) => price.value === value)
 
                     setFormValue({
                       ...formValue,

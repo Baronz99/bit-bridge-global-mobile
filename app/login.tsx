@@ -75,7 +75,7 @@ const Login = () => {
               hidePassword={hidePassword}
               setHidePassword={setHidePassword}
               onChangeText={(value) => setFormInput({ ...formInput, password: value })}
-              className="border-gray-600 text-white border-b py-4 my-0  border-b-1 text-base font-semibold px-3 "
+              className="border-gray-600  text-white border-b py-4 my-0  border-b-1 text-base font-semibold px-3 "
             />
             <TouchableOpacity
               className="py-3  flex-row items-center flex justify-center mt-10  bg-app-primary rounded-lg"
