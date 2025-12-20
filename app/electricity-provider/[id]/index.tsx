@@ -14,6 +14,9 @@ import FormSelect from '@/components/FormSelect'
 // import powerDistribution from "../../data/powerDistributions.json"
 import powerDistribution from '../../../data/powerDistributions.json'
 import Loader from '@/components/Loader'
+import useNotification from '@/hooks/useNotification'
+import AppModal from '@/components/modal/Modal'
+import NotificationAlert from '@/components/notification'
 
 const ProvideDertails = () => {
   const { id } = useLocalSearchParams()
@@ -22,6 +25,8 @@ const ProvideDertails = () => {
     authState: { token },
     userProfileData,
   } = useAuth()
+    const { notification, setNotification } = useNotification()
+
   const [error, setError] = useState<string | null>(null)
   const [loader, setLoader] = useState(false)
 
@@ -60,6 +65,11 @@ const ProvideDertails = () => {
         })
     } catch (error: any) {
       setLoader(false)
+       setNotification({
+        error: true,
+        message: error.message || 'something went wrong',
+        data: null,
+      })
     }
   }
 
@@ -120,6 +130,17 @@ const ProvideDertails = () => {
         </View>
       </ScrollView>
       <Loader open={loader} />
+       <AppModal
+        open={!!notification.message}
+        onclose={() => setNotification({ message: null, error: false, data: null })}
+      >
+        <NotificationAlert
+          onPress={() => setNotification({ message: null, error: false, data: null })}
+          message={notification.message}
+          error={notification.error}
+          data={notification.data}
+        />
+      </AppModal>
     </View>
   )
 }
