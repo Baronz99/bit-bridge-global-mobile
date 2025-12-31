@@ -38,7 +38,9 @@
           "backgroundColor": "#ffffff"
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-font",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true
@@ -53,12 +55,11 @@
     },
     "owner": "vortech-engineering",
     "updates": {
-      "runtimeVersion": "1.0.0",
       "enabled": true,
       "url": "https://u.expo.dev/2dedaba7-b1ad-4919-afd4-de6dc510ce23"
     },
     "runtimeVersion": {
-      "policy": "appVersion"
+      "policy": "sdkVersion"
     }
   }
 }

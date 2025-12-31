@@ -271,7 +271,7 @@ export default function Index() {
             <Link href={"/accountDetails" as any} asChild>
               <TouchableOpacity className="my-2 bg-gray-900 py-2 w-48 flex flex-row gap-4 items-center rounded-2xl px-4">
                 <Text className="text-white text-lg text-left font-bold">Moniepoint</Text>
-                <AntDesign name="caretdown" size={14} color="gray" />
+                <AntDesign name="caret-down" size={14} color="gray" />
               </TouchableOpacity>
             </Link>
           ) : null}
