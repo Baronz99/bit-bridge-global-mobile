@@ -1,27 +1,18 @@
-import axios from 'axios'
-import APP_CONFIG from './baseUrl'
+import client from '@/api/client'
 
-const { base_url, api_route } = APP_CONFIG
-export const userProfile = async ({ token }: { token: string }) => {
+export const userProfile = async () => {
   try {
-    const response = await axios.get(`${base_url + api_route}users/user_profile`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
-
-    const result = response.data
-
-    return result
+    const response = await client.get('/users/user_profile')
+    return response.data
   } catch (error: any) {
-    if (axios.isAxiosError(error) || error.response) {
+    if (error?.response) {
       return error.response.data || 'error occured'
     }
     return 'something went wrong'
   }
 }
 
-export const userProfileUpdate = async ({ token, formData }: { token: string; formData: any }) => {
+export const userProfileUpdate = async ({ formData }: { formData: any }) => {
   const userData = {
     user: {
       email: formData?.email,
@@ -33,25 +24,19 @@ export const userProfileUpdate = async ({ token, formData }: { token: string; fo
       },
     },
   }
+
   try {
-    const response = await axios.patch(`${base_url + api_route}users/user_update`, userData, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
-
-    const result = response.data
-    return result
+    const response = await client.patch('/users/user_update', userData)
+    return response.data
   } catch (error: any) {
-    if (axios.isAxiosError(error) || error.response) {
-      throw new Error(error.response.data.message || 'error occured')
+    if (error?.response) {
+      throw new Error(error.response.data?.message || 'error occured')
     }
-
     throw new Error('something went wrong')
   }
 }
 
-export const userPasswordUpdate = async ({ token, formData }: { token: string; formData: any }) => {
+export const userPasswordUpdate = async ({ formData }: { formData: any }) => {
   const userData = {
     user: {
       confirm_password: formData?.confirm_password,
@@ -59,60 +44,40 @@ export const userPasswordUpdate = async ({ token, formData }: { token: string; f
       old_password: formData?.old_password,
     },
   }
-  try {
-    const response = await axios.patch(
-      `${base_url + api_route}users/user_password_update`,
-      userData,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    )
 
-    const result = response.data
-    return result
+  try {
+    const response = await client.patch('/users/user_password_update', userData)
+    return response.data
   } catch (error: any) {
     if (error?.response) {
-      throw new Error(error?.response.data.message || 'error occured')
+      throw new Error(error.response.data?.message || 'error occured')
     }
-
     throw new Error('something went wrong')
   }
 }
 
-export const userProfileDel = async ({ token }: { token: string }) => {
+export const userProfileDel = async () => {
   try {
-    const response = await axios.delete(`${base_url + api_route}users`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
-
-    const result = response.data
-    return result.message
+    const response = await client.delete('/users')
+    return response.data?.message
   } catch (error: any) {
-    if (axios.isAxiosError(error) || error.response) {
+    if (error?.response) {
       throw error.response.data
     }
-
     throw new Error('something went wrong')
   }
 }
 
 export const sendUserConfirmation = async (email: string) => {
   try {
-    const response = await axios.get(
-      `${base_url + api_route}users/resend_confirmation_token?email=${email}`
+    const response = await client.get(
+      `/users/resend_confirmation_token?email=${encodeURIComponent(email)}`
     )
-
-    const data = response.data
-    return data
+    return response.data
   } catch (error: any) {
-    if (error.response) {
-      throw new Error(error.response.data.message)
+    if (error?.response) {
+      throw new Error(error.response.data?.message || 'error occured')
     }
-    console.error(error)
     throw new Error('Something went wrong')
   }
 }

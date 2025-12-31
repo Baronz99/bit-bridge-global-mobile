@@ -1,7 +1,6 @@
 import { ActivityIndicator, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import React, { useEffect, useState } from 'react'
-import { userPasswordUpdate, userProfileUpdate } from '@/api/auth'
-import { useAuth } from '@/services/useAuth'
+import { userPasswordUpdate } from '@/api/auth'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
 import FormInput from '@/components/FormInput'
 import { icons } from '@/constants/icons'
@@ -10,12 +9,6 @@ import Loader from '@/components/Loader'
 
 const index = () => {
   const [errorMessage, setErrorMessage] = useState(null)
-  const {
-    authState: { token },
-    userProfileData,
-    loadProfile,
-  } = useAuth()
-
   const [toggleModal, setToggleModal] = useState(false)
   const [error, setError] = useState(null)
 
@@ -32,7 +25,6 @@ const index = () => {
     setLoading(true)
     try {
       const result = await userPasswordUpdate({
-        token: token,
         formData: formInput,
       })
 
@@ -58,7 +50,7 @@ const index = () => {
                 isPassword={true}
                 setHidePassword={setHidePassword}
                 hidePassword={hidePassword}
-                onChangeText={(value) => setFormInput({ ...formInput, old_password: value })}
+                onChangeText={(value: string) => setFormInput({ ...formInput, old_password: value })}
                 className="border-gray-800 border-b text-white  my-0 py-4 border-b-1 text-base font-semibold px-3 "
               />
 
@@ -69,7 +61,7 @@ const index = () => {
                 isPassword={true}
                 setHidePassword={setHidePassword}
                 hidePassword={hidePassword}
-                onChangeText={(value) => setFormInput({ ...formInput, password: value })}
+                onChangeText={(value: string) => setFormInput({ ...formInput, password: value })}
                 className="border-gray-600 border-b text-white  my-0 py-4 border-b-1 text-base font-semibold px-3 "
               />
               <FormInput
@@ -79,7 +71,7 @@ const index = () => {
                 setHidePassword={setHidePassword}
                 hidePassword={hidePassword}
                 placeholder="Confirm Password"
-                onChangeText={(value) => setFormInput({ ...formInput, confirm_password: value })}
+                onChangeText={(value: string) => setFormInput({ ...formInput, confirm_password: value })}
                 className="border-gray-600 border-b text-white  my-0 py-4 border-b-1 text-base font-semibold px-3 "
               />
 

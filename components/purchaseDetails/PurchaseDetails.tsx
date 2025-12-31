@@ -7,7 +7,7 @@ const PurchaseDetails = ({ title, data }: any) => {
     <View className="bg-gray-800 rounded-2xl p-6 shadow-lg mb-8">
       <Text className="text-lg font-semibold text-center text-gray-200 mb-4">{title}</Text>
 
-      <Summary data={data} />
+      <Summary data={data} applyCommission={false} />
     </View>
   )
 }

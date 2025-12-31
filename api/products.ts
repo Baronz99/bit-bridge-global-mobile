@@ -1,89 +1,69 @@
-import axios from 'axios'
-import APP_CONFIG from './baseUrl'
+// src/api/products.ts (MOBILE APP)
+import client from '@/api/client'
 
-const { base_url, api_route } = APP_CONFIG
-export const getProducts = async ({
-  token,
-  params,
-}: {
-  token: string
-  params?: {
-    category?: 'mobile provider' | 'gift card' | 'service' | 'utility' | 'crypto'
-    type?: string
-  }
-}) => {
+export type ProductCategory =
+  | 'mobile provider'
+  | 'gift card'
+  | 'service'
+  | 'utility'
+  | 'crypto'
+
+type GetProductsParams = {
+  category?: ProductCategory
+  type?: string
+}
+
+type GetProvisionsParams = {
+  category?: string
+  type?: string
+}
+
+/**
+ * ✅ Uses central axios client (client.ts)
+ * - baseURL already points to .../api/v1
+ * - Authorization header is attached automatically via interceptor
+ * - 401 refresh/retry handled globally
+ */
+export const getProducts = async (params?: GetProductsParams) => {
   try {
-    if (!token) {
-      throw new Error('Token is required')
-    }
-    const response = await axios.get(`${base_url + api_route}products`, {
-      params,
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
-
-    const { data } = response.data
-
-    return data
-  } catch (error: any) {
-    if (error.response) {
-      throw new Error(error.response.data.message || 'Something went wrong')
-    }
-
-    throw error.message || 'Something went wrong'
+    const res = await client.get('/products', { params })
+    return res.data?.data
+  } catch (err: any) {
+    const msg =
+      err?.response?.data?.message ||
+      err?.message ||
+      'Something went wrong'
+    if (err) err.message = msg
+    throw err
   }
 }
 
-export const getProvisions = async ({
-  token,
-  params,
-}: {
-  token: string
-  params?: {
-    category?: string
-    type?: string
-  }
-}) => {
+export const getProvisions = async (params?: GetProvisionsParams) => {
   try {
-    if (!token) {
-      throw new Error('Token is required')
-    }
-    const response = await axios.get(`${base_url + api_route}provisions`, {
-      params,
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
-
-    const { data } = response.data
-
-    return data
-  } catch (error: any) {
-    if (error.response) {
-      throw new Error(error.response.data.message || 'Something went wrong')
-    }
-
-    throw error.message || 'Something went wrong'
+    const res = await client.get('/provisions', { params })
+    return res.data?.data
+  } catch (err: any) {
+    const msg =
+      err?.response?.data?.message ||
+      err?.message ||
+      'Something went wrong'
+    if (err) err.message = msg
+    throw err
   }
 }
 
-export const getProvision = async ({ id, token }: { id: string; token: string }) => {
+export const getProvision = async (id: string) => {
   try {
-    const response = await axios.get(`${base_url + api_route}provisions/${id}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
+    if (!id) throw new Error('Provision id is required')
 
-    const { data } = response.data
-
-    return data
-  } catch (error: any) {
-    if (error.response) {
-      throw new Error(error.response.data.message || 'Something went wrong')
-    }
-
-    throw new Error(error.message || 'Something went wrong')
+    const res = await client.get(`/provisions/${id}`)
+    return res.data?.data
+  } catch (err: any) {
+    const msg =
+      err?.response?.data?.message ||
+      err?.message ||
+      'Something went wrong'
+    if (err) err.message = msg
+    throw err
   }
 }

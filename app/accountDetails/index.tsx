@@ -2,13 +2,11 @@ import { useAuth } from '@/services/useAuth'
 import moneyFormat from '@/utils/moneyFormat'
 import { Feather } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
-import { ActivityIndicator, Image, Text, TouchableOpacity, View } from 'react-native'
+import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native'
 
 const AccouuntDetails = () => {
   const {
-    authState: { token },
     userProfileData,
-    loadProfile,
   } = useAuth()
   const router = useRouter()
 

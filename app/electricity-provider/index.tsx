@@ -1,15 +1,15 @@
 import { FlatList, Image, Text, TouchableOpacity, View } from 'react-native'
 import React from 'react'
-import { useAuth } from '@/services/useAuth'
 import { Link } from 'expo-router'
 import { images } from '@/constants/images'
 import powerDistribution from '../../data/powerDistributions.json'
 
-const Index = () => {
-  const {
-    authState: { token },
-  } = useAuth()
+const getImageByKey = (key: string) => {
+  const dict = images as Record<string, any>
+  return dict[key] ?? images.fail ?? images.bg
+}
 
+const Index = () => {
   return (
     <View className="flex-1 px-4 bg-primary">
       <View className="mt-10">
@@ -32,12 +32,18 @@ const Index = () => {
           }}
           //  ItemSeparatorComponent={() => <View className="w-4 -red-50"/>}
           renderItem={({ item }: any) => (
-            <Link href={`/electricity-provider/${item.id}`} asChild>
+            <Link
+              href={{
+                pathname: '/electricity-provider/[id]',
+                params: { id: String(item.id) },
+              }}
+              asChild
+            >
               <TouchableOpacity
                 key={item?.id}
                 className="bg-gray-800/50 w-[30%] h-40 overflow-hidden rounded-lg flex-row items-center mb-3"
               >
-                <Image source={images[`${item.image}`]} className="w-full h-full" />
+                <Image source={getImageByKey(String(item.image))} className="w-full h-full" />
               </TouchableOpacity>
             </Link>
           )}

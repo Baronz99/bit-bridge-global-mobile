@@ -1,10 +1,9 @@
-import { FlatList, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
-import React, { useEffect, useState } from 'react'
+import { Image, ScrollView, Text, TouchableOpacity, View } from 'react-native'
+import React, { useCallback, useEffect, useState } from 'react'
 import useFetch from '@/services/useFetch'
 import { getProducts } from '@/api/products'
 import { useAuth } from '@/services/useAuth'
 
-import MobileProviderView from '@/components/mobileProviderView/mobileProviderView'
 import { useRouter } from 'expo-router'
 import { createPurchaseOrder, getPriceList } from '@/api/billOrder'
 import Loader from '@/components/Loader'
@@ -15,17 +14,19 @@ import { splitString } from '@/utils'
 import FormSelect from '@/components/FormSelect'
 import { images } from '@/constants/images'
 
+const getImageByKey = (key: string) => {
+  const dict = images as Record<string, any>
+  return dict[key] ?? images.fail ?? images.bg
+}
+
 const index = () => {
   const router = useRouter()
   const [loader, setLoader] = useState(false)
 
-  const [selectProvider, setSelectedProvider] = useState(null)
-  const [selectProvision, setSelectedProvision] = useState(null)
+  const [selectProvider, setSelectedProvider] = useState<any | null>(null)
+  const [selectProvision, setSelectedProvision] = useState<any | null>(null)
 
-  const {
-    authState: { token },
-    userProfileData,
-  } = useAuth()
+  const { userProfileData } = useAuth()
 
   const [formValue, setFormValue] = useState({
     billersCode: '',
@@ -34,38 +35,33 @@ const index = () => {
     description: null,
   })
 
-  const { data } = useFetch(() =>
-    getProducts({
-      token,
-      params: {
-        category: 'mobile provider',
-      },
+  const fetchProducts = useCallback(() => {
+    return getProducts({
+      category: 'mobile provider',
     })
-  )
+  }, [])
+  const { data } = useFetch(fetchProducts)
 
   const { data: priceList, refetch } = useFetch(
     () =>
       getPriceList({
         provider: selectProvider?.provider,
         service_type: selectProvision?.service_type,
-        token: token,
       }),
     false
   )
+  const safePriceList = priceList ?? []
 
   const handleFormSubmit = async () => {
     setLoader(true)
 
     try {
       const response = await createPurchaseOrder({
-        orderData: {
-          ...formValue,
-          email: userProfileData?.email,
-          service_type: selectProvision?.service_type,
-          biller: selectProvider?.provider.toUpperCase(),
-          skip: true,
-        },
-        token,
+        ...formValue,
+        email: userProfileData?.email,
+        service_type: selectProvision?.service_type,
+        biller: selectProvider?.provider?.toUpperCase(),
+        skip: true,
       })
 
       setLoader(false)
@@ -109,15 +105,15 @@ const index = () => {
   }, [selectProvision, selectProvider])
 
   useEffect(() => {
-    if (priceList) {
+    if (safePriceList.length > 0) {
       setFormValue({
         ...formValue,
-        tariff_class: priceList[0].value,
-        amount: priceList[0].amount,
-        description: priceList[0].label,
+        tariff_class: safePriceList[0].value,
+        amount: safePriceList[0].amount,
+        description: safePriceList[0].label,
       })
     }
-  }, [priceList])
+  }, [safePriceList])
 
   const airtimeBillers_ = data?.filter((item: any) => item.category === 'mobile provider')
 
@@ -127,17 +123,19 @@ const index = () => {
         <View className="bg-gray-900/60 p-4 rounded-xl">
           <View className="py-4 flex-wrap gap-y-4 flex-row">
             {airtimeBillers_ &&
-              airtimeBillers_?.map((item: any) => (
-                <>
+              airtimeBillers_?.map((item: any, index: number) =>
+                item ? (
                   <SelectBoxIcon
-                    key={item.id}
+                    key={String(
+                      item?.id ?? item?.uuid ?? item?.code ?? item?.provider ?? item?.name ?? index
+                    )}
                     selectedLabel={selectProvider?.provider}
                     onSelect={() => setSelectedProvider(item)}
-                    icon={images[`${splitString(item?.provider)}`]}
+                    icon={getImageByKey(String(splitString(item?.provider)))}
                     label={item?.provider}
                   />
-                </>
-              ))}
+                ) : null
+              )}
           </View>
         </View>
 
@@ -164,13 +162,13 @@ const index = () => {
 
                 {selectProvision?.service_type === 'DATA' && (
                   <FormSelect
-                    options={priceList ?? []}
+                    options={safePriceList}
                     selectedValue={formValue.tariff_class}
                     name="tarrif_class"
                     label="Data Plan"
                     placeHolder="Data Plan"
                     onValueChange={(value: string) => {
-                      const newAmountdata = priceList.find((price: any) => price.value === value)
+                      const newAmountdata = safePriceList.find((price: any) => price.value === value)
 
                       setFormValue({
                         ...formValue,

@@ -19,13 +19,11 @@ import { useRouter } from 'expo-router'
 const wallet = () => {
   const {
     userProfileData,
-    authState: { token },
   } = useAuth()
   const router = useRouter()
 
   const { data, loading } = useFetch(() =>
     getTransactions({
-      token,
       params: {
         transaction_type: 'deposit',
       },
@@ -82,7 +80,7 @@ const wallet = () => {
                   <Text className="flex-1 text-center text-white">No transaction</Text>
                 </View>
               ) : (
-                data?.data.map((item, index) => (
+                data?.data.map((item: any, index: number) => (
                   <>
                     <View key={index} className="flex-row border-t border-gray-600 px-4 py-2">
                       <Text

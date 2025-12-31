@@ -1,7 +1,6 @@
 import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import React, { useState } from 'react'
 import FormInput from '@/components/FormInput'
-import { useAuth } from '@/services/useAuth'
 import { createTransaction } from '@/api/transactions'
 import Loader from '@/components/Loader'
 import NotificationAlert from '@/components/notification'
@@ -9,9 +8,6 @@ import FormSelect from '@/components/FormSelect'
 import banks from '@/data/banks.json'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
 const index = () => {
-  const {
-    authState: { token },
-  } = useAuth()
   const [loading, setLoading] = useState(false)
   const [modalVisible, setModalVisible] = useState(false)
 
@@ -46,7 +42,6 @@ const index = () => {
           status: 'pending',
           transaction_type: 'withdrawal',
         },
-        token,
       })
 
       setLoading(false)
@@ -111,7 +106,7 @@ const index = () => {
           </View>
         </KeyboardAvoidWrapper>
 
-        {loading && <Loader />}
+        <Loader open={loading} />
       </ScrollView>
 
       <Modal

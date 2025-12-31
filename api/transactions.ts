@@ -1,12 +1,8 @@
-import axios from 'axios'
-import APP_CONFIG from './baseUrl'
-const { base_url, api_route } = APP_CONFIG
+import client from '@/api/client'
 
 export const getTransactions = async ({
-  token,
   params,
 }: {
-  token: string
   params?: {
     category?: string
     type?: string
@@ -14,14 +10,8 @@ export const getTransactions = async ({
   }
 }) => {
   try {
-    if (!token) {
-      throw new Error('Token is required')
-    }
-    const response = await axios.get(`${base_url + api_route}transactions/user`, {
+    const response = await client.get('/transactions/user', {
       params,
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
     })
 
     const data = response.data
@@ -36,7 +26,7 @@ export const getTransactions = async ({
   }
 }
 
-export const createTransaction = async ({ data, token }: { data: any; token: string }) => {
+export const createTransaction = async ({ data }: { data: any }) => {
   const formdata = {
     transaction: {
       ...data,
@@ -44,12 +34,7 @@ export const createTransaction = async ({ data, token }: { data: any; token: str
   }
 
   try {
-    const response = await axios.post(`${base_url + api_route}transactions`, formdata, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-    })
+    const response = await client.post('/transactions', formdata)
 
     const result = response.data
 
@@ -62,7 +47,7 @@ export const createTransaction = async ({ data, token }: { data: any; token: str
   }
 }
 
-export const initiateMonnifyTransaction = async ({ data, token }: { data: any; token: string }) => {
+export const initiateMonnifyTransaction = async ({ data }: { data: any }) => {
   const formdata = {
     transaction: {
       ...data,
@@ -72,16 +57,7 @@ export const initiateMonnifyTransaction = async ({ data, token }: { data: any; t
   console.log(formdata)
 
   try {
-    const response = await axios.post(
-      `${base_url + api_route}transactions/initialize_transaction`,
-      formdata,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    )
+    const response = await client.post('/transactions/initialize_transaction', formdata)
 
     const result = response.data
 
@@ -94,13 +70,9 @@ export const initiateMonnifyTransaction = async ({ data, token }: { data: any; t
   }
 }
 
-export const getTransactionRecord = async ({ id, token }: { id: string; token: string }) => {
+export const getTransactionRecord = async (id: string) => {
   try {
-    const response = await axios.get(`${base_url + api_route}transaction_records/${id}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
+    const response = await client.get(`/transaction_records/${id}`)
 
     const { data } = response.data
 

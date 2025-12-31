@@ -1,38 +1,9 @@
-import {
-  ActivityIndicator,
-  FlatList,
-  Image,
-  Linking,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native'
-import React, { useEffect, useState } from 'react'
-import { Link, useRouter } from 'expo-router'
-import useFetch from '@/services/useFetch'
-
-import { getTransactions } from '@/api/transactions'
-import { useAuth } from '@/services/useAuth'
-
-import { getUserOrders } from '@/api/billOrder'
-import { AntDesign, Feather, FontAwesome, Ionicons } from '@expo/vector-icons'
-import AppModal from '@/components/modal/Modal'
-import { userProfileDel } from '@/api/auth'
+import { Linking, ScrollView, Text, TouchableOpacity, View } from 'react-native'
+import React from 'react'
+import { AntDesign, Feather } from '@expo/vector-icons'
 
 const index = () => {
-  const {
-    userProfileData,
-    authState: { token },
-    loadProfile,
-    onLogout,
-  } = useAuth()
-
-  const [loading, setLoading] = useState(false)
-
   const handlePrivacy = async () => {
-    setLoading(true)
     Linking.openURL('https://www.bitbridgeglobal.com/privacy-policy')
   }
 

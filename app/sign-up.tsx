@@ -50,7 +50,7 @@ const SignUp = () => {
 
       setLoading(false)
       router.push('/confirmEmail')
-    } catch (error) {
+    } catch (error: any) {
       // Handle errors during the login process
       setErrorMessage(error.message)
       setLoading(false)
@@ -65,22 +65,22 @@ const SignUp = () => {
           <View className="">
             <FormInput
               placeholder="First Name"
-              onChangeText={(value) => setFormInput({ ...formInput, first_name: value })}
+              onChangeText={(value: string) => setFormInput({ ...formInput, first_name: value })}
               className="border-gray-800 border-b text-white  my-0 py-4 border-b-1 text-base font-semibold px-3 "
             />
             <FormInput
               placeholder="Last Name"
-              onChangeText={(value) => setFormInput({ ...formInput, last_name: value })}
+              onChangeText={(value: string) => setFormInput({ ...formInput, last_name: value })}
               className="border-gray-600 border-b text-white  my-0 py-4 border-b-1 text-base font-semibold px-3 "
             />
             <FormInput
               placeholder="Phone Nuumber"
-              onChangeText={(value) => setFormInput({ ...formInput, phone: value })}
+              onChangeText={(value: string) => setFormInput({ ...formInput, phone: value })}
               className="border-gray-600 border-b text-white  my-0 py-4 border-b-1 text-base font-semibold px-3 "
             />
             <FormInput
               placeholder="Email Address"
-              onChangeText={(value) => setFormInput({ ...formInput, email: value })}
+              onChangeText={(value: string) => setFormInput({ ...formInput, email: value })}
               className="border-gray-600 border-b text-white  my-0 py-4 border-b-1 text-base font-semibold px-3 "
             />
             <FormInput
@@ -89,7 +89,7 @@ const SignUp = () => {
               secureTextEntry={hidePassword}
               hidePassword={hidePassword}
               setHidePassword={setHidePassword}
-              onChangeText={(value) => setFormInput({ ...formInput, password: value })}
+              onChangeText={(value: string) => setFormInput({ ...formInput, password: value })}
               className="border-gray-600 text-white border-b py-4 my-0  border-b-1 text-base font-semibold px-3 "
             />
             <FormInput
@@ -98,7 +98,7 @@ const SignUp = () => {
               secureTextEntry={hidePassword}
               hidePassword={hidePassword}
               setHidePassword={setHidePassword}
-              onChangeText={(value) => setFormInput({ ...formInput, confirm_password: value })}
+              onChangeText={(value: string) => setFormInput({ ...formInput, confirm_password: value })}
               className="border-gray-600 text-white border-b py-4 my-0  border-b-1 text-base font-semibold px-3 "
             />
             <View className="flex flex-row items-center">

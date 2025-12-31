@@ -1,35 +1,12 @@
-import {
-  ActivityIndicator,
-  FlatList,
-  Image,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native'
-import React, { useEffect, useState } from 'react'
-import { images } from '@/constants/images'
-import { Link, useRouter } from 'expo-router'
+import { ActivityIndicator, ScrollView, Text, View } from 'react-native'
+import React from 'react'
+import { Link } from 'expo-router'
 import useFetch from '@/services/useFetch'
-
-import { getTransactions } from '@/api/transactions'
-import { useAuth } from '@/services/useAuth'
 import moneyFormat from '@/utils/moneyFormat'
-import { dateFormat } from '@/utils/dateFormat'
 import { getUserOrders } from '@/api/billOrder'
 
 const index = () => {
-  const router = useRouter()
-  const {
-    userProfileData,
-    authState: { token },
-  } = useAuth()
-
-  const { data, loading } = useFetch(() =>
-    getUserOrders({
-      token,
-    })
-  )
+  const { data, loading } = useFetch(() => getUserOrders())
 
   return (
     <View className="flex-1 bg-primary">
@@ -58,14 +35,20 @@ const index = () => {
                 <ActivityIndicator size={'large'} color={'#000ff'} className="mt-10 self-center" />
               ) : (
                 data &&
-                data?.map((item, index) => (
+                data?.map((item: any, index: number) => (
                   <View key={index} className="flex-row border-t border-gray-900 px-4 py-3">
                     <Text className="flex-1 text-gray-200">{item.service_type}</Text>
 
                     <Text className="flex-1 text-center text-white">
                       {moneyFormat(item.amount)}
                     </Text>
-                    <Link href={`/orderDetails/${item?.id}`} asChild>
+                    <Link
+                      href={{
+                        pathname: '/orderDetails/[id]',
+                        params: { id: String(item?.id) },
+                      }}
+                      asChild
+                    >
                       <Text
                         className={`"flex-1 ${item?.status === 'completed' ? 'text-blue-700' : 'text-red-700'}  text-center`}
                       >

@@ -1,5 +1,5 @@
 import { Alert, Pressable, Share, Text, View } from 'react-native'
-import React, { useEffect } from 'react'
+import React, { useCallback, useEffect } from 'react'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 
 import useFetch from '@/services/useFetch'
@@ -26,26 +26,20 @@ export default function TransactionSuccessScreen() {
   }>()
   // const reference  = "bbg-1757381050"
   const {
-    authState: { token },
     loadProfile,
   } = useAuth()
   const router = useRouter()
 
-  const { data, loading } = useFetch(() => {
+  const fetchReceipt = useCallback(() => {
     if (reference) {
-      return getTransactionRecord({
-        id: reference as string,
-        token: token,
-      })
-    } else if (orderId) {
-      return getPurchaseOrder({
-        id: orderId as string,
-        token,
-      })
-    } else {
-      return undefined
+      return getTransactionRecord(reference as string)
     }
-  })
+    if (orderId) {
+      return getPurchaseOrder(orderId as string)
+    }
+    return Promise.resolve(null)
+  }, [reference, orderId])
+  const { data, loading } = useFetch(fetchReceipt)
 
   const receipt_type = reference?.split('-')[0]
 
@@ -53,20 +47,10 @@ export default function TransactionSuccessScreen() {
     data: updateData,
     refetch,
     error: updateError,
-  } = useFetch(
-    () =>
-      updateOrderStatus({
-        id: reference as string,
-        token: token,
-        orderData: {
-          type: receipt_type,
-        },
-      }),
-    false
-  )
+  } = useFetch(() => updateOrderStatus(reference as string), false)
 
   useEffect(() => {
-    loadProfile(token)
+    loadProfile()
   }, [])
 
   useEffect(() => {

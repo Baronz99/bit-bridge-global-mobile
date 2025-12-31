@@ -1,20 +1,10 @@
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  Linking,
-  Pressable,
-  Animated,
-  ActivityIndicator,
-  Switch,
-} from 'react-native'
-import React, { useMemo, useRef, useState } from 'react'
+import { View, Text, Linking, Switch, TouchableOpacity } from 'react-native'
+import React, { useCallback, useState } from 'react'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import useNotification from '@/hooks/useNotification'
-import { useIsFocused } from '@react-navigation/native'
 import useFetch from '@/services/useFetch'
 import { useAuth } from '@/services/useAuth'
-import { confirmBillPayment, confirmOrderPayment, getPurchaseOrder } from '@/api/billOrder'
+import { confirmBillPayment, getPurchaseOrder } from '@/api/billOrder'
 import Summary from '@/components/cards/Summary'
 import Loader from '@/components/Loader'
 import AppModal from '@/components/modal/Modal'
@@ -24,9 +14,10 @@ import moneyFormat from '@/utils/moneyFormat'
 const confirmDetails = () => {
   const { orderId } = useLocalSearchParams()
   const [loader, setLoader] = useState(false)
+  const [pendingRetry, setPendingRetry] = useState(false)
+  const [lastPaymentMethod, setLastPaymentMethod] = useState<string | null>(null)
   const { notification, setNotification } = useNotification()
   const [applyCommission, setApplyCommission] = useState(false)
-  const translateX = useRef(new Animated.Value(0)).current
   const router = useRouter()
   const toggleSwitch = () => {
     // Animated.timing(translateX, {
@@ -37,35 +28,36 @@ const confirmDetails = () => {
     setApplyCommission((prev) => !prev)
   }
 
-  const {
-    userProfileData,
-
-    authState: { token },
-    loadProfile,
-  } = useAuth()
+  const { userProfileData, loadProfile } = useAuth()
   const [textInfo, setTextInfo] = useState('')
 
-  const { data, refetch, loading, error, reset } = useFetch(() =>
-    getPurchaseOrder({
-      id: orderId,
-      token,
-    })
-  )
-  const isFocused = useIsFocused()
+  const fetchOrder = useCallback(() => getPurchaseOrder(orderId as string), [orderId])
+  const { data } = useFetch(fetchOrder)
   // const [getstarted, setOpenStarted] = useState(false)
 
   const handleConfirmation = async (payment_method: string) => {
     // setTextInfo("Please wait while we process your payment")
+    setLastPaymentMethod(payment_method)
     setLoader(true)
 
     try {
       const response = await confirmBillPayment({
-        queryId: orderId,
-        token,
+        queryId: orderId as string,
         payment_method,
-        data: { payment_method, use_commission: applyCommission },
       })
       setLoader(false)
+
+      if (response?.pending || response?.status === 'pending') {
+        setPendingRetry(true)
+        setNotification({
+          error: true,
+          message:
+            response?.message ||
+            'Payment confirmation is still processing. Please retry shortly.',
+          data: null,
+        })
+        return
+      }
 
       if (payment_method === 'card') {
         Linking.openURL(response.responseBody.checkoutUrl)
@@ -86,9 +78,10 @@ const confirmDetails = () => {
         data: null,
       })
 
-      loadProfile(token)
+      loadProfile()
     } catch (error: any) {
       setLoader(false)
+      setPendingRetry(false)
       setNotification({
         error: true,
         message: error.message || 'something went wrong',
@@ -166,6 +159,14 @@ const confirmDetails = () => {
           error={notification.error}
           data={notification.data}
         />
+        {pendingRetry && lastPaymentMethod ? (
+          <TouchableOpacity
+            onPress={() => handleConfirmation(lastPaymentMethod)}
+            className="border rounded-md mt-4 border-alt py-4"
+          >
+            <Text className="text-alt text-center">Retry Confirmation</Text>
+          </TouchableOpacity>
+        ) : null}
       </AppModal>
     </View>
   )

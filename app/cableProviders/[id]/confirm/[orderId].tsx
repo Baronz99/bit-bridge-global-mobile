@@ -1,5 +1,5 @@
-import { Image, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
-import React, { useState } from 'react'
+import { Linking, Text, TouchableOpacity, View } from 'react-native'
+import React, { useCallback, useState } from 'react'
 import { useLocalSearchParams } from 'expo-router'
 import useFetch from '@/services/useFetch'
 import { getProvision } from '@/api/products'
@@ -17,25 +17,33 @@ import TransactionButtons from '@/components/transactionButtons/TransactionButto
 const CableetailConfirm = () => {
   const { orderId } = useLocalSearchParams()
   const [loader, setLoader] = useState(false)
-  const {
-    authState: { token },
-    loadProfile,
-  } = useAuth()
+  const [pendingRetry, setPendingRetry] = useState(false)
+  const [lastPaymentMethod, setLastPaymentMethod] = useState<string | null>(null)
+  const { loadProfile } = useAuth()
   const { notification, setNotification } = useNotification()
 
-  const { data, refetch, loading, error, reset } = useFetch(() =>
-    getPurchaseOrder({
-      id: orderId,
-      token,
-    })
-  )
+  const fetchOrder = useCallback(() => getPurchaseOrder(orderId as string), [orderId])
+  const { data } = useFetch(fetchOrder)
 
   const handleCardConfirmation = async (payment_method: string) => {
+    setLastPaymentMethod(payment_method)
     setLoader(true)
 
     try {
-      const response = await confirmBillPayment({ queryId: orderId, payment_method, token })
+      const response = await confirmBillPayment({ queryId: orderId as string, payment_method })
       setLoader(false)
+
+      if (response?.pending || response?.status === 'pending') {
+        setPendingRetry(true)
+        setNotification({
+          error: true,
+          message:
+            response?.message ||
+            'Payment confirmation is still processing. Please retry shortly.',
+          data: null,
+        })
+        return
+      }
 
       if (payment_method === 'card') {
         Linking.openURL(response.responseBody.checkoutUrl)
@@ -47,9 +55,10 @@ const CableetailConfirm = () => {
         data: null,
       })
 
-      loadProfile(token)
+      loadProfile()
     } catch (error: any) {
       setLoader(false)
+      setPendingRetry(false)
       setNotification({
         error: true,
         message: error.message || 'something went wrong',
@@ -72,7 +81,7 @@ const CableetailConfirm = () => {
       <View className="bg-gray-800 rounded-2xl p-6 shadow-lg mb-8">
         <Text className="text-lg font-semibold text-center text-gray-200 mb-4">TV Details</Text>
 
-        <Summary data={data} />
+        <Summary data={data} applyCommission={false} />
       </View>
       <TransactionButtons handleConfirmation={handleCardConfirmation} />
       {loader && <Loader open={loader} />}
@@ -81,6 +90,14 @@ const CableetailConfirm = () => {
         error={notification.error}
         data={notification.data}
       />
+      {pendingRetry && lastPaymentMethod ? (
+        <TouchableOpacity
+          onPress={() => handleCardConfirmation(lastPaymentMethod)}
+          className="border rounded-md mt-4 border-alt py-4"
+        >
+          <Text className="text-alt text-center">Retry Confirmation</Text>
+        </TouchableOpacity>
+      ) : null}
     </View>
   )
 }

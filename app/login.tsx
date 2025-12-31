@@ -1,23 +1,20 @@
 import {
   ActivityIndicator,
   Image,
-  KeyboardAvoidingView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native'
 import React, { useState } from 'react'
 import { icons } from '@/constants/icons'
-import { Link, router, useRouter } from 'expo-router'
-import { Formik } from 'formik'
+import { Link, useRouter } from 'expo-router'
 import { useAuth } from '@/services/useAuth'
 import FormInput from '@/components/FormInput'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
 
 const Login = () => {
-  const [errorMessage, setErrorMessage] = useState<null | string>(null)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const router = useRouter()
 
   const [formInput, setFormInput] = useState({
@@ -28,32 +25,36 @@ const Login = () => {
   const [hidePassword, setHidePassword] = useState(true)
   const [loading, setLoading] = useState(false)
 
-  const { onLogin } = useAuth()
+  const { onLogin, authState } = useAuth()
+
   const handleLogin = async () => {
     try {
-      if (formInput.email.trim() === '' || formInput.password.trim() === '') {
+      setErrorMessage(null)
+
+      const email = formInput.email.trim()
+      const password = formInput.password.trim()
+
+      if (!email || !password) {
         throw new Error('Enter Login Details')
       }
+
       setLoading(true)
+      await onLogin({ email, password })
 
-      const result = await onLogin(formInput)
-      if (result) {
-        router.push('/')
-      } else {
-        setErrorMessage('Invalid email or password')
-      }
-
-      setLoading(false)
+      // ✅ go to the authenticated area
+      router.replace('/(tabs)' as any)
     } catch (error: any) {
+      setErrorMessage(error?.message || 'Login failed')
+      console.error('Login error:', error?.message || error)
+    } finally {
       setLoading(false)
-      setErrorMessage(error.message)
-      console.error('Login error:', error.message)
     }
   }
+
   return (
     <View className="flex-1 bg-primary px-4 ">
       <Image source={icons.appLogo} className="w-full h-96 mb-5 mx-auto" />
-      <Link href={'/sign-up'} asChild></Link>
+
       <KeyboardAvoidWrapper>
         <View className="flex-1">
           <View>
@@ -63,41 +64,51 @@ const Login = () => {
               autoComplete="email"
               textContentType="emailAddress"
               keyboardType="email-address"
-              onChangeText={(value) => setFormInput({ ...formInput, email: value })}
-              className="border-gray-600 border-b text-white  my-0 py-4 border-b-1 text-base font-semibold px-3 "
+              onChangeText={(value: string) => setFormInput({ ...formInput, email: value })}
+
+              className="border-gray-600 border-b text-white my-0 py-4 border-b-1 text-base font-semibold px-3 "
             />
+
             <FormInput
               placeholder="Enter Password"
-              isPassword={true}
-              // value={formInput.password}
-
+              isPassword
               secureTextEntry={hidePassword}
               hidePassword={hidePassword}
               setHidePassword={setHidePassword}
-              onChangeText={(value) => setFormInput({ ...formInput, password: value })}
-              className="border-gray-600  text-white border-b py-4 my-0  border-b-1 text-base font-semibold px-3 "
+              onChangeText={(value: string) => setFormInput({ ...formInput, password: value })}
+
+              className="border-gray-600 text-white border-b py-4 my-0 border-b-1 text-base font-semibold px-3 "
             />
+
             <TouchableOpacity
-              className="py-3  flex-row items-center flex justify-center mt-10  bg-app-primary rounded-lg"
+              className="py-3 flex-row items-center flex justify-center mt-10 bg-app-primary rounded-lg"
               onPress={handleLogin}
+              disabled={loading}
             >
               {loading ? (
                 <ActivityIndicator />
               ) : (
-                <Text className=" font-semibold text-base text-gray-100">Log In</Text>
+                <Text className="font-semibold text-base text-gray-100">
+                  Log In
+                </Text>
               )}
             </TouchableOpacity>
           </View>
 
-          <Text className="text-red-600">{errorMessage} </Text>
+          {!!errorMessage && <Text className="text-red-600 mt-3">{errorMessage}</Text>}
+
+          {/* Debug */}
+          <Text className="text-gray-400 mt-2 text-xs">
+            Authenticated: {String(authState?.authenticated)}
+          </Text>
+
           <TouchableOpacity className="w-full m-auto mt-auto py-3 flex-row">
-            <Text className="text-white  w-full border-gray-800 border-b py-2 text-center">
+            <Text className="text-white w-full border-gray-800 border-b py-2 text-center">
               Don't have an account?{' '}
               <Link
-                href={'/sign-up'}
-                className=" text-center border-gray-100 border-b text-alt py-2 "
+                href={"/sign-up" as any}
+                className="text-center border-gray-100 border-b text-alt py-2"
               >
-                {' '}
                 Sign Up
               </Link>
             </Text>

@@ -1,239 +1,175 @@
-import axios from 'axios'
-import APP_CONFIG from './baseUrl'
+// src/api/billOrder.ts (MOBILE APP)
+import client from '@/api/client'
 import moneyFormat from '@/utils/moneyFormat'
-const { base_url, api_route } = APP_CONFIG
 
-export const createPurchaseOrder = async ({ orderData, token }) => {
+const errMsg = (err: any, fallback = 'Something went wrong') =>
+  err?.response?.data?.message || err?.message || fallback
+
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+const isHtmlResponse = (err: any) => {
+  const data = err?.response?.data
+  if (typeof data === 'string') {
+    return data.trim().startsWith('<')
+  }
+  const contentType = err?.response?.headers?.['content-type'] as string | undefined
+  return contentType ? contentType.includes('text/html') : false
+}
+
+const isPendingResponse = (data: any) =>
+  data?.status === 'pending' || data?.data?.status === 'pending'
+
+export const createPurchaseOrder = async (orderData: any) => {
   try {
-    const response = await axios.post(
-      `${base_url + api_route}payment_processors/process_payment`,
-      orderData,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    )
-
-    const data = response.data
-    return data
-  } catch (error: any) {
-    if (error.response) {
-      throw new Error(error.response.data.message)
-    }
-
-    throw new Error(error.message || 'Something went wrong')
+    const res = await client.post('/payment_processors/process_payment', orderData)
+    return res.data
+  } catch (err: any) {
+    throw new Error(errMsg(err))
   }
 }
 
-export const updateOrderStatus = async ({ id, token }: any) => {
+export const updateOrderStatus = async (id: string) => {
   try {
-    const response = await axios.get(
-      `${base_url + api_route}payment_processors/${id}/update_status`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    )
-
-    const data = response.data
-    return data
-  } catch (error: any) {
-    if (error.response) {
-      throw new Error(error.response.data.message)
-    }
-
-    throw new Error(error.message || 'Something went wrong')
+    const res = await client.get(`/payment_processors/${id}/update_status`)
+    return res.data
+  } catch (err: any) {
+    throw new Error(errMsg(err))
   }
 }
 
-export const getPurchaseOrder = async ({ id, token }: any) => {
+export const getPurchaseOrder = async (id: string) => {
   try {
-    const response = await axios.get(`${base_url + api_route}payment_processors/${id}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+    const res = await client.get(`/payment_processors/${id}`)
+    return res.data?.data
+  } catch (err: any) {
+    throw new Error(errMsg(err))
+  }
+}
+
+export const confirmPayment = async ({
+  queryId,
+  payment_method,
+}: {
+  queryId: string
+  payment_method: string
+}) => {
+  try {
+    const res = await client.get(`/payment_processors/${queryId}/confirm_payment`, {
+      params: { payment_method },
     })
-
-    const { data } = response.data
-    return data
-  } catch (error: any) {
-    if (error.response) {
-      throw new Error(error.response.data.message)
-    }
-    throw new Error('Something went wrong')
-  }
-}
-
-export const confirmPayment = async ({ token, queryId, payment_method }: any) => {
-  try {
-    const response = await axios.get(
-      `${base_url + api_route}payment_processors/${queryId}/confirm_payment?payment_method=${payment_method}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    )
-
-    const data = response.data
-
-    return data
-  } catch (error: any) {
-    if (error.response) {
-      throw new Error(error.response.data.message)
-    }
-    throw new Error('Something went wrong')
+    return res.data
+  } catch (err: any) {
+    throw new Error(errMsg(err))
   }
 }
 
 export const confirmBillPayment = async ({
-  token,
   queryId,
   payment_method,
-  use_commission,
-}: any) => {
-  try {
-    const response = await axios.get(
-      `${base_url + api_route}bill_orders/${queryId}/initialize_confirm_payment?payment_method=${payment_method}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    )
-
-    const data = response.data
-
-    return data
-  } catch (error: any) {
-    if (error.response) {
-      throw new Error(error.response.data.message)
-    }
-    throw new Error('Something went wrong')
-  }
-}
-
-export const confirmOrderPayment = async ({ token, queryId, data }: any) => {
-  try {
-    const response = await axios.patch(
-      `${base_url + api_route}bill_orders/${queryId}/confirm_bill_payment`,
-      { bill_order: data },
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    )
-
-    const responseData = response.data
-
-    return responseData
-  } catch (error: any) {
-    console.log(error, token, '[Error for Order]: Error retrieved from confirmation')
-    if (error.response) {
-      throw new Error(error.response.data.message)
-    }
-    throw new Error('Something went wrong')
-  }
-}
-export const repurchaseOrder = async ({ id, token }: any) => {
-  try {
-    const response = await axios.get(
-      `${base_url + api_route}payment_processors//${id}/repurchase`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    )
-
-    const result = response.data
-
-    return result
-  } catch (error: any) {
-    if (error.response) {
-      throw new Error(error.response.data.message)
-    }
-
-    throw new Error('Something went wrong')
-  }
-}
-
-export const getUserOrders = async ({
-  token,
-  params,
 }: {
-  token: string
-  params?: {
-    status: string
+  queryId: string
+  payment_method: string
+}) => {
+  const maxRetries = 3
+  for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+    try {
+      const res = await client.get(`/bill_orders/${queryId}/initialize_confirm_payment`, {
+        params: { payment_method },
+      })
+      return res.data
+    } catch (err: any) {
+      const status = err?.response?.status
+      if (status === 503) {
+        if (isHtmlResponse(err)) {
+          throw new Error('Payment provider is temporarily unavailable. Please try again.')
+        }
+
+        const respData = err?.response?.data
+        if (isPendingResponse(respData)) {
+          if (attempt < maxRetries) {
+            await delay(3000)
+            continue
+          }
+          return {
+            pending: true,
+            status: 'pending',
+            message:
+              respData?.message ||
+              'Payment confirmation is still processing. Please retry shortly.',
+          }
+        }
+      }
+      throw new Error(errMsg(err))
+    }
   }
+}
+
+export const confirmOrderPayment = async ({
+  queryId,
+  data,
+}: {
+  queryId: string
+  data: any
 }) => {
   try {
-    const response = await axios.get(`${base_url + api_route}bill_orders/user`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+    const res = await client.patch(`/bill_orders/${queryId}/confirm_bill_payment`, {
+      bill_order: data,
     })
-
-    const { data } = response.data
-    return data
-  } catch (error: any) {
-    if (error.response) {
-      throw new Error(error.response?.message || 'failed to purchace')
-    }
-    console.error(error)
-    throw new Error('Something went wrong')
+    return res.data
+  } catch (err: any) {
+    throw new Error(errMsg(err))
   }
 }
 
-export const getRescentPurchaseOrder = async ({ token }: { token: string }) => {
+export const repurchaseOrder = async (id: string) => {
   try {
-    const response = await axios.get(`${base_url + api_route}bill_orders/user_recent`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
-
-    const { data } = response.data
-    return data
-  } catch (error: any) {
-    if (error.response) {
-      throw new Error(error.response?.message || 'failed to purchace')
-    }
-    console.error(error)
-    throw new Error('Something went wrong')
+    const res = await client.get(`/payment_processors/${id}/repurchase`)
+    return res.data
+  } catch (err: any) {
+    throw new Error(errMsg(err))
   }
 }
 
-export const getPriceList = async ({ provider, service_type, token }: any) => {
+export const getUserOrders = async (params?: { status?: string }) => {
   try {
-    const response = await axios.get(
-      `${base_url + api_route}payment_processors/get_price_list?provider=${provider}&service_type=${service_type}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    )
+    const res = await client.get('/bill_orders/user', { params })
+    return res.data?.data
+  } catch (err: any) {
+    throw new Error(errMsg(err, 'Failed to fetch orders'))
+  }
+}
 
-    const result = response.data
+export const getRescentPurchaseOrder = async () => {
+  try {
+    const res = await client.get('/bill_orders/user_recent')
+    return res.data?.data
+  } catch (err: any) {
+    throw new Error(errMsg(err, 'Failed to fetch recent orders'))
+  }
+}
 
-    const priceListOptions = result.data.map((item: any) => {
-      return {
+export const getPriceList = async ({
+  provider,
+  service_type,
+}: {
+  provider: string
+  service_type: string
+}) => {
+  try {
+    const res = await client.get('/payment_processors/get_price_list', {
+      params: { provider, service_type },
+    })
+
+    const result = res.data
+    const priceListOptions =
+      result?.data?.map((item: any) => ({
         value: item.code,
-        label: `${moneyFormat(item?.price)} | ${item?.desc} |  ${item?.validity ?? ''}`,
+        label: `${moneyFormat(item?.price)} | ${item?.desc} | ${item?.validity ?? ''}`,
         amount: item?.price,
-      }
-    })
+      })) ?? []
 
-    return [{label: 'Select Data Plan', value: null, amount: 0}, ...priceListOptions]
-  } catch (error: any) {
-    if (error.response) {
-      throw new Error(error.response.data.message)
-    }
-    console.error(error)
-    throw new Error('Something went wrong')
+    return [{ label: 'Select Data Plan', value: null, amount: 0 }, ...priceListOptions]
+  } catch (err: any) {
+    throw new Error(errMsg(err))
   }
 }

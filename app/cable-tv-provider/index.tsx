@@ -1,9 +1,9 @@
-import { FlatList, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
-import React, { useEffect, useState } from 'react'
+import { Image, ScrollView, Text, TouchableOpacity, View } from 'react-native'
+import React, { useCallback, useEffect, useState } from 'react'
 import useFetch from '@/services/useFetch'
 import { getProducts } from '@/api/products'
 import { useAuth } from '@/services/useAuth'
-import { Link, useRouter } from 'expo-router'
+import { useRouter } from 'expo-router'
 import { images } from '@/constants/images'
 import { splitString } from '@/utils'
 import SelectBoxIcon from '@/components/select-box/SelectBoxIcon'
@@ -16,17 +16,19 @@ import AppModal from '@/components/modal/Modal'
 import NotificationAlert from '@/components/notification'
 import useNotification from '@/hooks/useNotification'
 
+const getImageByKey = (key: string) => {
+  const dict = images as Record<string, any>
+  return dict[key] ?? images.fail ?? images.bg
+}
+
 const index = () => {
-  const {
-    authState: { token },
-    userProfileData,
-  } = useAuth()
+  const { userProfileData } = useAuth()
   const router = useRouter()
 
   const [loader, setLoader] = useState(false)
   const { notification, setNotification } = useNotification()
-  const [selectProvider, setSelectedProvider] = useState(null)
-  const [selectProvision, setSelectedProvision] = useState(null)
+  const [selectProvider, setSelectedProvider] = useState<any | null>(null)
+  const [selectProvision, setSelectedProvision] = useState<any | null>(null)
   const [formValue, setFormValue] = useState({
     billersCode: '',
     amount: '',
@@ -34,24 +36,22 @@ const index = () => {
     description: null,
   })
 
-  const { data } = useFetch(() =>
-    getProducts({
-      token,
-      params: {
-        category: 'utility',
-      },
+  const fetchProducts = useCallback(() => {
+    return getProducts({
+      category: 'utility',
     })
-  )
+  }, [])
+  const { data } = useFetch(fetchProducts)
 
   const { data: priceList, refetch } = useFetch(
     () =>
       getPriceList({
         provider: selectProvider?.provider,
         service_type: selectProvision?.service_type,
-        token: token,
       }),
     false
   )
+  const safePriceList = priceList ?? []
 
   const handleFormSubmit = async () => {
     if(!formValue.billersCode || !formValue.amount || !formValue.tariff_class){
@@ -63,23 +63,23 @@ const index = () => {
       return
     }
     setLoader(true)
-    const data = {
-        orderData: {
-          ...formValue,
-          email: userProfileData?.email,
-          service_type: selectProvision?.service_type,
-          biller: selectProvider?.provider.toUpperCase(),
-        },
-        token,
-      }
+    const orderData = {
+      ...formValue,
+      email: userProfileData?.email,
+      service_type: selectProvision?.service_type,
+      biller: selectProvider?.provider?.toUpperCase(),
+    }
 
     try {
-      const response = await createPurchaseOrder(data)
+      const response = await createPurchaseOrder(orderData)
       console.log(response, "response data")
 
       setLoader(false)
 
-      router.push(`/cable-tv-provider/confirm/${response?.data.id}`)
+      router.push({
+        pathname: '/cable-tv-provider/confirm/[orderId]',
+        params: { orderId: String(response?.data?.id) },
+      })
     } catch (error: any) {
       setNotification({
         message: error.message || 'Something went wrong',
@@ -118,24 +118,31 @@ const index = () => {
     }
   })
 
-  const priceListData = priceList  || [{label: 'Select Data Plan', value: "Select Data Plan", amount: 0},{label: 'Loading', value: "Loading", amount: 0}]
+  const priceListData = safePriceList.length
+    ? safePriceList
+    : [
+        { label: 'Select Data Plan', value: 'Select Data Plan', amount: 0 },
+        { label: 'Loading', value: 'Loading', amount: 0 },
+      ]
 
   return (
     <View className="flex-1 bg-primary px-4">
       <View className="bg-gray-900/60 p-4 rounded-xl">
         <View className="py-4 flex-wrap gap-y-4 flex-row">
           {cableProviders &&
-            cableProviders?.map((item: any) => (
-              <>
+            cableProviders?.map((item: any, index: number) =>
+              item ? (
                 <SelectBoxIcon
-                  key={item.id}
+                  key={String(
+                    item?.id ?? item?.uuid ?? item?.code ?? item?.provider ?? item?.name ?? index
+                  )}
                   onSelect={() => setSelectedProvider(item)}
                   selectedLabel={selectProvider?.provider?.toLowerCase()}
-                  icon={images[`${splitString(item?.provider)}`]}
+                  icon={getImageByKey(String(splitString(item?.provider)))}
                   label={splitString(item?.provider)}
                 />
-              </>
-            ))}
+              ) : null
+            )}
         </View>
       </View>
 
@@ -214,5 +221,3 @@ const index = () => {
 }
 
 export default index
-
-const styles = StyleSheet.create({})

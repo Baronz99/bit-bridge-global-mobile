@@ -4,6 +4,11 @@ import { Link } from 'expo-router'
 import { splitString } from '@/utils'
 import { images } from '@/constants/images'
 
+const getImageByKey = (key: string) => {
+  const dict = images as Record<string, any>
+  return dict[key] ?? images.fail ?? images.bg
+}
+
 const MobileProviderView = ({ data }: any) => {
   const dataList: any[] = []
   const vtuList = []
@@ -34,7 +39,7 @@ const MobileProviderView = ({ data }: any) => {
             renderItem={({ item }) => (
               <Link href={`/mobileProviders/${item.id}`} asChild>
                 <TouchableOpacity className="w-40 h-32 bg-gray-900 rounded">
-                  <Image source={images[`${splitString(item.name)}`]} className="w-full h-full" />
+                  <Image source={getImageByKey(String(splitString(item.name)))} className="w-full h-full" />
                 </TouchableOpacity>
               </Link>
             )}
@@ -56,7 +61,7 @@ const MobileProviderView = ({ data }: any) => {
             renderItem={({ item }: any) => (
               <Link href={`/mobileProviders/${item.id}`} asChild>
                 <TouchableOpacity className="w-40 h-32 bg-gray-200 rounded overflow-hidden">
-                  <Image source={images[`${splitString(item.name)}`]} className="w-full h-full" />
+                  <Image source={getImageByKey(String(splitString(item.name)))} className="w-full h-full" />
                 </TouchableOpacity>
               </Link>
             )}

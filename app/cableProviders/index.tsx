@@ -1,25 +1,23 @@
-import { FlatList, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
-import React from 'react'
+import { FlatList, Image, Text, TouchableOpacity, View } from 'react-native'
+import React, { useCallback } from 'react'
 import useFetch from '@/services/useFetch'
 import { getProducts } from '@/api/products'
-import { useAuth } from '@/services/useAuth'
 import { Link } from 'expo-router'
 import { images } from '@/constants/images'
 import { splitString } from '@/utils'
 
-const index = () => {
-  const {
-    authState: { token },
-  } = useAuth()
+const getImageByKey = (key: string) => {
+  const dict = images as Record<string, any>
+  return dict[key] ?? images.fail ?? images.bg
+}
 
-  const { data } = useFetch(() =>
-    getProducts({
-      token,
-      params: {
-        category: 'utility',
-      },
+const index = () => {
+  const fetchProducts = useCallback(() => {
+    return getProducts({
+      category: 'utility',
     })
-  )
+  }, [])
+  const { data } = useFetch(fetchProducts)
 
   const cableList: any[] = []
   const vtuList = []
@@ -47,9 +45,15 @@ const index = () => {
               horizontal
               showsHorizontalScrollIndicator={false}
               renderItem={({ item }: any) => (
-                <Link href={`/cableProviders/${item.id}`} asChild>
+                <Link
+                  href={{
+                    pathname: '/cableProviders/[id]',
+                    params: { id: String(item.id) },
+                  }}
+                  asChild
+                >
                   <TouchableOpacity className="w-40 h-32 bg-gray-200 rounded overflow-hidden">
-                    <Image source={images[`${splitString(item.name)}`]} className="w-full h-full" />
+                    <Image source={getImageByKey(String(splitString(item.name)))} className="w-full h-full" />
                   </TouchableOpacity>
                 </Link>
               )}
@@ -63,5 +67,3 @@ const index = () => {
 }
 
 export default index
-
-const styles = StyleSheet.create({})

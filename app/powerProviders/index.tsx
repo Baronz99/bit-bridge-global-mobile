@@ -1,16 +1,11 @@
 import { FlatList, Text, View } from 'react-native'
 import React from 'react'
 
-import { useAuth } from '@/services/useAuth'
 
 import powerDistribution from '../../data/powerDistributions.json'
 import PowerProviderCard from '@/components/ProviderCard'
 
 const Index = () => {
-  const {
-    authState: { token },
-  } = useAuth()
-
   return (
     <View className="flex-1 bg-primary">
       <View className="mt-10">

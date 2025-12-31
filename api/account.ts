@@ -1,8 +1,10 @@
-import axios from 'axios'
-import APP_CONFIG from './baseUrl'
-const { base_url, api_route } = APP_CONFIG
+// src/api/account.ts (MOBILE APP)
+import client from '@/api/client'
 
-interface CreateAccount {
+const errMsg = (err: any, fallback = 'Something went wrong') =>
+  err?.response?.data?.message || err?.message || fallback
+
+export interface CreateAccountPayload {
   account: {
     bvn: string
     currency: string
@@ -10,22 +12,24 @@ interface CreateAccount {
   }
 }
 
-export const createBankAccount = async (bvndata: CreateAccount, token: string) => {
+/**
+ * ✅ Uses central client:
+ * - baseURL is .../api/v1
+ * - Authorization attached automatically
+ * - 401 refresh/retry handled globally
+ */
+export const createBankAccount = async (payload: CreateAccountPayload) => {
   try {
-    const response = await axios.post(`${base_url + api_route}accounts`, bvndata, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+    const res = await client.post('/accounts', payload)
+    return res.data
+  } catch (err: any) {
+    const msg = errMsg(err)
+    console.log('[createBankAccount error]', {
+      message: msg,
+      status: err?.response?.status,
+      data: err?.response?.data,
+      url: err?.config?.url,
     })
-
-    const data = response.data
-    return data
-  } catch (error: any) {
-    console.log(error.response.data, 'error response')
-    if (error.response) {
-      throw new Error(error.response.data.message)
-    }
-
-    throw new Error(error?.message || 'Something went wrong')
+    throw new Error(msg)
   }
 }

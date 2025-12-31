@@ -16,7 +16,6 @@ const index = () => {
     data: null,
   })
   const {
-    authState: { token },
     userProfileData,
     loadProfile,
   } = useAuth()
@@ -36,7 +35,6 @@ const index = () => {
     setLoading(true)
     try {
       const result = await userProfileUpdate({
-        token: token,
         formData: {
           ...formInput,
           user_profile_id: userProfileData?.user_profile?.id,
@@ -85,25 +83,25 @@ const index = () => {
               <FormInput
                 placeholder="First Name"
                 value={formInput.first_name}
-                onChangeText={(value) => setFormInput({ ...formInput, first_name: value })}
+                onChangeText={(value: string) => setFormInput({ ...formInput, first_name: value })}
                 className="border-gray-800 border-b text-white  my-0 py-4 border-b-1 text-base font-semibold px-3 "
               />
               <FormInput
                 value={formInput.last_name}
                 placeholder="Last Name"
-                onChangeText={(value) => setFormInput({ ...formInput, last_name: value })}
+                onChangeText={(value: string) => setFormInput({ ...formInput, last_name: value })}
                 className="border-gray-600 border-b text-white  my-0 py-4 border-b-1 text-base font-semibold px-3 "
               />
               <FormInput
                 value={formInput?.email}
                 placeholder="Email Address"
-                onChangeText={(value) => setFormInput({ ...formInput, email: value })}
+                onChangeText={(value: string) => setFormInput({ ...formInput, email: value })}
                 className="border-gray-600 border-b text-white  my-0 py-4 border-b-1 text-base font-semibold px-3 "
               />
               <FormInput
                 value={formInput?.phone}
                 placeholder="Phone Number"
-                onChangeText={(value) => setFormInput({ ...formInput, phone: value })}
+                onChangeText={(value: string) => setFormInput({ ...formInput, phone: value })}
                 className="border-gray-600 border-b text-white  my-0 py-4 border-b-1 text-base font-semibold px-3 "
               />
 

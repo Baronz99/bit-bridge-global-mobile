@@ -1,15 +1,11 @@
-import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
-import React, { useEffect, useState } from 'react'
+import { Image, ScrollView, Text, TouchableOpacity, View } from 'react-native'
+import React, { useState } from 'react'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import useFetch from '@/services/useFetch'
-import { getProvision } from '@/api/products'
 import { images } from '@/constants/images'
 import FormInput from '@/components/FormInput'
 import { useAuth } from '@/services/useAuth'
-import { splitString } from '@/utils'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
-import { createPurchaseOrder, getPriceList } from '@/api/billOrder'
-import FormSelect from '@/components/FormSelect'
+import { createPurchaseOrder } from '@/api/billOrder'
 
 // import powerDistribution from "../../data/powerDistributions.json"
 import powerDistribution from '../../../data/powerDistributions.json'
@@ -18,16 +14,16 @@ import useNotification from '@/hooks/useNotification'
 import AppModal from '@/components/modal/Modal'
 import NotificationAlert from '@/components/notification'
 
+const getImageByKey = (key: string) => {
+  const dict = images as Record<string, any>
+  return dict[key] ?? images.fail ?? images.bg
+}
+
 const ProvideDertails = () => {
   const { id } = useLocalSearchParams()
   const router = useRouter()
-  const {
-    authState: { token },
-    userProfileData,
-  } = useAuth()
-    const { notification, setNotification } = useNotification()
-
-  const [error, setError] = useState<string | null>(null)
+  const { userProfileData } = useAuth()
+  const { notification, setNotification } = useNotification()
   const [loader, setLoader] = useState(false)
 
   const data = powerDistribution.find((item) => String(item.id) === id)
@@ -44,14 +40,10 @@ const ProvideDertails = () => {
 
     try {
       const response = await createPurchaseOrder({
-        orderData: {
-          ...formValue,
-          email: userProfileData.email,
-          service_type: 'ELECTRICITY',
-          biller: data?.biller,
-        },
-
-        token,
+        ...formValue,
+        email: userProfileData.email,
+        service_type: 'ELECTRICITY',
+        biller: data?.biller,
       })
 
       setLoader(false)
@@ -84,7 +76,7 @@ const ProvideDertails = () => {
       >
         <View className="py-6">
           <Image
-            source={images[`${data.image}`]}
+            source={getImageByKey(String(data?.image ?? ''))}
             resizeMode="stretch"
             className="w-full h-40 rounded-lg"
           />

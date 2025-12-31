@@ -21,12 +21,7 @@ import AppModal from '@/components/modal/Modal'
 import { userProfileDel } from '@/api/auth'
 
 const index = () => {
-  const {
-    userProfileData,
-    authState: { token },
-    loadProfile,
-    onLogout,
-  } = useAuth()
+  const { onLogout } = useAuth()
 
   const [toggleModal, setToggleModal] = useState(false)
   const [errorMessage, setErrorMessage] = useState(null)
@@ -36,16 +31,14 @@ const index = () => {
   const handleDelete = async () => {
     setLoading(true)
     try {
-      const response = await userProfileDel({
-        token,
-      })
+      const response = await userProfileDel()
 
       if (response) {
         setLoading(false)
         setToggleModal(false)
         onLogout()
       }
-    } catch (error) {
+    } catch (error: any) {
       setLoading(false)
       setErrorMessage(error?.message || 'An error occurred')
     }

@@ -1,19 +1,13 @@
-import axios from 'axios'
-import APP_CONFIG from './baseUrl'
+import client from '@/api/client'
 
-const { base_url, api_route } = APP_CONFIG
-export const userWallet = async ({ token }: { token: string }) => {
+export const userWallet = async () => {
   try {
-    const response = await axios.get(`${base_url + api_route}wallets`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
+    const response = await client.get('/wallets')
     const result = response.data
 
     return result
   } catch (error: any) {
-    if (axios.isAxiosError(error) || error.response) {
+    if (error?.response) {
       return error.response.data || 'error occured'
     }
 

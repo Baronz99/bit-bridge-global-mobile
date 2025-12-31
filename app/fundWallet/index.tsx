@@ -9,7 +9,6 @@ import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoi
 
 const index = () => {
   const {
-    authState: { token },
     userProfileData,
     loadProfile,
   } = useAuth()
@@ -39,11 +38,10 @@ const index = () => {
           description: 'fund wallet',
           redirect_url: 'https://bitbridgeglobal.com/app-redirect',
         },
-        token,
       })
 
       setLoading(false)
-      loadProfile(token)
+      loadProfile()
 
       // setNotice({
       //     error: false,

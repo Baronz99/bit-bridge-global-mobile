@@ -1,5 +1,5 @@
 import { Image, SafeAreaView, ScrollView, Text, TouchableOpacity, View } from 'react-native'
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import useFetch from '@/services/useFetch'
 import { getProvision } from '@/api/products'
@@ -11,41 +11,35 @@ import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoi
 import { createPurchaseOrder, getPriceList } from '@/api/billOrder'
 import FormSelect from '@/components/FormSelect'
 import Loader from '@/components/Loader'
-import { useIsFocused } from '@react-navigation/native'
+
+const getImageByKey = (key: string) => {
+  const dict = images as Record<string, any>
+  return dict[key] ?? images.fail ?? images.bg
+}
 const ProvideDertails = () => {
   const { id } = useLocalSearchParams()
   const [loader, setLoader] = useState(false)
-  const isFocused = useIsFocused()
 
   const router = useRouter()
-  const {
-    authState: { token },
-    userProfileData,
-  } = useAuth()
-  const [error, setError] = useState<string | null>(null)
-  const { data } = useFetch(() =>
-    getProvision({
-      id: id as string,
-      token: token,
-    })
-  )
+  const { userProfileData } = useAuth()
+  const fetchProvision = useCallback(() => getProvision(id as string), [id])
+  const { data } = useFetch(fetchProvision)
 
   const { data: priceList, refetch } = useFetch(
     () =>
       getPriceList({
-        id: id as string,
         provider: data?.product.provider,
         service_type: data?.service_type,
-        token: token,
       }),
     false
   )
+  const safePriceList = priceList ?? []
 
   useEffect(() => {
     if (data && data?.service_type === 'DATA') {
       refetch()
     }
-  }, [data])
+  }, [data, refetch])
 
   // const {}
   const [formValue, setFormValue] = useState({
@@ -60,14 +54,11 @@ const ProvideDertails = () => {
 
     try {
       const response = await createPurchaseOrder({
-        orderData: {
-          ...formValue,
-          email: userProfileData?.email,
-          service_type: data.service_type,
-          biller: data.product.provider.toUpperCase(),
-          skip: true,
-        },
-        token,
+        ...formValue,
+        email: userProfileData?.email,
+        service_type: data?.service_type,
+        biller: data?.product?.provider?.toUpperCase(),
+        skip: true,
       })
 
       setLoader(false)
@@ -97,7 +88,7 @@ const ProvideDertails = () => {
         >
           <View className="py-6">
             <Image
-              source={images[`${splitString(data?.name)}`]}
+              source={getImageByKey(String(splitString(data?.name)))}
               className="w-full h-40 rounded-lg"
             />
 
@@ -122,13 +113,13 @@ const ProvideDertails = () => {
 
                 {data?.service_type === 'DATA' && (
                   <FormSelect
-                    options={priceList ?? []}
+                    options={safePriceList}
                     selectedValue={formValue.tariff_class}
                     name="tarrif_class"
                     label="Data Plan"
                     placeHolder="Data Plan"
                     onValueChange={(value: string) => {
-                      const newAmountdata = priceList.find((price: any) => price.value === value)
+                      const newAmountdata = safePriceList.find((price: any) => price.value === value)
 
                       setFormValue({
                         ...formValue,

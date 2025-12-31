@@ -1,24 +1,15 @@
-import { Image, StyleSheet, Text, View } from 'react-native'
+import { Image, Text, View } from 'react-native'
 import React from 'react'
-import { useLocalSearchParams, useSearchParams } from 'expo-router/build/hooks'
+import { useLocalSearchParams } from 'expo-router/build/hooks'
 import useFetch from '@/services/useFetch'
-import { useAuth } from '@/services/useAuth'
-import { getPurchaseOrder, getUserOrders } from '@/api/billOrder'
+import { getPurchaseOrder } from '@/api/billOrder'
 import { icons } from '@/constants/icons'
 import moneyFormat from '@/utils/moneyFormat'
 import { dateFormat } from '@/utils/dateFormat'
 
 const OrderDetails = () => {
   const { id } = useLocalSearchParams()
-  const {
-    authState: { token },
-  } = useAuth()
-  const { data, loading } = useFetch(() =>
-    getPurchaseOrder({
-      id,
-      token,
-    })
-  )
+  const { data, loading } = useFetch(() => getPurchaseOrder(id as string))
 
   return (
     <View className="flex-1 bg-primary px-4">
@@ -77,5 +68,3 @@ const DetailLine = ({ label, value }: any) => (
   </View>
 )
 export default OrderDetails
-
-const styles = StyleSheet.create({})

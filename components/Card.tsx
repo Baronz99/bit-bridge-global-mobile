@@ -1,24 +1,25 @@
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import React from 'react'
-import { Link } from 'expo-router'
+import { Image, TouchableOpacity } from 'react-native'
 import { splitString } from '@/utils'
 import { images } from '@/constants/images'
 
-const ProviderCard = ({ item, link }: any) => {
+/**
+ * Pure UI Provider Card (NO navigation inside).
+ * Parent screen must wrap with <Link href=... asChild>.
+ */
+const ProviderCard = ({ item }: { item: any }) => {
+  // images is typed; dynamic index needs Record cast + fallback
+  const dict = images as Record<string, any>
+  const key = String(splitString(item?.name ?? ''))
+  const img = dict[key] ?? images.fail ?? images.bg
+
   return (
-    <Link href={link} asChild>
-      <TouchableOpacity
-        key={item?.id}
-        className="bg-gray-900 w-40 h-40 overflow-hidden rounded-lg flex-row items-center gap-3 mb-3"
-      >
-        <Image
-          source={images[`${splitString(item.name)}`]}
-          resizeMode="contain"
-          className="w-full h-full object-contain"
-        />
-        {/* <Text className="text-white">Hey</Text> */}
-      </TouchableOpacity>
-    </Link>
+    <TouchableOpacity
+      activeOpacity={0.9}
+      className="bg-gray-900 w-40 h-40 overflow-hidden rounded-lg flex-row items-center gap-3 mb-3"
+    >
+      <Image source={img} resizeMode="contain" className="w-full h-full object-contain" />
+    </TouchableOpacity>
   )
 }
 

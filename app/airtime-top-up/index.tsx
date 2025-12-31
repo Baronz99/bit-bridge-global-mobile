@@ -1,9 +1,9 @@
-import { FlatList, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
-import React, { useEffect, useState } from 'react'
+import { Image, ScrollView, Text, TouchableOpacity, View } from 'react-native'
+import React, { useCallback, useEffect, useState } from 'react'
 import useFetch from '@/services/useFetch'
 import { getProducts } from '@/api/products'
 import { useAuth } from '@/services/useAuth'
-import { Link, useRouter } from 'expo-router'
+import { useRouter } from 'expo-router'
 import { images } from '@/constants/images'
 import { splitString } from '@/utils'
 
@@ -14,17 +14,19 @@ import FormInput from '@/components/FormInput'
 import FormSelect from '@/components/FormSelect'
 import Loader from '@/components/Loader'
 
+const getImageByKey = (key: string) => {
+  const dict = images as Record<string, any>
+  return dict[key] ?? images.fail ?? images.bg
+}
+
 const index = () => {
   const router = useRouter()
   const [loader, setLoader] = useState(false)
 
-  const [selectProvider, setSelectedProvider] = useState(null)
-  const [selectProvision, setSelectedProvision] = useState(null)
+  const [selectProvider, setSelectedProvider] = useState<any | null>(null)
+  const [selectProvision, setSelectedProvision] = useState<any | null>(null)
 
-  const {
-    authState: { token },
-    userProfileData,
-  } = useAuth()
+  const { userProfileData } = useAuth()
 
   const [formValue, setFormValue] = useState({
     billersCode: '',
@@ -32,20 +34,18 @@ const index = () => {
     tariff_class: '',
     description: null,
   })
+  const priceList: any[] = []
 
   const handleFormSubmit = async () => {
     setLoader(true)
 
     try {
       const response = await createPurchaseOrder({
-        orderData: {
-          ...formValue,
-          email: userProfileData?.email,
-          service_type: selectProvision?.service_type,
-          biller: selectProvider?.provider.toUpperCase(),
-          skip: true,
-        },
-        token,
+        ...formValue,
+        email: userProfileData?.email,
+        service_type: selectProvision?.service_type,
+        biller: selectProvider?.provider?.toUpperCase(),
+        skip: true,
       })
 
       setLoader(false)
@@ -62,14 +62,12 @@ const index = () => {
     }
   }
 
-  const { data } = useFetch(() =>
-    getProducts({
-      token,
-      params: {
-        category: 'mobile provider',
-      },
+  const fetchProducts = useCallback(() => {
+    return getProducts({
+      category: 'mobile provider',
     })
-  )
+  }, [])
+  const { data } = useFetch(fetchProducts)
 
   useEffect(() => {
     if (data) {
@@ -101,17 +99,19 @@ const index = () => {
         <View className="bg-gray-900/60 p-4 rounded-xl">
           <View className="py-4 flex-wrap gap-y-4 flex-row">
             {airtimeBillers_ &&
-              airtimeBillers_?.map((item: any) => (
-                <>
+              airtimeBillers_?.map((item: any, index: number) =>
+                item ? (
                   <SelectBoxIcon
                     selectedLabel={selectProvider?.provider}
-                    key={item.id}
+                    key={String(
+                      item?.id ?? item?.uuid ?? item?.code ?? item?.provider ?? item?.name ?? index
+                    )}
                     onSelect={() => setSelectedProvider(item)}
-                    icon={images[`${splitString(item?.provider)}`]}
+                    icon={getImageByKey(String(splitString(item?.provider)))}
                     label={item?.provider}
                   />
-                </>
-              ))}
+                ) : null
+              )}
           </View>
         </View>
 

@@ -1,48 +1,43 @@
-import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
-import React, { useEffect, useState } from 'react'
+import { Image, ScrollView, Text, TouchableOpacity, View } from 'react-native'
+import React, { useCallback, useEffect, useState } from 'react'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import useFetch from '@/services/useFetch'
 import { getProvision } from '@/api/products'
 import { images } from '@/constants/images'
 import FormInput from '@/components/FormInput'
-import { useAuth } from '@/services/useAuth'
 import { splitString } from '@/utils'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
 import { createPurchaseOrder, getPriceList } from '@/api/billOrder'
 import FormSelect from '@/components/FormSelect'
 import Loader from '@/components/Loader'
+
+const getImageByKey = (key: string) => {
+  const dict = images as Record<string, any>
+  return dict[key] ?? images.fail ?? images.bg
+}
 const ProvideDertails = () => {
   const { id } = useLocalSearchParams()
   const [loader, setLoader] = useState(false)
 
   const router = useRouter()
-  const {
-    authState: { token },
-  } = useAuth()
-  const [error, setError] = useState<string | null>(null)
-  const { data } = useFetch(() =>
-    getProvision({
-      id: id as string,
-      token: token,
-    })
-  )
+  const fetchProvision = useCallback(() => getProvision(id as string), [id])
+  const { data } = useFetch(fetchProvision)
 
   const { data: priceList, refetch } = useFetch(
     () =>
       getPriceList({
-        id: id as string,
         provider: data?.product.provider,
         service_type: data?.service_type,
-        token: token,
       }),
     false
   )
+  const safePriceList = priceList ?? []
 
   useEffect(() => {
     if (data && data?.service_type === 'TV') {
       refetch()
     }
-  }, [data])
+  }, [data, refetch])
 
   const [formValue, setFormValue] = useState({
     billersCode: '',
@@ -56,18 +51,19 @@ const ProvideDertails = () => {
 
     try {
       const response = await createPurchaseOrder({
-        orderData: {
-          ...formValue,
-          email: '',
-          service_type: data.service_type,
-          biller: data.product.provider.toUpperCase(),
-        },
-        token,
+        ...formValue,
+        email: '',
+        service_type: data?.service_type,
+        biller: data?.product?.provider?.toUpperCase(),
       })
 
       setLoader(false)
 
-      if (response) router.push(`/cableProviders/${id}/confirm/${response?.data.id}`)
+      if (response)
+        router.push({
+          pathname: '/cableProviders/[id]/confirm/[orderId]',
+          params: { id: String(id), orderId: String(response?.data?.id) },
+        })
     } catch (error: any) {
       setLoader(false)
     }
@@ -83,7 +79,7 @@ const ProvideDertails = () => {
         className="flex-1"
       >
         <View className="py-6">
-          <Image source={images[`${splitString(data?.name)}`]} className="w-full h-40 rounded-lg" />
+          <Image source={getImageByKey(String(splitString(data?.name)))} className="w-full h-40 rounded-lg" />
 
           <KeyboardAvoidWrapper>
             <View>
@@ -105,13 +101,13 @@ const ProvideDertails = () => {
               )}
 
               <FormSelect
-                options={priceList ?? []}
+                options={safePriceList}
                 selectedValue={formValue.tariff_class}
                 name="tarrif_class"
                 label="Data Plan"
                 placeHolder="Data Plan"
                 onValueChange={(value: string) => {
-                  const newAmountdata = priceList.find((price: any) => price.value === value)
+                  const newAmountdata = safePriceList.find((price: any) => price.value === value)
 
                   setFormValue({
                     ...formValue,
@@ -133,7 +129,7 @@ const ProvideDertails = () => {
         </View>
       </ScrollView>
 
-      {loader && <Loader />}
+      <Loader open={loader} />
     </View>
   )
 }
