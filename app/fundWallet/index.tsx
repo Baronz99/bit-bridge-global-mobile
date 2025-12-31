@@ -41,7 +41,7 @@ const index = () => {
       })
 
       setLoading(false)
-      loadProfile()
+      loadProfile({ force: true })
 
       // setNotice({
       //     error: false,

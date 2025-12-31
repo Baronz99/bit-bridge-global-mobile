@@ -30,7 +30,7 @@ const Profile = () => {
 
   useEffect(() => {
     loadProfile()
-  }, [])
+  }, [loadProfile])
 
   return (
     <>

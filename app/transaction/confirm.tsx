@@ -59,7 +59,7 @@ export default function TransactionSuccessScreen() {
   } = useFetch(fetchUpdateStatus, false)
 
   useEffect(() => {
-    loadProfile()
+    loadProfile({ force: true })
   }, [])
 
   useEffect(() => {

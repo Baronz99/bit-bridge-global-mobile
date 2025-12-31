@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "bitbridge-app",
-    "slug": "bitbridgeglobal",
+    "slug": "bit-bridge-global-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/logos/logo.png",
@@ -10,7 +10,7 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.emmykage.bitbridgeapp",
+      "bundleIdentifier": "com.baronz99.bitbridgeapp",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -20,7 +20,7 @@
         "foregroundImage": "./assets/logos/logo.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.vortech.bitbridgeapp"
+      "package": "com.baronz99.bitbridgeapp"
     },
     "web": {
       "bundler": "metro",
@@ -50,13 +50,12 @@
         "origin": false
       },
       "eas": {
-        "projectId": "2dedaba7-b1ad-4919-afd4-de6dc510ce23"
+        "projectId": "138ede9a-6452-46f2-8fe4-0e7c5c30b172"
       }
     },
-    "owner": "vortech-engineering",
+    "owner": "bz99",
     "updates": {
-      "enabled": true,
-      "url": "https://u.expo.dev/2dedaba7-b1ad-4919-afd4-de6dc510ce23"
+      "enabled": true
     },
     "runtimeVersion": {
       "policy": "sdkVersion"

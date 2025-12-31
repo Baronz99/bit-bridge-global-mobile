@@ -42,7 +42,7 @@ const index = () => {
       })
 
       setLoading(false)
-      loadProfile()
+      loadProfile({ force: true })
       setErrorMessage({
         error: false,
         data: result?.data,

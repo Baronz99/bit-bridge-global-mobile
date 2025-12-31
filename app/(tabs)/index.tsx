@@ -100,7 +100,7 @@ export default function Index() {
 
   const onRefresh = useCallback(() => {
     setRefreshing(true)
-    loadProfile()
+    loadProfile({ force: true })
       .catch(() => {})
       .finally(() => {
         setTimeout(() => setRefreshing(false), 700)
@@ -456,7 +456,7 @@ export default function Index() {
                     setToggleBvn(false)
                     setBvnDismissed(true)
                     setNotification({ error: false, message: response?.message ?? 'BVN submitted', data: response?.data })
-                    loadProfile()
+                    loadProfile({ force: true })
                   })
                   .catch((err: any) => {
                     setLoader(false)

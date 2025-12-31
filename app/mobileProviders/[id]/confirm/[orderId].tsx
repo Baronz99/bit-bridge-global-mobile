@@ -82,7 +82,7 @@ const confirm = () => {
       })
 
       resetPending()
-      loadProfile()
+      loadProfile({ force: true })
     } catch (error: any) {
       setLoader(false)
       resetPending()

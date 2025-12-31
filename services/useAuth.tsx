@@ -1,5 +1,6 @@
 // src/services/useAuth.tsx (MOBILE APP)
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { AppState } from 'react-native'
 import * as SecureStore from 'expo-secure-store'
 import client, {
   TOKEN_KEY as ACCESS_TOKEN_KEY,
@@ -26,7 +27,7 @@ export type AuthContextValue = {
 
   login: (payload: LoginPayload) => Promise<any>
   logout: () => Promise<void>
-  refreshProfile: () => Promise<any>
+  refreshProfile: (options?: { force?: boolean }) => Promise<any>
 
   // legacy (what your current screens still use)
   authState: LegacyAuthState
@@ -36,7 +37,7 @@ export type AuthContextValue = {
 
   // legacy aliases used by older screens
   userProfileData: any | null
-  loadProfile: () => Promise<any>
+  loadProfile: (options?: { force?: boolean }) => Promise<any>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -72,15 +73,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setToken] = useState<string | null>(null)
   const [refreshToken, setRefreshToken] = useState<string | null>(null)
   const [user, setUser] = useState<any | null>(null)
+  const userRef = useRef<any | null>(null)
+  const profileLoadedRef = useRef(false)
+  const profileFetchInFlightRef = useRef(false)
 
   const authenticated = !!token
 
   // ✅ Profile fetch (api/v1)
-  const refreshProfile = useCallback(async () => {
-    const res = await client.get('/users/user_profile')
-    const data = res?.data?.data ?? res?.data
-    setUser(data)
-    return data
+  const refreshProfile = useCallback(async (options?: { force?: boolean }) => {
+    const force = options?.force === true
+
+    if (!force) {
+      if (profileFetchInFlightRef.current) return userRef.current
+      if (profileLoadedRef.current) return userRef.current
+    }
+
+    profileFetchInFlightRef.current = true
+    try {
+      const res = await client.get('/users/user_profile')
+      const data = res?.data?.data ?? res?.data
+      userRef.current = data
+      setUser(data)
+      profileLoadedRef.current = true
+      return data
+    } finally {
+      profileFetchInFlightRef.current = false
+    }
   }, [])
 
   // ✅ One-time boot: load tokens and profile
@@ -103,12 +121,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // If we have an access token, try profile
       if (storedAccess) {
-        await refreshProfile().catch(async () => {
+        await refreshProfile({ force: true }).catch(async () => {
           // If profile fails badly, clear session
           await clearTokens()
           setToken(null)
           setRefreshToken(null)
           setUser(null)
+          userRef.current = null
+          profileLoadedRef.current = false
         })
       }
     } finally {
@@ -128,6 +148,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setToken(null)
       setRefreshToken(null)
       setUser(null)
+      userRef.current = null
+      profileLoadedRef.current = false
     }
 
     // ✅ on() returns an unsubscribe function in your typed emitter
@@ -135,6 +157,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       unsubscribe?.()
+    }
+  }, [])
+
+  useEffect(() => {
+    userRef.current = user
+  }, [user])
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        profileLoadedRef.current = false
+      }
+    })
+
+    return () => {
+      subscription.remove()
     }
   }, [])
 
@@ -189,7 +227,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(access)
     setRefreshToken(bodyRefresh || null)
 
-    await refreshProfile()
+    await refreshProfile({ force: true })
     return json
   }, [refreshProfile])
 
@@ -198,6 +236,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(null)
     setRefreshToken(null)
     setUser(null)
+    userRef.current = null
+    profileLoadedRef.current = false
   }, [])
 
   const onRegister = async (_formData: any) => {
