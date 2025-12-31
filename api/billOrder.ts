@@ -5,8 +5,6 @@ import moneyFormat from '@/utils/moneyFormat'
 const errMsg = (err: any, fallback = 'Something went wrong') =>
   err?.response?.data?.message || err?.message || fallback
 
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
-
 const isHtmlResponse = (err: any) => {
   const data = err?.response?.data
   if (typeof data === 'string') {
@@ -18,6 +16,11 @@ const isHtmlResponse = (err: any) => {
 
 const isPendingResponse = (data: any) =>
   data?.status === 'pending' || data?.data?.status === 'pending'
+
+const isTimeoutError = (err: any) => {
+  const msg = String(err?.message || '').toLowerCase()
+  return err?.code === 'ECONNABORTED' || msg.includes('timeout')
+}
 
 export const createPurchaseOrder = async (orderData: any) => {
   try {
@@ -70,37 +73,33 @@ export const confirmBillPayment = async ({
   queryId: string
   payment_method: string
 }) => {
-  const maxRetries = 3
-  for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
-    try {
-      const res = await client.get(`/bill_orders/${queryId}/initialize_confirm_payment`, {
-        params: { payment_method },
-      })
-      return res.data
-    } catch (err: any) {
-      const status = err?.response?.status
-      if (status === 503) {
-        if (isHtmlResponse(err)) {
-          throw new Error('Payment provider is temporarily unavailable. Please try again.')
-        }
-
-        const respData = err?.response?.data
-        if (isPendingResponse(respData)) {
-          if (attempt < maxRetries) {
-            await delay(3000)
-            continue
-          }
-          return {
-            pending: true,
-            status: 'pending',
-            message:
-              respData?.message ||
-              'Payment confirmation is still processing. Please retry shortly.',
-          }
+  try {
+    const res = await client.get(`/bill_orders/${queryId}/initialize_confirm_payment`, {
+      params: { payment_method },
+    })
+    return res.data
+  } catch (err: any) {
+    const status = err?.response?.status
+    if (status === 503 || isTimeoutError(err)) {
+      if (isHtmlResponse(err)) {
+        return {
+          pending: true,
+          status: 'pending',
+          message: 'Payment pending. Please try again in a moment.',
         }
       }
-      throw new Error(errMsg(err))
+
+      const respData = err?.response?.data
+      if (isPendingResponse(respData) || status === 503 || isTimeoutError(err)) {
+        return {
+          pending: true,
+          status: 'pending',
+          message:
+            respData?.message || 'Payment pending. Please try again in a moment.',
+        }
+      }
     }
+    throw new Error(errMsg(err))
   }
 }
 

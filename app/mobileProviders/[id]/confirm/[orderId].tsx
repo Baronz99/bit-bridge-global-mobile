@@ -1,5 +1,5 @@
 import { View, Text, Linking, TouchableOpacity, Animated } from 'react-native'
-import React, { useCallback, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocalSearchParams } from 'expo-router'
 import useNotification from '@/hooks/useNotification'
 import useFetch from '@/services/useFetch'
@@ -15,10 +15,12 @@ const confirm = () => {
   const { orderId } = useLocalSearchParams()
   const [loader, setLoader] = useState(false)
   const [pendingRetry, setPendingRetry] = useState(false)
+  const [retryCount, setRetryCount] = useState(0)
   const [lastPaymentMethod, setLastPaymentMethod] = useState<string | null>(null)
   const { notification, setNotification } = useNotification()
   const [applyCommission, setApplyCommission] = useState(false)
   const translateX = useRef(new Animated.Value(0)).current
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const toggleSwitch = () => {
     Animated.timing(translateX, {
@@ -36,7 +38,20 @@ const confirm = () => {
   const { data, loading } = useFetch(fetchOrder)
   // const [getstarted, setOpenStarted] = useState(false)
 
-  const handleConfirmation = async (payment_method: string) => {
+  const clearRetryTimer = () => {
+    if (retryTimerRef.current) {
+      clearTimeout(retryTimerRef.current)
+      retryTimerRef.current = null
+    }
+  }
+
+  const resetPending = useCallback(() => {
+    clearRetryTimer()
+    setPendingRetry(false)
+    setRetryCount(0)
+  }, [])
+
+  const handleConfirmation = useCallback(async (payment_method: string) => {
     // setTextInfo("Please wait while we process your payment")
     setLastPaymentMethod(payment_method)
     setLoader(true)
@@ -50,8 +65,7 @@ const confirm = () => {
         setNotification({
           error: true,
           message:
-            response?.message ||
-            'Payment confirmation is still processing. Please retry shortly.',
+            response?.message || 'Payment pending. Please try again in a moment.',
           data: null,
         })
         return
@@ -67,17 +81,31 @@ const confirm = () => {
         data: null,
       })
 
+      resetPending()
       loadProfile()
     } catch (error: any) {
       setLoader(false)
-      setPendingRetry(false)
+      resetPending()
       setNotification({
         error: true,
         message: error.message || 'something went wrong',
         data: null,
       })
     }
-  }
+  }, [loadProfile, orderId, resetPending, setNotification])
+
+  useEffect(() => {
+    if (!pendingRetry || !lastPaymentMethod) return
+    if (retryCount >= 3) return
+    clearRetryTimer()
+    retryTimerRef.current = setTimeout(() => {
+      setRetryCount((count) => count + 1)
+      handleConfirmation(lastPaymentMethod)
+    }, 5000)
+    return () => {
+      clearRetryTimer()
+    }
+  }, [handleConfirmation, lastPaymentMethod, pendingRetry, retryCount])
 
   const commissionValue = useMemo(
     () => Number((data?.amount * data?.commissionRate).toFixed(2)),
@@ -168,6 +196,25 @@ const confirm = () => {
         ))}
       <Text className="text-white text-center">{textInfo}</Text>
 
+      {pendingRetry ? (
+        <View className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 mb-3">
+          <Text className="text-yellow-200 text-center">
+            Payment pending. Please try again in a moment.
+          </Text>
+          {lastPaymentMethod ? (
+            <TouchableOpacity
+              onPress={() => {
+                setRetryCount(0)
+                handleConfirmation(lastPaymentMethod)
+              }}
+              className="border rounded-md mt-3 border-alt py-3"
+            >
+              <Text className="text-alt text-center">Retry Confirmation</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      ) : null}
+
       <TransactionButtons handleConfirmation={handleConfirmation} />
 
       <Loader open={loader} />
@@ -175,27 +222,19 @@ const confirm = () => {
       <AppModal
         open={!!notification?.message}
         onclose={() => {
-          setPendingRetry(false)
+          resetPending()
           setNotification({ message: null, error: false, data: null })
         }}
       >
         <NotificationAlert
           onPress={() => {
-            setPendingRetry(false)
+            resetPending()
             setNotification({ message: null, error: false, data: null })
           }}
           message={notification?.message}
           error={notification.error}
           data={notification.data}
         />
-        {pendingRetry && lastPaymentMethod ? (
-          <TouchableOpacity
-            onPress={() => handleConfirmation(lastPaymentMethod)}
-            className="border rounded-md mt-4 border-alt py-4"
-          >
-            <Text className="text-alt text-center">Retry Confirmation</Text>
-          </TouchableOpacity>
-        ) : null}
       </AppModal>
     </View>
   )

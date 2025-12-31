@@ -142,31 +142,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // ✅ Login: use ROOT /login (Devise) and store access + refresh tokens
   const login = useCallback(async (payload: LoginPayload) => {
     const loginUrl = `${APP_CONFIG.root_url}/login`
-    const res = await fetch(loginUrl, {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        user: {
-          email: (payload.email || '').trim(),
-          password: (payload.password || '').trim(),
+    let res
+    try {
+      res = await client.request({
+        method: 'POST',
+        baseURL: APP_CONFIG.root_url,
+        url: '/login',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
         },
-      }),
-    })
-
-    console.log('[AUTH] login', { url: loginUrl, status: res.status })
-
-    const json = await res.json().catch(() => ({}))
-
-    if (!res.ok) {
-      const msg = (json?.error || json?.message || 'Login failed') as string
+        data: {
+          user: {
+            email: (payload.email || '').trim(),
+            password: (payload.password || '').trim(),
+          },
+        },
+        __skipAuth: true,
+        __skipAuthRefresh: true,
+      } as any)
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.error ||
+        err?.response?.data?.message ||
+        err?.message ||
+        'Login failed'
       throw new Error(msg)
     }
 
+    console.log('[AUTH] login', { url: loginUrl, status: res.status })
+
+    const json = res.data || {}
+
     // Prefer header, fallback to payload
-    const authHeader = res.headers.get('authorization') || res.headers.get('Authorization')
+    const authHeader = res.headers?.authorization || res.headers?.Authorization
     const headerToken = authHeader ? normalize(authHeader) : null
 
     const bodyAccess = normalize(json?.access_token || json?.token || json?.jwt)

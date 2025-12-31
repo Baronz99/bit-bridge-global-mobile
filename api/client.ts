@@ -67,23 +67,30 @@ const refreshAccessToken = async (): Promise<string | null> => {
   const refreshToken = await getRefreshToken()
   if (!refreshToken) return null
 
-  const res = await fetch(`${ROOT_URL}/refresh`, {
-    method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      'Bit-Refresh-Token': refreshToken,
-    },
-  })
+  let res
+  try {
+    res = await client.request({
+      method: 'POST',
+      baseURL: ROOT_URL,
+      url: '/refresh',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        'Bit-Refresh-Token': refreshToken,
+      },
+      __skipAuth: true,
+      __skipAuthRefresh: true,
+    } as any)
+  } catch {
+    return null
+  }
 
   console.log('[AUTH] refresh', {
     url: `${ROOT_URL}/refresh`,
     status: res.status,
   })
 
-  if (!res.ok) return null
-
-  const data = await res.json().catch(() => ({} as any))
+  const data = res.data ?? {}
   const nextAccess = data?.access_token || data?.token || null
   const nextRefresh = data?.refresh_token || null
 
@@ -124,6 +131,7 @@ const logResponse = (config: InternalAxiosRequestConfig | undefined, status?: nu
 // Attach token on every request
 client.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
   const token = await getAccessToken()
+  const skipAuth = (config as any).__skipAuth === true
 
   config.headers = config.headers ?? {}
   config.headers.Accept = 'application/json'
@@ -131,10 +139,14 @@ client.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
 
   const existingAuth =
     (config.headers as any).Authorization || (config.headers as any).authorization
-  if (existingAuth) {
-    config.headers.Authorization = existingAuth
-  } else if (token) {
-    config.headers.Authorization = `Bearer ${token}`
+  if (!skipAuth) {
+    if (existingAuth) {
+      config.headers.Authorization = existingAuth
+    } else if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    } else {
+      delete (config.headers as any).Authorization
+    }
   } else {
     delete (config.headers as any).Authorization
   }
@@ -152,8 +164,12 @@ client.interceptors.response.use(
   async (error: AxiosError) => {
     const status = error?.response?.status
     const originalRequest: any = error?.config
+    const isRefreshRequest =
+      originalRequest?.__skipAuthRefresh === true ||
+      originalRequest?.url?.includes('/refresh') ||
+      originalRequest?.headers?.['Bit-Refresh-Token']
 
-    if (status === 401 && originalRequest && !originalRequest._retry) {
+    if (status === 401 && originalRequest && !originalRequest._retry && !isRefreshRequest) {
       originalRequest._retry = true
 
       try {

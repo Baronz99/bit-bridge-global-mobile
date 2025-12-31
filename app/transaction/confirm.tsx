@@ -43,11 +43,15 @@ export default function TransactionSuccessScreen() {
 
   const receipt_type = reference?.split('-')[0]
 
+  const fetchUpdateStatus = useCallback(
+    () => updateOrderStatus(reference as string),
+    [reference]
+  )
   const {
     data: updateData,
     refetch,
     error: updateError,
-  } = useFetch(() => updateOrderStatus(reference as string), false)
+  } = useFetch(fetchUpdateStatus, false)
 
   useEffect(() => {
     loadProfile()
