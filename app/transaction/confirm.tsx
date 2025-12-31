@@ -1,5 +1,5 @@
 import { Alert, Pressable, Share, Text, View } from 'react-native'
-import React, { useCallback, useEffect } from 'react'
+import React, { useCallback, useEffect, useRef } from 'react'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 
 import useFetch from '@/services/useFetch'
@@ -42,6 +42,11 @@ export default function TransactionSuccessScreen() {
   const { data, loading } = useFetch(fetchReceipt)
 
   const receipt_type = reference?.split('-')[0]
+  const hasRefetchedRef = useRef(false)
+
+  useEffect(() => {
+    hasRefetchedRef.current = false
+  }, [reference, orderId])
 
   const fetchUpdateStatus = useCallback(
     () => updateOrderStatus(reference as string),
@@ -58,7 +63,8 @@ export default function TransactionSuccessScreen() {
   }, [])
 
   useEffect(() => {
-    if (data && data?.status === 'initialized') {
+    if (data && data?.status === 'initialized' && !hasRefetchedRef.current) {
+      hasRefetchedRef.current = true
       refetch()
     }
   }, [data])
