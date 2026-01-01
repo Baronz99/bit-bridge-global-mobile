@@ -3,6 +3,7 @@ import React, { useState } from 'react'
 import { Tabs, Redirect } from 'expo-router'
 import { Image, SafeAreaView, Text, TouchableOpacity, View } from 'react-native'
 import { icons } from '@/constants/icons'
+import { FEATURE_TIMELINE } from '@/constants/featureFlags'
 import { useAuth } from '@/services/useAuth'
 import LoaderScreen from '../LoaderScreen'
 import AppModal from '@/components/modal/Modal'
@@ -84,6 +85,19 @@ export default function TabsLayout() {
               title: 'All Services',
               headerTintColor: 'white',
               tabBarIcon: ({ focused }) => <TabIcon focused={focused} icon={icons.utility} title="Service" />,
+            }}
+          />
+
+          <Tabs.Screen
+            name="timeline"
+            options={{
+              title: 'Timeline',
+              headerShown: true,
+              href: FEATURE_TIMELINE ? undefined : null,
+              tabBarButton: FEATURE_TIMELINE ? undefined : () => null,
+              tabBarIcon: ({ focused }) => (
+                <TabIcon focused={focused} icon={icons.transaction} title="Timeline" />
+              ),
             }}
           />
 
