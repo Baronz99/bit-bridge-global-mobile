@@ -14,7 +14,7 @@ import { Link } from 'expo-router'
 import { useAuth } from '@/services/useAuth'
 import { AntDesign, Feather, FontAwesome, Ionicons } from '@expo/vector-icons'
 import AppModal from '@/components/modal/Modal'
-import { FEATURE_KYC_CENTER } from '@/constants/featureFlags'
+import { FEATURE_CIRCLES, FEATURE_KYC_CENTER, FEATURE_TIMELINE } from '@/constants/featureFlags'
 
 const Profile = () => {
   const [toggleModal, setToggleModal] = useState(false)
@@ -78,6 +78,38 @@ const Profile = () => {
                   </TouchableOpacity>
                 </Link>
               </View>
+            ) : null}
+
+            {FEATURE_CIRCLES || FEATURE_TIMELINE ? (
+              <>
+                <View className="my-2 mx-4">
+                  <Text className="text-white text-lg font-semibold">Community</Text>
+                </View>
+
+                {FEATURE_CIRCLES ? (
+                  <View className="bg-gray-900 my-4 py-4 px-4 rounded-xl">
+                    <Link href={'/circles' as any} asChild>
+                      <TouchableOpacity className="flex-row gap-4 items-center">
+                        <Ionicons name="people-outline" size={20} color="white" />
+                        <Text className="text-white flex-1  ">Circles</Text>
+                        <Feather name="arrow-right" size={20} color="white" />
+                      </TouchableOpacity>
+                    </Link>
+                  </View>
+                ) : null}
+
+                {FEATURE_TIMELINE ? (
+                  <View className="bg-gray-900 my-4 py-4 px-4 rounded-xl">
+                    <Link href={'/timeline' as any} asChild>
+                      <TouchableOpacity className="flex-row gap-4 items-center">
+                        <Ionicons name="time-outline" size={20} color="white" />
+                        <Text className="text-white flex-1  ">Timeline</Text>
+                        <Feather name="arrow-right" size={20} color="white" />
+                      </TouchableOpacity>
+                    </Link>
+                  </View>
+                ) : null}
+              </>
             ) : null}
 
             <View className="my-2 mx-4">
