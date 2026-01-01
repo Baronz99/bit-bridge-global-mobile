@@ -10,7 +10,7 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.baronz99.bitbridgeapp",
+      "bundleIdentifier": "com.emmykage.bitbridgeapp",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -20,7 +20,7 @@
         "foregroundImage": "./assets/logos/logo.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.baronz99.bitbridgeapp"
+      "package": "com.vortech.bitbridgeapp"
     },
     "web": {
       "bundler": "metro",
