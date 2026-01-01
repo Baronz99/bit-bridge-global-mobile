@@ -14,15 +14,12 @@ import { Link } from 'expo-router'
 import { useAuth } from '@/services/useAuth'
 import { AntDesign, Feather, FontAwesome, Ionicons } from '@expo/vector-icons'
 import AppModal from '@/components/modal/Modal'
+import { FEATURE_KYC_CENTER } from '@/constants/featureFlags'
 
 const Profile = () => {
   const [toggleModal, setToggleModal] = useState(false)
 
-  const {
-    userProfileData,
-    onLogout,
-    loadProfile,
-  } = useAuth()
+  const { userProfileData, onLogout, loadProfile } = useAuth()
 
   const handleLogout = async () => {
     await onLogout()
@@ -70,6 +67,18 @@ const Profile = () => {
                 </TouchableOpacity>
               </Link>
             </View>
+
+            {FEATURE_KYC_CENTER ? (
+              <View className="bg-gray-900 my-4 py-4 px-4 rounded-xl">
+                <Link href={'/kyc' as any} asChild>
+                  <TouchableOpacity className="flex-row gap-4 items-center">
+                    <Ionicons name="shield-checkmark-outline" size={20} color="white" />
+                    <Text className="text-white flex-1  ">KYC Center</Text>
+                    <Feather name="arrow-right" size={20} color="white" />
+                  </TouchableOpacity>
+                </Link>
+              </View>
+            ) : null}
 
             <View className="my-2 mx-4">
               <Text className="text-white text-lg font-semibold">Privacy & Security</Text>
