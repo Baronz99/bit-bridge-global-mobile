@@ -1,7 +1,15 @@
-// src/services/useAuth.tsx (MOBILE APP)
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { AppState } from 'react-native'
 import * as SecureStore from 'expo-secure-store'
+
 import client, {
   TOKEN_KEY as ACCESS_TOKEN_KEY,
   REFRESH_TOKEN_KEY,
@@ -19,7 +27,6 @@ type LegacyAuthState = {
 export type AuthContextValue = {
   loading: boolean
 
-  // preferred
   token: string | null
   refreshToken: string | null
   user: any | null
@@ -29,13 +36,12 @@ export type AuthContextValue = {
   logout: () => Promise<void>
   refreshProfile: (options?: { force?: boolean }) => Promise<any>
 
-  // legacy (what your current screens still use)
+  // legacy
   authState: LegacyAuthState
   onLogin: (payload: LoginPayload) => Promise<any>
   onLogout: () => Promise<void>
   onRegister: (formData: any) => Promise<any>
 
-  // legacy aliases used by older screens
   userProfileData: any | null
   loadProfile: (options?: { force?: boolean }) => Promise<any>
 }
@@ -43,7 +49,10 @@ export type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null)
 
 const normalize = (v: string | null | undefined) =>
-  String(v || '').replace(/^Bearer\s+/i, '').replace(/^"+|"+$/g, '').trim()
+  String(v || '')
+    .replace(/^Bearer\s+/i, '')
+    .replace(/^"+|"+$/g, '')
+    .trim()
 
 async function saveTokens(accessToken: string, refreshToken?: string | null) {
   const cleanAccess = normalize(accessToken)
@@ -54,9 +63,7 @@ async function saveTokens(accessToken: string, refreshToken?: string | null) {
 
   if (refreshToken) {
     const cleanRefresh = normalize(refreshToken)
-    if (cleanRefresh) {
-      await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, cleanRefresh)
-    }
+    if (cleanRefresh) await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, cleanRefresh)
   }
 }
 
@@ -73,13 +80,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setToken] = useState<string | null>(null)
   const [refreshToken, setRefreshToken] = useState<string | null>(null)
   const [user, setUser] = useState<any | null>(null)
+
   const userRef = useRef<any | null>(null)
   const profileLoadedRef = useRef(false)
   const profileFetchInFlightRef = useRef(false)
 
   const authenticated = !!token
 
-  // ✅ Profile fetch (api/v1)
   const refreshProfile = useCallback(async (options?: { force?: boolean }) => {
     const force = options?.force === true
 
@@ -101,8 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  // ✅ One-time boot: load tokens and profile
-  const bootstrap = async () => {
+  const bootstrap = useCallback(async () => {
     try {
       const storedAccess = await SecureStore.getItemAsync(ACCESS_TOKEN_KEY)
       const storedRefresh = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY)
@@ -119,10 +125,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (storedRefresh) setRefreshToken(normalize(storedRefresh))
       else setRefreshToken(null)
 
-      // If we have an access token, try profile
       if (storedAccess) {
         await refreshProfile({ force: true }).catch(async () => {
-          // If profile fails badly, clear session
           await clearTokens()
           setToken(null)
           setRefreshToken(null)
@@ -134,15 +138,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [refreshProfile])
 
   useEffect(() => {
     void bootstrap()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [bootstrap])
 
-  // ✅ Listen for global 401 "logout" signal from api/client refresh logic
-    useEffect(() => {
+  useEffect(() => {
     const onUnauthorized = async () => {
       await clearTokens()
       setToken(null)
@@ -152,9 +154,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       profileLoadedRef.current = false
     }
 
-    // ✅ on() returns an unsubscribe function in your typed emitter
     const unsubscribe = authEvents.on('unauthorized', onUnauthorized)
-
     return () => {
       unsubscribe?.()
     }
@@ -170,66 +170,64 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         profileLoadedRef.current = false
       }
     })
-
-    return () => {
-      subscription.remove()
-    }
+    return () => subscription.remove()
   }, [])
 
+  const login = useCallback(
+    async (payload: LoginPayload) => {
+      const loginUrl = `${APP_CONFIG.root_url}/login`
+      let res
 
-  // ✅ Login: use ROOT /login (Devise) and store access + refresh tokens
-  const login = useCallback(async (payload: LoginPayload) => {
-    const loginUrl = `${APP_CONFIG.root_url}/login`
-    let res
-    try {
-      res = await client.request({
-        method: 'POST',
-        baseURL: APP_CONFIG.root_url,
-        url: '/login',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-        },
-        data: {
-          user: {
-            email: (payload.email || '').trim(),
-            password: (payload.password || '').trim(),
+      try {
+        res = await client.request({
+          method: 'POST',
+          baseURL: APP_CONFIG.root_url,
+          url: '/login',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
           },
-        },
-        __skipAuth: true,
-        __skipAuthRefresh: true,
-      } as any)
-    } catch (err: any) {
-      const msg =
-        err?.response?.data?.error ||
-        err?.response?.data?.message ||
-        err?.message ||
-        'Login failed'
-      throw new Error(msg)
-    }
+          data: {
+            user: {
+              email: (payload.email || '').trim(),
+              password: (payload.password || '').trim(),
+            },
+          },
+          __skipAuth: true,
+          __skipAuthRefresh: true,
+        } as any)
+      } catch (err: any) {
+        const msg =
+          err?.response?.data?.error ||
+          err?.response?.data?.message ||
+          err?.message ||
+          'Login failed'
+        throw new Error(msg)
+      }
 
-    console.log('[AUTH] login', { url: loginUrl, status: res.status })
+      console.log('[AUTH] login', { url: loginUrl, status: res.status })
 
-    const json = res.data || {}
+      const json = res.data || {}
 
-    // Prefer header, fallback to payload
-    const authHeader = res.headers?.authorization || res.headers?.Authorization
-    const headerToken = authHeader ? normalize(authHeader) : null
+      const authHeader = res.headers?.authorization || res.headers?.Authorization
+      const headerToken = authHeader ? normalize(authHeader) : null
 
-    const bodyAccess = normalize(json?.access_token || json?.token || json?.jwt)
-    const bodyRefresh = normalize(json?.refresh_token)
+      const bodyAccess = normalize(json?.access_token || json?.token || json?.jwt)
+      const bodyRefresh = normalize(json?.refresh_token)
 
-    const access = headerToken || bodyAccess
-    if (!access) throw new Error('No access token returned')
+      const cleanAccess = normalize(headerToken || bodyAccess)
+      if (!cleanAccess) throw new Error('No access token returned')
 
-    await saveTokens(access, bodyRefresh || null)
+      await saveTokens(cleanAccess, bodyRefresh || null)
 
-    setToken(access)
-    setRefreshToken(bodyRefresh || null)
+      setToken(cleanAccess)
+      setRefreshToken(bodyRefresh || null)
 
-    await refreshProfile({ force: true })
-    return json
-  }, [refreshProfile])
+      await refreshProfile({ force: true })
+      return json
+    },
+    [refreshProfile]
+  )
 
   const logout = useCallback(async () => {
     await clearTokens()
@@ -267,7 +265,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       onLogout: logout,
       onRegister,
 
-      // legacy aliases
       userProfileData: user,
       loadProfile: refreshProfile,
     }
