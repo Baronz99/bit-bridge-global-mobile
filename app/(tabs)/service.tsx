@@ -1,13 +1,14 @@
 import React, { useMemo } from 'react'
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { icons } from '@/constants/icons'
-import { Link } from 'expo-router'
+import { useRouter } from 'expo-router'
 import ViewBox from '@/components/view-box/ViewBoxIcon'
 
 const Utilities = () => {
+  const router = useRouter()
   const items = useMemo(
-    () =>
-      [
+    () => {
+      return [
         {
           id: 0,
           label: 'Airtime',
@@ -85,7 +86,8 @@ const Utilities = () => {
           link: '/convert-usd-to-ngn',
           image: icons.transfer,
         },
-      ] as const,
+      ] as const
+    },
     []
   )
 
@@ -97,13 +99,17 @@ const Utilities = () => {
 
           <View className="py-4 flex-wrap gap-y-4 flex-row">
             {items.map((item) => (
-              <Link key={item.id} href={item.link as any} asChild>
-                <TouchableOpacity activeOpacity={0.9}>
+              <View key={item.id} className="w-1/4 items-center mb-4">
+                <TouchableOpacity
+                  activeOpacity={0.9}
+                  onPress={() => router.push(item.link as any)}
+                >
                   <ViewBox icon={item.image} label={item.label} />
                 </TouchableOpacity>
-              </Link>
+              </View>
             ))}
           </View>
+
         </View>
       </ScrollView>
     </View>
