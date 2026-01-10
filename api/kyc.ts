@@ -59,6 +59,28 @@ export type KycStatusResponse = {
     phone_verified?: boolean
     phone_verified_at?: string
     phone_e164?: string
+    primary_use_case?: string
+    id_type?: string
+    user_profile?: {
+      id?: string | number
+      first_name?: string
+      last_name?: string
+      full_name?: string
+      phone_number?: string
+      date_of_birth?: string
+      role?: string
+      primary_use_case?: string
+      id_type?: string
+      address_line1?: string
+      address_line2?: string
+      city?: string
+      state?: string
+      country?: string
+      postal_code?: string
+      proof_of_address_type?: string
+      proof_of_address_url?: string
+      id_document_url?: string
+    }
     user_kyc?: {
       bvn_status?: string
       bvn_last4?: string
@@ -76,6 +98,24 @@ export type KycStatusResponse = {
       bvn_locked_until?: string
     }
   }
+}
+
+export type Tier3SubmitPayload = {
+  image: string
+}
+
+export type Tier3SubmitResponse = {
+  status?: string
+  message?: string
+  detail?: string
+  error?: string
+}
+
+export type Tier3StatusResponse = {
+  tier3_status?: string
+  tier3_error?: string
+  tier3_reference?: string
+  tier3_verified_at?: string
 }
 
 export const requestPhoneOtp = async (payload: PhoneVerificationRequestPayload) => {
@@ -96,4 +136,23 @@ export const verifyBvn = async (payload: BvnVerifyPayload) => {
 export const getKycStatus = async () => {
   const res = await client.get('/users/user_profile')
   return res.data as KycStatusResponse
+}
+
+export const submitTier3 = async (payload: Tier3SubmitPayload) => {
+  try {
+    const res = await client.post('/verification/tier3/submit', payload)
+    return res.data as Tier3SubmitResponse
+  } catch (error: any) {
+    const status = error?.response?.status
+    if (status === 404) {
+      const res = await client.post('/verification/tier3/start', payload)
+      return res.data as Tier3SubmitResponse
+    }
+    throw error
+  }
+}
+
+export const getTier3Status = async () => {
+  const res = await client.get('/verification/tier3/status')
+  return res.data as Tier3StatusResponse
 }
