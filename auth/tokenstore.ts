@@ -2,6 +2,7 @@ import * as SecureStore from 'expo-secure-store'
 
 export const TOKEN_KEY = 'bitglobal'
 export const REFRESH_TOKEN_KEY = 'refresh-token'
+export const EMAIL_KEY = 'email'
 
 const normalizeToken = (raw?: string | null) => {
   if (!raw) return null
@@ -42,4 +43,11 @@ export const clearRefreshToken = async () => {
 
 export const clearAuthStorage = async () => {
   await Promise.all([clearAccessToken(), clearRefreshToken()])
+}
+
+// Generic storage helpers used by auth flows (avoid importing SecureStore in useAuth.tsx).
+export const setEmailForVerification = async (email: string) => {
+  const clean = String(email || '').trim()
+  if (!clean) return
+  await SecureStore.setItemAsync(EMAIL_KEY, clean)
 }

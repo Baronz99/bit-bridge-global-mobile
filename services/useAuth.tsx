@@ -8,14 +8,16 @@ import React, {
   useState,
 } from 'react'
 import { AppState } from 'react-native'
-import * as SecureStore from 'expo-secure-store'
-
 import client, {
-  TOKEN_KEY as ACCESS_TOKEN_KEY,
-  REFRESH_TOKEN_KEY,
   authEvents,
+  clearTokens as clearStoredTokens,
+  getStoredAccessToken,
+  getStoredRefreshToken,
+  setTokens as setStoredTokens,
 } from '@/api/client'
 import APP_CONFIG from '@/api/baseUrl'
+import { signup as signupApi } from '@/api/auth'
+import { setEmailForVerification } from '@/auth/tokenstore'
 
 type LoginPayload = { email: string; password: string }
 
@@ -58,20 +60,12 @@ async function saveTokens(accessToken: string, refreshToken?: string | null) {
   const cleanAccess = normalize(accessToken)
   if (!cleanAccess) throw new Error('Missing access token')
 
-  await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, cleanAccess)
+  await setStoredTokens(cleanAccess, refreshToken ? normalize(refreshToken) : undefined)
   client.defaults.headers.Authorization = `Bearer ${cleanAccess}`
-
-  if (refreshToken) {
-    const cleanRefresh = normalize(refreshToken)
-    if (cleanRefresh) await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, cleanRefresh)
-  }
 }
 
 async function clearTokens() {
-  await Promise.all([
-    SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY),
-    SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY),
-  ])
+  await clearStoredTokens()
   delete client.defaults.headers.Authorization
 }
 
@@ -110,8 +104,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const bootstrap = useCallback(async () => {
     try {
-      const storedAccess = await SecureStore.getItemAsync(ACCESS_TOKEN_KEY)
-      const storedRefresh = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY)
+      const storedAccess = await getStoredAccessToken()
+      const storedRefresh = await getStoredRefreshToken()
 
       if (storedAccess) {
         const cleanAccess = normalize(storedAccess)
@@ -238,8 +232,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     profileLoadedRef.current = false
   }, [])
 
-  const onRegister = async (_formData: any) => {
-    throw new Error('Register not implemented yet')
+  const onRegister = async (formData: any) => {
+    const userProfile: Record<string, any> = {}
+    if (formData?.first_name) userProfile.first_name = formData.first_name
+    if (formData?.last_name) userProfile.last_name = formData.last_name
+    if (formData?.phone) userProfile.phone_number = formData.phone
+
+    const payload = {
+      user: {
+        email: (formData?.email || '').trim(),
+        password: (formData?.password || '').trim(),
+        password_confirmation: (formData?.confirm_password || '').trim(),
+        ...(Object.keys(userProfile).length ? { user_profile_attributes: userProfile } : {}),
+      },
+    }
+
+    if (!payload.user.email || !payload.user.password || !payload.user.password_confirmation) {
+      throw new Error('Email and password are required')
+    }
+
+    const result = await signupApi(payload)
+    await setEmailForVerification(payload.user.email)
+    return result
   }
 
   const value = useMemo<AuthContextValue>(() => {

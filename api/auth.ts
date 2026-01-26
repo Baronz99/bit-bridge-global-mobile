@@ -1,4 +1,28 @@
 import client from '@/api/client'
+import APP_CONFIG from './baseUrl'
+
+export const signup = async (payload: { user: Record<string, any> }) => {
+  try {
+    const response = await client.request({
+      method: 'POST',
+      baseURL: APP_CONFIG.root_url,
+      url: '/signup',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      data: payload,
+      __skipAuth: true,
+      __skipAuthRefresh: true,
+    } as any)
+    return response.data
+  } catch (error: any) {
+    if (error?.response) {
+      throw new Error(error.response.data?.status?.message || 'Signup failed')
+    }
+    throw new Error(error?.message || 'Signup failed')
+  }
+}
 
 export const userProfile = async () => {
   try {
@@ -21,6 +45,10 @@ export const userProfileUpdate = async ({ formData }: { formData: any }) => {
         first_name: formData?.first_name,
         last_name: formData?.last_name,
         phone_number: formData?.phone,
+        address_line1: formData?.address_line1,
+        city: formData?.city,
+        state: formData?.state,
+        postal_code: formData?.postal_code,
       },
     },
   }
@@ -73,6 +101,42 @@ export const sendUserConfirmation = async (email: string) => {
     const response = await client.get(
       `/users/resend_confirmation_token?email=${encodeURIComponent(email)}`
     )
+    return response.data
+  } catch (error: any) {
+    if (error?.response) {
+      throw new Error(error.response.data?.message || 'error occured')
+    }
+    throw new Error('Something went wrong')
+  }
+}
+
+export const requestPasswordReset = async (email: string) => {
+  try {
+    const response = await client.get('/users/password_reset', {
+      params: { email },
+    })
+    return response.data
+  } catch (error: any) {
+    if (error?.response) {
+      throw new Error(error.response.data?.message || 'error occured')
+    }
+    throw new Error('Something went wrong')
+  }
+}
+
+export const confirmPasswordReset = async (payload: {
+  reset_password_token: string
+  password: string
+  password_confirmation?: string
+}) => {
+  try {
+    const response = await client.patch('/users/update_password', {
+      user: {
+        reset_password_token: payload.reset_password_token,
+        password: payload.password,
+        password_confirmation: payload.password_confirmation || payload.password,
+      },
+    })
     return response.data
   } catch (error: any) {
     if (error?.response) {
