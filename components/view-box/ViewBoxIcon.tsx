@@ -11,7 +11,7 @@ const LABEL_WIDTH = 80
 
 const ViewBox = ({ icon, label }: Props) => {
   return (
-    <View className="flex-col items-center justify-center w-full h-full">
+    <View className="flex-col items-center justify-center">
       <View
         className="bg-white/20 rounded-full items-center justify-center"
         style={{ width: ICON_CONTAINER_SIZE, height: ICON_CONTAINER_SIZE }}

@@ -4,6 +4,9 @@ import rankingGradient from '@/assets/images/rankingGradient.png'
 import mtn from '@/assets/images/mtn.webp'
 import airtel from '@/assets/images/airtel.webp'
 import glo from '@/assets/images/glo.webp'
+import nineMobile from '@/assets/images/9-mobile.webp'
+import ntel from '@/assets/images/ntel.webp'
+import startimes from '@/assets/images/startimes.webp'
 import AEDC from '@/assets/power-providers/Abuja-Electric.jpg'
 import EKEDC from '@/assets/power-providers/Eko-Electric-Payment-PHCN.jpg'
 import EEDC from '@/assets/power-providers/Enugu-Electric-EEDC.jpg'
@@ -24,22 +27,42 @@ export const images = {
   bg,
   highlight,
   rankingGradient,
+
+  // Mobile Networks
   mtn,
   airtel,
   glo,
+
+  // 9mobile / Etisalat (ALL aliases)
+  '9-mobile': nineMobile,
+  '9mobile': nineMobile,
+  '9mobil': nineMobile,
+  '9_mobil': nineMobile,
+  etisalat: nineMobile,
+  emts: nineMobile,
+
+  // NTEL
+  ntel,
+
+  // Cable
+  dstv,
+  gotv,
+  startimes,
+
+  // Power
   AEDC,
   EKEDC,
   EEDC,
   IKEDC,
   JED,
   PHED,
-  dstv,
-  gotv,
+
+  // Misc
+  cable,
+  mobile,
+  electricity,
+  user,
   fail,
   sorry,
   success,
-  cable,
-  mobile,
-  user,
-  electricity,
 }

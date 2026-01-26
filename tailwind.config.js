@@ -6,23 +6,22 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        primary: '#030014',
-        'theme-primary': '#2f3b69',
-        secondary: '#030014',
-        accent: '#a855f7',
-        'app-primary': '#2f3b69',
-        // alt: "#695d2f",
-        alt: '#ffcc00',
-        mtn: '#2f3b69',
+        primary: '#0b1120',
+        'theme-primary': '#1d4ed8',
+        secondary: '#0b1120',
+        accent: '#14b8a6',
+        'app-primary': '#1d4ed8',
+        alt: '#f4b000',
+        mtn: '#1d4ed8',
         'dstv-blue': '#0071b0',
         light: {
           100: '#f3f3f3',
-          200: '#A8b5db',
+          200: '#a8b5db',
           300: '#9ca4ab',
         },
         dark: {
-          100: '#221f3d',
-          200: '#0f0d23',
+          100: '#111827',
+          200: '#0b1120',
           300: '#9ca4ab',
         },
       },
