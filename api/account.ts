@@ -1,5 +1,6 @@
 // src/api/account.ts (MOBILE APP)
 import client from '@/api/client'
+import { normalizeBank, normalizeBeneficiary } from '@/utils/normalize'
 
 const errMsg = (err: any, fallback = 'Something went wrong') =>
   err?.response?.data?.message || err?.message || fallback
@@ -34,10 +35,72 @@ export const createBankAccount = async (payload: CreateAccountPayload) => {
   }
 }
 
+export const getUserAnchorAccountDetail = async () => {
+  try {
+    const res = await client.get('/accounts/get_user_account_detail')
+    return res.data
+  } catch (err: any) {
+    const msg = errMsg(err)
+    console.log('[getUserAnchorAccountDetail error]', {
+      message: msg,
+      status: err?.response?.status,
+      data: err?.response?.data,
+      url: err?.config?.url,
+    })
+    throw err
+  }
+}
+
+const parseAccountError = (err: any) => {
+  const status = err?.response?.status
+  const data = err?.response?.data || {}
+  return {
+    status,
+    error_code: data?.error_code,
+    message: data?.message || err?.message,
+    missing_fields: Array.isArray(data?.missing_fields) ? data.missing_fields : [],
+  }
+}
+
+export const createAnchorAccount = async (payload?: { account?: Record<string, unknown> }) => {
+  try {
+    const accountPayload = {
+      vendor: 'anchor',
+      ...(payload?.account || {}),
+    }
+    const res = await client.post('/accounts', { account: accountPayload })
+    return res.data
+  } catch (err: any) {
+    const parsed = parseAccountError(err)
+    console.log('[createAnchorAccount error]', {
+      message: parsed.message,
+      status: parsed.status,
+      error_code: parsed.error_code,
+      missing_fields: parsed.missing_fields,
+      url: err?.config?.url,
+    })
+    throw parsed
+  }
+}
+
 export const getBanks = async () => {
   try {
     const res = await client.get('/accounts/get_banks')
-    return res.data
+    const payload = res.data
+    const raw =
+      payload?.data?.banks ||
+      payload?.data?.data ||
+      payload?.data ||
+      payload?.banks ||
+      payload
+    const list = Array.isArray(raw) ? raw : []
+    console.log('[getBanks] payload keys', Object.keys(payload || {}))
+    console.log('[getBanks] raw sample', list.slice(0, 2))
+    const normalized = list.map((item) => normalizeBank(item || {}))
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[getBanks] normalized sample', normalized[0])
+    }
+    return normalized
   } catch (err: any) {
     const msg = errMsg(err)
     console.log('[getBanks error]', {
@@ -53,7 +116,15 @@ export const getBanks = async () => {
 export const getBeneficiaries = async () => {
   try {
     const res = await client.get('/accounts/beneficiaries')
-    return res.data
+    const payload = res.data
+    const raw =
+      payload?.data?.beneficiaries ||
+      payload?.data?.data ||
+      payload?.data ||
+      payload?.beneficiaries ||
+      payload
+    const list = Array.isArray(raw) ? raw : []
+    return list.map((item) => normalizeBeneficiary(item || {}))
   } catch (err: any) {
     const msg = errMsg(err)
     console.log('[getBeneficiaries error]', {
@@ -112,6 +183,8 @@ export const initiateFundTransfer = async (payload: {
     inter_bank: boolean
     counter_party_id?: string
     pin: string
+    transfer_reference?: string
+    save_beneficiary?: boolean
   }
 }) => {
   try {
@@ -120,6 +193,27 @@ export const initiateFundTransfer = async (payload: {
   } catch (err: any) {
     const msg = errMsg(err)
     console.log('[initiateFundTransfer error]', {
+      message: msg,
+      status: err?.response?.status,
+      data: err?.response?.data,
+      url: err?.config?.url,
+    })
+    throw err
+  }
+}
+
+export const resolveAccountName = async (payload: {
+  account: {
+    bank_code: string
+    account_number: string
+  }
+}) => {
+  try {
+    const res = await client.post('/accounts/resolve', payload)
+    return res.data
+  } catch (err: any) {
+    const msg = errMsg(err)
+    console.log('[resolveAccountName error]', {
       message: msg,
       status: err?.response?.status,
       data: err?.response?.data,
@@ -144,5 +238,59 @@ export const verifyTransfer = async (transferId: string) => {
       url: err?.config?.url,
     })
     throw err
+  }
+}
+
+export const getAccounts = async () => {
+  try {
+    const res = await client.get('/accounts/user_accounts')
+    return res.data
+  } catch (err: any) {
+    const msg = errMsg(err, 'Failed to fetch accounts')
+    console.log('[getAccounts error]', {
+      message: msg,
+      status: err?.response?.status,
+      data: err?.response?.data,
+      url: err?.config?.url,
+    })
+    throw new Error(msg)
+  }
+}
+
+export const createDepositAccount = async () => {
+  try {
+    const res = await client.get('/accounts/get_account_number')
+    return res.data
+  } catch (err: any) {
+    const msg = errMsg(err, 'Failed to create deposit account')
+    console.log('[createDepositAccount error]', {
+      message: msg,
+      status: err?.response?.status,
+      data: err?.response?.data,
+      url: err?.config?.url,
+    })
+    throw new Error(msg)
+  }
+}
+
+export const verifyKyc = async (payload: {
+  bvn: string
+  dob: string
+  gender?: string
+}) => {
+  try {
+    const res = await client.post('/accounts/verify_kyc', {
+      account: payload,
+    })
+    return res.data
+  } catch (err: any) {
+    const msg = errMsg(err, 'Failed to verify KYC')
+    console.log('[verifyKyc error]', {
+      message: msg,
+      status: err?.response?.status,
+      data: err?.response?.data,
+      url: err?.config?.url,
+    })
+    throw new Error(msg)
   }
 }

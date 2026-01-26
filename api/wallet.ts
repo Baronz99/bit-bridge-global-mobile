@@ -15,6 +15,15 @@ export const userWallet = async () => {
   }
 }
 
+export const getUserWallet = async () => {
+  try {
+    const response = await client.get('/wallets/user')
+    return response.data
+  } catch (error) {
+    throw error
+  }
+}
+
 export const activateTunnel = async () => {
   try {
     const response = await client.post('/wallets/tunnel/activate')
@@ -35,11 +44,16 @@ export const quoteTunnelNgnToUsd = async (amountNgn: number) => {
   }
 }
 
-export const convertTunnelNgnToUsd = async (amountNgn: number, pin: string) => {
+export const convertTunnelNgnToUsd = async (
+  amountNgn: number,
+  transactionPin: string,
+  quoteToken?: string
+) => {
   try {
     const response = await client.post('/wallets/tunnel/convert', {
       amount_ngn: amountNgn,
-      pin,
+      transaction_pin: transactionPin,
+      quote_token: quoteToken,
     })
     return response.data
   } catch (error) {
@@ -58,12 +72,31 @@ export const quoteTunnelUsdToNgn = async (amountUsd: number) => {
   }
 }
 
-export const convertTunnelUsdToNgn = async (amountUsd: number, pin: string) => {
+export const convertTunnelUsdToNgn = async (
+  amountUsd: number,
+  transactionPin: string,
+  quoteToken?: string
+) => {
   try {
     const response = await client.post('/wallets/tunnel/convert-back', {
       amount_usd: amountUsd,
-      pin,
+      transaction_pin: transactionPin,
+      quote_token: quoteToken,
     })
+    return response.data
+  } catch (error) {
+    throw error
+  }
+}
+
+export const sendMoneyToUser = async (payload: {
+  phone_number: string
+  amount: number
+  transaction_pin: string
+  description?: string
+}) => {
+  try {
+    const response = await client.post('/wallets/send_money', payload)
     return response.data
   } catch (error) {
     throw error
