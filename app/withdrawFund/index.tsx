@@ -7,9 +7,15 @@ import NotificationAlert from '@/components/notification'
 import FormSelect from '@/components/FormSelect'
 import banks from '@/data/banks.json'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
+import TransactionPinModal from '@/components/TransactionPinModal'
+import { getTransactionPinStatus } from '@/api/transactionPin'
+import { useRouter } from 'expo-router'
 const index = () => {
   const [loading, setLoading] = useState(false)
   const [modalVisible, setModalVisible] = useState(false)
+  const [pinModalOpen, setPinModalOpen] = useState(false)
+  const [pinError, setPinError] = useState<string | null>(null)
+  const router = useRouter()
 
   const [formData, setFormData] = useState({
     amount: 0,
@@ -23,7 +29,7 @@ const index = () => {
     data: null,
   })
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (transactionPin: string) => {
     if (
       formData.amount ||
       !formData.bank.trim() ||
@@ -41,6 +47,7 @@ const index = () => {
           ...formData,
           status: 'pending',
           transaction_type: 'withdrawal',
+          transaction_pin: transactionPin,
         },
       })
 
@@ -119,7 +126,39 @@ const index = () => {
           <View className="bg-primary w-full rounded-xl py-8">
             <Text className="text-center text-white text-2xl">Confirm Withrawal</Text>
             <View className="w-full p-4 bg-primary rounded-lg">
-              <TouchableOpacity className="py-2 px-2 bg-primary" onPress={() => handleSubmit()}>
+              <TouchableOpacity
+                className="py-2 px-2 bg-primary"
+                onPress={async () => {
+                  try {
+                    const status = await getTransactionPinStatus()
+                    const payload = status?.data ?? status
+                    const hasPin =
+                      payload?.has_pin === true ||
+                      payload?.status === 'set' ||
+                      payload?.pin_set === true
+                    if (!hasPin) {
+                      setNotice({
+                        message: 'Set your transaction PIN to continue.',
+                        error: true,
+                        data: null,
+                      })
+                      setModalVisible(false)
+                      router.push('/settings/pin/set')
+                      return
+                    }
+                    setModalVisible(false)
+                    setPinError(null)
+                    setPinModalOpen(true)
+                  } catch (error: any) {
+                    setNotice({
+                      message: error?.message || 'Unable to check PIN status',
+                      error: true,
+                      data: null,
+                    })
+                    setModalVisible(false)
+                  }
+                }}
+              >
                 <Text className="text-center text-alt text-lg">Confirm Payment</Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -134,6 +173,15 @@ const index = () => {
           </View>
         </View>
       </Modal>
+
+      <TransactionPinModal
+        open={pinModalOpen}
+        onClose={() => setPinModalOpen(false)}
+        onSubmit={handleSubmit}
+        loading={loading}
+        errorMessage={pinError}
+        title="Enter PIN to Withdraw"
+      />
     </View>
   )
 }

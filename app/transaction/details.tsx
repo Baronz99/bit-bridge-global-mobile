@@ -121,15 +121,15 @@ const confirmDetails = () => {
   return (
     <View className="flex-1 p-4 bg-primary">
       <View className="mb-6">
-        <Text className="text-2xl font-bold text-white text-center">Confirm Recharge</Text>
+        <Text className="text-2xl font-bold text-white text-center">Confirm Payment</Text>
         <Text className="text-sm text-white text-center mt-1">
-          Please verify the transaction details below.
+          Review the details before you pay.
         </Text>
       </View>
 
       <View className="bg-gray-800 rounded-2xl p-6 shadow-lg mb-8">
         <Text className="text-lg font-semibold text-center text-gray-200 mb-4">
-          Recharge Details
+          Payment Summary
         </Text>
 
         <Summary data={data} applyCommission={applyCommission} />
@@ -193,6 +193,18 @@ const confirmDetails = () => {
       ) : null}
 
       <TransactionButtons handleConfirmation={handleConfirmation} />
+
+      <TouchableOpacity
+        onPress={() =>
+          router.push({
+            pathname: '/transaction/confirm',
+            params: { orderId: String(orderId) },
+          })
+        }
+        className="border rounded-md mt-4 border-gray-700 py-4"
+      >
+        <Text className="text-gray-300 text-center">View Receipt</Text>
+      </TouchableOpacity>
 
       <Loader open={loader} />
 

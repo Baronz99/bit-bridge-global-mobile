@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { ScrollView, Text, View } from 'react-native'
+import { ScrollView, Text, TouchableOpacity, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import Loader from '@/components/Loader'
 import NotificationAlert from '@/components/notification'
@@ -55,7 +55,15 @@ const BeneficiariesScreen = () => {
     <View className="flex-1 bg-primary px-4">
       <ScrollView showsVerticalScrollIndicator={false}>
         <View className="pt-10">
-          <Text className="text-white text-2xl mb-2">Beneficiaries</Text>
+          <View className="flex-row items-center justify-between mb-2">
+            <Text className="text-white text-2xl">Beneficiaries</Text>
+            <TouchableOpacity
+              onPress={() => router.push('/add-beneficiary')}
+              className="bg-app-primary px-4 py-2 rounded-full"
+            >
+              <Text className="text-black text-xs font-semibold">Add beneficiary</Text>
+            </TouchableOpacity>
+          </View>
           <Text className="text-gray-300 mb-6">Your saved beneficiaries.</Text>
 
           <NotificationAlert message={notice.message} data={notice.data} error={notice.error} />
@@ -71,7 +79,7 @@ const BeneficiariesScreen = () => {
                   {item?.account_name || item?.name || item?.beneficiary_name || 'Beneficiary'}
                 </Text>
                 <Text className="text-gray-300 mt-1">
-                  {item?.bank_name || item?.bank || 'Bank'} •{' '}
+                  {item?.bank_name || item?.bank || 'Bank'} |{' '}
                   {item?.account_number || item?.account || 'Account'}
                 </Text>
               </View>

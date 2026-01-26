@@ -46,6 +46,10 @@ const SignUp = () => {
         setErrorMessage('You must consent before signing up')
         return
       }
+      if (formInput.password !== formInput.confirm_password) {
+        throw new Error('Passwords do not match')
+      }
+
       const result = await onRegister(formInput)
 
       setLoading(false)
@@ -63,21 +67,6 @@ const SignUp = () => {
           <Image source={icons.appLogo} className="w-full h-48 0 mt-20 mb-5 mx-auto" />
 
           <View className="">
-            <FormInput
-              placeholder="First Name"
-              onChangeText={(value: string) => setFormInput({ ...formInput, first_name: value })}
-              className="border-gray-800 border-b text-white  my-0 py-4 border-b-1 text-base font-semibold px-3 "
-            />
-            <FormInput
-              placeholder="Last Name"
-              onChangeText={(value: string) => setFormInput({ ...formInput, last_name: value })}
-              className="border-gray-600 border-b text-white  my-0 py-4 border-b-1 text-base font-semibold px-3 "
-            />
-            <FormInput
-              placeholder="Phone Nuumber"
-              onChangeText={(value: string) => setFormInput({ ...formInput, phone: value })}
-              className="border-gray-600 border-b text-white  my-0 py-4 border-b-1 text-base font-semibold px-3 "
-            />
             <FormInput
               placeholder="Email Address"
               onChangeText={(value: string) => setFormInput({ ...formInput, email: value })}
@@ -100,6 +89,21 @@ const SignUp = () => {
               setHidePassword={setHidePassword}
               onChangeText={(value: string) => setFormInput({ ...formInput, confirm_password: value })}
               className="border-gray-600 text-white border-b py-4 my-0  border-b-1 text-base font-semibold px-3 "
+            />
+            <FormInput
+              placeholder="First Name (optional)"
+              onChangeText={(value: string) => setFormInput({ ...formInput, first_name: value })}
+              className="border-gray-800 border-b text-white  my-0 py-4 border-b-1 text-base font-semibold px-3 "
+            />
+            <FormInput
+              placeholder="Last Name (optional)"
+              onChangeText={(value: string) => setFormInput({ ...formInput, last_name: value })}
+              className="border-gray-600 border-b text-white  my-0 py-4 border-b-1 text-base font-semibold px-3 "
+            />
+            <FormInput
+              placeholder="Phone Number (optional)"
+              onChangeText={(value: string) => setFormInput({ ...formInput, phone: value })}
+              className="border-gray-600 border-b text-white  my-0 py-4 border-b-1 text-base font-semibold px-3 "
             />
             <View className="flex flex-row items-center">
               <ConsentCheckbox checked={checked} setChecked={setChecked} />

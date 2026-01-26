@@ -80,6 +80,10 @@ const Login = () => {
               className="border-gray-600 text-white border-b py-4 my-0 border-b-1 text-base font-semibold px-3 "
             />
 
+            <Link href={"/forgot-password" as any} className="text-alt text-right mt-2">
+              Forgot password?
+            </Link>
+
             <TouchableOpacity
               className="py-3 flex-row items-center flex justify-center mt-10 bg-app-primary rounded-lg"
               onPress={handleLogin}

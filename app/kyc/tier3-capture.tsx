@@ -43,6 +43,7 @@ export default function Tier3Capture() {
   const cameraRef = useRef<React.ElementRef<typeof CameraView> | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const pollUntilRef = useRef(0)
+  const submittedAtRef = useRef<number | null>(null)
 
   const [permission, requestPermission] = useCameraPermissions()
   const { userProfileData, loadProfile } = useAuth()
@@ -142,7 +143,7 @@ export default function Tier3Capture() {
     try {
       const data = await getTier3Status()
       setTier3StatusSnapshot(data)
-      const nextStatus = resolveUiStatus(data, submittedAt)
+      const nextStatus = resolveUiStatus(data, submittedAtRef.current)
       setUiStatus((prev) => (prev === TIER3_UI_STATUS.submitting ? prev : nextStatus))
 
       if (nextStatus === TIER3_UI_STATUS.verified || nextStatus === TIER3_UI_STATUS.failed) {
@@ -156,7 +157,7 @@ export default function Tier3Capture() {
     } catch (_) {
       return null
     }
-  }, [loadProfile, resolveUiStatus, stopPolling, submittedAt])
+  }, [loadProfile, resolveUiStatus, stopPolling])
 
   const startPolling = useCallback(() => {
     stopPolling()
@@ -171,7 +172,7 @@ export default function Tier3Capture() {
       }
 
       const data = await fetchTier3Status()
-      const nextStatus = resolveUiStatus(data, submittedAt)
+      const nextStatus = resolveUiStatus(data, submittedAtRef.current)
       if (nextStatus === TIER3_UI_STATUS.verified || nextStatus === TIER3_UI_STATUS.failed) {
         stopPolling()
       }
@@ -179,7 +180,7 @@ export default function Tier3Capture() {
 
     void pollOnce()
     pollRef.current = setInterval(pollOnce, TIER3_POLL_INTERVAL_MS)
-  }, [fetchTier3Status, resolveUiStatus, stopPolling, submittedAt])
+  }, [fetchTier3Status, resolveUiStatus, stopPolling])
 
   const onSubmit = useCallback(async () => {
     if (!bvnVerified) {
@@ -194,14 +195,15 @@ export default function Tier3Capture() {
 
     setUiStatus(TIER3_UI_STATUS.submitting)
     setTier3Error('')
-    setSubmittedAt(Date.now())
+    const now = Date.now()
+    setSubmittedAt(now)
+    submittedAtRef.current = now
     setPollExpired(false)
 
     try {
       await submitTier3({ image: capturedDataUrl })
       setUiStatus(TIER3_UI_STATUS.processing)
       startPolling()
-      await loadProfile()
     } catch (e: any) {
       setTier3Error(e?.message || 'Unable to submit Tier 3 verification.')
       setUiStatus(TIER3_UI_STATUS.failed)

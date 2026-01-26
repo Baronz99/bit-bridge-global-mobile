@@ -1,0 +1,191 @@
+import React, { useMemo } from 'react'
+import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native'
+import { Link } from 'expo-router'
+import useFetch from '@/services/useFetch'
+import { getUserCards } from '@/api/cards'
+import { useAuth } from '@/services/useAuth'
+import ScreenContainer from '@/components/ScreenContainer'
+import moneyFormat from '@/utils/moneyFormat'
+
+const CardsScreen = () => {
+  const { data, loading, error, refetch } = useFetch(() => getUserCards())
+  const { userProfileData } = useAuth()
+
+  const cards = useMemo(() => {
+    const payload = data?.data ?? data
+    if (Array.isArray(payload)) return payload
+    if (Array.isArray(payload?.cards)) return payload.cards
+    if (Array.isArray(payload?.data)) return payload.data
+    if (Array.isArray(payload?.data?.cards)) return payload.data.cards
+    if (Array.isArray(payload?.results)) return payload.results
+    if (payload?.card) return [payload.card]
+    if (payload?.card_id) return [payload]
+    return []
+  }, [data])
+
+  const hasKycAccess = useMemo(() => {
+    const payload = userProfileData?.data ?? userProfileData
+    const kycLevel = payload?.kyc_level || payload?.user_kyc?.kyc_level
+    const phoneVerified = payload?.phone_verified === true || payload?.phone_verified_at
+    if (!kycLevel && !phoneVerified) return false
+    if (kycLevel && String(kycLevel).toLowerCase() === 'tier_0') return false
+    return true
+  }, [userProfileData])
+
+  const cardsCount = cards.length
+
+  return (
+    <ScreenContainer>
+      <View className="flex-row items-center justify-between">
+        <View>
+          <Text className="text-white text-2xl font-semibold">Cards</Text>
+          <Text className="text-gray-400 text-xs mt-1">Virtual cards for USD spend.</Text>
+        </View>
+        <Link href={hasKycAccess ? '/cards/create' : '/kyc'} asChild>
+          <TouchableOpacity className="bg-app-primary px-4 py-2 rounded-full">
+            <Text className="text-white text-xs">
+              {hasKycAccess ? 'Create card' : 'Complete KYC'}
+            </Text>
+          </TouchableOpacity>
+        </Link>
+      </View>
+
+      <View className="bg-gray-900/80 border border-gray-800 rounded-3xl px-5 py-6 mt-6">
+        <Text className="text-white/70 text-xs tracking-widest uppercase">Tunnel (USD)</Text>
+        <Text className="text-white text-2xl font-semibold mt-2">Virtual Cards</Text>
+        <Text className="text-gray-300 mt-2 text-sm">
+          Cards are funded from your USD Tunnel wallet.
+        </Text>
+        <View className="flex-row gap-2 mt-4">
+          <View className="bg-gray-950 border border-gray-800 rounded-full px-3 py-1">
+            <Text className="text-xs text-gray-300">Cards: {cardsCount}</Text>
+          </View>
+          <View className="bg-gray-950 border border-gray-800 rounded-full px-3 py-1">
+            <Text className="text-xs text-gray-300">
+              KYC: {hasKycAccess ? 'Verified' : 'Required'}
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      {loading ? (
+        <View className="py-6">
+          <ActivityIndicator />
+        </View>
+      ) : null}
+
+      {error ? (
+        <View className="bg-red-500/20 border border-red-500/30 rounded-xl p-3 mt-4">
+          <Text className="text-white font-semibold">Error</Text>
+          <Text className="text-white/80">{error?.message || 'Failed to load cards'}</Text>
+          <TouchableOpacity onPress={refetch} className="mt-3 bg-red-600 py-2 rounded-lg">
+            <Text className="text-white text-center">Retry</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+
+      <View className="mt-6">
+        <Text className="text-white text-lg font-semibold">Your cards</Text>
+        <Text className="text-gray-400 text-xs mt-1">
+          Manage your virtual cards and spending controls.
+        </Text>
+      </View>
+
+      <View className="mt-4 gap-3">
+        {cards.length === 0 && !loading ? (
+          <View className="bg-gray-900 border border-gray-800 rounded-2xl p-4">
+            <Text className="text-gray-300 text-center">
+              {hasKycAccess
+                ? 'Create a virtual card to get started.'
+                : 'Complete KYC to create a virtual card.'}
+            </Text>
+            <Link href={hasKycAccess ? '/cards/create' : '/kyc'} asChild>
+              <TouchableOpacity className="bg-app-primary py-3 rounded-xl mt-4">
+                <Text className="text-white text-center font-medium">
+                  {hasKycAccess ? 'Create Card' : 'Go to KYC'}
+                </Text>
+              </TouchableOpacity>
+            </Link>
+          </View>
+        ) : null}
+
+        {cards.map((card: any, index: number) => {
+          const id = card?.id ?? card?.card_id ?? index
+          const last4 =
+            card?.last4 || card?.last_4 || card?.card_last4 || card?.lastFour
+          const status = card?.status || card?.card_status || 'active'
+          const cardholder =
+            [card?.first_name, card?.last_name].filter(Boolean).join(' ') ||
+            [userProfileData?.user_profile?.first_name, userProfileData?.user_profile?.last_name]
+              .filter(Boolean)
+              .join(' ') ||
+            userProfileData?.user_profile?.full_name ||
+            userProfileData?.full_name ||
+            '--'
+          const normalizeUsdLimit = (value: any) => {
+            if (value === null || value === undefined || value === '') return null
+            const amount = Number(value)
+            if (!Number.isFinite(amount)) return null
+            return amount > 100000 ? amount / 100 : amount
+          }
+          const rawLimit =
+            card?.card_limit_usd ??
+            card?.card_limit ??
+            card?.limit
+          const limitValue = normalizeUsdLimit(rawLimit)
+          const limit =
+            limitValue !== null
+              ? moneyFormat(limitValue, String(card?.card_currency || 'USD'))
+              : '--'
+          const statusTone =
+            String(status).toLowerCase() === 'active'
+              ? 'bg-emerald-500/15 text-emerald-300'
+              : String(status).toLowerCase() === 'frozen'
+                ? 'bg-amber-500/15 text-amber-300'
+                : 'bg-red-500/15 text-red-300'
+
+          return (
+            <Link
+              key={String(id)}
+              href={{ pathname: '/cards/[id]', params: { id: String(id) } }}
+              asChild
+            >
+              <TouchableOpacity className="bg-gray-900 rounded-2xl p-4 border border-gray-800">
+                <View className="flex-row justify-between items-start">
+                  <View>
+                    <Text className="text-white text-base font-semibold">
+                      {card?.card_brand || card?.brand || 'Virtual Card'}
+                    </Text>
+                    <Text className="text-gray-400 text-xs mt-1">Virtual • USD</Text>
+                  </View>
+                  <View className={`px-2 py-1 rounded-full ${statusTone}`}>
+                    <Text className="text-[10px] uppercase">{status}</Text>
+                  </View>
+                </View>
+                <View className="mt-4">
+                  <Text className="text-gray-300 text-xs">Card number</Text>
+                  <Text className="text-white text-sm mt-1 tracking-widest">
+                    **** **** **** {last4 || '----'}
+                  </Text>
+                </View>
+                <View className="flex-row justify-between mt-4">
+                  <View>
+                    <Text className="text-gray-400 text-xs">Cardholder</Text>
+                    <Text className="text-white text-xs mt-1">{cardholder}</Text>
+                  </View>
+                  <View>
+                    <Text className="text-gray-400 text-xs text-right">Limit</Text>
+                    <Text className="text-white text-xs mt-1 text-right">{limit}</Text>
+                  </View>
+                </View>
+                <Text className="text-gray-400 text-xs mt-3">Tap to view details</Text>
+              </TouchableOpacity>
+            </Link>
+          )
+        })}
+      </View>
+    </ScreenContainer>
+  )
+}
+
+export default CardsScreen

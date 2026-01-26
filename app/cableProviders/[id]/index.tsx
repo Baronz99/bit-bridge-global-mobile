@@ -8,6 +8,7 @@ import FormInput from '@/components/FormInput'
 import { splitString } from '@/utils'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
 import { createPurchaseOrder, getPriceList } from '@/api/billOrder'
+import { createOrderFromPurchase } from '@/api/orders'
 import FormSelect from '@/components/FormSelect'
 import Loader from '@/components/Loader'
 
@@ -58,6 +59,18 @@ const ProvideDertails = () => {
       })
 
       setLoader(false)
+
+      const amountValue = Number(formValue.amount)
+      if (Number.isFinite(amountValue)) {
+        void createOrderFromPurchase({
+          product_id: data?.product?.id,
+          provision_id: data?.id,
+          amount: amountValue,
+          currency: data?.currency || data?.product?.currency,
+          order_type: data?.service_type,
+          extra_info: `IUC: ${formValue.billersCode}`,
+        })
+      }
 
       if (response)
         router.push({

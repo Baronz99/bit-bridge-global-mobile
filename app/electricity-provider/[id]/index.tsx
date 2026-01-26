@@ -6,8 +6,6 @@ import FormInput from '@/components/FormInput'
 import { useAuth } from '@/services/useAuth'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
 import { createPurchaseOrder } from '@/api/billOrder'
-
-// import powerDistribution from "../../data/powerDistributions.json"
 import powerDistribution from '../../../data/powerDistributions.json'
 import Loader from '@/components/Loader'
 import useNotification from '@/hooks/useNotification'
@@ -57,7 +55,7 @@ const ProvideDertails = () => {
         })
     } catch (error: any) {
       setLoader(false)
-       setNotification({
+      setNotification({
         error: true,
         message: error.message || 'something went wrong',
         data: null,
@@ -66,7 +64,7 @@ const ProvideDertails = () => {
   }
 
   return (
-    <View className="flex-1 bg-primary px-4 ">
+    <View className="flex-1 bg-primary px-4">
       <ScrollView
         contentContainerStyle={{
           paddingBottom: 80,
@@ -74,15 +72,27 @@ const ProvideDertails = () => {
         showsVerticalScrollIndicator={false}
         className="flex-1"
       >
-        <View className="py-6">
+        <View className="mt-6 rounded-3xl border border-gray-800 bg-gray-900/80 p-5">
+          <Text className="text-white/70 text-xs tracking-widest uppercase">Utilities</Text>
+          <Text className="text-white text-2xl font-semibold mt-2">Electricity Payment</Text>
+          <Text className="text-gray-400 mt-2 text-sm">
+            {data?.biller || 'Disco'} power purchase.
+          </Text>
+        </View>
+
+        <View className="mt-6 rounded-2xl border border-gray-800 bg-gray-900/70 p-4">
+          <Text className="text-white text-sm font-semibold">Selected Disco</Text>
           <Image
             source={getImageByKey(String(data?.image ?? ''))}
             resizeMode="stretch"
-            className="w-full h-40 rounded-lg"
+            className="w-full h-40 rounded-2xl mt-4"
           />
+        </View>
 
+        <View className="mt-6 rounded-2xl border border-gray-800 bg-gray-900/70 p-4">
+          <Text className="text-white text-sm font-semibold">Payment Details</Text>
           <KeyboardAvoidWrapper>
-            <View className=" mt-4 w-full">
+            <View className="mt-3 w-full">
               <FormInput
                 name="billerCode"
                 label="Meter Number"
@@ -95,7 +105,7 @@ const ProvideDertails = () => {
 
               <FormInput
                 name="phone"
-                label="Phone Number "
+                label="Phone Number"
                 placeHolder="Phone Number"
                 onChangeText={(text: string) => setFormValue({ ...formValue, phone: text.trim() })}
                 value={formValue.phone}
@@ -113,16 +123,16 @@ const ProvideDertails = () => {
 
               <TouchableOpacity
                 onPress={handleFormSubmit}
-                className="border rounded-md mt-4 border-alt py-5 "
+                className="bg-app-primary rounded-xl mt-4 py-4"
               >
-                <Text className="text-alt text-center">Proceed</Text>
+                <Text className="text-white text-center font-semibold">Proceed</Text>
               </TouchableOpacity>
             </View>
           </KeyboardAvoidWrapper>
         </View>
       </ScrollView>
       <Loader open={loader} />
-       <AppModal
+      <AppModal
         open={!!notification.message}
         onclose={() => setNotification({ message: null, error: false, data: null })}
       >

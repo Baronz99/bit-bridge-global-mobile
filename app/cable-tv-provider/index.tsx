@@ -1,5 +1,5 @@
 import { Image, ScrollView, Text, TouchableOpacity, View } from 'react-native'
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import useFetch from '@/services/useFetch'
 import { getProducts } from '@/api/products'
 import { useAuth } from '@/services/useAuth'
@@ -9,6 +9,7 @@ import { splitString } from '@/utils'
 import SelectBoxIcon from '@/components/select-box/SelectBoxIcon'
 import FormSelect from '@/components/FormSelect'
 import { createPurchaseOrder, getPriceList } from '@/api/billOrder'
+import { createOrderFromPurchase } from '@/api/orders'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
 import FormInput from '@/components/FormInput'
 import Loader from '@/components/Loader'
@@ -54,7 +55,7 @@ const index = () => {
   const safePriceList = priceList ?? []
 
   const handleFormSubmit = async () => {
-    if(!formValue.billersCode || !formValue.amount || !formValue.tariff_class){
+    if (!formValue.billersCode || !formValue.amount || !formValue.tariff_class) {
       setNotification({
         message: 'Please fill all required fields',
         error: true,
@@ -72,9 +73,19 @@ const index = () => {
 
     try {
       const response = await createPurchaseOrder(orderData)
-      console.log(response, "response data")
-
       setLoader(false)
+
+      const amountValue = Number(formValue.amount)
+      if (Number.isFinite(amountValue)) {
+        void createOrderFromPurchase({
+          product_id: selectProvider?.id,
+          provision_id: selectProvision?.id,
+          amount: amountValue,
+          currency: selectProvision?.currency || selectProvider?.currency,
+          order_type: selectProvision?.service_type,
+          extra_info: `IUC: ${formValue.billersCode}`,
+        })
+      }
 
       router.push({
         pathname: '/cable-tv-provider/confirm/[orderId]',
@@ -112,11 +123,16 @@ const index = () => {
     }
   }, [selectProvider])
 
-  const cableProviders = data?.map((item: any) => {
-    if (item.category === 'utility') {
-      return item
+  const cableProviders = useMemo(() => {
+    const list = (data ?? []).filter((item: any) => item?.category === 'utility')
+    const unique = new Map<string, any>()
+    for (const item of list) {
+      const key = String(item?.provider ?? item?.name ?? '').trim().toLowerCase()
+      if (!key) continue
+      if (!unique.has(key)) unique.set(key, item)
     }
-  })
+    return Array.from(unique.values())
+  }, [data])
 
   const priceListData = safePriceList.length
     ? safePriceList
@@ -127,95 +143,97 @@ const index = () => {
 
   return (
     <View className="flex-1 bg-primary px-4">
-      <View className="bg-gray-900/60 p-4 rounded-xl">
-        <View className="py-4 flex-wrap gap-y-4 flex-row">
-          {cableProviders &&
-            cableProviders?.map((item: any, index: number) =>
-              item ? (
-                <SelectBoxIcon
-                  key={String(
-                    item?.id ?? item?.uuid ?? item?.code ?? item?.provider ?? item?.name ?? index
-                  )}
-                  onSelect={() => setSelectedProvider(item)}
-                  selectedLabel={selectProvider?.provider?.toLowerCase()}
-                  icon={getImageByKey(String(splitString(item?.provider)))}
-                  label={splitString(item?.provider)}
-                />
-              ) : null
-            )}
+      <ScrollView contentContainerStyle={{ paddingBottom: 80 }} showsVerticalScrollIndicator={false}>
+        <View className="mt-6 rounded-3xl border border-gray-800 bg-gray-900/80 p-5">
+          <Text className="text-white/70 text-xs tracking-widest uppercase">Utilities</Text>
+          <Text className="text-white text-2xl font-semibold mt-2">Cable TV Subscription</Text>
+          <Text className="text-gray-400 mt-2 text-sm">
+            Renew your favorite TV packages in seconds.
+          </Text>
         </View>
-      </View>
 
-      <ScrollView
-        contentContainerStyle={{
-          paddingBottom: 80,
-        }}
-        showsVerticalScrollIndicator={false}
-        //   className='flex-1'
-      >
-        <View className="flex-1 bg-primary px-4 ">
-          <View className="py-6">
-            <KeyboardAvoidWrapper>
-              <View>
-                <FormInput
-                  name="billerCode"
-                  label="IUC number"
-                  placeHolder="Enter 10 digit IUC Number"
-                  onChangeText={(text: string) => setFormValue({ ...formValue, billersCode: text })}
-                  value={formValue.billersCode}
-                />
-                {data?.service_type === 'VTU' && (
-                  <FormInput
-                    name="amount"
-                    label="amount"
-                    placeHolder="Enter Amount"
-                    onChangeText={(text: string) => setFormValue({ ...formValue, amount: text })}
-                    value={formValue.amount}
+        <View className="mt-6 rounded-2xl border border-gray-800 bg-gray-900/70 p-4">
+          <Text className="text-white text-sm font-semibold">Choose Provider</Text>
+          <View className="mt-4 flex-row flex-wrap gap-y-4">
+            {cableProviders &&
+              cableProviders?.map((item: any, index: number) =>
+                item ? (
+                  <SelectBoxIcon
+                    key={String(
+                      item?.id ?? item?.uuid ?? item?.code ?? item?.provider ?? item?.name ?? index
+                    )}
+                    onSelect={() => setSelectedProvider(item)}
+                    selectedLabel={selectProvider?.provider?.toLowerCase()}
+                    icon={getImageByKey(String(splitString(item?.provider)))}
+                    label={splitString(item?.provider)}
                   />
-                )}
-
-                <FormSelect
-                  options={priceListData}
-                  selectedValue={formValue.tariff_class}
-                  name="tarrif_class"
-                  label="Data Plan"
-                  placeHolder="Data Plan"
-                  onValueChange={(value: string) => {
-                    const newAmountdata = priceListData.find((price: any) => price.value === value)
-
-                    setFormValue({
-                      ...formValue,
-                      amount: newAmountdata.amount,
-                      description: newAmountdata.label,
-                      tariff_class: value,
-                    })
-                  }}
-                />
-
-                <TouchableOpacity
-                  onPress={handleFormSubmit}
-                  className="border rounded-md mt-4 border-alt py-5 "
-                >
-                  <Text className="text-alt text-center">Proceed</Text>
-                </TouchableOpacity>
-              </View>
-            </KeyboardAvoidWrapper>
+                ) : null
+              )}
           </View>
+        </View>
 
-          <Loader open={loader} />
-          <AppModal
-            open={!!notification.message}
-            onclose={() => setNotification({ message: null, error: false, data: null })}
-          >
-            <NotificationAlert
-              onPress={() => setNotification({ message: null, error: false, data: null })}
-              message={notification.message}
-              error={notification.error}
-              data={notification.data}
-            />
-          </AppModal>
+        <View className="mt-6 rounded-2xl border border-gray-800 bg-gray-900/70 p-4">
+          <Text className="text-white text-sm font-semibold">Subscription Details</Text>
+          <KeyboardAvoidWrapper>
+            <View className="mt-3">
+              <FormInput
+                name="billerCode"
+                label="IUC number"
+                placeHolder="Enter 10 digit IUC Number"
+                onChangeText={(text: string) => setFormValue({ ...formValue, billersCode: text })}
+                value={formValue.billersCode}
+              />
+              {data?.service_type === 'VTU' && (
+                <FormInput
+                  name="amount"
+                  label="amount"
+                  placeHolder="Enter Amount"
+                  onChangeText={(text: string) => setFormValue({ ...formValue, amount: text })}
+                  value={formValue.amount}
+                />
+              )}
+
+              <FormSelect
+                options={priceListData}
+                selectedValue={formValue.tariff_class}
+                name="tarrif_class"
+                label="Data Plan"
+                placeHolder="Data Plan"
+                onValueChange={(value: string) => {
+                  const newAmountdata = priceListData.find((price: any) => price.value === value)
+
+                  setFormValue({
+                    ...formValue,
+                    amount: newAmountdata.amount,
+                    description: newAmountdata.label,
+                    tariff_class: value,
+                  })
+                }}
+              />
+
+              <TouchableOpacity
+                onPress={handleFormSubmit}
+                className="bg-app-primary rounded-xl mt-4 py-4"
+              >
+                <Text className="text-white text-center font-semibold">Proceed</Text>
+              </TouchableOpacity>
+            </View>
+          </KeyboardAvoidWrapper>
         </View>
       </ScrollView>
+
+      <Loader open={loader} />
+      <AppModal
+        open={!!notification.message}
+        onclose={() => setNotification({ message: null, error: false, data: null })}
+      >
+        <NotificationAlert
+          onPress={() => setNotification({ message: null, error: false, data: null })}
+          message={notification.message}
+          error={notification.error}
+          data={notification.data}
+        />
+      </AppModal>
     </View>
   )
 }

@@ -89,11 +89,6 @@ const BankListScreen = () => {
               <Text className="text-gray-300 mt-1">
                 {selected?.name || selected?.bank_name || selected?.label}
               </Text>
-              {(selected?.code || selected?.bank_code) && (
-                <Text className="text-gray-400 mt-1">
-                  Code: {selected?.code || selected?.bank_code}
-                </Text>
-              )}
             </View>
           )}
         </View>

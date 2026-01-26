@@ -25,6 +25,10 @@ const index = () => {
     first_name: '',
     last_name: '',
     phone: '',
+    address_line1: '',
+    city: '',
+    state: '',
+    postal_code: '',
     user_profile_id: '',
   })
   const [loading, setLoading] = useState(false)
@@ -32,6 +36,20 @@ const index = () => {
   const [hidePassword, setHidePassword] = useState(true)
 
   const handleUpdate = async () => {
+    if (
+      !formInput.address_line1.trim() ||
+      !formInput.city.trim() ||
+      !formInput.state.trim() ||
+      !formInput.postal_code.trim()
+    ) {
+      setErrorMessage({
+        error: true,
+        data: null,
+        message: 'Address, city, state, and postal code are required.',
+      })
+      return
+    }
+
     setLoading(true)
     try {
       const result = await userProfileUpdate({
@@ -68,6 +86,10 @@ const index = () => {
         last_name: userProfileData?.user_profile?.last_name,
         phone: userProfileData?.user_profile?.phone_number,
         email: userProfileData?.email,
+        address_line1: userProfileData?.user_profile?.address_line1,
+        city: userProfileData?.user_profile?.city,
+        state: userProfileData?.user_profile?.state,
+        postal_code: userProfileData?.user_profile?.postal_code,
       })
     }
   }, [userProfileData])
@@ -102,6 +124,34 @@ const index = () => {
                 value={formInput?.phone}
                 placeholder="Phone Number"
                 onChangeText={(value: string) => setFormInput({ ...formInput, phone: value })}
+                className="border-gray-600 border-b text-white  my-0 py-4 border-b-1 text-base font-semibold px-3 "
+              />
+              <FormInput
+                value={formInput?.address_line1}
+                placeholder="Address Line 1"
+                onChangeText={(value: string) =>
+                  setFormInput({ ...formInput, address_line1: value })
+                }
+                className="border-gray-600 border-b text-white  my-0 py-4 border-b-1 text-base font-semibold px-3 "
+              />
+              <FormInput
+                value={formInput?.city}
+                placeholder="City"
+                onChangeText={(value: string) => setFormInput({ ...formInput, city: value })}
+                className="border-gray-600 border-b text-white  my-0 py-4 border-b-1 text-base font-semibold px-3 "
+              />
+              <FormInput
+                value={formInput?.state}
+                placeholder="State"
+                onChangeText={(value: string) => setFormInput({ ...formInput, state: value })}
+                className="border-gray-600 border-b text-white  my-0 py-4 border-b-1 text-base font-semibold px-3 "
+              />
+              <FormInput
+                value={formInput?.postal_code}
+                placeholder="Postal Code"
+                onChangeText={(value: string) =>
+                  setFormInput({ ...formInput, postal_code: value })
+                }
                 className="border-gray-600 border-b text-white  my-0 py-4 border-b-1 text-base font-semibold px-3 "
               />
 

@@ -1,5 +1,5 @@
-import { Image, SafeAreaView, ScrollView, Text, TouchableOpacity, View } from 'react-native'
-import React, { useCallback, useEffect, useState } from 'react'
+import { Image, ScrollView, Text, TouchableOpacity, View } from 'react-native'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import useFetch from '@/services/useFetch'
 import { getProvision } from '@/api/products'
@@ -9,6 +9,7 @@ import { useAuth } from '@/services/useAuth'
 import { splitString } from '@/utils'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
 import { createPurchaseOrder, getPriceList } from '@/api/billOrder'
+import { createOrderFromPurchase } from '@/api/orders'
 import FormSelect from '@/components/FormSelect'
 import Loader from '@/components/Loader'
 
@@ -25,23 +26,34 @@ const ProvideDertails = () => {
   const fetchProvision = useCallback(() => getProvision(id as string), [id])
   const { data } = useFetch(fetchProvision)
 
-  const { data: priceList, refetch } = useFetch(
-    () =>
-      getPriceList({
-        provider: data?.product.provider,
-        service_type: data?.service_type,
-      }),
-    false
-  )
+  const providerName = useMemo(() => {
+    const raw = String(data?.product?.provider ?? '').trim()
+    return raw ? String(splitString(raw)) : ''
+  }, [data])
+  const serviceType = useMemo(() => {
+    const raw = String(data?.service_type ?? '').toLowerCase()
+    if (raw.includes('data')) return 'DATA'
+    if (raw.includes('vtu')) return 'VTU'
+    return data?.service_type ?? ''
+  }, [data])
+
+  const fetchPriceList = useCallback(() => {
+    if (!providerName || serviceType !== 'DATA') return Promise.resolve([])
+    return getPriceList({
+      provider: providerName,
+      service_type: serviceType,
+    })
+  }, [providerName, serviceType])
+
+  const { data: priceList, refetch } = useFetch(fetchPriceList, false)
   const safePriceList = priceList ?? []
 
   useEffect(() => {
-    if (data && data?.service_type === 'DATA') {
+    if (providerName && serviceType === 'DATA') {
       refetch()
     }
-  }, [data, refetch])
+  }, [providerName, serviceType, refetch])
 
-  // const {}
   const [formValue, setFormValue] = useState({
     billersCode: '',
     amount: '',
@@ -63,6 +75,18 @@ const ProvideDertails = () => {
 
       setLoader(false)
 
+      const amountValue = Number(formValue.amount)
+      if (Number.isFinite(amountValue)) {
+        void createOrderFromPurchase({
+          product_id: data?.product?.id,
+          provision_id: data?.id,
+          amount: amountValue,
+          currency: data?.currency || data?.product?.currency,
+          order_type: data?.service_type,
+          extra_info: `Phone: ${formValue.billersCode}`,
+        })
+      }
+
       if (response)
         router.push({
           pathname: `/transaction/details`,
@@ -77,73 +101,85 @@ const ProvideDertails = () => {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-primary">
-      <View className="flex-1 bg-primary px-4">
-        <ScrollView
-          contentContainerStyle={{
-            paddingBottom: 80,
-          }}
-          showsVerticalScrollIndicator={false}
-          className="flex-1"
-        >
-          <View className="py-6">
-            <Image
-              source={getImageByKey(String(splitString(data?.name)))}
-              className="w-full h-40 rounded-lg"
-            />
+    <View className="flex-1 bg-primary px-4">
+      <ScrollView
+        contentContainerStyle={{
+          paddingBottom: 80,
+        }}
+        showsVerticalScrollIndicator={false}
+        className="flex-1"
+      >
+        <View className="mt-6 rounded-3xl border border-gray-800 bg-gray-900/80 p-5">
+          <Text className="text-white/70 text-xs tracking-widest uppercase">Mobile</Text>
+          <Text className="text-white text-2xl font-semibold mt-2">
+            {serviceType === 'DATA' ? 'Data Top Up' : 'Airtime Top Up'}
+          </Text>
+          <Text className="text-gray-400 mt-2 text-sm">
+            {data?.product?.provider || 'Provider'} {data?.service_type || 'top up'}.
+          </Text>
+        </View>
 
-            <KeyboardAvoidWrapper>
-              <View>
+        <View className="mt-6 rounded-2xl border border-gray-800 bg-gray-900/70 p-4">
+          <Text className="text-white text-sm font-semibold">Selected Provider</Text>
+          <Image
+            source={getImageByKey(String(splitString(data?.name)))}
+            className="w-full h-40 rounded-2xl mt-4"
+          />
+        </View>
+
+        <View className="mt-6 rounded-2xl border border-gray-800 bg-gray-900/70 p-4">
+          <Text className="text-white text-sm font-semibold">Top Up Details</Text>
+          <KeyboardAvoidWrapper>
+            <View className="mt-3">
+              <FormInput
+                name="billerCode"
+                label="Phone Number"
+                placeHolder="Enter 11 digits Number"
+                onChangeText={(text: string) => setFormValue({ ...formValue, billersCode: text })}
+                value={formValue.billersCode}
+              />
+              {serviceType === 'VTU' && (
                 <FormInput
-                  name="billerCode"
-                  label="Phone Number"
-                  placeHolder="Enter 11 digits Number"
-                  onChangeText={(text: string) => setFormValue({ ...formValue, billersCode: text })}
-                  value={formValue.billersCode}
+                  name="amount"
+                  label="Amount"
+                  placeHolder="Enter Amount"
+                  onChangeText={(text: string) => setFormValue({ ...formValue, amount: text })}
+                  value={formValue.amount}
                 />
-                {data?.service_type === 'VTU' && (
-                  <FormInput
-                    name="amount"
-                    label="Amount"
-                    placeHolder="Enter Amount"
-                    onChangeText={(text: string) => setFormValue({ ...formValue, amount: text })}
-                    value={formValue.amount}
-                  />
-                )}
+              )}
 
-                {data?.service_type === 'DATA' && (
-                  <FormSelect
-                    options={safePriceList}
-                    selectedValue={formValue.tariff_class}
-                    name="tarrif_class"
-                    label="Data Plan"
-                    placeHolder="Data Plan"
-                    onValueChange={(value: string) => {
-                      const newAmountdata = safePriceList.find((price: any) => price.value === value)
+              {serviceType === 'DATA' && (
+                <FormSelect
+                  options={safePriceList}
+                  selectedValue={formValue.tariff_class}
+                  name="tarrif_class"
+                  label="Data Plan"
+                  placeHolder="Data Plan"
+                  onValueChange={(value: string) => {
+                    const newAmountdata = safePriceList.find((price: any) => price.value === value)
 
-                      setFormValue({
-                        ...formValue,
-                        amount: newAmountdata.amount,
-                        description: newAmountdata.label,
-                        tariff_class: value,
-                      })
-                    }}
-                  />
-                )}
+                    setFormValue({
+                      ...formValue,
+                      amount: newAmountdata.amount,
+                      description: newAmountdata.label,
+                      tariff_class: value,
+                    })
+                  }}
+                />
+              )}
 
-                <TouchableOpacity
-                  onPress={handleFormSubmit}
-                  className="border rounded-md mt-4 border-alt py-5 "
-                >
-                  <Text className="text-alt text-center">Proceed</Text>
-                </TouchableOpacity>
-              </View>
-            </KeyboardAvoidWrapper>
-          </View>
-        </ScrollView>
-        <Loader open={loader} />
-      </View>
-    </SafeAreaView>
+              <TouchableOpacity
+                onPress={handleFormSubmit}
+                className="bg-app-primary rounded-xl mt-4 py-4"
+              >
+                <Text className="text-white text-center font-semibold">Proceed</Text>
+              </TouchableOpacity>
+            </View>
+          </KeyboardAvoidWrapper>
+        </View>
+      </ScrollView>
+      <Loader open={loader} />
+    </View>
   )
 }
 

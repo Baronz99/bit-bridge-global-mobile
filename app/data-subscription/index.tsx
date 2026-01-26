@@ -1,199 +1,254 @@
-import { Image, ScrollView, Text, TouchableOpacity, View } from 'react-native'
-import React, { useCallback, useEffect, useState } from 'react'
+import { ScrollView, Text, TouchableOpacity, View } from 'react-native'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import useFetch from '@/services/useFetch'
 import { getProducts } from '@/api/products'
 import { useAuth } from '@/services/useAuth'
-
 import { useRouter } from 'expo-router'
 import { createPurchaseOrder, getPriceList } from '@/api/billOrder'
+import { createOrderFromPurchase } from '@/api/orders'
 import Loader from '@/components/Loader'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
 import FormInput from '@/components/FormInput'
 import SelectBoxIcon from '@/components/select-box/SelectBoxIcon'
-import { splitString } from '@/utils'
 import FormSelect from '@/components/FormSelect'
+import { splitString } from '@/utils'
 import { images } from '@/constants/images'
+
+type PriceOption = {
+  label: string
+  value: string | number | null
+  amount: number
+}
+
+const normalizeProviderKey = (raw: any) => {
+  const s = String(raw ?? '').trim().toLowerCase()
+  if (!s) return ''
+  // normalize common aliases to match your images keys + backend normalization
+  if (['9mobile', '9-mobile', '9_mobil', '9mobil', 'etisalat', 'emts'].includes(s)) return '9mobile'
+  return s
+}
 
 const getImageByKey = (key: string) => {
   const dict = images as Record<string, any>
-  return dict[key] ?? images.fail ?? images.bg
+  const k = normalizeProviderKey(key)
+  return dict[k] ?? dict.fail ?? dict.bg
 }
 
-const index = () => {
+const isRealPlanOption = (x: any) => {
+  if (!x) return false
+  if (x?.value == null) return false
+  const v = String(x.value).trim()
+  if (!v) return false
+  const label = String(x.label ?? '').trim().toLowerCase()
+  if (label.includes('select data plan')) return false
+  return true
+}
+
+const DataSubscriptionScreen = () => {
   const router = useRouter()
-  const [loader, setLoader] = useState(false)
-
-  const [selectProvider, setSelectedProvider] = useState<any | null>(null)
-  const [selectProvision, setSelectedProvision] = useState<any | null>(null)
-
   const { userProfileData } = useAuth()
+
+  const [loader, setLoader] = useState(false)
+  const [selectProvider, setSelectedProvider] = useState<any | null>(null)
 
   const [formValue, setFormValue] = useState({
     billersCode: '',
     amount: '',
     tariff_class: '',
-    description: null,
+    description: null as string | null,
   })
 
-  const fetchProducts = useCallback(() => {
-    return getProducts({
-      category: 'mobile provider',
-    })
-  }, [])
-  const { data } = useFetch(fetchProducts)
+  const serviceType = 'DATA'
 
-  const { data: priceList, refetch } = useFetch(
-    () =>
-      getPriceList({
-        provider: selectProvider?.provider,
-        service_type: selectProvision?.service_type,
-      }),
-    false
-  )
-  const safePriceList = priceList ?? []
+  // ---- products ----
+  const fetchProducts = useCallback(() => getProducts({ category: 'mobile provider' }), [])
+  const { data: products, error: productsError } = useFetch(fetchProducts)
 
-  const handleFormSubmit = async () => {
+  // ✅ Only show providers that your upstream actually supports
+  const providers = useMemo(() => {
+    const list = (products ?? []).filter((item: any) => item?.category === 'mobile provider')
+
+    const unique = new Map<string, any>()
+    for (const item of list) {
+      const key = normalizeProviderKey(item?.provider ?? item?.name)
+      if (!key) continue
+
+      // Hide ntel (upstream rejects: "invalid disco NTEL for vertical DATA")
+      if (key === 'ntel') continue
+
+      if (!unique.has(key)) unique.set(key, { ...item, _normalizedProvider: key })
+    }
+    return Array.from(unique.values())
+  }, [products])
+
+  // Default provider (MTN first, else first)
+  useEffect(() => {
+    if (!providers?.length) return
+    const mtn = providers.find((p: any) => normalizeProviderKey(p?.provider) === 'mtn')
+    setSelectedProvider(mtn ?? providers[0] ?? null)
+  }, [providers])
+
+  const selectedProviderName = useMemo(() => {
+    // backend expects provider like mtn/glo/airtel/9mobile (it also accepts 9-mobile, but we normalize anyway)
+    return normalizeProviderKey(selectProvider?.provider)
+  }, [selectProvider])
+
+  // ---- price list (for ALL providers) ----
+  const fetchPriceList = useCallback(() => {
+    if (!selectedProviderName) return Promise.resolve([])
+    return getPriceList({ provider: selectedProviderName, service_type: serviceType })
+  }, [selectedProviderName])
+
+  const { data: priceList, refetch: refetchPriceList } = useFetch(fetchPriceList, false)
+
+  const rawPriceList: PriceOption[] = useMemo(() => {
+    if (!Array.isArray(priceList)) return []
+    return priceList as any
+  }, [priceList])
+
+  const planOptions: PriceOption[] = useMemo(() => {
+    return rawPriceList.filter(isRealPlanOption)
+  }, [rawPriceList])
+
+  // When provider changes, refetch plans + reset fields
+  useEffect(() => {
+    if (!selectedProviderName) return
+    setFormValue((prev) => ({ ...prev, tariff_class: '', amount: '', description: null }))
+    refetchPriceList()
+  }, [selectedProviderName, refetchPriceList])
+
+  const handleProviderSelect = (item: any) => {
+    setSelectedProvider(item)
+  }
+
+  const handleProceed = async () => {
     setLoader(true)
-
     try {
       const response = await createPurchaseOrder({
         ...formValue,
         email: userProfileData?.email,
-        service_type: selectProvision?.service_type,
-        biller: selectProvider?.provider?.toUpperCase(),
+        service_type: serviceType,
+        biller: String(selectedProviderName).toUpperCase(),
         skip: true,
       })
 
-      setLoader(false)
+      const amountValue = Number(formValue.amount)
+      if (Number.isFinite(amountValue)) {
+        await createOrderFromPurchase({
+          product_id: selectProvider?.id,
+          amount: amountValue,
+          currency: selectProvider?.currency,
+          order_type: serviceType,
+          extra_info: `Phone: ${formValue.billersCode}`,
+        }).catch(() => {})
+      }
 
-      if (response)
+      if (response) {
         router.push({
-          pathname: `/transaction/details`,
-          params: {
-            orderId: response?.data?.id,
-          },
+          pathname: `/transaction/details` as any,
+          params: { orderId: response?.data?.id },
         })
-    } catch (error: any) {
+      }
+    } finally {
       setLoader(false)
     }
   }
 
-  useEffect(() => {
-    if (data) {
-      const airtimeProvider = data.find(
-        (provider: any) => provider.provider.toLowerCase() === 'mtn'
-      )
-
-      setSelectedProvider(airtimeProvider)
-    }
-  }, [data])
-
-  useEffect(() => {
-    if (selectProvider) {
-      const provision = selectProvider?.provisions?.find(
-        (item: any) => item.service_type === 'DATA'
-      )
-
-      setSelectedProvision(provision)
-    }
-  }, [selectProvider])
-
-  useEffect(() => {
-    if (selectProvision?.service_type === 'DATA') {
-      refetch()
-    }
-  }, [selectProvision, selectProvider])
-
-  useEffect(() => {
-    if (safePriceList.length > 0) {
-      setFormValue({
-        ...formValue,
-        tariff_class: safePriceList[0].value,
-        amount: safePriceList[0].amount,
-        description: safePriceList[0].label,
-      })
-    }
-  }, [safePriceList])
-
-  const airtimeBillers_ = data?.filter((item: any) => item.category === 'mobile provider')
+  const planPlaceholder = 'Select data plan'
 
   return (
     <>
       <View className="flex-1 bg-primary px-4">
-        <View className="bg-gray-900/60 p-4 rounded-xl">
-          <View className="py-4 flex-wrap gap-y-4 flex-row">
-            {airtimeBillers_ &&
-              airtimeBillers_?.map((item: any, index: number) =>
+        <ScrollView contentContainerStyle={{ paddingBottom: 80 }}>
+          <View className="mt-6 rounded-3xl border border-gray-800 bg-gray-900/80 p-5">
+            <Text className="text-white/70 text-xs tracking-widest uppercase">Mobile</Text>
+            <Text className="text-white text-2xl font-semibold mt-2">Data Subscription</Text>
+            <Text className="text-gray-400 mt-2 text-sm">Choose a network and subscribe instantly.</Text>
+          </View>
+
+          {!!productsError?.message ? (
+            <View className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 p-3">
+              <Text className="text-white font-semibold">Products error</Text>
+              <Text className="text-white/80 text-xs">{productsError.message}</Text>
+            </View>
+          ) : null}
+
+          <View className="mt-6 rounded-2xl border border-gray-800 bg-gray-900/70 p-4">
+            <Text className="text-white text-sm font-semibold">Choose Network</Text>
+            <View className="mt-4 flex-row flex-wrap gap-y-4">
+              {providers?.map((item: any, index: number) =>
                 item ? (
                   <SelectBoxIcon
-                    key={String(
-                      item?.id ?? item?.uuid ?? item?.code ?? item?.provider ?? item?.name ?? index
-                    )}
+                    key={String(item?.id ?? item?._normalizedProvider ?? index)}
                     selectedLabel={selectProvider?.provider}
-                    onSelect={() => setSelectedProvider(item)}
-                    icon={getImageByKey(String(splitString(item?.provider)))}
+                    onSelect={() => handleProviderSelect(item)}
+                    icon={getImageByKey(item?._normalizedProvider ?? item?.provider)}
                     label={item?.provider}
                   />
                 ) : null
               )}
+            </View>
           </View>
-        </View>
 
-        <View className="py-6">
-          <ScrollView>
+          <View className="mt-6 rounded-2xl border border-gray-800 bg-gray-900/70 p-4">
+            <Text className="text-white text-sm font-semibold">Subscription Details</Text>
+
             <KeyboardAvoidWrapper>
-              <View>
+              <View className="mt-3">
                 <FormInput
                   name="billerCode"
                   label="Phone Number"
                   placeHolder="Enter 11 digits Number"
-                  onChangeText={(text: string) => setFormValue({ ...formValue, billersCode: text })}
+                  onChangeText={(text: string) =>
+                    setFormValue((prev) => ({ ...prev, billersCode: text }))
+                  }
                   value={formValue.billersCode}
                 />
-                {/* {selectProvision?.service_type === "VTU" && (
-                <FormInput 
-                name='amount'
-                label='Amount'
-                placeHolder='Enter Amount'
-                onChangeText={(text: string) => setFormValue({...formValue, amount: text})}
-                value={formValue.amount}    
-                />
-                )} */}
 
-                {selectProvision?.service_type === 'DATA' && (
+                {planOptions.length > 0 ? (
                   <FormSelect
-                    options={safePriceList}
+                    options={planOptions}
                     selectedValue={formValue.tariff_class}
-                    name="tarrif_class"
+                    name="tariff_class"
                     label="Data Plan"
-                    placeHolder="Data Plan"
+                    placeHolder={planPlaceholder}
                     onValueChange={(value: string) => {
-                      const newAmountdata = safePriceList.find((price: any) => price.value === value)
-
-                      setFormValue({
-                        ...formValue,
-                        amount: newAmountdata.amount,
-                        description: newAmountdata.label,
+                      const picked = planOptions.find(
+                        (p: any) => String(p?.value) === String(value)
+                      )
+                      setFormValue((prev) => ({
+                        ...prev,
                         tariff_class: value,
-                      })
+                        amount: String(picked?.amount ?? ''),
+                        description: picked?.label ?? null,
+                      }))
                     }}
                   />
+                ) : (
+                  <View className="mt-3 rounded-xl border border-gray-800 bg-gray-950/40 p-3">
+                    <Text className="text-gray-300 text-xs">
+                      {selectedProviderName
+                        ? 'Loading data plans…'
+                        : 'Select a network to load data plans.'}
+                    </Text>
+                  </View>
                 )}
 
                 <TouchableOpacity
-                  onPress={handleFormSubmit}
-                  className="border rounded-md mt-4 border-alt py-5 "
+                  onPress={handleProceed}
+                  className="bg-app-primary rounded-xl mt-4 py-4"
                 >
-                  <Text className="text-alt text-center">Proceed</Text>
+                  <Text className="text-white text-center font-semibold">Proceed</Text>
                 </TouchableOpacity>
               </View>
             </KeyboardAvoidWrapper>
-          </ScrollView>
-        </View>
+          </View>
+        </ScrollView>
       </View>
+
       <Loader open={loader} />
     </>
   )
 }
 
-export default index
+export default DataSubscriptionScreen

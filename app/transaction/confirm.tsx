@@ -7,6 +7,7 @@ import { getTransactionRecord } from '@/api/transactions'
 import { useAuth } from '@/services/useAuth'
 import moneyFormat from '@/utils/moneyFormat'
 import { getPurchaseOrder, updateOrderStatus } from '@/api/billOrder'
+import { getOrder } from '@/api/orders'
 // import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons'
 import { RouteProp, useNavigation } from '@react-navigation/native'
@@ -20,9 +21,10 @@ const Row = ({ label, value }: { label: string; value?: string | number }) => (
 )
 
 export default function TransactionSuccessScreen() {
-  const { reference, orderId } = useLocalSearchParams<{
+  const { reference, orderId, source } = useLocalSearchParams<{
     reference?: string
     orderId?: string
+    source?: string
   }>()
   // const reference  = "bbg-1757381050"
   const {
@@ -35,10 +37,13 @@ export default function TransactionSuccessScreen() {
       return getTransactionRecord(reference as string)
     }
     if (orderId) {
+      if (source === 'order') {
+        return getOrder(orderId as string)
+      }
       return getPurchaseOrder(orderId as string)
     }
     return Promise.resolve(null)
-  }, [reference, orderId])
+  }, [reference, orderId, source])
   const { data, loading } = useFetch(fetchReceipt)
 
   const receipt_type = reference?.split('-')[0]
@@ -95,6 +100,25 @@ export default function TransactionSuccessScreen() {
     }
   }
 
+  const handleShareReceipt = async () => {
+    try {
+      const amount = moneyFormat(Number(data?.total_amount ?? data?.amount ?? 0))
+      const ref = data?.id ?? data?.reference ?? '—'
+      const status = data?.status ?? 'pending'
+      const created = data?.created_at ?? '—'
+      await Share.share({
+        message:
+          `BitBridge Receipt\n` +
+          `Status: ${status}\n` +
+          `Amount: ${amount}\n` +
+          `Reference: ${ref}\n` +
+          `Date: ${created}`,
+      })
+    } catch {
+      /* user canceled */
+    }
+  }
+
   console.log(data, 'DATA: bill order data fetched on confirm screen')
 
   const billContent = (
@@ -120,8 +144,17 @@ export default function TransactionSuccessScreen() {
         </View>
       )}
 
+      {/* Summary */}
+      <View className="mx-4 rounded-2xl p-4 bg-slate-900 mb-4">
+        <Text className="text-slate-200 font-semibold mb-2">Receipt Summary</Text>
+        <Row label="Service" value={data?.service_type || '—'} />
+        <Row label="Recipient" value={data?.meter_number || data?.phone_number || '—'} />
+        <Row label="Reference" value={data?.id} />
+        <Row label="Status" value={data?.status ?? 'pending'} />
+      </View>
+
       {/* Card */}
-      <View className="mx-4 rounded-2xl p-5 shadow-sm">
+      <View className="mx-4 rounded-2xl p-5 shadow-sm bg-gray-900">
         {/* Amount */}
         <View className="items-center mb-4">
           <Text className="text-slate-200">Amount Paid</Text>
@@ -174,10 +207,54 @@ export default function TransactionSuccessScreen() {
         <Row label="Payment Method" value={data?.payment_method ?? '—'} />
         <Row label="Reference" value={data?.id} />
         <Row label="Date" value={data?.created_at} />
+
+        <Pressable
+          onPress={handleShareReceipt}
+          className="mt-4 w-full rounded-2xl border border-slate-600 py-3 items-center"
+          accessibilityRole="button"
+          accessibilityLabel="Share receipt"
+        >
+          <Text className="text-slate-200 font-medium">Share Receipt</Text>
+        </Pressable>
       </View>
 
       {/* Footer actions */}
     </>
+  )
+
+  const orderContent = (
+    <View className="flex-1 bg-gray-900">
+      <View className="items-center pt-14 pb-8 px-6">
+        <View className="w-16 h-16 rounded-full bg-green-900 items-center justify-center mb-4">
+          <Ionicons name="checkmark" size={36} color="#22c55e" />
+        </View>
+        <Text className="text-2xl font-bold text-white">Order Received</Text>
+        <Text className="text-gray-400 mt-1">Your order has been created.</Text>
+      </View>
+
+      <View className="bg-gray-800 mx-4 rounded-2xl p-5 shadow-sm">
+        <Text className="text-gray-300 font-semibold mb-2">Receipt Summary</Text>
+        <Row label="Order ID" value={data?.id} />
+        <Row label="Status" value={data?.status ?? 'pending'} />
+        <Row label="Items" value={data?.order_items?.length ?? 0} />
+        <Row label="Date" value={data?.created_at} />
+        <View className="items-center mb-4">
+          <Text className="text-gray-400">Total Amount</Text>
+          <Text className="text-3xl font-extrabold text-white mt-1">
+            {moneyFormat(data?.total_amount ?? data?.amount ?? 0)}
+          </Text>
+        </View>
+
+        <Pressable
+          onPress={handleShareReceipt}
+          className="mt-4 w-full rounded-2xl border border-slate-600 py-3 items-center"
+          accessibilityRole="button"
+          accessibilityLabel="Share receipt"
+        >
+          <Text className="text-slate-200 font-medium">Share Receipt</Text>
+        </Pressable>
+      </View>
+    </View>
   )
 
   const transactionContent = (
@@ -229,6 +306,8 @@ export default function TransactionSuccessScreen() {
         <LoadingIndicator />
       ) : reference && receipt_type === 'fbg' ? (
         transactionContent
+      ) : source === 'order' ? (
+        orderContent
       ) : (
         billContent
       )}

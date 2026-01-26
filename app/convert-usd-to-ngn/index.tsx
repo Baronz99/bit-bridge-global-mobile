@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { Text, TouchableOpacity, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import FormInput from '@/components/FormInput'
@@ -7,6 +7,7 @@ import Loader from '@/components/Loader'
 import NotificationAlert from '@/components/notification'
 import TransactionPinModal from '@/components/TransactionPinModal'
 import { convertTunnelUsdToNgn, quoteTunnelUsdToNgn } from '@/api/wallet'
+import { getTransactionPinStatus } from '@/api/transactionPin'
 import { useAuth } from '@/services/useAuth'
 import moneyFormat from '@/utils/moneyFormat'
 import { apiErrorMessage } from '@/utils/apiErrorMessage'
@@ -16,6 +17,7 @@ const ConvertUsdToNgnScreen = () => {
   const { onLogout, loadProfile } = useAuth()
 
   const [loading, setLoading] = useState(false)
+  const [quoteLoading, setQuoteLoading] = useState(false)
   const [amountUsd, setAmountUsd] = useState('')
   const [quoteData, setQuoteData] = useState<any | null>(null)
   const [pinModalOpen, setPinModalOpen] = useState(false)
@@ -27,7 +29,7 @@ const ConvertUsdToNgnScreen = () => {
   })
 
   const amountValue = useMemo(() => Number(amountUsd), [amountUsd])
-  const quote = quoteData?.data ?? quoteData
+  const quote = quoteData
 
   const handleError = async (error: any, options?: { forPin?: boolean }) => {
     const status = error?.response?.status
@@ -51,32 +53,44 @@ const ConvertUsdToNgnScreen = () => {
     }
   }
 
-  const handleQuote = async () => {
-    if (!amountValue || Number.isNaN(amountValue) || amountValue <= 0) {
-      setNotice({ message: 'Enter a valid USD amount.', error: true, data: null })
+  useEffect(() => {
+    const value = Number(amountUsd)
+    if (!value || Number.isNaN(value) || value <= 0) {
+      setQuoteData(null)
+      setNotice({ message: null, error: false, data: null })
+      setQuoteLoading(false)
       return
     }
 
-    setLoading(true)
-    setNotice({ message: null, error: false, data: null })
-    setPinError(null)
+    let active = true
+    const timer = setTimeout(async () => {
+      setQuoteLoading(true)
+      setPinError(null)
+      try {
+        console.log('[TunnelFX] quote USD->NGN start')
+        const response = await quoteTunnelUsdToNgn(value)
+        if (!active) return
+        setQuoteData(response)
+        console.log('[TunnelFX] quote USD->NGN success')
+        setNotice({ message: null, error: false, data: null })
+      } catch (error: any) {
+        if (!active) return
+        console.log('[TunnelFX] quote USD->NGN failed', {
+          status: error?.response?.status,
+        })
+        await handleError(error)
+      } finally {
+        if (active) setQuoteLoading(false)
+      }
+    }, 450)
 
-    try {
-      const response = await quoteTunnelUsdToNgn(amountValue)
-      setQuoteData(response)
-      setNotice({
-        message: response?.message || 'Quote ready.',
-        error: false,
-        data: response?.data || null,
-      })
-    } catch (error: any) {
-      await handleError(error)
-    } finally {
-      setLoading(false)
+    return () => {
+      active = false
+      clearTimeout(timer)
     }
-  }
+  }, [amountUsd])
 
-  const handleConvert = async (pin: string) => {
+  const handleConvert = async (transactionPin: string) => {
     if (!quoteData) {
       setNotice({ message: 'Get a quote first.', error: true, data: null })
       return
@@ -85,8 +99,10 @@ const ConvertUsdToNgnScreen = () => {
     setLoading(true)
     setPinError(null)
     try {
-      const response = await convertTunnelUsdToNgn(amountValue, pin)
+      console.log('[TunnelFX] convert USD->NGN start')
+      const response = await convertTunnelUsdToNgn(amountValue, transactionPin, quote?.quote_token)
       setPinModalOpen(false)
+      console.log('[TunnelFX] convert USD->NGN success')
       setNotice({
         message: response?.message || 'Conversion successful.',
         error: false,
@@ -95,16 +111,19 @@ const ConvertUsdToNgnScreen = () => {
       setQuoteData(null)
       loadProfile({ force: true })
     } catch (error: any) {
+      console.log('[TunnelFX] convert USD->NGN failed', {
+        status: error?.response?.status,
+      })
       await handleError(error, { forPin: true })
     } finally {
       setLoading(false)
     }
   }
 
-  const amountNgn =
-    quote?.amount_ngn ?? quote?.ngn_amount ?? quote?.converted_amount ?? quote?.amount
-  const rate = quote?.rate ?? quote?.exchange_rate
-  const fee = quote?.fee ?? quote?.fees
+  const feeAmount = quote?.fee_amount
+  const amountAfterFee = quote?.amount_after_fee
+  const executionRate = quote?.execution_rate
+  const amountOut = quote?.amount_out
 
   return (
     <View className="flex-1 bg-primary px-4">
@@ -120,35 +139,50 @@ const ConvertUsdToNgnScreen = () => {
 
           <NotificationAlert message={notice.message} data={notice.data} error={notice.error} />
 
-          {!!quote && (
-            <View className="bg-gray-900 rounded-xl p-4 mt-4">
-              <Text className="text-white mb-2">Quote Preview</Text>
-              <Text className="text-gray-300">
-                You pay: {moneyFormat(amountValue || 0, 'USD')}
-              </Text>
-              {amountNgn !== undefined && amountNgn !== null && (
-                <Text className="text-alt">
-                  You receive: {moneyFormat(Number(amountNgn) || 0, 'NGN')}
+          <View className="bg-gray-900 rounded-xl p-4 mt-4">
+            <Text className="text-white mb-2">Live quote</Text>
+            {quoteLoading ? (
+              <Text className="text-gray-400">Fetching live rate...</Text>
+            ) : quote ? (
+              <>
+                <Text className="text-gray-300">
+                  Conversion fee (1%): - {moneyFormat(Number(feeAmount) || 0, 'USD')}
                 </Text>
-              )}
-              {rate !== undefined && rate !== null && (
-                <Text className="text-gray-300">Rate: {rate}</Text>
-              )}
-              {fee !== undefined && fee !== null && (
-                <Text className="text-gray-300">Fee: {fee}</Text>
-              )}
-            </View>
-          )}
+                <Text className="text-gray-300">
+                  Amount we&apos;ll convert: = {moneyFormat(Number(amountAfterFee) || 0, 'USD')}
+                </Text>
+                <Text className="text-gray-300">
+                  Today&apos;s rate: 1 USD = {Number(executionRate || 0).toFixed(2)} NGN
+                </Text>
+                <Text className="text-alt">
+                  Amount you&apos;ll receive: {moneyFormat(Number(amountOut) || 0, 'NGN')}
+                </Text>
+              </>
+            ) : (
+              <Text className="text-gray-400">Enter an amount to see the quote.</Text>
+            )}
+          </View>
+
 
           <TouchableOpacity
-            onPress={handleQuote}
-            className="bg-theme-primary py-6 mt-8 rounded-xl"
-          >
-            <Text className="text-alt font-medium text-center">Get Quote</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => setPinModalOpen(true)}
+            onPress={async () => {
+              try {
+                const status = await getTransactionPinStatus()
+                const payload = status?.data ?? status
+                const hasPin =
+                  payload?.has_pin === true ||
+                  payload?.status === 'set' ||
+                  payload?.pin_set === true
+                if (!hasPin) {
+                  setNotice({ message: 'Set your transaction PIN to continue.', error: true, data: null })
+                  router.push('/settings/pin/set')
+                  return
+                }
+                setPinModalOpen(true)
+              } catch (error: any) {
+                await handleError(error)
+              }
+            }}
             className={`${quote ? 'bg-gray-900' : 'bg-gray-700'} py-6 mt-4 rounded-xl`}
             disabled={!quote}
           >

@@ -1,6 +1,6 @@
 import { Linking, Text, TouchableOpacity, View } from 'react-native'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { useLocalSearchParams } from 'expo-router'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import useFetch from '@/services/useFetch'
 import { getProvision } from '@/api/products'
 import { confirmBillPayment, confirmPayment, getPurchaseOrder } from '@/api/billOrder'
@@ -23,6 +23,7 @@ const CableetailConfirm = () => {
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const { loadProfile } = useAuth()
   const { notification, setNotification } = useNotification()
+  const router = useRouter()
 
   const fetchOrder = useCallback(() => getPurchaseOrder(orderId as string), [orderId])
   const { data } = useFetch(fetchOrder)
@@ -63,6 +64,13 @@ const CableetailConfirm = () => {
         Linking.openURL(response.responseBody.checkoutUrl)
       }
 
+      if (response?.data?.id || orderId) {
+        router.push({
+          pathname: '/transaction/confirm',
+          params: { orderId: String(response?.data?.id || orderId) },
+        })
+      }
+
       setNotification({
         error: false,
         message: response?.message || 'Recharge Successful',
@@ -98,16 +106,14 @@ const CableetailConfirm = () => {
   return (
     <View className="flex-1 px-4 bg-primary w-full">
       <View className="mb-6">
-        <Text className="text-2xl font-bold text-white text-center">
-          Confirm Cable Subsccription
-        </Text>
+        <Text className="text-2xl font-bold text-white text-center">Confirm Payment</Text>
         <Text className="text-sm text-white text-center mt-1">
-          Please verify the transaction details below.
+          Review the details before you pay.
         </Text>
       </View>
 
       <View className="bg-gray-800 rounded-2xl p-6 shadow-lg mb-8">
-        <Text className="text-lg font-semibold text-center text-gray-200 mb-4">TV Details</Text>
+        <Text className="text-lg font-semibold text-center text-gray-200 mb-4">Payment Summary</Text>
 
         <Summary data={data} applyCommission={false} />
       </View>
@@ -130,6 +136,17 @@ const CableetailConfirm = () => {
         </View>
       ) : null}
       <TransactionButtons handleConfirmation={handleCardConfirmation} />
+      <TouchableOpacity
+        onPress={() =>
+          router.push({
+            pathname: '/transaction/confirm',
+            params: { orderId: String(orderId) },
+          })
+        }
+        className="border rounded-md mt-4 border-gray-700 py-4"
+      >
+        <Text className="text-gray-300 text-center">View Receipt</Text>
+      </TouchableOpacity>
       {loader && <Loader open={loader} />}
       <NotificationAlert
         message={notification.message}

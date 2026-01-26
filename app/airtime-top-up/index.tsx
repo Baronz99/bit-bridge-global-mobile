@@ -1,5 +1,5 @@
 import { Image, ScrollView, Text, TouchableOpacity, View } from 'react-native'
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import useFetch from '@/services/useFetch'
 import { getProducts } from '@/api/products'
 import { useAuth } from '@/services/useAuth'
@@ -9,6 +9,7 @@ import { splitString } from '@/utils'
 
 import SelectBoxIcon from '@/components/select-box/SelectBoxIcon'
 import { createPurchaseOrder } from '@/api/billOrder'
+import { createOrderFromPurchase } from '@/api/orders'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
 import FormInput from '@/components/FormInput'
 import FormSelect from '@/components/FormSelect'
@@ -50,6 +51,18 @@ const index = () => {
 
       setLoader(false)
 
+      const amountValue = Number(formValue.amount)
+      if (Number.isFinite(amountValue)) {
+        void createOrderFromPurchase({
+          product_id: selectProvider?.id,
+          provision_id: selectProvision?.id,
+          amount: amountValue,
+          currency: selectProvision?.currency || selectProvider?.currency,
+          order_type: selectProvision?.service_type,
+          extra_info: `Phone: ${formValue.billersCode}`,
+        })
+      }
+
       if (response)
         router.push({
           pathname: `/transaction/details`,
@@ -87,38 +100,53 @@ const index = () => {
     }
   }, [selectProvider])
 
-  const airtimeBillers_ = data?.map((item: any) => {
-    if (item.category === 'mobile provider') {
-      return item
+  const airtimeBillers_ = useMemo(() => {
+    const list = (data ?? []).filter((item: any) => item?.category === 'mobile provider')
+    const unique = new Map<string, any>()
+    for (const item of list) {
+      const key = String(item?.provider ?? item?.name ?? '').trim().toLowerCase()
+      if (!key) continue
+      if (!unique.has(key)) unique.set(key, item)
     }
-  })
+    return Array.from(unique.values())
+  }, [data])
 
   return (
     <>
       <View className="flex-1 bg-primary px-4">
-        <View className="bg-gray-900/60 p-4 rounded-xl">
-          <View className="py-4 flex-wrap gap-y-4 flex-row">
-            {airtimeBillers_ &&
-              airtimeBillers_?.map((item: any, index: number) =>
-                item ? (
-                  <SelectBoxIcon
-                    selectedLabel={selectProvider?.provider}
-                    key={String(
-                      item?.id ?? item?.uuid ?? item?.code ?? item?.provider ?? item?.name ?? index
-                    )}
-                    onSelect={() => setSelectedProvider(item)}
-                    icon={getImageByKey(String(splitString(item?.provider)))}
-                    label={item?.provider}
-                  />
-                ) : null
-              )}
+        <ScrollView contentContainerStyle={{ paddingBottom: 80 }}>
+          <View className="mt-6 rounded-3xl border border-gray-800 bg-gray-900/80 p-5">
+            <Text className="text-white/70 text-xs tracking-widest uppercase">Mobile</Text>
+            <Text className="text-white text-2xl font-semibold mt-2">Airtime Top Up</Text>
+            <Text className="text-gray-400 mt-2 text-sm">
+              Buy airtime instantly across all networks.
+            </Text>
           </View>
-        </View>
 
-        <View className="py-6">
-          <ScrollView>
+          <View className="mt-6 rounded-2xl border border-gray-800 bg-gray-900/70 p-4">
+            <Text className="text-white text-sm font-semibold">Choose Network</Text>
+            <View className="mt-4 flex-row flex-wrap gap-y-4">
+              {airtimeBillers_ &&
+                airtimeBillers_?.map((item: any, index: number) =>
+                  item ? (
+                    <SelectBoxIcon
+                      selectedLabel={selectProvider?.provider}
+                      key={String(
+                        item?.id ?? item?.uuid ?? item?.code ?? item?.provider ?? item?.name ?? index
+                      )}
+                      onSelect={() => setSelectedProvider(item)}
+                      icon={getImageByKey(String(splitString(item?.provider)))}
+                      label={item?.provider}
+                    />
+                  ) : null
+                )}
+            </View>
+          </View>
+
+          <View className="mt-6 rounded-2xl border border-gray-800 bg-gray-900/70 p-4">
+            <Text className="text-white text-sm font-semibold">Top Up Details</Text>
             <KeyboardAvoidWrapper>
-              <View>
+              <View className="mt-3">
                 <FormInput
                   name="billerCode"
                   label="Phone Number"
@@ -158,14 +186,14 @@ const index = () => {
 
                 <TouchableOpacity
                   onPress={handleFormSubmit}
-                  className="border rounded-md mt-4 border-alt py-5 "
+                  className="bg-app-primary rounded-xl mt-4 py-4"
                 >
-                  <Text className="text-alt text-center">Proceed</Text>
+                  <Text className="text-white text-center font-semibold">Proceed</Text>
                 </TouchableOpacity>
               </View>
             </KeyboardAvoidWrapper>
-          </ScrollView>
-        </View>
+          </View>
+        </ScrollView>
       </View>
       <Loader open={loader} />
     </>
