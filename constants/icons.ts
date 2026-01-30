@@ -32,39 +32,44 @@ import call from '@/assets/icons/phone.png'
 import tv from '@/assets/icons/tv.png'
 
 import appLogo from '@/assets/logos/logo.png'
+import appLogoClear from '@/assets/logos/bitbridge-logo-clear.png'
 
 export const icons = {
-  home,
+  // logos
   appLogo,
+  appLogoClear,
+
+  // nav/icons
+  home,
   search,
   person,
+  wallet,
   logo,
+  transaction,
   save,
   star,
   play,
   arrow,
-  transaction,
-  wallet,
   trophy,
   walletColor,
+  tag,
   withdraw,
   withdrawal,
-  tag,
   utility,
   transfer,
   logout,
   login,
   user,
-  bin,
   lock,
-  legal,
+  bin,
   phone,
+  legal,
   wifi,
   electricity,
   television,
   email,
-  call,
-  power,
-  tv,
   data,
+  power,
+  call,
+  tv,
 }

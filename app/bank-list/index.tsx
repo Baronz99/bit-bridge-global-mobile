@@ -24,15 +24,8 @@ const BankListScreen = () => {
       setLoading(true)
       setNotice({ message: null, error: false, data: null })
       try {
-        const response = await getBanks()
-        const raw =
-          response?.data?.banks ||
-          response?.data?.data ||
-          response?.data ||
-          response?.banks ||
-          response
-        const list = Array.isArray(raw) ? raw : []
-        setBanks(list)
+      const list = await getBanks()
+      setBanks(list)
       } catch (error: any) {
         const status = error?.response?.status
         if (status === 401) {

@@ -1,9 +1,3 @@
-// app/(tabs)/index.tsx — FULL REPLACEMENT (Recent Activity = Timeline + Currency-aware)
-// ✅ Home “Recent Activity” uses /timeline (bank-grade cards)
-// ✅ View all routes to /(tabs)/timeline
-// ✅ Keeps your existing Home features working (profile, onboarding banner, quick services, orders, repurchase modal, etc.)
-// ✅ Currency-aware amounts: Virtual Card / USD renders as $; NGN renders as ₦ via moneyFormat()
-
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
@@ -30,6 +24,7 @@ import { useAuth } from '@/services/useAuth'
 import useFetch from '@/services/useFetch'
 
 import moneyFormat from '@/utils/moneyFormat'
+import { decideHomeNavigation, extractReceiptReference } from '@/utils/timelineRefs'
 
 import AppModal from '@/components/modal/Modal'
 import Loader from '@/components/Loader'
@@ -39,52 +34,79 @@ import ScreenContainer from '@/components/ScreenContainer'
 import ViewBox from '@/components/view-box/ViewBoxIcon'
 
 // ---------------------------
-// Timeline helpers (Home-only) ✅
+// Types
 // ---------------------------
 type TimelineItem = Record<string, any>
 
-type TimelineRoot = {
-  items?: unknown
-  data?: unknown
-  timeline?: unknown
-  results?: unknown
-  next_cursor?: string | null
-  cursor?: string | null
+// ---------------------------
+// Tiny safe helpers
+// ---------------------------
+const s = (v: any, fallback = '') => {
+  const x = String(v ?? '').trim()
+  if (!x) return fallback
+  const low = x.toLowerCase()
+  if (low === 'undefined' || low === 'null') return fallback
+  return x
 }
 
+const n = (v: any, fallback = 0) => {
+  const x = Number(v)
+  return Number.isFinite(x) ? x : fallback
+}
+
+const formatRelative = (iso: any) => {
+  const raw = s(iso, '')
+  if (!raw) return ''
+  const ms = Date.parse(raw)
+  if (!Number.isFinite(ms)) return raw
+  const diff = Date.now() - ms
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  const days = Math.floor(hrs / 24)
+  return `${days}d ago`
+}
+
+const normalizeStatus = (raw: any) => s(raw, 'pending').toLowerCase()
+
+const toBankStatus = (raw: any): 'successful' | 'pending' | 'failed' => {
+  const v = normalizeStatus(raw)
+  if (v.includes('success') || v.includes('complete') || v.includes('approved') || v.includes('paid'))
+    return 'successful'
+  if (v.includes('fail') || v.includes('declin') || v.includes('revers') || v.includes('error'))
+    return 'failed'
+  return 'pending'
+}
+
+// ---------------------------
+// Timeline parsing (Home-only)
+// ---------------------------
 const extractTimeline = (payload: unknown): TimelineItem[] => {
-  const container = (payload ?? {}) as TimelineRoot & Record<string, any>
+  if (!payload) return []
+  const top = (payload as any)?.data ?? payload
+  const root =
+    (top as any)?.items
+      ? top
+      : (top as any)?.data && typeof (top as any)?.data === 'object'
+        ? (top as any).data
+        : top
+
   const list =
-    container?.items ??
-    container?.data ??
-    container?.timeline ??
-    container?.results ??
-    container
-  return Array.isArray(list) ? list : []
+    (root as any)?.items ??
+    (root as any)?.timeline ??
+    (root as any)?.results ??
+    (root as any)?.data ??
+    root
+
+  return Array.isArray(list) ? (list as TimelineItem[]) : []
 }
 
-const getTimelineText = (t: TimelineItem) => {
-  // Backend appears to have: kind, label, meta.description
-  const label = t?.label
-  const desc =
-    t?.meta?.description ??
-    t?.description ??
-    t?.narration ??
-    t?.title ??
-    t?.summary ??
-    t?.message ??
-    t?.note ??
-    ''
-  const type = t?.type ?? t?.kind ?? t?.meta?.transaction_type ?? t?.transaction_type ?? ''
-  const status = t?.status ?? t?.state ?? ''
-
-  const s1 = String(label || '').trim()
-  if (s1) return s1
-
-  const s2 = String(desc || '').trim()
-  if (s2) return s2
-
-  return String(type || status || 'Activity').replace(/_/g, ' ')
+const getTimelineTimestampMs = (t: TimelineItem): number => {
+  const dt = t?.occurred_at ?? t?.created_at ?? t?.updated_at ?? t?.createdAt ?? t?.timestamp
+  const ms = Date.parse(String(dt || ''))
+  return Number.isFinite(ms) ? ms : 0
 }
 
 const getTimelineKind = (t: TimelineItem) => {
@@ -100,143 +122,106 @@ const getTimelineKind = (t: TimelineItem) => {
   ).toLowerCase()
 }
 
-const getTimelineStatus = (t: TimelineItem) => {
-  return String(t?.status ?? t?.state ?? t?.payment_status ?? '').toLowerCase()
+// ---------------------------
+// Receipt reference detection (Home-safe)
+// ---------------------------
+const getBestReceiptReference = (t: TimelineItem) => extractReceiptReference(t, { allowWalletTx: true })
+
+const isMoneyLikeTimelineItem = (t: TimelineItem) => {
+  const kind = getTimelineKind(t)
+  const meta = (t?.meta ?? {}) as Record<string, any>
+  const txType = String(meta?.transaction_type || '').toLowerCase()
+  const label = String(t?.label || t?.title || t?.text || t?.message || '').toLowerCase()
+
+  if (getBestReceiptReference(t)) return true
+  if (txType) return true
+  if (kind.includes('wallet') || kind.includes('transaction')) return true
+  if (kind.includes('deposit') || kind.includes('withdraw')) return true
+  if (kind.includes('transfer')) return true
+  if (kind.includes('bill') || label.includes('airtime') || label.includes('data') || label.includes('electric') || label.includes('cable'))
+    return true
+  if (kind.includes('card')) return true
+  return false
 }
 
-const getTimelineCurrency = (t: TimelineItem) => {
-  const direct = String(t?.meta?.currency ?? t?.currency ?? '').toUpperCase()
-  if (direct) return direct
+// ---------------------------
+// Bank-grade Home row (compact, unique)
+// ---------------------------
+const StatusPill = ({ status }: { status: 'successful' | 'pending' | 'failed' }) => {
+  const text =
+    status === 'successful' ? 'Success' : status === 'failed' ? 'Failed' : 'Pending'
 
-  // Fallback inference (safe):
-  const label = String(t?.label ?? '').toLowerCase()
-  const walletType = String(t?.meta?.wallet_type ?? '').toLowerCase()
-  const bank = String(t?.meta?.bank ?? '').toLowerCase()
+  const klass =
+    status === 'successful'
+      ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
+      : status === 'failed'
+        ? 'bg-red-500/15 border-red-500/30 text-red-300'
+        : 'bg-amber-500/15 border-amber-500/30 text-amber-300'
 
-  if (walletType.includes('virtual') || label.includes('virtual card') || bank.includes('virtual card')) {
-    return 'USD'
-  }
-
-  return 'NGN'
-}
-
-const minorUnitDivisor = (currency: string) => {
-  const cur = (currency || '').toUpperCase()
-  if (cur === 'JPY') return 1
-  return 100 // NGN, USD
-}
-
-const getTimelineAmount = (t: TimelineItem): number => {
-  const currency = getTimelineCurrency(t)
-
-  // Prefer amount_cents from backend (your logs show amount_cents)
-  const cents = Number(t?.amount_cents)
-  if (Number.isFinite(cents)) return cents / minorUnitDivisor(currency)
-
-  // Fallbacks
-  const raw =
-    t?.amount ??
-    t?.total_amount ??
-    t?.value ??
-    t?.meta?.amount ??
-    t?.metadata?.amount ??
-    t?.data?.amount
-
-  const n = Number(raw)
-  return Number.isFinite(n) ? n : 0
-}
-
-const getTimelineTimestamp = (t: TimelineItem): number => {
-  // Backend shows occurred_at
-  const dt =
-    t?.occurred_at ??
-    t?.created_at ??
-    t?.createdAt ??
-    t?.timestamp ??
-    t?.time ??
-    t?.date ??
-    t?.updated_at
-
-  const ms = Date.parse(String(dt || ''))
-  return Number.isFinite(ms) ? ms : 0
-}
-
-const formatTime = (ms: number) => {
-  if (!ms) return ''
-  const d = new Date(ms)
-  const day = String(d.getDate()).padStart(2, '0')
-  const mon = d.toLocaleString('en-GB', { month: 'short' })
-  const hr = String(d.getHours()).padStart(2, '0')
-  const min = String(d.getMinutes()).padStart(2, '0')
-  return `${day} ${mon}, ${hr}:${min}`
-}
-
-const formatMoneyByCurrency = (amount: number, currency: string) => {
-  const cur = (currency || 'NGN').toUpperCase()
-
-  if (cur === 'USD') {
-    // “Bank-grade” formatting
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount)
-  }
-
-  // Default to existing NGN formatter
-  return moneyFormat(amount)
-}
-
-const isMoneyKind = (kind: string) => {
-  const k = (kind || '').toLowerCase()
   return (
-    k.includes('wallet') ||
-    k.includes('transaction') ||
-    k.includes('deposit') ||
-    k.includes('withdraw') ||
-    k.includes('transfer') ||
-    k.includes('bill') ||
-    k.includes('airtime') ||
-    k.includes('data') ||
-    k.includes('cable') ||
-    k.includes('electric') ||
-    k.includes('fund') ||
-    k.includes('payment') ||
-    k.includes('purchase') ||
-    k.includes('charge') ||
-    k.includes('refund') ||
-    k.includes('payout')
+    <View className={`px-2 py-1 rounded-full border ${klass}`}>
+      <Text className="text-[10px] font-semibold">{text}</Text>
+    </View>
   )
 }
 
-const pickActivityIcon = (kind: string) => {
-  const k = (kind || '').toLowerCase()
-  if (k.includes('deposit') || k.includes('fund')) return icons.walletColor
-  if (k.includes('withdraw')) return icons.withdraw
-  if (k.includes('transfer') || k.includes('send')) return icons.transfer
-  if (k.includes('airtime') || k.includes('mobile')) return icons.call
-  if (k.includes('data')) return icons.data
-  if (k.includes('cable') || k.includes('tv')) return icons.tv
-  if (k.includes('electric') || k.includes('power')) return icons.power
-  return icons.tag
+const getHomeRowTitle = (t: TimelineItem) => {
+  const kind = getTimelineKind(t)
+  const label = s(t?.label, '')
+  if (label) return label
+
+  if (kind.includes('bill')) return 'Bill payment'
+  if (kind.includes('card')) return 'Card transaction'
+  if (kind.includes('wallet')) {
+    const meta = (t?.meta ?? {}) as any
+    const txType = s(meta?.transaction_type, '').toLowerCase()
+    if (txType === 'deposit') return 'Wallet deposit'
+    if (txType === 'withdraw' || txType === 'withdrawal') return 'Wallet withdrawal'
+    return 'Wallet transaction'
+  }
+  return 'Activity'
 }
 
-const pillForStatus = (status: string) => {
-  const s = (status || '').toLowerCase()
+const getHomeRowSubtitle = (t: TimelineItem) => {
+  const meta = (t?.meta ?? {}) as any
+  const bank = s(meta?.bank, '')
+  const addr = s(meta?.address, '')
+  const circle = s(meta?.circle_name, '')
+  const service = s(meta?.service_type, '')
+  const biller = s(meta?.biller, '')
 
-  if (s.includes('success') || s.includes('approved') || s.includes('completed')) {
-    return { label: 'Success', cls: 'bg-emerald-500/15 border-emerald-500/30' }
-  }
-  if (s.includes('failed') || s.includes('rejected') || s.includes('error')) {
-    return { label: 'Failed', cls: 'bg-red-500/15 border-red-500/30' }
-  }
-  if (s.includes('pending') || s.includes('processing') || s.includes('initialized')) {
-    return { label: 'Pending', cls: 'bg-amber-500/15 border-amber-500/30' }
-  }
-
-  return { label: status ? String(status) : 'Update', cls: 'bg-gray-700/30 border-gray-700' }
+  if (biller) return biller
+  if (service) return service
+  if (bank && addr) return `${bank} • ${addr}`
+  if (bank) return bank
+  if (addr) return addr
+  if (circle) return circle
+  return ''
 }
 
+const getHomeRowAmount = (t: TimelineItem) => {
+  const cents = n(t?.amount_cents, NaN)
+  if (Number.isFinite(cents)) return cents / 100
+  const meta = (t?.meta ?? {}) as any
+  const a = n(t?.amount, NaN)
+  if (Number.isFinite(a)) return a
+  const b = n(meta?.amount, NaN)
+  if (Number.isFinite(b)) return b
+  return 0
+}
+
+const getHomeRowCurrency = (t: TimelineItem) => {
+  const meta = (t?.meta ?? {}) as any
+  return s(meta?.currency, s(t?.currency, 'NGN')) || 'NGN'
+}
+
+// ---------------------------
+// Main screen
+// ---------------------------
 export default function Index() {
   const { authState, userProfileData, loadProfile } = useAuth()
   const router = useRouter()
-  const token = authState?.token // string | null
+  const token = authState?.token
 
   const [billOrder, setBillOrder] = useState<any | null>(null)
   const [openModal, setOpenModal] = useState(false)
@@ -249,7 +234,7 @@ export default function Index() {
   const [sendOpen, setSendOpen] = useState(false)
   const [loader, setLoader] = useState(false)
 
-  // ✅ Recent activity toggle (money vs all)
+  // ✅ Recent Activity toggle (money vs all)
   const [activityMode, setActivityMode] = useState<'money' | 'all'>('money')
 
   useEffect(() => {
@@ -266,15 +251,15 @@ export default function Index() {
   const fetchRecentPurchases = useCallback(() => getRescentPurchaseOrder(), [])
   const fetchRecentOrders = useCallback(() => getUserOrders(), [])
 
-  // Old deposits-only transactions (kept, but no longer the main “Recent Activity”)
+  // Old deposits-only transactions (kept, but not main “Recent Activity”)
   const fetchRecentTransactions = useCallback(() => {
     return getTransactions({ params: { transaction_type: 'deposit' } })
   }, [])
 
-  // ✅ NEW: Recent Activity from Timeline
+  // ✅ Recent Activity from Timeline — Home should NOT be noisy
   const fetchRecentTimeline = useCallback(() => {
-    // Keep it small but enough to filter properly
-    return listTimeline({ limit: 25 })
+    // IMPORTANT: for Home, show_alerts should be false for bank-grade signal
+    return listTimeline({ limit: 25, show_alerts: false } as any)
   }, [])
 
   const {
@@ -315,7 +300,7 @@ export default function Index() {
 
   // -------- KYC state helpers --------
   const kycLevel = useMemo(() => {
-    const payload = userProfileData?.data ?? userProfileData
+    const payload = (userProfileData as any)?.data ?? userProfileData
     return String(payload?.kyc_level || payload?.user_kyc?.kyc_level || 'tier_0')
       .trim()
       .toLowerCase()
@@ -328,7 +313,7 @@ export default function Index() {
   }, [kycLevel])
 
   const hasCardAccess = useMemo(() => {
-    const payload = userProfileData?.data ?? userProfileData
+    const payload = (userProfileData as any)?.data ?? userProfileData
     const phoneVerified = payload?.phone_verified === true || payload?.phone_verified_at
     if (!kycLevel && !phoneVerified) return false
     if (kycLevel === 'tier_0' || kycLevel === 'nil') return false
@@ -338,7 +323,7 @@ export default function Index() {
   const KYC_REQUIRED_NOW = ['send_receive', 'virtual_cards', 'taxes']
 
   const onboardingBanner = useMemo(() => {
-    const payload = userProfileData?.data ?? userProfileData
+    const payload = (userProfileData as any)?.data ?? userProfileData
     if (!payload) return null
 
     const stage = payload?.onboarding_stage || 'email_confirmed'
@@ -438,13 +423,13 @@ export default function Index() {
       {
         id: 2,
         label: 'Bought',
-        amount: userProfileData?.wallet?.total_bills ?? 0,
+        amount: (userProfileData as any)?.wallet?.total_bills ?? 0,
         icon: icons.walletColor,
       },
       {
         id: 3,
         label: 'Withdrawals',
-        amount: userProfileData?.wallet?.withdrawn ?? 0,
+        amount: (userProfileData as any)?.wallet?.withdrawn ?? 0,
         icon: icons.withdraw,
       },
       { id: 4, label: 'Sold', amount: 0, icon: icons.tag },
@@ -493,22 +478,35 @@ export default function Index() {
 
   const recentActivity = useMemo(() => {
     const list = extractTimeline(recentTimelineRaw)
-
-    const sorted = [...list].sort((a, b) => getTimelineTimestamp(b) - getTimelineTimestamp(a))
-
-    const filtered =
-      activityMode === 'money'
-        ? sorted.filter((item) => isMoneyKind(getTimelineKind(item)))
-        : sorted
-
-    return filtered.slice(0, 3)
+    const sorted = [...list].sort((a, b) => getTimelineTimestampMs(b) - getTimelineTimestampMs(a))
+    const filtered = activityMode === 'money' ? sorted.filter(isMoneyLikeTimelineItem) : sorted
+    return filtered.slice(0, 6)
   }, [recentTimelineRaw, activityMode])
 
-  const showTopError = recentPurchasesError?.message || timelineError?.message
+  const showTopError = (recentPurchasesError as any)?.message || (timelineError as any)?.message
 
-  const goToTimeline = () => {
+  const goToTimeline = useCallback(() => {
     router.push('/(tabs)/timeline' as any)
-  }
+  }, [router])
+
+  const handlePressRecentActivity = useCallback(
+    (item: TimelineItem) => {
+      const decision = decideHomeNavigation(item)
+
+      if (decision.type === 'receipt') {
+        router.push({ pathname: '/transaction/receipt', params: { reference: decision.reference } } as any)
+        return
+      }
+
+      if (decision.type === 'timeline-detail') {
+        router.push({ pathname: '/timeline/[id]', params: { id: decision.id } } as any)
+        return
+      }
+
+      goToTimeline()
+    },
+    [router, goToTimeline]
+  )
 
   return (
     <>
@@ -534,12 +532,12 @@ export default function Index() {
               <View>
                 <Text className="text-white/70 text-xs tracking-widest uppercase">Bridge Wallet</Text>
                 <Text className="text-white text-3xl font-semibold mt-2">
-                  {moneyFormat(userProfileData?.wallet?.balance ?? 0)}
+                  {moneyFormat((userProfileData as any)?.wallet?.balance ?? 0)}
                 </Text>
                 <View className="flex-row mt-3 items-center gap-2">
                   <Image source={icons.trophy} className="w-5 h-5" />
                   <Text className="text-white text-sm">
-                    {moneyFormat(userProfileData?.wallet?.commission ?? 0)}
+                    {moneyFormat((userProfileData as any)?.wallet?.commission ?? 0)}
                   </Text>
                 </View>
               </View>
@@ -610,12 +608,12 @@ export default function Index() {
           {showTopError ? (
             <View className="bg-red-500/20 border border-red-500/30 rounded-xl p-3 mt-4">
               <Text className="text-white font-semibold">Network/Error</Text>
-              <Text className="text-white/80">{showTopError}</Text>
+              <Text className="text-white/80">{String(showTopError)}</Text>
             </View>
           ) : null}
 
           {/* Account chip */}
-          {userProfileData?.account ? (
+          {(userProfileData as any)?.account ? (
             <Link href={'/accountDetails' as any} asChild>
               <TouchableOpacity className="my-4 bg-gray-900 border border-gray-800 py-3 w-52 flex flex-row gap-4 items-center rounded-2xl px-4">
                 <Text className="text-white text-lg text-left font-semibold">Moniepoint</Text>
@@ -699,9 +697,7 @@ export default function Index() {
                           {moneyFormat(Number(order?.total_amount ?? order?.amount ?? 0))}
                         </Text>
                       </View>
-                      <Text className="text-gray-400 text-xs mt-1">
-                        {order?.status || 'pending'}
-                      </Text>
+                      <Text className="text-gray-400 text-xs mt-1">{order?.status || 'pending'}</Text>
                     </TouchableOpacity>
                   </Link>
                 ))}
@@ -709,7 +705,7 @@ export default function Index() {
             </View>
           ) : null}
 
-          {/* ✅ Recent Activity (timeline) */}
+          {/* ✅ Recent Activity (Bank-grade Home Rows) */}
           <View className="mb-8">
             <View className="flex-row items-center justify-between mb-3">
               <Text className="text-white text-lg font-semibold">Recent Activity</Text>
@@ -767,57 +763,46 @@ export default function Index() {
             ) : recentActivity.length ? (
               <View className="gap-3">
                 {recentActivity.map((item: any, index: number) => {
-                  const kind = getTimelineKind(item)
-                  const text = getTimelineText(item)
-                  const status = getTimelineStatus(item)
-                  const pill = pillForStatus(status)
-                  const icon = pickActivityIcon(kind)
-                  const id = item?.id ?? item?.uuid ?? index
-
-                  const currency = getTimelineCurrency(item)
-                  const amount = getTimelineAmount(item)
-                  const ts = getTimelineTimestamp(item)
+                  const title = getHomeRowTitle(item)
+                  const subtitle = getHomeRowSubtitle(item)
+                  const amount = getHomeRowAmount(item)
+                  const currency = getHomeRowCurrency(item)
+                  const status = toBankStatus(item?.status)
+                  const when = formatRelative(item?.occurred_at ?? item?.created_at ?? item?.updated_at)
+                  const receiptRef = getBestReceiptReference(item)
+                  const showChevron = true
 
                   return (
                     <TouchableOpacity
-                      key={String(id)}
-                      onPress={() => {
-                        if (item?.id != null) {
-                          router.push({
-                            pathname: '/timeline/[id]' as any,
-                            params: { id: String(item.id) },
-                          })
-                        } else {
-                          goToTimeline()
-                        }
-                      }}
+                      key={String(item?.id ?? item?.uuid ?? index)}
+                      onPress={() => handlePressRecentActivity(item)}
                       className="bg-gray-900/80 border border-gray-800 rounded-2xl p-4"
+                      activeOpacity={0.85}
                     >
-                      <View className="flex-row items-start justify-between">
-                        <View className="flex-row items-start gap-3 flex-1 pr-3">
-                          <View className="h-10 w-10 rounded-full bg-gray-950/40 border border-gray-800 items-center justify-center">
-                            <Image source={icon} className="w-5 h-5" />
-                          </View>
+                      <View className="flex-row items-center justify-between">
+                        <View className="flex-1 pr-3">
+                          <Text className="text-white font-semibold">{title}</Text>
+                          {subtitle ? (
+                            <Text className="text-gray-400 text-xs mt-1">{subtitle}</Text>
+                          ) : null}
 
-                          <View className="flex-1">
-                            <Text className="text-white font-semibold" numberOfLines={1}>
-                              {text}
-                            </Text>
-
-                            <View className="flex-row items-center gap-2 mt-1">
-                              <View className={`px-2 py-1 rounded-full border ${pill.cls}`}>
-                                <Text className="text-xs font-semibold text-white/90">
-                                  {pill.label}
-                                </Text>
-                              </View>
-                              <Text className="text-gray-400 text-xs">{formatTime(ts)}</Text>
-                            </View>
+                          <View className="flex-row items-center gap-2 mt-2">
+                            <StatusPill status={status} />
+                            {when ? <Text className="text-gray-500 text-[10px]">{when}</Text> : null}
+                            {receiptRef ? (
+                              <Text className="text-emerald-400 text-[10px]">Receipt</Text>
+                            ) : null}
                           </View>
                         </View>
 
-                        <Text className="text-white font-semibold">
-                          {formatMoneyByCurrency(amount, currency)}
-                        </Text>
+                        <View className="items-end">
+                          <Text className="text-gray-200 font-semibold">
+                            {moneyFormat(amount, currency)}
+                          </Text>
+                          {showChevron ? (
+                            <Feather name="chevron-right" size={16} color="#9CA3AF" />
+                          ) : null}
+                        </View>
                       </View>
                     </TouchableOpacity>
                   )
@@ -827,7 +812,7 @@ export default function Index() {
               <View className="bg-gray-900/70 border border-gray-800 rounded-2xl p-4">
                 <Text className="text-gray-300 text-sm font-semibold">No recent activity yet.</Text>
                 <Text className="text-gray-400 text-xs mt-1">
-                  Your latest transactions and events will appear here.
+                  Your latest transactions will appear here.
                 </Text>
               </View>
             )}
@@ -839,14 +824,11 @@ export default function Index() {
                   <TouchableOpacity
                     key={String(tx?.id ?? index)}
                     className="bg-gray-900/80 border border-gray-800 rounded-2xl p-4"
+                    onPress={goToTimeline}
                   >
                     <View className="flex-row justify-between">
-                      <Text className="text-white font-semibold">
-                        {tx?.transaction_type || 'deposit'}
-                      </Text>
-                      <Text className="text-gray-300">
-                        {moneyFormat(Number(tx?.amount ?? 0))}
-                      </Text>
+                      <Text className="text-white font-semibold">{tx?.transaction_type || 'deposit'}</Text>
+                      <Text className="text-gray-300">{moneyFormat(Number(tx?.amount ?? 0))}</Text>
                     </View>
                     <Text className="text-gray-400 text-xs mt-1">{tx?.status || 'pending'}</Text>
                   </TouchableOpacity>
@@ -871,9 +853,7 @@ export default function Index() {
                     className="bg-alt/80 border rounded-2xl text-sm h-16 w-40 shadow-sm flex flex-col justify-center items-center"
                   >
                     <Text className="font-semibold">{item?.biller}</Text>
-                    <Text className="text-primary font-medium text-xl">
-                      {moneyFormat(item?.amount ?? 0)}
-                    </Text>
+                    <Text className="text-primary font-medium text-xl">{moneyFormat(item?.amount ?? 0)}</Text>
                   </TouchableOpacity>
                 )}
                 keyExtractor={(item: any, index) => String(item?.id ?? index)}
@@ -890,22 +870,16 @@ export default function Index() {
       <AppModal onclose={() => setOpenModal(false)} open={openModal}>
         <View className="bg-black/70 justify-center items-center px-6">
           <View className="bg-gray-900 p-6 rounded-2xl w-full max-w-md">
-            <Text className="text-white text-xl font-semibold text-center mb-4">
-              Confirm Transaction
-            </Text>
+            <Text className="text-white text-xl font-semibold text-center mb-4">Confirm Transaction</Text>
             <Text className="text-gray-300 text-center mb-6">
               Are you sure you want to proceed with this transaction?
             </Text>
 
             <View>
-              <Text className="text-white font-semibold text-center text-lg">
-                {billOrder?.biller}
-              </Text>
+              <Text className="text-white font-semibold text-center text-lg">{billOrder?.biller}</Text>
               <LabelText label="Description" value={`subscription ${billOrder?.service_type ?? ''}`} />
               <LabelText label="Recipient" value={billOrder?.meter_number ?? ''} />
-              <Text className="text-3xl text-white text-center my-2">
-                {moneyFormat(billOrder?.amount ?? 0)}
-              </Text>
+              <Text className="text-3xl text-white text-center my-2">{moneyFormat(billOrder?.amount ?? 0)}</Text>
             </View>
 
             <View className="flex-row gap-4 justify-between">
@@ -940,9 +914,7 @@ export default function Index() {
       {/* Explore services modal */}
       <AppModal open={getstarted} onclose={() => setOpenStarted(false)}>
         <View className="bg-gray-900 p-6 rounded-2xl w-full max-w-md">
-          <Text className="text-white text-xl font-semibold text-center mb-2">
-            Explore services
-          </Text>
+          <Text className="text-white text-xl font-semibold text-center mb-2">Explore services</Text>
           <Text className="text-gray-300 text-center mb-5">Recommended for you</Text>
 
           <View className="flex-row flex-wrap -mx-2">
@@ -977,14 +949,12 @@ export default function Index() {
       <AppModal open={sendOpen} onclose={() => setSendOpen(false)}>
         <View className="bg-gray-900 p-6 rounded-2xl w-full max-w-md">
           <Text className="text-white text-xl font-semibold text-center mb-2">Send money</Text>
-          <Text className="text-gray-400 text-center text-xs mb-5">
-            Choose how you want to send your funds.
-          </Text>
+          <Text className="text-gray-400 text-center text-xs mb-5">Choose how you want to send your funds.</Text>
 
           <TouchableOpacity
             onPress={() => {
               setSendOpen(false)
-              router.push('/send-money')
+              router.push('/send-money' as any)
             }}
             className="bg-gray-950 border border-gray-800 py-3 rounded-xl items-center"
           >
@@ -994,7 +964,7 @@ export default function Index() {
           <TouchableOpacity
             onPress={() => {
               setSendOpen(false)
-              router.push('/bank-transfer')
+              router.push('/bank-transfer' as any)
             }}
             className="bg-gray-950 border border-gray-800 py-3 rounded-xl items-center mt-3"
           >

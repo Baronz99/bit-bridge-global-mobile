@@ -1,16 +1,14 @@
 import { Alert, Pressable, Share, Text, View } from 'react-native'
-import React, { useCallback, useEffect, useRef } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef } from 'react'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 
 import useFetch from '@/services/useFetch'
 import { getTransactionRecord } from '@/api/transactions'
 import { useAuth } from '@/services/useAuth'
 import moneyFormat from '@/utils/moneyFormat'
-import { getPurchaseOrder, updateOrderStatus } from '@/api/billOrder'
+import { cancelPayment, getPurchaseOrder, queryTransaction } from '@/api/billOrder'
 import { getOrder } from '@/api/orders'
-// import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons'
-import { RouteProp, useNavigation } from '@react-navigation/native'
 import LoadingIndicator from '@/components/loadingIndicator'
 
 const Row = ({ label, value }: { label: string; value?: string | number }) => (
@@ -20,64 +18,157 @@ const Row = ({ label, value }: { label: string; value?: string | number }) => (
   </View>
 )
 
+const norm = (s?: any) => String(s || '').toLowerCase().trim()
+
+const isTerminalStatus = (s?: string) => {
+  const v = norm(s)
+  return ['completed', 'approved', 'success', 'paid', 'failed', 'declined', 'cancelled', 'canceled'].includes(v)
+}
+
+const isStillProcessing = (s?: string) => {
+  const v = norm(s)
+  return ['initialized', 'pending', 'processing', 'in_progress', 'queued'].includes(v)
+}
+
+const pickFirst = (...values: any[]) => {
+  for (const v of values) {
+    const s = String(v ?? '').trim()
+    if (s) return s
+  }
+  return ''
+}
+
 export default function TransactionSuccessScreen() {
   const { reference, orderId, source } = useLocalSearchParams<{
     reference?: string
     orderId?: string
     source?: string
   }>()
-  // const reference  = "bbg-1757381050"
-  const {
-    loadProfile,
-  } = useAuth()
+
+  const { loadProfile } = useAuth()
   const router = useRouter()
 
+  const receiptType = useMemo(() => {
+    const ref = String(reference || '')
+    return ref.includes('-') ? ref.split('-')[0] : ''
+  }, [reference])
+
+  /**
+   * Fetch receipt:
+   * - reference => transaction record (includes deposits like fbg-*)
+   * - orderId + source=order => order receipt
+   * - orderId => bill order receipt
+   */
   const fetchReceipt = useCallback(() => {
-    if (reference) {
-      return getTransactionRecord(reference as string)
-    }
+    if (reference) return getTransactionRecord(reference as string)
     if (orderId) {
-      if (source === 'order') {
-        return getOrder(orderId as string)
-      }
+      if (source === 'order') return getOrder(orderId as string)
       return getPurchaseOrder(orderId as string)
     }
     return Promise.resolve(null)
   }, [reference, orderId, source])
-  const { data, loading } = useFetch(fetchReceipt)
 
-  const receipt_type = reference?.split('-')[0]
-  const hasRefetchedRef = useRef(false)
+  const { data, loading, refetch } = useFetch(fetchReceipt)
 
-  useEffect(() => {
-    hasRefetchedRef.current = false
-  }, [reference, orderId])
+  // ---- Safe polling (NO MULTI-INTERVALS) ----
+  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const pollCountRef = useRef(0)
+  const hasQueriedVendorRef = useRef(false)
+  const hasLoadedProfileRef = useRef(false)
+  const didRefreshOnTerminalRef = useRef(false)
+  const mountedRef = useRef(true)
 
-  const fetchUpdateStatus = useCallback(
-    () => updateOrderStatus(reference as string),
-    [reference]
-  )
-  const {
-    data: updateData,
-    refetch,
-    error: updateError,
-  } = useFetch(fetchUpdateStatus, false)
-
-  useEffect(() => {
-    loadProfile({ force: true })
+  const stopPolling = useCallback(() => {
+    if (pollTimerRef.current) {
+      clearInterval(pollTimerRef.current)
+      pollTimerRef.current = null
+    }
   }, [])
 
   useEffect(() => {
-    if (data && data?.status === 'initialized' && !hasRefetchedRef.current) {
-      hasRefetchedRef.current = true
-      refetch()
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      stopPolling()
     }
-  }, [data])
+  }, [stopPolling])
 
+  useEffect(() => {
+    pollCountRef.current = 0
+    hasQueriedVendorRef.current = false
+    didRefreshOnTerminalRef.current = false
+    stopPolling()
+  }, [reference, orderId, stopPolling])
+
+  useEffect(() => {
+    if (!hasLoadedProfileRef.current) {
+      hasLoadedProfileRef.current = true
+      try {
+        loadProfile({ force: true })
+      } catch {
+        // ignore
+      }
+    }
+  }, [loadProfile])
+
+  useEffect(() => {
+    if (!data) return
+
+    const status = norm((data as any)?.status)
+    const ref = String(reference || '')
+
+    if (isTerminalStatus(status)) {
+      stopPolling()
+
+      if (!didRefreshOnTerminalRef.current) {
+        didRefreshOnTerminalRef.current = true
+        try {
+          loadProfile({ force: true })
+        } catch {
+          // ignore
+        }
+      }
+      return
+    }
+
+    if (ref && ref.startsWith('bbg-') && isStillProcessing(status) && !hasQueriedVendorRef.current) {
+      hasQueriedVendorRef.current = true
+      ;(async () => {
+        try {
+          await queryTransaction(ref)
+        } catch {
+          // ignore
+        } finally {
+          refetch?.()
+        }
+      })()
+    }
+
+    if (!pollTimerRef.current && isStillProcessing(status)) {
+      pollCountRef.current = 0
+
+      pollTimerRef.current = setInterval(() => {
+        if (!mountedRef.current) {
+          stopPolling()
+          return
+        }
+
+        pollCountRef.current += 1
+
+        if (pollCountRef.current >= 12) {
+          stopPolling()
+          return
+        }
+
+        refetch?.()
+      }, 5000)
+    }
+  }, [data, reference, refetch, loadProfile, stopPolling])
+
+  // ---- Share helpers ----
   const handleCopyToken = async () => {
     try {
-      // await Clipboard.setStringAsync(token);
-      Alert.alert('Copied', 'AEDC token copied to clipboard.')
+      Alert.alert('Copied', 'Token copied to clipboard.')
     } catch {
       Alert.alert('Copy failed', 'Please try again.')
     }
@@ -85,27 +176,25 @@ export default function TransactionSuccessScreen() {
 
   const handleShare = async () => {
     try {
+      const ref = pickFirst((data as any)?.reference, (data as any)?.id, reference, '—')
       await Share.share({
         message:
-          `AEDC Payment Successful\n` +
-          `Amount: ${moneyFormat(data?.amount.toLocaleString())}\n` +
-          `Meter: ${data?.meter_number}\n` +
-          `Units: ${data?.units ?? '-'} kWh\n` +
-          `Token: ${data?.token}\n` +
-          `Ref: ${data?.id}\n` +
-          `Date: ${data?.created_at}`,
+          `Payment Successful\n` +
+          `Amount: ${moneyFormat(Number((data as any)?.amount ?? 0))}\n` +
+          `Ref: ${ref}\n` +
+          `Date: ${(data as any)?.created_at ?? '—'}`,
       })
     } catch {
-      /* user canceled */
+      /* canceled */
     }
   }
 
   const handleShareReceipt = async () => {
     try {
-      const amount = moneyFormat(Number(data?.total_amount ?? data?.amount ?? 0))
-      const ref = data?.id ?? data?.reference ?? '—'
-      const status = data?.status ?? 'pending'
-      const created = data?.created_at ?? '—'
+      const amount = moneyFormat(Number((data as any)?.total_amount ?? (data as any)?.amount ?? 0))
+      const ref = pickFirst((data as any)?.reference, (data as any)?.id, reference, '—')
+      const status = (data as any)?.status ?? 'pending'
+      const created = (data as any)?.created_at ?? '—'
       await Share.share({
         message:
           `BitBridge Receipt\n` +
@@ -115,81 +204,119 @@ export default function TransactionSuccessScreen() {
           `Date: ${created}`,
       })
     } catch {
-      /* user canceled */
+      /* canceled */
     }
   }
 
-  console.log(data, 'DATA: bill order data fetched on confirm screen')
+  /**
+   * ✅ Clean receipt flow:
+   * Always pass the REAL reference (fbg-/bbg-), never UUID id.
+   */
+  const handleViewReceipt = useCallback(() => {
+    const ref = pickFirst(
+      (data as any)?.reference, // ✅ best
+      (data as any)?.transaction_record?.reference,
+      (data as any)?.transaction_ref,
+      (data as any)?.transaction_reference,
+      reference
+    )
 
+    if (!ref) return
+
+    router.push({
+      pathname: '/transaction/receipt',
+      params: { reference: ref },
+    } as any)
+  }, [data, reference, router])
+
+  // ---- Optional manual cancel (ONLY for bbg-*; never auto) ----
+  const handleCancel = async () => {
+    const ref = String(reference || '')
+    if (!ref || !ref.startsWith('bbg-')) return
+
+    Alert.alert(
+      'Cancel payment?',
+      'This will mark the transaction as declined. Only do this if you intentionally want to cancel.',
+      [
+        { text: 'No', style: 'cancel' },
+        {
+          text: 'Yes, Cancel',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await cancelPayment(ref)
+              refetch?.()
+              loadProfile({ force: true })
+            } catch (e: any) {
+              Alert.alert('Cancel failed', e?.message || 'Please try again.')
+            }
+          },
+        },
+      ]
+    )
+  }
+
+  // ---- UI blocks ----
   const billContent = (
     <>
-      {/* Header / Success badge */}
-      {data?.status === 'completed' ? (
+      {(data as any)?.status === 'completed' ? (
         <View className="items-center pt-14 pb-8 px-6">
           <View className="w-16 h-16 rounded-full bg-green-100 items-center justify-center mb-4">
             <Ionicons name="checkmark" size={36} color="#16a34a" />
           </View>
           <Text className="text-2xl font-bold text-slate-100">Payment Successful</Text>
           <Text className="text-slate-400 mt-1">
-            Your {data?.biller} {data?.service_types} purchase is complete.
+            Your {(data as any)?.biller} {(data as any)?.service_types} purchase is complete.
           </Text>
         </View>
       ) : (
         <View className="items-center pt-14 pb-8 px-6">
-          <View className="w-16 h-16 rounded-full bg-red-900 items-center justify-center mb-4">
-            <Ionicons name="close" size={36} color="#ef4444" />
+          <View className="w-16 h-16 rounded-full bg-slate-800 items-center justify-center mb-4">
+            <Ionicons name="time-outline" size={34} color="#94a3b8" />
           </View>
-          <Text className="text-2xl font-bold text-white">Payment Declined {data?.status}</Text>
-          <Text className="text-gray-400 mt-1">Your transaction could not be processed.</Text>
+          <Text className="text-2xl font-bold text-white">
+            {(data as any)?.status ? `Status: ${(data as any)?.status}` : 'Processing...'}
+          </Text>
+          <Text className="text-gray-400 mt-1">
+            If this stays pending, please wait a moment — it may be confirming.
+          </Text>
         </View>
       )}
 
-      {/* Summary */}
       <View className="mx-4 rounded-2xl p-4 bg-slate-900 mb-4">
         <Text className="text-slate-200 font-semibold mb-2">Receipt Summary</Text>
-        <Row label="Service" value={data?.service_type || '—'} />
-        <Row label="Recipient" value={data?.meter_number || data?.phone_number || '—'} />
-        <Row label="Reference" value={data?.id} />
-        <Row label="Status" value={data?.status ?? 'pending'} />
+        <Row label="Service" value={(data as any)?.service_type || '—'} />
+        <Row label="Recipient" value={(data as any)?.meter_number || (data as any)?.phone_number || '—'} />
+        <Row label="Reference" value={pickFirst((data as any)?.reference, (data as any)?.id, reference, '—')} />
+        <Row label="Status" value={(data as any)?.status ?? 'pending'} />
       </View>
 
-      {/* Card */}
       <View className="mx-4 rounded-2xl p-5 shadow-sm bg-gray-900">
-        {/* Amount */}
         <View className="items-center mb-4">
-          <Text className="text-slate-200">Amount Paid</Text>
+          <Text className="text-slate-200">Amount</Text>
           <Text className="text-3xl font-extrabold text-slate-100 mt-1">
-            ₦{data?.total_amount?.toLocaleString()}
+            ₦{Number((data as any)?.total_amount ?? 0).toLocaleString()}
           </Text>
         </View>
 
-        {/* AEDC Token */}
-
-        {data?.service_type === 'ELECTRICITY' && (
-          <View className="border border-slate-600 -200 rounded-xl p-4 mb-4 bg-slate-900">
-            <Text className="text-slate-200 text-xs mb-1">{data?.biller} Token</Text>
+        {(data as any)?.service_type === 'ELECTRICITY' && (
+          <View className="border border-slate-700 rounded-xl p-4 mb-4 bg-slate-900">
+            <Text className="text-slate-200 text-xs mb-1">{(data as any)?.biller} Token</Text>
             <View className="flex-row items-center justify-between flex-wrap">
               <Text selectable className="text-lg font-semibold tracking-widest text-slate-200">
-                {data?.token}
+                {(data as any)?.token}
               </Text>
               <Pressable
                 onPress={handleCopyToken}
-                accessibilityRole="button"
-                accessibilityLabel="Copy AEDC token"
-                className="px-3 py-2 rounded-lg bg-gray-900 border border-slate-600 -200"
+                className="px-3 py-2 rounded-lg bg-gray-900 border border-slate-700"
               >
-                <View className="flex-row  items-center">
+                <View className="flex-row items-center">
                   <Ionicons name="copy-outline" size={18} color={'gray'} />
                   <Text className="ml-1 font-medium text-slate-400">Copy</Text>
                 </View>
               </Pressable>
             </View>
-            <Pressable
-              onPress={handleShare}
-              className="self-start mt-3"
-              accessibilityRole="button"
-              accessibilityLabel="Share token"
-            >
+            <Pressable onPress={handleShare} className="self-start mt-3">
               <View className="flex-row items-center">
                 <Ionicons name="share-outline" color={'white'} size={18} />
                 <Text className="ml-1 text-slate-300 font-medium">Share</Text>
@@ -198,27 +325,39 @@ export default function TransactionSuccessScreen() {
           </View>
         )}
 
-        {/* Details */}
-        <Row label="Meter Number" value={data?.meter_number} />
-        {!!data?.customerName && <Row label="Customer Name" value={data?.customerName} />}
-        {!!data?.address && <Row label="Address" value={data?.address} />}
-        <Row label="Disco" value={data?.biller} />
-        {data?.units && <Row label="Units (kWh)" value={data?.units ?? '-'} />}
-        <Row label="Payment Method" value={data?.payment_method ?? '—'} />
-        <Row label="Reference" value={data?.id} />
-        <Row label="Date" value={data?.created_at} />
+        <Row label="Meter/Phone" value={(data as any)?.meter_number || (data as any)?.phone_number} />
+        {!!(data as any)?.customerName && <Row label="Customer Name" value={(data as any)?.customerName} />}
+        {!!(data as any)?.address && <Row label="Address" value={(data as any)?.address} />}
+        <Row label="Provider" value={(data as any)?.biller} />
+        {(data as any)?.units && <Row label="Units (kWh)" value={(data as any)?.units ?? '-'} />}
+        <Row label="Payment Method" value={(data as any)?.payment_method ?? '—'} />
+        <Row label="Reference" value={pickFirst((data as any)?.reference, (data as any)?.id, reference, '—')} />
+        <Row label="Date" value={(data as any)?.created_at} />
+
+        <Pressable
+          onPress={handleViewReceipt}
+          className="mt-4 w-full rounded-2xl bg-theme-primary py-3 items-center"
+        >
+          <Text className="text-white font-semibold">View Receipt Details</Text>
+        </Pressable>
 
         <Pressable
           onPress={handleShareReceipt}
-          className="mt-4 w-full rounded-2xl border border-slate-600 py-3 items-center"
-          accessibilityRole="button"
-          accessibilityLabel="Share receipt"
+          className="mt-3 w-full rounded-2xl border border-slate-600 py-3 items-center"
         >
           <Text className="text-slate-200 font-medium">Share Receipt</Text>
         </Pressable>
-      </View>
 
-      {/* Footer actions */}
+        {String(reference || '').startsWith('bbg-') &&
+          isStillProcessing(String((data as any)?.status || '')) && (
+            <Pressable
+              onPress={handleCancel}
+              className="mt-3 w-full rounded-2xl border border-red-600 py-3 items-center"
+            >
+              <Text className="text-red-400 font-medium">Cancel Payment</Text>
+            </Pressable>
+          )}
+      </View>
     </>
   )
 
@@ -234,22 +373,28 @@ export default function TransactionSuccessScreen() {
 
       <View className="bg-gray-800 mx-4 rounded-2xl p-5 shadow-sm">
         <Text className="text-gray-300 font-semibold mb-2">Receipt Summary</Text>
-        <Row label="Order ID" value={data?.id} />
-        <Row label="Status" value={data?.status ?? 'pending'} />
-        <Row label="Items" value={data?.order_items?.length ?? 0} />
-        <Row label="Date" value={data?.created_at} />
+        <Row label="Order ID" value={(data as any)?.id} />
+        <Row label="Status" value={(data as any)?.status ?? 'pending'} />
+        <Row label="Items" value={(data as any)?.order_items?.length ?? 0} />
+        <Row label="Date" value={(data as any)?.created_at} />
+
         <View className="items-center mb-4">
           <Text className="text-gray-400">Total Amount</Text>
           <Text className="text-3xl font-extrabold text-white mt-1">
-            {moneyFormat(data?.total_amount ?? data?.amount ?? 0)}
+            {moneyFormat((data as any)?.total_amount ?? (data as any)?.amount ?? 0)}
           </Text>
         </View>
 
         <Pressable
+          onPress={handleViewReceipt}
+          className="mt-4 w-full rounded-2xl bg-theme-primary py-3 items-center"
+        >
+          <Text className="text-white font-semibold">View Receipt Details</Text>
+        </Pressable>
+
+        <Pressable
           onPress={handleShareReceipt}
-          className="mt-4 w-full rounded-2xl border border-slate-600 py-3 items-center"
-          accessibilityRole="button"
-          accessibilityLabel="Share receipt"
+          className="mt-3 w-full rounded-2xl border border-slate-600 py-3 items-center"
         >
           <Text className="text-slate-200 font-medium">Share Receipt</Text>
         </Pressable>
@@ -258,77 +403,70 @@ export default function TransactionSuccessScreen() {
   )
 
   const transactionContent = (
-    <>
-      {/* Success Header */}
-      <View className="flex-1 bg-gray-900">
-        {/* Success Header */}
-
-        {data?.status == 'approved' ? (
-          <View className="items-center pt-14 pb-8 px-6">
-            <View className="w-16 h-16 rounded-full bg-green-900 items-center justify-center mb-4">
-              <Ionicons name="checkmark" size={36} color="#22c55e" />
-            </View>
-            <Text className="text-2xl font-bold text-white">Deposit Successful</Text>
-            <Text className="text-gray-400 mt-1">Your deposit has been credited.</Text>
+    <View className="flex-1 bg-gray-900">
+      {(data as any)?.status === 'approved' ? (
+        <View className="items-center pt-14 pb-8 px-6">
+          <View className="w-16 h-16 rounded-full bg-green-900 items-center justify-center mb-4">
+            <Ionicons name="checkmark" size={36} color="#22c55e" />
           </View>
-        ) : (
-          <View className="items-center pt-14 pb-8 px-6">
-            <View className="w-16 h-16 rounded-full bg-red-900 items-center justify-center mb-4">
-              <Ionicons name="close" size={36} color="#ef4444" />
-            </View>
-            <Text className="text-2xl font-bold text-white">Transaction Declined</Text>
-            <Text className="text-gray-400 mt-1">Your transaction could not be processed.</Text>
-          </View>
-        )}
-
-        {/* Card with details */}
-        <View className="bg-gray-800 mx-4 rounded-2xl p-5 shadow-sm">
-          {/* Amount */}
-          <View className="items-center mb-4">
-            <Text className="text-gray-400">Amount Deposited</Text>
-            <Text className="text-3xl font-extrabold text-white mt-1">
-              ₦{data?.amount.toLocaleString()}
-            </Text>
-          </View>
-
-          {/* Transaction Details */}
-          <Row label="Reference" value={data?.id} />
-          <Row label="Date" value={data?.created_at} />
-          <Row label="Payment Method" value={data?.payment_method ?? '—'} />
+          <Text className="text-2xl font-bold text-white">Deposit Successful</Text>
+          <Text className="text-gray-400 mt-1">Your deposit has been credited.</Text>
         </View>
+      ) : (
+        <View className="items-center pt-14 pb-8 px-6">
+          <View className="w-16 h-16 rounded-full bg-slate-800 items-center justify-center mb-4">
+            <Ionicons name="time-outline" size={34} color="#94a3b8" />
+          </View>
+          <Text className="text-2xl font-bold text-white">
+            {(data as any)?.status ? `Status: ${(data as any)?.status}` : 'Processing...'}
+          </Text>
+          <Text className="text-gray-400 mt-1">
+            Deposits can take a moment to reflect. Please wait — we’ll refresh automatically.
+          </Text>
+        </View>
+      )}
+
+      <View className="bg-gray-800 mx-4 rounded-2xl p-5 shadow-sm">
+        <View className="items-center mb-4">
+          <Text className="text-gray-400">Amount</Text>
+          <Text className="text-3xl font-extrabold text-white mt-1">
+            ₦{Number((data as any)?.amount ?? 0).toLocaleString()}
+          </Text>
+        </View>
+
+        <Row label="Reference" value={pickFirst((data as any)?.reference, (data as any)?.id, reference, '—')} />
+        <Row label="Date" value={(data as any)?.created_at} />
+        <Row label="Payment Method" value={(data as any)?.payment_method ?? '—'} />
+
+        <Pressable
+          onPress={handleViewReceipt}
+          className="mt-4 w-full rounded-2xl bg-theme-primary py-3 items-center"
+        >
+          <Text className="text-white font-semibold">View Receipt Details</Text>
+        </Pressable>
       </View>
-    </>
+    </View>
   )
 
   return (
     <View className="flex-1 px-1 bg-primary">
       {loading ? (
         <LoadingIndicator />
-      ) : reference && receipt_type === 'fbg' ? (
+      ) : reference && receiptType === 'fbg' ? (
         transactionContent
       ) : source === 'order' ? (
         orderContent
       ) : (
         billContent
       )}
+
       <View className="mt-auto px-4 pb-8 pt-6">
         <Pressable
           onPress={() => router.push('/')}
-          className="w-full h-14 rounded-2xl bg-theme-primary  items-center justify-center"
-          accessibilityRole="button"
-          accessibilityLabel="Go back to Home"
+          className="w-full h-14 rounded-2xl bg-theme-primary items-center justify-center"
         >
           <Text className="text-white font-semibold text-base">Back to Home</Text>
         </Pressable>
-
-        {/* <Pressable
-          onPress={() => navigation.goBack()}
-          className="w-full h-12 mt-3 rounded-2xl border border-slate-300 items-center justify-center"
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-        >
-          <Text className="text-slate-700 font-medium">Go Back</Text>
-        </Pressable> */}
       </View>
     </View>
   )

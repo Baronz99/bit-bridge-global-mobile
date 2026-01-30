@@ -22,14 +22,7 @@ const BeneficiariesScreen = () => {
       setLoading(true)
       setNotice({ message: null, error: false, data: null })
       try {
-        const response = await getBeneficiaries()
-        const raw =
-          response?.data?.beneficiaries ||
-          response?.data?.data ||
-          response?.data ||
-          response?.beneficiaries ||
-          response
-        const list = Array.isArray(raw) ? raw : []
+        const list = await getBeneficiaries()
         setBeneficiaries(list)
       } catch (error: any) {
         const status = error?.response?.status

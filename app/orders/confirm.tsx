@@ -36,7 +36,9 @@ const OrderConfirm = () => {
     )
   }
 
-  const productOptions = useMemo(() => {
+  type Option = { label: string; value: string; currency?: any }
+
+  const productOptions: Option[] = useMemo(() => {
     const list = Array.isArray(productsFetch.data) ? productsFetch.data : []
     const options = list.map((item: any) => ({
       label: item?.name || item?.product || `Product ${item?.id}`,
@@ -46,7 +48,7 @@ const OrderConfirm = () => {
     return [{ label: 'Select Product', value: '' }, ...options]
   }, [productsFetch.data])
 
-  const provisionOptions = useMemo(() => {
+  const provisionOptions: Option[] = useMemo(() => {
     const list = Array.isArray(provisionsFetch.data) ? provisionsFetch.data : []
     const filtered = form.product_id
       ? list.filter((item: any) => String(item?.product_id || item?.product?.id) === form.product_id)

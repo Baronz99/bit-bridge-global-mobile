@@ -32,11 +32,12 @@ const QueryTransactionScreen = () => {
     setNotice({ message: null, error: false, data: null })
     try {
       const response = await queryTransaction(formValue.trim())
-      setResult(response?.data ?? response)
+      const payload: any = response
+      setResult(payload?.data ?? payload)
       setNotice({
-        message: response?.message || 'Transaction queried.',
+        message: payload?.message || 'Transaction queried.',
         error: false,
-        data: response?.data || null,
+        data: payload?.data || null,
       })
     } catch (error: any) {
       const status = error?.response?.status

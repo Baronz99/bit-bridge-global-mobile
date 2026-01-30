@@ -1,6 +1,17 @@
-// src/api/billOrder.ts (MOBILE APP) — SAFE + NORMALIZED
+// src/api/billOrder.ts (MOBILE APP) — SAFE + NORMALIZED (NO AUTO-DECLINE)
 import client from '@/api/client'
 import moneyFormat from '@/utils/moneyFormat'
+
+/**
+ * ⚠️ IMPORTANT:
+ * - DO NOT call /payment_processors/:id/update_status automatically.
+ * - That endpoint DECLINES transactions for some reference types (e.g., fbg-*),
+ *   which can block Monnify webhook crediting.
+ * - Only call cancelPayment() when the user explicitly taps "Cancel Payment".
+ */
+
+const isBillRef = (ref: string) => String(ref || '').startsWith('bbg-')
+
 
 const errMsg = (err: any, fallback = 'Something went wrong') =>
   err?.response?.data?.message || err?.message || fallback
@@ -21,7 +32,7 @@ const isTimeoutError = (err: any) => {
 }
 
 /** --- Normalization helpers (match backend logic) --- */
-const normalizeProvider = (provider: string) => {
+export const normalizeProvider = (provider: string) => {
   const p = String(provider || '').trim().toLowerCase()
 
   // mobile
@@ -39,7 +50,7 @@ const normalizeProvider = (provider: string) => {
   return p
 }
 
-const normalizeServiceType = (serviceType: string) => {
+export const normalizeServiceType = (serviceType: string) => {
   const s = String(serviceType || '').trim().toUpperCase()
   if (['CABLE', 'CABLETV', 'CABLE_TV'].includes(s)) return 'TV'
   if (s === 'AIRTIME') return 'VTU'
@@ -48,7 +59,7 @@ const normalizeServiceType = (serviceType: string) => {
 
 /**
  * Guard unsupported combinations BEFORE calling backend
- * (Based on your real prod logs: NTEL fails for DATA)
+ * (Based on real prod logs: NTEL fails for DATA)
  */
 const SERVICE_SUPPORTED_PROVIDERS: Record<string, Set<string>> = {
   DATA: new Set(['mtn', 'glo', 'airtel', '9mobile']),
@@ -67,6 +78,8 @@ const isProviderSupported = (serviceType: string, provider: string) => {
 /** --- Shared UI placeholder --- */
 const placeholderOption = { label: 'Select Data Plan', value: null as any, amount: 0 }
 
+/** -------------------- Core APIs -------------------- */
+
 export const createPurchaseOrder = async (orderData: any) => {
   try {
     const res = await client.post('/payment_processors/process_payment', orderData)
@@ -76,14 +89,30 @@ export const createPurchaseOrder = async (orderData: any) => {
   }
 }
 
-export const updateOrderStatus = async (id: string) => {
+/**
+ /**
+ * ✅ SAFE: cancel only bill orders (bbg-*)
+ * Never cancel funding/deposits (fbg-*) from mobile.
+ * Reason: backend update_status declines some reference types and can block webhook crediting.
+ */
+export const cancelPayment = async (reference: string, reason = 'user_cancelled') => {
   try {
-    const res = await client.get(`/payment_processors/${id}/update_status`)
+    if (!reference) throw new Error('Missing payment reference')
+
+    // HARD GUARD (required)
+    if (!isBillRef(reference)) {
+      throw new Error('Cancel is only available for bill payments.')
+    }
+
+    const res = await client.get(`/payment_processors/${reference}/update_status`, {
+      params: { reason },
+    })
     return res.data
   } catch (err: any) {
     throw new Error(errMsg(err))
   }
 }
+
 
 export const getPurchaseOrder = async (id: string) => {
   try {
@@ -111,6 +140,9 @@ export const confirmPayment = async ({
   }
 }
 
+/**
+ * BillOrders confirm endpoint (kept as-is with your "pending" tolerant behavior)
+ */
 export const confirmBillPayment = async ({
   queryId,
   payment_method,
@@ -191,6 +223,28 @@ export const getRescentPurchaseOrder = async () => {
   }
 }
 
+/** -------------------- Payment processor helpers (mobile post-checkout) -------------------- */
+
+export const getRefOrder = async (reference: string | number) => {
+  try {
+    const res = await client.get(`/payment_processors/${reference}/get_ref_order`)
+    return res.data
+  } catch (err: any) {
+    throw new Error(errMsg(err))
+  }
+}
+
+export const queryTransaction = async (reference: string | number) => {
+  try {
+    const res = await client.get(`/payment_processors/${reference}/query_transaction`)
+    return res.data
+  } catch (err: any) {
+    throw new Error(errMsg(err))
+  }
+}
+
+/** -------------------- Price list -------------------- */
+
 export const getPriceList = async ({
   provider,
   service_type,
@@ -217,7 +271,6 @@ export const getPriceList = async ({
 
     const result = res.data
 
-    // Build options and dedupe by "value" (code)
     const mapped =
       result?.data?.map((item: any) => {
         const code = item?.code
@@ -248,4 +301,19 @@ export const getPriceList = async ({
     }
     throw new Error(errMsg(err))
   }
+}
+
+export default {
+  createPurchaseOrder,
+  cancelPayment,
+  getPurchaseOrder,
+  confirmPayment,
+  confirmBillPayment,
+  confirmOrderPayment,
+  repurchaseOrder,
+  getUserOrders,
+  getRescentPurchaseOrder,
+  getRefOrder,
+  queryTransaction,
+  getPriceList,
 }
