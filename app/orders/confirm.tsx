@@ -151,7 +151,7 @@ const OrderConfirm = () => {
                 label="Product"
                 selectedValue={form.product_id}
                 onValueChange={(value: string) => {
-                  const selected = productOptions.find((item) => item.value === value)
+                  const selected = productOptions.find((item) => item.value === value) as any
                   setForm({
                     ...form,
                     product_id: value,
@@ -175,7 +175,7 @@ const OrderConfirm = () => {
                 label="Provision (optional)"
                 selectedValue={form.provision_id}
                 onValueChange={(value: string) => {
-                  const selected = provisionOptions.find((item) => item.value === value)
+                  const selected = provisionOptions.find((item) => item.value === value) as any
                   setForm({
                     ...form,
                     provision_id: value,

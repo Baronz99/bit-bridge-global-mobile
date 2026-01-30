@@ -126,7 +126,7 @@ const CirclesScreen = () => {
         description: form.description.trim(),
       })
       const created = response?.data ?? response
-      setData((prev) => {
+      setData((prev: unknown) => {
         const list = extractCircles(prev)
         return [created, ...list]
       })

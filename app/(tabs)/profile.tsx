@@ -27,7 +27,7 @@ import {
 type RowItem = {
   label: string
   href?: string
-  icon: JSX.Element
+  icon: React.ReactElement
   tone?: 'default' | 'danger'
   onPress?: () => void
 }

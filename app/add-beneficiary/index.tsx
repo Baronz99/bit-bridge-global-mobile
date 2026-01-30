@@ -19,7 +19,7 @@ const AddBeneficiaryScreen = () => {
     account_number: '',
     account_name: '',
   })
-  const [notice, setNotice] = useState({
+  const [notice, setNotice] = useState<{ message: string | null; error: boolean; data: any }>({
     message: null,
     error: false,
     data: null,

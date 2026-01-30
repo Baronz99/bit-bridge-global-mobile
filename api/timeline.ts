@@ -16,7 +16,7 @@ export type TimelineQuery = {
   search?: string
 }
 
-export const listTimeline = async (query: TimelineQuery = {}): Promise<unknown> => {
+export const listTimeline = async (query: TimelineQuery = {}): Promise<any> => {
   const params: Record<string, unknown> = {}
   if (query.cursor) params.cursor = query.cursor
   if (query.limit) params.limit = query.limit
@@ -34,13 +34,13 @@ export const listTimeline = async (query: TimelineQuery = {}): Promise<unknown> 
   return res.data
 }
 
-export const getTimelineItem = async (id: string): Promise<unknown> => {
+export const getTimelineItem = async (id: string): Promise<any> => {
   // Placeholder for a detail endpoint.
   const res = await client.get(`/timeline/${id}`)
   return res.data
 }
 
-export const listCircleTimeline = async (circleId: string | number): Promise<unknown> => {
+export const listCircleTimeline = async (circleId: string | number): Promise<any> => {
   const res = await client.get(`/circles/${circleId}/timeline`)
   return res.data
 }

@@ -22,7 +22,7 @@ const ConvertNgnToUsdScreen = () => {
   const [quoteData, setQuoteData] = useState<any | null>(null)
   const [pinModalOpen, setPinModalOpen] = useState(false)
   const [pinError, setPinError] = useState<string | null>(null)
-  const [notice, setNotice] = useState({
+  const [notice, setNotice] = useState<{ message: string | null; error: boolean; data: any | null }>({
     message: null,
     error: false,
     data: null,

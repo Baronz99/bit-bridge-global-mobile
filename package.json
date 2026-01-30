@@ -11,9 +11,6 @@
     "test": "jest --watchAll",
     "lint": "expo lint"
   },
-  "jest": {
-    "preset": "jest-expo"
-  },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
     "@react-native-masked-view/masked-view": "^0.3.2",

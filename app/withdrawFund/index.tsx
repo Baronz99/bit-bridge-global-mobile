@@ -10,6 +10,8 @@ import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoi
 import TransactionPinModal from '@/components/TransactionPinModal'
 import { getTransactionPinStatus } from '@/api/transactionPin'
 import { useRouter } from 'expo-router'
+type NoticeState = { message: string | null; error: boolean; data: any | null }
+
 const index = () => {
   const [loading, setLoading] = useState(false)
   const [modalVisible, setModalVisible] = useState(false)
@@ -23,7 +25,7 @@ const index = () => {
     address: '',
   })
 
-  const [notice, setNotice] = useState({
+  const [notice, setNotice] = useState<NoticeState>({
     message: null,
     error: false,
     data: null,

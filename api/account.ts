@@ -83,7 +83,7 @@ export const createAnchorAccount = async (payload?: { account?: Record<string, u
   }
 }
 
-export const getBanks = async () => {
+export const getBanks = async (): Promise<any> => {
   try {
     const res = await client.get('/accounts/get_banks')
     const payload = res.data
@@ -113,7 +113,7 @@ export const getBanks = async () => {
   }
 }
 
-export const getBeneficiaries = async () => {
+export const getBeneficiaries = async (): Promise<any> => {
   try {
     const res = await client.get('/accounts/beneficiaries')
     const payload = res.data

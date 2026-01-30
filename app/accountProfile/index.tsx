@@ -10,7 +10,11 @@ import Loader from '@/components/Loader'
 import AppAlert from '@/components/app-notification/AppAlert'
 
 const index = () => {
-  const [errorMessage, setErrorMessage] = useState({
+  const [errorMessage, setErrorMessage] = useState<{
+    error: boolean
+    message: string | null
+    data: any
+  }>({
     error: false,
     message: null,
     data: null,

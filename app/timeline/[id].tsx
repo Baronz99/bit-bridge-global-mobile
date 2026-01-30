@@ -16,7 +16,7 @@ const ActivityDetailsScreen = () => {
   const router = useRouter()
   const { id } = useLocalSearchParams<{ id?: string }>()
   const [loading, setLoading] = useState(true)
-  const [record, setRecord] = useState<Record<string, unknown> | null>(null)
+  const [record, setRecord] = useState<any | null>(null)
 
   const loadDetails = useCallback(async () => {
     if (!id) return

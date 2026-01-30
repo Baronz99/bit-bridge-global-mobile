@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Text, TouchableOpacity, View } from 'react-native'
+import { Alert, Text, TouchableOpacity, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import FormInput from '@/components/FormInput'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
@@ -100,13 +100,23 @@ const CircleWithdrawScreen = () => {
         router.replace('/login')
         return
       }
+
+      const errors = error?.response?.data?.errors
+      const messageFromErrors =
+        Array.isArray(errors) && errors.length > 0
+          ? errors.join('\n')
+          : typeof errors === 'string'
+            ? errors
+            : error?.response?.data?.message
+
       const message = buildApiErrorMessage({
         status,
         data: error?.response?.data,
-        fallback: error?.message || 'Something went wrong',
+        fallback: messageFromErrors || error?.message || 'Something went wrong',
       })
       setPinError(message)
       setNotice({ message, error: true, data: null })
+      Alert.alert('Withdrawal failed', message)
     } finally {
       setLoading(false)
     }
