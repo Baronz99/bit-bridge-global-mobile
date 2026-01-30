@@ -19,7 +19,8 @@ const AddBeneficiaryScreen = () => {
     account_number: '',
     account_name: '',
   })
-  const [notice, setNotice] = useState({
+  type NoticeState = { message: string | null; error: boolean; data: any | null }
+  const [notice, setNotice] = useState<NoticeState>({
     message: null,
     error: false,
     data: null,
@@ -30,14 +31,7 @@ const AddBeneficiaryScreen = () => {
       setLoading(true)
       setNotice({ message: null, error: false, data: null })
       try {
-        const response = await getBanks()
-        const raw =
-          response?.data?.banks ||
-          response?.data?.data ||
-          response?.data ||
-          response?.banks ||
-          response
-        const list = Array.isArray(raw) ? raw : []
+        const list = await getBanks()
         setBanks(list)
       } catch (error: any) {
         const status = error?.response?.status

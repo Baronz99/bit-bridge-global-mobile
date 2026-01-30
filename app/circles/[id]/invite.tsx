@@ -41,11 +41,12 @@ const InviteCircleMemberScreen = () => {
     setNotice({ message: null, error: false, data: null })
     try {
       const response = await inviteCircleMember(circleId, { email, role: 'member' })
+      const payload: any = response
       setFormData({ email: '' })
       setNotice({
-        message: response?.message || `Invitation sent to ${email}.`,
+        message: payload?.message || `Invitation sent to ${email}.`,
         error: false,
-        data: response?.data || null,
+        data: payload?.data || null,
       })
     } catch (error: any) {
       const status = error?.response?.status

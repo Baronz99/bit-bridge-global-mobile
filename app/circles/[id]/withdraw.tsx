@@ -86,12 +86,13 @@ const CircleWithdrawScreen = () => {
         note: formData.description.trim() || undefined,
         transaction_pin: transactionPin,
       })
+      const payload: any = response
       setPinModalOpen(false)
       setFormData({ amount: '', description: '' })
       setNotice({
-        message: response?.message || 'Withdrawal request submitted.',
+        message: payload?.message || 'Withdrawal request submitted.',
         error: false,
-        data: response?.data || null,
+        data: payload?.data || null,
       })
     } catch (error: any) {
       const status = error?.response?.status

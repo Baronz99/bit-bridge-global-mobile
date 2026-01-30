@@ -23,7 +23,8 @@ const index = () => {
     address: '',
   })
 
-  const [notice, setNotice] = useState({
+  type NoticeState = { message: string | null; error: boolean; data: any | null }
+  const [notice, setNotice] = useState<NoticeState>({
     message: null,
     error: false,
     data: null,

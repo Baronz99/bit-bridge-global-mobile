@@ -1,10 +1,9 @@
-import React, { useCallback, useEffect } from 'react'
+import React, { useCallback } from 'react'
 import { ActivityIndicator, Alert, Share, Text, TouchableOpacity, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import useFetch from '@/services/useFetch'
 import { getTransactionRecord } from '@/api/transactions'
 import moneyFormat from '@/utils/moneyFormat'
-import { useAuth } from '@/services/useAuth'
 
 const Row = ({ label, value }: { label: string; value?: string | number }) => (
   <View className="flex-row justify-between py-2">
@@ -15,7 +14,6 @@ const Row = ({ label, value }: { label: string; value?: string | number }) => (
 
 const TransactionRecordScreen = () => {
   const router = useRouter()
-  const { onLogout } = useAuth()
   const { reference } = useLocalSearchParams<{ reference?: string | string[] }>()
   const ref = Array.isArray(reference) ? reference[0] : reference
 
@@ -24,15 +22,10 @@ const TransactionRecordScreen = () => {
     return getTransactionRecord(ref)
   }, [ref])
 
-  const { data, loading, error } = useFetch(fetchRecord)
-
-  useEffect(() => {
-    const status = error?.response?.status
-    if (status === 401) {
-      void onLogout()
-      router.replace('/login')
-    }
-  }, [error, onLogout, router])
+  // IMPORTANT:
+  // - Do NOT manually logout on 401 here.
+  // - client.ts already handles refresh/retry and emits unauthorized → AuthProvider clears session.
+  const { data, loading, error, refetch } = useFetch(fetchRecord)
 
   if (!ref) {
     return (
@@ -45,10 +38,10 @@ const TransactionRecordScreen = () => {
   const handleShareReceipt = async () => {
     if (!data) return
     try {
-      const amount = moneyFormat(Number(data?.amount ?? 0))
-      const status = data?.status ?? 'pending'
-      const referenceText = data?.reference || data?.id || ref
-      const created = data?.created_at ?? '-'
+      const amount = moneyFormat(Number((data as any)?.amount ?? 0))
+      const status = (data as any)?.status ?? 'pending'
+      const referenceText = (data as any)?.reference || (data as any)?.id || ref
+      const created = (data as any)?.created_at ?? '-'
       await Share.share({
         message:
           `BitBridge Wallet Receipt\n` +
@@ -63,7 +56,7 @@ const TransactionRecordScreen = () => {
   }
 
   const handleCopyReference = async () => {
-    const referenceText = data?.reference || data?.id || ref
+    const referenceText = (data as any)?.reference || (data as any)?.id || ref
     try {
       const Clipboard = await import('expo-clipboard')
       await Clipboard.setStringAsync(String(referenceText))
@@ -73,7 +66,7 @@ const TransactionRecordScreen = () => {
     }
   }
 
-  const statusLabel = String(data?.status || 'pending').toLowerCase()
+  const statusLabel = String((data as any)?.status || 'pending').toLowerCase()
   const statusClass =
     statusLabel === 'approved'
       ? 'bg-green-700'
@@ -95,8 +88,18 @@ const TransactionRecordScreen = () => {
           <View className="bg-gray-900 p-4 rounded-xl">
             <Text className="text-white font-semibold">Unable to load</Text>
             <Text className="text-gray-300 text-sm mt-1">
-              {error?.message || 'Something went wrong.'}
+              {(error as any)?.response?.data?.message ||
+                (error as any)?.response?.data?.error ||
+                (error as any)?.message ||
+                'Something went wrong.'}
             </Text>
+
+            <TouchableOpacity
+              onPress={() => refetch?.()}
+              className="mt-4 bg-theme-primary py-3 rounded-xl"
+            >
+              <Text className="text-white text-center font-medium">Try Again</Text>
+            </TouchableOpacity>
           </View>
         ) : data ? (
           <View className="bg-gray-900 p-4 rounded-xl">
@@ -106,22 +109,31 @@ const TransactionRecordScreen = () => {
                 <Text className="text-white text-xs font-semibold">{statusLabel}</Text>
               </View>
             </View>
-            <Row label="Status" value={data?.status} />
-            <Row label="Amount" value={moneyFormat(data?.amount ?? 0)} />
-            <Row label="Type" value={data?.transaction_type || data?.type} />
-            <Row label="Reference" value={data?.reference || data?.id} />
-            <Row label="Description" value={data?.description} />
-            <Row label="Payment Method" value={data?.payment_method} />
-            <Row label="Date" value={data?.created_at} />
+
+            <Row label="Status" value={(data as any)?.status} />
+            <Row label="Amount" value={moneyFormat((data as any)?.amount ?? 0)} />
+            <Row label="Type" value={(data as any)?.transaction_type || (data as any)?.type} />
+            <Row label="Reference" value={(data as any)?.reference || (data as any)?.id} />
+            <Row label="Description" value={(data as any)?.description} />
+            <Row label="Payment Method" value={(data as any)?.payment_method} />
+            <Row label="Date" value={(data as any)?.created_at} />
           </View>
         ) : (
           <View className="bg-gray-900 p-4 rounded-xl">
             <Text className="text-gray-300 text-center">No transaction record found.</Text>
+
+            <TouchableOpacity
+              onPress={() => refetch?.()}
+              className="mt-4 bg-theme-primary py-3 rounded-xl"
+            >
+              <Text className="text-white text-center font-medium">Refresh</Text>
+            </TouchableOpacity>
           </View>
         )}
 
         <View className="mt-5">
           <Text className="text-gray-400 text-xs mb-2">Actions</Text>
+
           <TouchableOpacity
             onPress={() =>
               router.push({
@@ -132,6 +144,13 @@ const TransactionRecordScreen = () => {
             className="bg-theme-primary py-4 rounded-xl"
           >
             <Text className="text-white text-center font-medium">View Receipt</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => refetch?.()}
+            className="bg-gray-900 py-4 mt-3 rounded-xl"
+          >
+            <Text className="text-white text-center">Refresh Status</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -150,11 +169,16 @@ const TransactionRecordScreen = () => {
             <Text className="text-white text-center">Copy Reference</Text>
           </TouchableOpacity>
 
+          {/* NOTE:
+              This route expects an order id in many apps.
+              If your dispute system really uses transaction reference, keep it.
+              Otherwise, you should wire this to the correct order id field when available.
+          */}
           <TouchableOpacity
             onPress={() =>
               router.push({
                 pathname: '/orders/[id]/dispute',
-                params: { id: String(data?.reference || data?.id || ref) },
+                params: { id: String((data as any)?.reference || (data as any)?.id || ref) },
               })
             }
             className="bg-gray-900 py-4 mt-3 rounded-xl"

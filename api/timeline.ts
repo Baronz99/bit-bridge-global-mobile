@@ -1,11 +1,10 @@
+// api/timeline.ts
 import client from '@/api/client'
 
-export type TimelineRecord = Record<string, unknown>
-
 export type TimelineQuery = {
-  cursor?: string
+  cursor?: string | null
   limit?: number
-  type?: string
+  type?: string // all | wallet | cards | bills | circles
   status?: string
   startDate?: string
   endDate?: string
@@ -13,13 +12,17 @@ export type TimelineQuery = {
   maxAmount?: string
   source?: string
   showAlerts?: boolean
+  show_alerts?: boolean
   search?: string
 }
 
-export const listTimeline = async (query: TimelineQuery = {}): Promise<unknown> => {
-  const params: Record<string, unknown> = {}
+const normalizeQuery = (q?: TimelineQuery) => {
+  const query = q || {}
+  const params: Record<string, any> = {}
+
   if (query.cursor) params.cursor = query.cursor
-  if (query.limit) params.limit = query.limit
+  params.limit = query.limit ?? 25
+
   if (query.type && query.type !== 'all') params.type = query.type
   if (query.status && query.status !== 'all') params.status = query.status
   if (query.startDate) params.start_date = query.startDate
@@ -27,20 +30,38 @@ export const listTimeline = async (query: TimelineQuery = {}): Promise<unknown> 
   if (query.minAmount) params.min_amount = query.minAmount
   if (query.maxAmount) params.max_amount = query.maxAmount
   if (query.source && query.source !== 'all') params.source = query.source
-  if (query.showAlerts === false) params.show_alerts = false
+  if (typeof query.showAlerts === 'boolean') params.show_alerts = query.showAlerts
+  if (typeof query.show_alerts === 'boolean') params.show_alerts = query.show_alerts
   if (query.search) params.search = query.search
 
-  const res = await client.get('/timeline', { params })
-  return res.data
+  return params
 }
 
-export const getTimelineItem = async (id: string): Promise<unknown> => {
-  // Placeholder for a detail endpoint.
-  const res = await client.get(`/timeline/${id}`)
-  return res.data
+export const listTimeline = async (query?: TimelineQuery) => {
+  return client.get('/timeline', { params: normalizeQuery(query) })
 }
 
-export const listCircleTimeline = async (circleId: string | number): Promise<unknown> => {
-  const res = await client.get(`/circles/${circleId}/timeline`)
-  return res.data
+export const getTimelineItem = async (id: string) => {
+  return client.get(`/timeline/${id}`)
 }
+
+/**
+ * ✅ Smart helper:
+ * - Returns null on 404 (backend doesn't support some timeline IDs).
+ * - Throws for other errors.
+ */
+export const getTimelineItemSmart = async (id: string) => {
+  try {
+    return await getTimelineItem(id)
+  } catch (err: any) {
+    const status = err?.response?.status
+    if (status === 404) return null
+    throw err
+  }
+}
+
+// Compatibility for `import * as apiTimeline from '@/api/timeline'`
+export const apiTimeline = { listTimeline, getTimelineItem, getTimelineItemSmart }
+
+// Optional default export
+export default apiTimeline

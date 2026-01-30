@@ -29,7 +29,8 @@ const AuditSummaryScreen = () => {
     setNotice({ message: null, error: false, data: null })
     try {
       const response = await getCircleAuditSummary(circleId)
-      setSummary(response?.data ?? response)
+      const payload: any = response
+      setSummary(payload?.data ?? payload)
     } catch (error: any) {
       const status = error?.response?.status
       if (status === 401) {
@@ -58,7 +59,8 @@ const AuditSummaryScreen = () => {
     setNotice({ message: null, error: false, data: null })
     try {
       const response = await exportCircleCsv(circleId)
-      const payload = response?.data ?? response
+      const payloadAny: any = response
+      const payload = payloadAny?.data ?? payloadAny
       const url =
         payload?.url ||
         payload?.link ||

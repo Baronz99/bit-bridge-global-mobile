@@ -84,57 +84,29 @@ export const createAnchorAccount = async (payload?: { account?: Record<string, u
 }
 
 export const getBanks = async () => {
-  try {
-    const res = await client.get('/accounts/get_banks')
-    const payload = res.data
-    const raw =
-      payload?.data?.banks ||
-      payload?.data?.data ||
-      payload?.data ||
-      payload?.banks ||
-      payload
-    const list = Array.isArray(raw) ? raw : []
-    console.log('[getBanks] payload keys', Object.keys(payload || {}))
-    console.log('[getBanks] raw sample', list.slice(0, 2))
-    const normalized = list.map((item) => normalizeBank(item || {}))
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('[getBanks] normalized sample', normalized[0])
-    }
-    return normalized
-  } catch (err: any) {
-    const msg = errMsg(err)
-    console.log('[getBanks error]', {
-      message: msg,
-      status: err?.response?.status,
-      data: err?.response?.data,
-      url: err?.config?.url,
-    })
-    throw err
-  }
+  const res = await client.get('/accounts/get_banks')
+  const payload = res.data
+  const raw =
+    payload?.data?.banks ||
+    payload?.data?.data ||
+    payload?.data ||
+    payload?.banks ||
+    payload
+  const list = Array.isArray(raw) ? raw : []
+  return list.map((item) => normalizeBank(item || {}))
 }
 
 export const getBeneficiaries = async () => {
-  try {
-    const res = await client.get('/accounts/beneficiaries')
-    const payload = res.data
-    const raw =
-      payload?.data?.beneficiaries ||
-      payload?.data?.data ||
-      payload?.data ||
-      payload?.beneficiaries ||
-      payload
-    const list = Array.isArray(raw) ? raw : []
-    return list.map((item) => normalizeBeneficiary(item || {}))
-  } catch (err: any) {
-    const msg = errMsg(err)
-    console.log('[getBeneficiaries error]', {
-      message: msg,
-      status: err?.response?.status,
-      data: err?.response?.data,
-      url: err?.config?.url,
-    })
-    throw err
-  }
+  const res = await client.get('/accounts/beneficiaries')
+  const payload = res.data
+  const raw =
+    payload?.data?.beneficiaries ||
+    payload?.data?.data ||
+    payload?.data ||
+    payload?.beneficiaries ||
+    payload
+  const list = Array.isArray(raw) ? raw : []
+  return list.map((item) => normalizeBeneficiary(item || {}))
 }
 
 export const createCounterParty = async (payload: {

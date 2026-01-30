@@ -4,7 +4,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native'
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState, ReactElement, ReactNode } from 'react'
 import { images } from '@/constants/images'
 import { Link } from 'expo-router'
 import { useAuth } from '@/services/useAuth'
@@ -27,12 +27,12 @@ import {
 type RowItem = {
   label: string
   href?: string
-  icon: JSX.Element
+  icon: ReactElement
   tone?: 'default' | 'danger'
   onPress?: () => void
 }
 
-const Profile = () => {
+const Profile = (): ReactElement => {
   const [toggleModal, setToggleModal] = useState(false)
   const { userProfileData, onLogout, loadProfile } = useAuth()
 

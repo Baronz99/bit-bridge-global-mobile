@@ -4,12 +4,12 @@ import TimelineCard from '@/components/timeline/TimelineCard'
 
 type TimelineSection = {
   title: string
-  data: Record<string, unknown>[]
+  data: Record<string, any>[]
 }
 
 type TimelineSectionListProps = {
   sections: TimelineSection[]
-  onPressItem: (item: Record<string, unknown>) => void
+  onPressItem: (item: Record<string, any>) => void
   onEndReached?: () => void
   refreshing?: boolean
   onRefresh?: () => void
@@ -27,7 +27,7 @@ const TimelineSectionList = ({
   return (
     <SectionList
       sections={sections}
-      keyExtractor={(item, index) => String(item.id ?? item.uuid ?? item.slug ?? index)}
+      keyExtractor={(item, index) => String(item.id ?? item.uuid ?? item.slug ?? item.reference ?? index)}
       renderSectionHeader={({ section }) => (
         <View className="mt-6 mb-2">
           <Text className="text-gray-300 text-xs font-semibold tracking-widest uppercase">

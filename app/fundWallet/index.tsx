@@ -36,7 +36,7 @@ const index = () => {
           transaction_type: 'deposit',
           customer_name: userProfileData.email,
           description: 'fund wallet',
-          redirect_url: 'https://bitbridgeglobal.com/app-redirect',
+          redirect_url: 'https://bitbridge-staging.netlify.app/app-redirect',
         },
       })
 

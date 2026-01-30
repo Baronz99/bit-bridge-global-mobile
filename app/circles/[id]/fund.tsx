@@ -86,12 +86,13 @@ const CircleFundScreen = () => {
         note: formData.description.trim() || undefined,
         transaction_pin: transactionPin,
       })
+      const payload: any = response
       setPinModalOpen(false)
       setFormData({ amount: '', description: '' })
       setNotice({
-        message: response?.message || 'Circle funded successfully.',
+        message: payload?.message || 'Circle funded successfully.',
         error: false,
-        data: response?.data || null,
+        data: payload?.data || null,
       })
     } catch (error: any) {
       const status = error?.response?.status

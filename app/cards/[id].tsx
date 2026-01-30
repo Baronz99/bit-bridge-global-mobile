@@ -1,5 +1,14 @@
+// CardDetail.tsx (MOBILE) — full copy/paste replacement
+// ✅ Fixes Freeze button flip (uses unified displayStatus everywhere)
+// ✅ Fixes "1970" created date by supporting seconds + ms + ISO
+// ✅ PCI-safe receipt routing (no /transaction_records call)
+// ✅ Keeps pull-to-refresh
+// ✅ Keeps PIN-gated reveal/fund/unload
+// ✅ Adds SAFE logs (no PAN/CVV, no PIN, no auth headers)
+// ✅ Tightens: blocks fund/unload while frozen, clears stale notices, safer parsing
+
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native'
+import { ActivityIndicator, RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import useFetch from '@/services/useFetch'
 import {
@@ -19,12 +28,70 @@ import TransactionPinModal from '@/components/TransactionPinModal'
 import { getTransactionPinStatus } from '@/api/transactionPin'
 import { useAuth } from '@/services/useAuth'
 
+const DEBUG_CARDS =
+  String(process.env.EXPO_PUBLIC_DEBUG_CARDS || '').toLowerCase() === 'true' || __DEV__ === true
+
+type CardAction = 'fund' | 'unload' | 'reveal'
+type Id = string | number
+
+const safeStr = (v: any, fallback = '') => {
+  const s = String(v ?? '').trim()
+  return s || fallback
+}
+
+const isEncryptedValue = (value?: string | number | null) => {
+  if (!value) return false
+  return String(value).startsWith('ev:')
+}
+
+const parseAmount = (v: any) => {
+  const n = Number(v)
+  return Number.isFinite(n) ? n : NaN
+}
+
+/**
+ * Handles:
+ * - ISO strings: "2026-01-28T..."
+ * - Unix seconds: 1700000000
+ * - Unix ms: 1700000000000
+ * - Numeric strings: "1700..."
+ */
+const formatMaybeDateTime = (value?: string | number | null) => {
+  if (value === null || value === undefined || value === '') return '--'
+
+  // numeric-like?
+  const num = typeof value === 'number' ? value : Number(String(value))
+  if (Number.isFinite(num)) {
+    const ms = num < 1e12 ? num * 1000 : num // seconds -> ms
+    const d = new Date(ms)
+    return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleString()
+  }
+
+  const d = new Date(String(value))
+  return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleString()
+}
+
+const formatHistoryLabel = (item: any) => {
+  const raw = safeStr(item?.address || item?.description || item?.type, 'Card transaction')
+  const lower = raw.toLowerCase()
+  if (lower.includes('virtual card funding')) return 'Funding from Tunnel wallet'
+  if (lower.includes('virtual card withdrawal')) return 'Withdrawal to Tunnel wallet'
+  if (lower.includes('authorization')) return 'Card purchase'
+  if (lower.includes('reversal')) return 'Card reversal'
+  if (lower.includes('refund')) return 'Card refund'
+  if (lower.includes('conversion')) return 'Card conversion'
+  return raw
+}
+
 const CardDetail = () => {
   const { id } = useLocalSearchParams()
   const cardId = String(id || '')
   const router = useRouter()
   const { userProfileData } = useAuth()
 
+  // ----------------------------
+  // Fetchers
+  // ----------------------------
   const fetchDetails = useCallback(() => getCardDetails(cardId), [cardId])
   const fetchBalance = useCallback(() => getCardBalance(cardId), [cardId])
   const fetchHistory = useCallback(() => getCardHistory(cardId), [cardId])
@@ -35,50 +102,135 @@ const CardDetail = () => {
   const history = useFetch(fetchHistory)
   const cardMetaFetch = useFetch(fetchCardMeta)
 
-  const detailPayload = useMemo(() => details.data?.data ?? details.data, [details.data])
+  // ----------------------------
+  // Pull-to-refresh
+  // ----------------------------
+  const [refreshing, setRefreshing] = useState(false)
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true)
+    try {
+      await Promise.allSettled([details.refetch(), balance.refetch(), history.refetch(), cardMetaFetch.refetch()])
+    } finally {
+      setRefreshing(false)
+    }
+  }, [details, balance, history, cardMetaFetch])
+
+  // ----------------------------
+  // Normalized payloads
+  // ----------------------------
+  const detailPayload = useMemo(() => (details.data as any)?.data ?? details.data ?? {}, [details.data])
+
   const cardMetaPayload = useMemo(() => {
-    const payload = cardMetaFetch.data?.data ?? cardMetaFetch.data
+    const payload = (cardMetaFetch.data as any)?.data ?? cardMetaFetch.data
     if (Array.isArray(payload)) return payload
     if (payload?.card) return [payload.card]
     if (payload?.data) return [payload.data]
     if (payload?.card_id) return [payload]
     return []
   }, [cardMetaFetch.data])
+
   const cardMeta = useMemo(() => {
-    if (!Array.isArray(cardMetaPayload)) return null
+    if (!Array.isArray(cardMetaPayload) || cardMetaPayload.length === 0) return null
     return (
       cardMetaPayload.find((item: any) => String(item?.id) === cardId) ||
-      cardMetaPayload.find((item: any) => String(item?.card_id) === String(detailPayload?.card_id)) ||
+      cardMetaPayload.find((item: any) => String(item?.card_id) === String((detailPayload as any)?.card_id)) ||
       cardMetaPayload[0] ||
       null
     )
-  }, [cardMetaPayload, cardId, detailPayload?.card_id])
-  const balancePayload = useMemo(() => balance.data?.data ?? balance.data, [balance.data])
+  }, [cardMetaPayload, cardId, detailPayload])
+
+  const balancePayload = useMemo(() => (balance.data as any)?.data ?? balance.data ?? {}, [balance.data])
+
   const historyPayload = useMemo(() => {
-    const payload = history.data?.data ?? history.data
-    return Array.isArray(payload) ? payload : payload?.history ?? []
+    const payload = (history.data as any)?.data ?? history.data
+    if (Array.isArray(payload)) return payload
+    if (Array.isArray(payload?.history)) return payload.history
+    return []
   }, [history.data])
 
-  const last4 = detailPayload?.last4 || detailPayload?.last_4 || detailPayload?.card_last4
+  // ----------------------------
+  // Derived fields
+  // ----------------------------
+  const last4 =
+    (detailPayload as any)?.last4 ||
+    (detailPayload as any)?.last_4 ||
+    (detailPayload as any)?.card_last4 ||
+    (detailPayload as any)?.cardLast4
+
   const bridgeCardId =
-    detailPayload?.card_id ||
-    detailPayload?.cardId ||
-    detailPayload?.bridge_card_id ||
-    detailPayload?.bridgeCardId ||
+    (detailPayload as any)?.card_id ||
+    (detailPayload as any)?.cardId ||
+    (detailPayload as any)?.bridge_card_id ||
+    (detailPayload as any)?.bridgeCardId ||
     null
 
+  // Unified status source (IMPORTANT)
+  const displayStatus = useMemo(() => {
+    const s =
+      (detailPayload as any)?.status ??
+      (cardMeta as any)?.status ??
+      (detailPayload as any)?.card_status ??
+      (cardMeta as any)?.card_status ??
+      'active'
+    return String(s).toLowerCase()
+  }, [detailPayload, cardMeta])
+
+  const isFrozen = displayStatus === 'frozen'
+
+  const statusLabel = isFrozen ? 'Frozen' : 'Active'
+  const statusTone = isFrozen ? 'text-yellow-300' : 'text-emerald-300'
+
+  const frozenBy = (cardMeta as any)?.frozen_by || (cardMeta as any)?.frozenBy || ''
+  const frozenReason = (cardMeta as any)?.frozen_reason || (cardMeta as any)?.frozenReason || ''
+
+  const cardholderName = useMemo(() => {
+    const profile = (userProfileData as any)?.data ?? userProfileData
+    const u = profile?.user_profile ?? profile?.userProfile ?? profile
+    return (
+      [(detailPayload as any)?.first_name, (detailPayload as any)?.last_name].filter(Boolean).join(' ') ||
+      [(cardMeta as any)?.first_name, (cardMeta as any)?.last_name].filter(Boolean).join(' ') ||
+      [(u as any)?.first_name, (u as any)?.last_name].filter(Boolean).join(' ') ||
+      '--'
+    )
+  }, [detailPayload, cardMeta, userProfileData])
+
+  const currencyLabel = String((detailPayload as any)?.card_currency || 'USD').toUpperCase()
+  const cardTypeLabel = String((detailPayload as any)?.card_type || 'virtual').toUpperCase()
+
+  const normalizeUsdLimit = (value: any) => {
+    if (value === null || value === undefined || value === '') return null
+    const amount = Number(value)
+    if (!Number.isFinite(amount)) return null
+    return amount > 100000 ? amount / 100 : amount
+  }
+
+  const rawLimit =
+    (detailPayload as any)?.card_limit_usd ??
+    (detailPayload as any)?.card_limit ??
+    (detailPayload as any)?.limit ??
+    (cardMeta as any)?.card_limit_usd ??
+    (cardMeta as any)?.card_limit ??
+    (cardMeta as any)?.limit
+
+  const limitValue = normalizeUsdLimit(rawLimit)
+  const limitLabel = limitValue !== null ? moneyFormat(limitValue, currencyLabel) : '--'
+
+  // ----------------------------
+  // PIN-gated actions
+  // ----------------------------
   const [amount, setAmount] = useState('')
   const [notice, setNotice] = useState<string | null>(null)
-  const [cardReveal, setCardReveal] = useState<any | null>(null)
-  const revealTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [pinModalOpen, setPinModalOpen] = useState(false)
   const [pinError, setPinError] = useState<string | null>(null)
-  // ✅ Only change: allow reveal to reuse same modal without breaking fund/unload
-  const [action, setAction] = useState<'fund' | 'unload' | 'reveal'>('fund')
+  const [action, setAction] = useState<CardAction>('fund')
   const [actionLoading, setActionLoading] = useState(false)
 
+  // PCI reveal state (must not persist)
+  const [cardReveal, setCardReveal] = useState<any | null>(null)
+  const revealTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   const hasKycAccess = useMemo(() => {
-    const payload = userProfileData?.data ?? userProfileData
+    const payload = (userProfileData as any)?.data ?? userProfileData
     const kycLevel = payload?.kyc_level || payload?.user_kyc?.kyc_level
     const phoneVerified = payload?.phone_verified === true || payload?.phone_verified_at
     if (!kycLevel && !phoneVerified) return false
@@ -86,103 +238,115 @@ const CardDetail = () => {
     return true
   }, [userProfileData])
 
-  const handlePinGate = async (nextAction: 'fund' | 'unload' | 'reveal') => {
-  // Only fund/unload requires an amount
-  if (nextAction === 'fund' || nextAction === 'unload') {
-    const amountValue = Number(amount)
+  const clearTransientMessages = () => {
+    setNotice(null)
+    setPinError(null)
+  }
+
+  const handlePinGate = async (nextAction: CardAction) => {
+    clearTransientMessages()
+
+    // Block money actions while frozen (this matches expected UX)
+    if ((nextAction === 'fund' || nextAction === 'unload') && isFrozen) {
+      setNotice('Card is frozen. Unfreeze to continue.')
+      return
+    }
+
+    if (nextAction === 'fund' || nextAction === 'unload') {
+      const amountValue = parseAmount(amount)
+      if (!amountValue || Number.isNaN(amountValue) || amountValue <= 0) {
+        setNotice('Enter a valid amount.')
+        return
+      }
+      if (!bridgeCardId) {
+        setNotice('Card ID not available yet. Try again in a moment.')
+        return
+      }
+    }
+
+    if (nextAction === 'reveal' && !cardId) {
+      setNotice('Card not available yet. Try again in a moment.')
+      return
+    }
+
+    try {
+      const status = await getTransactionPinStatus()
+      const payload = (status as any)?.data ?? status
+      const hasPin = payload?.has_pin === true || payload?.status === 'set' || payload?.pin_set === true
+
+      if (!hasPin) {
+        setNotice('Set your transaction PIN to continue.')
+        return
+      }
+
+      setAction(nextAction)
+      setPinModalOpen(true)
+    } catch (error: any) {
+      setNotice(error?.message || 'Unable to check PIN status.')
+    }
+  }
+
+  const handlePinSubmit = async (transactionPin: string) => {
+    // Never log transactionPin.
+    if (!transactionPin) return
+
+    if (action === 'reveal') {
+      setActionLoading(true)
+      setPinError(null)
+      try {
+        // IMPORTANT: do not log reveal payload (PCI)
+        const response = await revealCard(cardId, transactionPin)
+        const payload = (response as any)?.data ?? response
+        const revealPayload = payload?.data ?? payload
+
+        setCardReveal(revealPayload || null)
+        setNotice('Card details revealed.')
+
+        if (revealTimer.current) clearTimeout(revealTimer.current)
+        revealTimer.current = setTimeout(() => {
+          setCardReveal(null)
+        }, 30_000)
+
+        setPinModalOpen(false)
+      } catch (error: any) {
+        setPinError(error?.message || 'Unable to reveal card.')
+      } finally {
+        setActionLoading(false)
+      }
+      return
+    }
+
+    // fund/unload
+    const amountValue = parseAmount(amount)
+    if (!bridgeCardId) {
+      setNotice('Card ID not available yet. Try again in a moment.')
+      return
+    }
     if (!amountValue || Number.isNaN(amountValue) || amountValue <= 0) {
       setNotice('Enter a valid amount.')
       return
     }
-    if (!bridgeCardId) {
-      setNotice('Card ID not available yet. Try again in a moment.')
-      return
-    }
-  }
-
-  // Reveal needs card record id (route param) – not bridgeCardId
-  if (nextAction === 'reveal' && !cardId) {
-    setNotice('Card not available yet. Try again in a moment.')
-    return
-  }
-
-  try {
-    const status = await getTransactionPinStatus()
-    const payload = status?.data ?? status
-    const hasPin =
-      payload?.has_pin === true ||
-      payload?.status === 'set' ||
-      payload?.pin_set === true
-
-    if (!hasPin) {
-      setNotice('Set your transaction PIN to continue.')
+    if (isFrozen) {
+      setNotice('Card is frozen. Unfreeze to continue.')
       return
     }
 
-    setAction(nextAction)
-    setPinError(null)
-    setPinModalOpen(true)
-  } catch (error: any) {
-    setNotice(error?.message || 'Unable to check PIN status.')
-  }
-}
-
-
-
-  const handlePinSubmit = async (transactionPin: string) => {
-    // ✅ Route by action; fund/unload logic stays same
-    if (action === 'reveal') {
-  setActionLoading(true)
-  setPinError(null)
-  try {
-    const response = await revealCard(cardId, transactionPin)
-    const payload = response?.data ?? response
-    const revealPayload = payload?.data ?? payload
-
-    setCardReveal(revealPayload || null)
-    setNotice('Card details revealed.')
-
-    if (revealTimer.current) clearTimeout(revealTimer.current as any)
-    revealTimer.current = setTimeout(() => setCardReveal(null), 30000) as any
-
-    setPinModalOpen(false)
-  } catch (error: any) {
-    setPinError(error?.message || 'Unable to reveal card.')
-  } finally {
-    setActionLoading(false)
-  }
-  return
-}
-
-
-
-    // existing fund/unload flow (unchanged)
-    const amountValue = Number(amount)
-    if (!bridgeCardId) {
-      setNotice('Card ID not available yet. Try again in a moment.')
-      return
-    }
     setActionLoading(true)
     setPinError(null)
+
     try {
       if (action === 'fund') {
-        await fundCard({
-          card_id: bridgeCardId,
-          amount: amountValue,
-          transaction_pin: transactionPin,
-        })
+        await fundCard({ card_id: bridgeCardId, amount: amountValue, transaction_pin: transactionPin })
         setNotice('Card funded successfully.')
       } else {
-        await unloadCard({
-          card_id: bridgeCardId,
-          amount: amountValue,
-          transaction_pin: transactionPin,
-        })
+        await unloadCard({ card_id: bridgeCardId, amount: amountValue, transaction_pin: transactionPin })
         setNotice('Card unloaded successfully.')
       }
+
       setPinModalOpen(false)
-      balance.refetch()
-      history.refetch()
+      setAmount('')
+
+      await Promise.allSettled([balance.refetch(), history.refetch(), details.refetch(), cardMetaFetch.refetch()])
     } catch (error: any) {
       setPinError(error?.message || 'Unable to complete card action.')
     } finally {
@@ -191,17 +355,26 @@ const CardDetail = () => {
   }
 
   const handleFreezeToggle = async () => {
+    clearTransientMessages()
     setActionLoading(true)
     try {
-      const isFrozen = detailPayload?.status === 'frozen'
-      if (isFrozen) {
+      // IMPORTANT: use unified status, not detailPayload-only
+      const frozenNow = isFrozen
+
+      if (DEBUG_CARDS) {
+        console.log('[CARD] freeze toggle', { cardId, frozenNow })
+      }
+
+      if (frozenNow) {
         await unfreezeCard(cardId)
         setNotice('Card unfrozen.')
       } else {
         await freezeCard(cardId)
         setNotice('Card frozen.')
       }
-      details.refetch()
+
+      // refresh both sources that could hold status
+      await Promise.allSettled([details.refetch(), cardMetaFetch.refetch()])
     } catch (error: any) {
       setNotice(error?.message || 'Unable to update card status.')
     } finally {
@@ -209,9 +382,9 @@ const CardDetail = () => {
     }
   }
 
-  // ✅ Keep hide logic exactly the same
   const handleHideReveal = () => {
     if (revealTimer.current) clearTimeout(revealTimer.current)
+    revealTimer.current = null
     setCardReveal(null)
     setNotice('Card details hidden.')
   }
@@ -222,21 +395,25 @@ const CardDetail = () => {
     }
   }, [])
 
-  const isEncryptedValue = (value?: string | number | null) => {
-    if (!value) return false
-    return String(value).startsWith('ev:')
-  }
-
+  // ----------------------------
+  // PCI-safe display values
+  // ----------------------------
   const revealLast4 = cardReveal?.last_4 || cardReveal?.last4 || cardReveal?.last_four
+
   const maskedPanValue = useMemo(() => {
-    if (detailPayload?.masked_pan && !isEncryptedValue(detailPayload.masked_pan))
-      return detailPayload.masked_pan
-    if (detailPayload?.card_pan && !isEncryptedValue(detailPayload.card_pan)) return detailPayload.card_pan
+    // SAFE: only masked values (never decrypted)
+    if ((detailPayload as any)?.masked_pan && !isEncryptedValue((detailPayload as any).masked_pan)) {
+      return (detailPayload as any).masked_pan
+    }
+    if ((detailPayload as any)?.card_pan && !isEncryptedValue((detailPayload as any).card_pan)) {
+      return (detailPayload as any).card_pan
+    }
     if (last4) return `**** **** **** ${last4}`
     return null
   }, [detailPayload, last4])
 
   const revealPanValue = useMemo(() => {
+    // Could contain PAN (only after PIN + short timer)
     if (cardReveal?.card_number && !isEncryptedValue(cardReveal.card_number)) return cardReveal.card_number
     if (cardReveal?.card_pan && !isEncryptedValue(cardReveal.card_pan)) return cardReveal.card_pan
     if (revealLast4) return `**** **** **** ${revealLast4}`
@@ -248,14 +425,16 @@ const CardDetail = () => {
     if (!cardReveal) return null
     const month = cardReveal.expiry_month || cardReveal.expiryMonth
     const year = cardReveal.expiry_year || cardReveal.expiryYear
+
     if (month && year && !isEncryptedValue(month) && !isEncryptedValue(year)) {
       const paddedMonth = String(month).padStart(2, '0')
       const shortYear = String(year).slice(-2)
       return `${paddedMonth}/${shortYear}`
     }
+
     const raw = cardReveal.expiry || cardReveal.expiry_date
-    if (isEncryptedValue(raw)) return null
-    if (!raw) return null
+    if (!raw || isEncryptedValue(raw)) return null
+
     const digits = String(raw).replace(/\D/g, '')
     if (digits.length === 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`
     if (digits.length === 6) return `${digits.slice(0, 2)}/${digits.slice(4)}`
@@ -276,72 +455,91 @@ const CardDetail = () => {
     const state = address?.state || ''
     const postal = address?.billing_zip_code || address?.postal || ''
     const country = address?.billing_country || address?.country || ''
-    const parts = [
-      line1,
-      line2,
-      [city, state].filter(Boolean).join(' '),
-      [country, postal].filter(Boolean).join(' '),
-    ]
+    const parts = [line1, line2, [city, state].filter(Boolean).join(' '), [country, postal].filter(Boolean).join(' ')]
       .map((part) => String(part || '').trim())
       .filter(Boolean)
     return parts.length ? parts : null
   }, [cardReveal])
 
-  const displayStatus = String(detailPayload?.status || cardMeta?.status || 'active').toLowerCase()
-  const statusLabel = displayStatus === 'frozen' ? 'Frozen' : 'Active'
-  const statusTone = displayStatus === 'frozen' ? 'text-yellow-300' : 'text-emerald-300'
-  const frozenBy = cardMeta?.frozen_by || cardMeta?.frozenBy || ''
-  const frozenReason = cardMeta?.frozen_reason || cardMeta?.frozenReason || ''
-  const cardholderName =
-    [detailPayload?.first_name, detailPayload?.last_name].filter(Boolean).join(' ') ||
-    [cardMeta?.first_name, cardMeta?.last_name].filter(Boolean).join(' ') ||
-    cardReveal?.cardholder_name ||
-    cardReveal?.cardholderName ||
-    [userProfileData?.user_profile?.first_name, userProfileData?.user_profile?.last_name]
-      .filter(Boolean)
-      .join(' ')
-  const currencyLabel = String(detailPayload?.card_currency || 'USD').toUpperCase()
-  const cardTypeLabel = String(detailPayload?.card_type || 'virtual').toUpperCase()
-  const normalizeUsdLimit = (value: any) => {
-    if (value === null || value === undefined || value === '') return null
-    const amount = Number(value)
-    if (!Number.isFinite(amount)) return null
-    return amount > 100000 ? amount / 100 : amount
-  }
-  const rawLimit =
-    detailPayload?.card_limit_usd ??
-    detailPayload?.card_limit ??
-    detailPayload?.limit ??
-    cardMeta?.card_limit_usd ??
-    cardMeta?.card_limit ??
-    cardMeta?.limit ??
-    cardReveal?.card_limit ??
-    cardReveal?.limit
-  const limitValue = normalizeUsdLimit(rawLimit)
-  const limitLabel = limitValue !== null ? moneyFormat(limitValue, currencyLabel) : null
+  // Available balance display
+  const availableBalanceLabel = useMemo(() => {
+    const cents =
+      (balancePayload as any)?.balance ??
+      (balancePayload as any)?.available_balance ??
+      (balancePayload as any)?.ledger_balance
 
-  const formatMaybeDateTime = (value?: string | null) => {
-    if (!value) return '--'
-    const parsed = new Date(value)
-    if (Number.isNaN(parsed.getTime())) return value
-    return parsed.toLocaleString()
-  }
+    const amountVal =
+      cents === null || cents === undefined ? Number((balancePayload as any)?.amount ?? 0) : Number(cents) / 100
 
-  const formatHistoryLabel = (item: any) => {
-    const raw = String(item?.address || item?.description || item?.type || 'Card transaction')
-    const lower = raw.toLowerCase()
-    if (lower.includes('virtual card funding')) return 'Funding from Tunnel wallet'
-    if (lower.includes('virtual card withdrawal')) return 'Withdrawal to Tunnel wallet'
-    if (lower.includes('authorization')) return 'Card purchase'
-    if (lower.includes('reversal')) return 'Card reversal'
-    if (lower.includes('refund')) return 'Card refund'
-    if (lower.includes('conversion')) return 'Card conversion'
-    return raw
-  }
+    return moneyFormat(amountVal, 'USD')
+  }, [balancePayload])
 
+  // Created date (fixes 1970)
+  const createdValue = useMemo(() => {
+    const v =
+      (detailPayload as any)?.created_at ||
+      (detailPayload as any)?.createdAt ||
+      (detailPayload as any)?.issued_at ||
+      (detailPayload as any)?.issuedAt ||
+      (detailPayload as any)?.created ||
+      cardReveal?.created_at ||
+      cardReveal?.createdAt ||
+      cardReveal?.issued_at ||
+      cardReveal?.issuedAt ||
+      cardReveal?.created
+
+    return formatMaybeDateTime(v)
+  }, [detailPayload, cardReveal])
+
+  // ----------------------------
+  // PCI-safe receipt routing
+  // ----------------------------
+  const openCardReceipt = useCallback(
+    (item: any, index: number) => {
+      const reference = item?.transaction_reference || item?.reference || item?.id || `${cardId}-${index}`
+      const createdAt = item?.created_at || item?.createdAt || ''
+      const amountValue = Number(item?.amount ?? 0)
+      const description = formatHistoryLabel(item)
+      const status = String(item?.status || 'pending')
+      const breakdown = item?.breakdown || {}
+
+      // SAFE log only
+      if (DEBUG_CARDS) {
+        console.log('[CARD] open receipt', {
+          cardId,
+          reference: String(reference),
+          amount: amountValue,
+          status,
+          hasBreakdown: !!breakdown && Object.keys(breakdown).length > 0,
+        })
+      }
+
+      router.push({
+        pathname: '/transaction/card-receipt',
+        params: {
+          cardId: String(cardId),
+          reference: String(reference),
+          amount: String(amountValue),
+          currency: 'USD',
+          status: String(status),
+          description: String(description),
+          created_at: String(createdAt),
+          breakdown: JSON.stringify(breakdown || {}),
+        },
+      } as any)
+    },
+    [router, cardId]
+  )
+
+  // ----------------------------
+  // Render
+  // ----------------------------
   return (
     <View className="flex-1 bg-primary px-4">
-      <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: 40 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
         <View className="mt-6 rounded-3xl border border-gray-800 bg-gray-900/80 p-5">
           <Text className="text-white/70 text-xs tracking-widest uppercase">Virtual Card</Text>
           <Text className="text-white text-2xl font-semibold mt-2">Card Details</Text>
@@ -357,22 +555,24 @@ const CardDetail = () => {
         {details.error ? (
           <View className="bg-red-500/20 border border-red-500/30 rounded-xl p-3 mt-4">
             <Text className="text-white font-semibold">Error</Text>
-            <Text className="text-white/80">{details.error?.message || 'Failed to load card'}</Text>
+            <Text className="text-white/80">{(details.error as any)?.message || 'Failed to load card'}</Text>
           </View>
         ) : null}
 
         <View className="mt-6 rounded-3xl border border-gray-800 bg-gray-900/80 p-6 overflow-hidden">
           <View className="absolute -right-8 -top-10 w-40 h-40 rounded-full bg-app-primary/10" />
           <View className="absolute -left-10 -bottom-12 w-52 h-52 rounded-full bg-white/5" />
+
           <View className="flex-row items-start justify-between">
             <View>
               <Text className="text-white/70 text-xs tracking-widest uppercase">
                 {cardTypeLabel} - {currencyLabel}
               </Text>
               <Text className="text-white text-xl font-semibold mt-2">
-                {detailPayload?.card_brand || detailPayload?.brand || 'Virtual Card'}
+                {(detailPayload as any)?.card_brand || (detailPayload as any)?.brand || 'Virtual Card'}
               </Text>
             </View>
+
             <View className="bg-gray-950/60 border border-gray-800 px-3 py-1 rounded-full">
               <Text className={`text-xs font-semibold ${statusTone}`}>{statusLabel}</Text>
             </View>
@@ -383,73 +583,59 @@ const CardDetail = () => {
             <Text className="text-white text-lg font-semibold tracking-widest mt-2">
               {revealPanValue || maskedPanValue || `**** **** **** ${last4 || '----'}`}
             </Text>
+            {cardReveal ? (
+              <Text className="text-amber-200 text-[11px] mt-2">
+                Revealed details will auto-hide in 30 seconds.
+              </Text>
+            ) : null}
           </View>
 
           <View className="flex-row justify-between mt-6">
             <View>
               <Text className="text-gray-400 text-xs uppercase tracking-widest">Cardholder</Text>
-              <Text className="text-white text-sm mt-2">{cardholderName || '--'}</Text>
+              <Text className="text-white text-sm mt-2">{cardholderName}</Text>
             </View>
             <View>
-              <Text className="text-gray-400 text-xs uppercase tracking-widest text-right">
-                Limit
-              </Text>
-              <Text className="text-white text-sm mt-2 text-right">{limitLabel || '--'}</Text>
+              <Text className="text-gray-400 text-xs uppercase tracking-widest text-right">Limit</Text>
+              <Text className="text-white text-sm mt-2 text-right">{limitLabel}</Text>
             </View>
           </View>
         </View>
 
         <View className="bg-gray-900 border border-gray-800 rounded-2xl p-4 mt-4">
           <Text className="text-white font-semibold">Available Balance</Text>
-          <Text className="text-white mt-2 text-2xl font-semibold">
-            {(() => {
-              const cents =
-                balancePayload?.balance ??
-                balancePayload?.available_balance ??
-                balancePayload?.ledger_balance
-              const amount =
-                cents === null || cents === undefined
-                  ? Number(balancePayload?.amount ?? 0)
-                  : Number(cents) / 100
-              return moneyFormat(amount, 'USD')
-            })()}
-          </Text>
+          <Text className="text-white mt-2 text-2xl font-semibold">{availableBalanceLabel}</Text>
           <Text className="text-gray-400 text-xs mt-1">USD tunnel wallet only.</Text>
         </View>
 
         <View className="bg-gray-900 border border-gray-800 rounded-2xl p-4 mt-4">
           <Text className="text-white font-semibold">Card Controls</Text>
-          {displayStatus === 'frozen' ? (
+
+          {isFrozen ? (
             <View className="mt-3 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2">
               <Text className="text-red-100 text-xs font-semibold">Card frozen</Text>
-              <Text className="text-red-200/90 text-[11px] mt-1">
-                {frozenReason || 'Your card is temporarily frozen.'}
-              </Text>
-              {frozenBy ? (
-                <Text className="text-red-200/80 text-[11px] mt-1">Frozen by: {frozenBy}</Text>
-              ) : null}
+              <Text className="text-red-200/90 text-[11px] mt-1">{frozenReason || 'Your card is temporarily frozen.'}</Text>
+              {frozenBy ? <Text className="text-red-200/80 text-[11px] mt-1">Frozen by: {frozenBy}</Text> : null}
             </View>
           ) : null}
-          <FormInput
-            label="Amount"
-            value={amount}
-            keyboardType="numeric"
-            onChangeText={(value: string) => setAmount(value)}
-          />
+
+          <FormInput label="Amount" value={amount} keyboardType="numeric" onChangeText={(v: string) => setAmount(v)} />
+
           {notice ? <Text className="text-yellow-400 mt-2">{notice}</Text> : null}
 
           <View className="flex-row gap-3 mt-4">
             <TouchableOpacity
               onPress={() => handlePinGate('fund')}
               className="bg-app-primary py-3 rounded-xl flex-1"
-              disabled={actionLoading}
+              disabled={actionLoading || !hasKycAccess || isFrozen}
             >
               <Text className="text-white text-center font-medium">Fund</Text>
             </TouchableOpacity>
+
             <TouchableOpacity
               onPress={() => handlePinGate('unload')}
               className="bg-gray-900 border border-gray-800 py-3 rounded-xl flex-1"
-              disabled={actionLoading}
+              disabled={actionLoading || !hasKycAccess || isFrozen}
             >
               <Text className="text-white text-center font-medium">Unload</Text>
             </TouchableOpacity>
@@ -461,51 +647,39 @@ const CardDetail = () => {
               className="bg-gray-900 border border-gray-800 py-3 rounded-xl flex-1"
               disabled={actionLoading}
             >
-              <Text className="text-white text-center font-medium">
-                {detailPayload?.status === 'frozen' ? 'Unfreeze' : 'Freeze'}
-              </Text>
+              <Text className="text-white text-center font-medium">{isFrozen ? 'Unfreeze' : 'Freeze'}</Text>
             </TouchableOpacity>
 
-            {/* ✅ Only change: Reveal now goes through PIN modal; Hide remains immediate */}
             <TouchableOpacity
               onPress={cardReveal ? handleHideReveal : () => handlePinGate('reveal')}
               className="bg-gray-900 border border-gray-800 py-3 rounded-xl flex-1"
               disabled={actionLoading}
             >
-              <Text className="text-white text-center font-medium">
-                {cardReveal ? 'Hide' : 'Reveal'}
-              </Text>
+              <Text className="text-white text-center font-medium">{cardReveal ? 'Hide' : 'Reveal'}</Text>
             </TouchableOpacity>
           </View>
+
+          {!hasKycAccess ? (
+            <Text className="text-gray-400 text-xs mt-3">Complete verification to fund/unload cards.</Text>
+          ) : null}
+          {isFrozen ? (
+            <Text className="text-gray-400 text-xs mt-2">Card is frozen — fund/unload is disabled.</Text>
+          ) : null}
         </View>
 
         <View className="bg-gray-900 border border-gray-800 rounded-2xl p-4 mt-4">
           <Text className="text-white font-semibold">Card Details</Text>
           <View className="mt-3">
-            <LabelText label="Card ID" value={detailPayload?.card_id || detailPayload?.id || '--'} />
+            <LabelText label="Card ID" value={String((detailPayload as any)?.card_id || (detailPayload as any)?.id || '--')} />
             <LabelText label="Currency" value={currencyLabel} />
             <LabelText label="Type" value={cardTypeLabel} />
-            <LabelText
-              label="Created"
-              value={formatMaybeDateTime(
-                detailPayload?.created_at ||
-                  detailPayload?.createdAt ||
-                  detailPayload?.issued_at ||
-                  detailPayload?.issuedAt ||
-                  detailPayload?.created ||
-                  cardReveal?.created_at ||
-                  cardReveal?.createdAt ||
-                  cardReveal?.issued_at ||
-                  cardReveal?.issuedAt ||
-                  cardReveal?.created
-              )}
-            />
+            <LabelText label="Created" value={createdValue} />
             <LabelText label="Expiry" value={revealExpiryValue || 'Hidden'} />
             <LabelText label="CVV" value={revealCvvValue || 'Hidden'} />
             {billingAddressLines ? (
               <View className="py-2 border-b border-gray-800/60">
                 <Text className="text-gray-400 text-xs uppercase tracking-widest">Billing address</Text>
-                {billingAddressLines.map((line, idx) => (
+                {billingAddressLines.map((line: string, idx: number) => (
                   <Text key={`${line}-${idx}`} className="text-white text-sm mt-1">
                     {line}
                   </Text>
@@ -519,53 +693,39 @@ const CardDetail = () => {
 
         <View className="bg-gray-900 border border-gray-800 rounded-2xl p-4 mt-4">
           <Text className="text-white font-semibold">Recent Activity</Text>
+
           {history.loading ? (
             <View className="py-4">
               <ActivityIndicator />
             </View>
           ) : null}
+
           {historyPayload.length === 0 && !history.loading ? (
             <Text className="text-gray-400 text-xs mt-2">No activity yet.</Text>
           ) : null}
+
           {historyPayload.slice(0, 5).map((item: any, index: number) => {
-            const reference =
-              item?.transaction_reference || item?.reference || item?.id || `${cardId}-${index}`
             const createdAt = item?.created_at || item?.createdAt || ''
             const amountValue = Number(item?.amount ?? 0)
             const description = formatHistoryLabel(item)
-            const status = String(item?.status || 'pending')
             const breakdown = item?.breakdown || {}
+
             return (
-              <View
-                key={String(item?.id ?? index)}
-                className="mt-3 rounded-xl border border-gray-800 bg-gray-950/60 px-3 py-2"
-              >
-                <TouchableOpacity
-                  onPress={() =>
-                    router.push({
-                      pathname: '/transaction/receipt',
-                      params: {
-                        reference: String(reference),
-                        amount: String(amountValue),
-                        currency: 'USD',
-                        status: String(status),
-                        description: String(description),
-                        created_at: String(createdAt),
-                      },
-                    })
-                  }
-                  className="py-1"
-                >
+              <View key={String(item?.id ?? index)} className="mt-3 rounded-xl border border-gray-800 bg-gray-950/60 px-3 py-2">
+                <TouchableOpacity onPress={() => openCardReceipt(item, index)} className="py-1">
                   <View className="flex-row justify-between">
                     <Text className="text-gray-200 text-sm">{description}</Text>
                     <Text className="text-gray-300 text-sm">{moneyFormat(amountValue, 'USD')}</Text>
                   </View>
-                  <Text className="text-gray-500 text-xs mt-1">{createdAt}</Text>
+
+                  <Text className="text-gray-500 text-xs mt-1">{createdAt ? formatMaybeDateTime(createdAt) : '--'}</Text>
+
                   {item?.decline_reason === 'insufficient_balance' ? (
                     <Text className="text-amber-200 text-[11px] mt-2">
                       Insufficient USD balance to cover purchase + fees.
                     </Text>
                   ) : null}
+
                   {breakdown &&
                   (breakdown.total_debit_usd ||
                     breakdown.provider_fee_usd ||
@@ -596,13 +756,7 @@ const CardDetail = () => {
         onSubmit={handlePinSubmit}
         loading={actionLoading}
         errorMessage={pinError}
-        title={
-          action === 'fund'
-            ? 'Enter PIN to Fund'
-            : action === 'unload'
-              ? 'Enter PIN to Unload'
-              : 'Enter PIN to Reveal'
-        }
+        title={action === 'fund' ? 'Enter PIN to Fund' : action === 'unload' ? 'Enter PIN to Unload' : 'Enter PIN to Reveal'}
       />
     </View>
   )
@@ -617,21 +771,9 @@ const LabelText = ({ label, value }: { label: string; value: string }) => (
   </View>
 )
 
-const LineItem = ({
-  label,
-  value,
-  emphasis,
-}: {
-  label: string
-  value: string
-  emphasis?: boolean
-}) => (
+const LineItem = ({ label, value, emphasis }: { label: string; value: string; emphasis?: boolean }) => (
   <View className="flex-row justify-between mt-1">
-    <Text className={`text-[11px] ${emphasis ? 'text-gray-200 font-semibold' : 'text-gray-400'}`}>
-      {label}
-    </Text>
-    <Text className={`text-[11px] ${emphasis ? 'text-gray-200 font-semibold' : 'text-gray-300'}`}>
-      {value}
-    </Text>
+    <Text className={`text-[11px] ${emphasis ? 'text-gray-200 font-semibold' : 'text-gray-400'}`}>{label}</Text>
+    <Text className={`text-[11px] ${emphasis ? 'text-gray-200 font-semibold' : 'text-gray-300'}`}>{value}</Text>
   </View>
 )

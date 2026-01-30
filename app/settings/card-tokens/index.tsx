@@ -85,14 +85,15 @@ const SavedCardTokensScreen = () => {
         active: nextActive,
         status: nextActive ? 'active' : 'inactive',
       })
-      const updated = response?.data ?? response
+      const payload: any = response
+      const updated = payload?.data ?? payload
       setTokens((prev) =>
         prev.map((item) => (item === token ? { ...item, ...updated } : item))
       )
       setNotice({
-        message: response?.message || 'Token updated.',
+        message: payload?.message || 'Token updated.',
         error: false,
-        data: response?.data || null,
+        data: payload?.data || null,
       })
     } catch (error: any) {
       const status = error?.response?.status

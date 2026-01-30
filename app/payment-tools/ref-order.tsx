@@ -32,11 +32,12 @@ const RefOrderScreen = () => {
     setNotice({ message: null, error: false, data: null })
     try {
       const response = await getRefOrder(formValue.trim())
-      setResult(response?.data ?? response)
+      const payload: any = response
+      setResult(payload?.data ?? payload)
       setNotice({
-        message: response?.message || 'Reference order fetched.',
+        message: payload?.message || 'Reference order fetched.',
         error: false,
-        data: response?.data || null,
+        data: payload?.data || null,
       })
     } catch (error: any) {
       const status = error?.response?.status
