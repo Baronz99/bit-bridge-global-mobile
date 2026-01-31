@@ -18,7 +18,7 @@ import { getTransactions } from '@/api/transactions'
 import { dateFormat } from '@/utils/dateFormat'
 import { useRouter } from 'expo-router'
 import { activateTunnel, getUserWallet } from '@/api/wallet'
-import { useAnchorOnboarding } from '@/services/useAnchorOnboarding'
+import { normalizeAnchorOnboarding, useAnchorOnboarding } from '@/services/useAnchorOnboarding'
 import AppModal from '@/components/modal/Modal'
 
 const WalletScreen = () => {
@@ -99,14 +99,11 @@ const WalletScreen = () => {
 
   const { data, loading, refetch } = useFetch(fetchTransactions)
   const { data: walletData, refetch: refetchWallet } = useFetch(() => getUserWallet())
-  const {
-    loading: anchorLoading,
-    isHydrated: anchorHydrated,
-    hasAnchorAccount,
-    accountNumber,
-    accountName,
-    bankName,
-  } = useAnchorOnboarding({ autoFetchOnMount: false, autoFetchOnFocus: false })
+  const anchorState = useAnchorOnboarding({ autoFetchOnMount: false, autoFetchOnFocus: false })
+  const anchorNormalized = useMemo(
+    () => normalizeAnchorOnboarding(anchorState.detailResponse, anchorState.userAccountsResponse),
+    [anchorState.detailResponse, anchorState.userAccountsResponse]
+  )
 
   const [tunnelLoading, setTunnelLoading] = useState(false)
   const [tunnelNotice, setTunnelNotice] = useState<string | null>(null)
@@ -364,28 +361,34 @@ const WalletScreen = () => {
 
           <View className="mt-4 rounded-2xl border border-gray-800 bg-gray-900/70 p-4">
             <Text className="text-white text-sm font-semibold">Bridge account (NGN)</Text>
-            <Text className="text-gray-400 text-xs mt-1">Use this virtual account for Naira deposits.</Text>
+            <Text className="text-gray-400 text-xs mt-1">Receive NGN deposits here.</Text>
 
-            {anchorLoading && anchorHydrated ? (
-              <View className="py-4 items-center">
-                <ActivityIndicator size="small" color="#f59e0b" />
-              </View>
-            ) : anchorHydrated && hasAnchorAccount && accountNumber ? (
+            {anchorNormalized.hasAccountNumber ? (
               <View className="mt-3">
                 <View className="flex-row items-center justify-between">
                   <View>
                     <Text className="text-gray-400 text-xs">Account number</Text>
-                    <Text className="text-white text-lg font-semibold mt-1">{accountNumber}</Text>
+                    <Text className="text-white text-lg font-semibold mt-1">
+                      {anchorNormalized.displayAccountNumber || '----'}
+                    </Text>
                   </View>
 
                   <TouchableOpacity
                     onPress={async () => {
+                      const raw = anchorNormalized.rawAccountNumber
+                      if (!raw) {
+                        Alert.alert(
+                          'Account number hidden',
+                          'Open Virtual Accounts to view the full number.'
+                        )
+                        return
+                      }
                       try {
                         const Clipboard = await import('expo-clipboard')
-                        await Clipboard.setStringAsync(String(accountNumber))
+                        await Clipboard.setStringAsync(String(raw))
                         Alert.alert('Copied', 'Account number copied.')
                       } catch {
-                        Alert.alert('Account number', String(accountNumber))
+                        Alert.alert('Account number', String(raw))
                       }
                     }}
                     className="bg-gray-950 border border-gray-800 px-3 py-2 rounded-full"
@@ -394,24 +397,31 @@ const WalletScreen = () => {
                   </TouchableOpacity>
                 </View>
 
-                {accountName ? (
-                  <Text className="text-gray-300 text-xs mt-2">{accountName}</Text>
+                {anchorNormalized.accountName ? (
+                  <Text className="text-gray-300 text-xs mt-2">{anchorNormalized.accountName}</Text>
                 ) : null}
-                {bankName ? (
-                  <Text className="text-gray-500 text-xs mt-1">{bankName}</Text>
+                {anchorNormalized.bankName ? (
+                  <Text className="text-gray-500 text-xs mt-1">{anchorNormalized.bankName}</Text>
                 ) : null}
+
+                <TouchableOpacity
+                  onPress={() => router.push('/anchor-account')}
+                  className="bg-gray-950 border border-gray-800 py-3 rounded-xl mt-3 items-center"
+                >
+                  <Text className="text-white text-xs font-semibold">View deposit account</Text>
+                </TouchableOpacity>
               </View>
             ) : (
               <View className="mt-3">
                 <Text className="text-gray-300 text-xs">
-                  Manage your Anchor account to enable Bridge deposits and generate a virtual account.
+                  Set up a virtual account to receive NGN deposits.
                 </Text>
 
                 <TouchableOpacity
                   onPress={() => router.push('/anchor-account')}
                   className="bg-gray-950 border border-gray-800 py-3 rounded-xl mt-3 items-center"
                 >
-                  <Text className="text-white text-xs font-semibold">Create NGN account</Text>
+                  <Text className="text-white text-xs font-semibold">Set up deposit account</Text>
                 </TouchableOpacity>
               </View>
             )}

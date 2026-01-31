@@ -31,7 +31,7 @@ const Utilities = () => {
       {
         title: 'Accounts',
         description: 'View and manage virtual accounts.',
-        items: [{ id: 12, label: 'Anchor Account', link: '/anchor-account', image: icons.wallet }],
+        items: [{ id: 12, label: 'Virtual Accounts', link: '/accounts', image: icons.wallet }],
       },
     ],
     []

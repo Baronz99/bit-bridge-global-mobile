@@ -345,10 +345,10 @@ const BankTransferScreen = () => {
                 No Anchor account found. Create one to continue.
               </Text>
               <TouchableOpacity
-                onPress={() => router.push('/anchor-account')}
+                onPress={() => router.push('/accounts')}
                 className="bg-theme-primary py-3 rounded-xl"
               >
-                <Text className="text-alt text-center font-medium">Create Anchor Account</Text>
+                <Text className="text-alt text-center font-medium">Manage Virtual Accounts</Text>
               </TouchableOpacity>
             </View>
           ) : null}
@@ -460,10 +460,10 @@ const BankTransferScreen = () => {
           </TouchableOpacity>
           {showAnchorCta && hasAnchor ? (
             <TouchableOpacity
-              onPress={() => router.push('/anchor-account')}
+              onPress={() => router.push('/accounts')}
               className="bg-gray-900 py-4 mt-4 rounded-xl"
             >
-              <Text className="text-white text-center">View Anchor Account</Text>
+              <Text className="text-white text-center">View Virtual Accounts</Text>
             </TouchableOpacity>
           ) : null}
         </View>

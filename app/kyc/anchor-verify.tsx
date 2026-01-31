@@ -4,10 +4,11 @@ import { useRouter } from 'expo-router'
 
 const AnchorKycVerify = () => {
   const router = useRouter()
+
   useEffect(() => {
     const timer = setTimeout(() => {
-      router.replace('/anchor-account')
-    }, 300)
+      router.replace('/accounts')
+    }, 200)
     return () => clearTimeout(timer)
   }, [router])
 
@@ -16,13 +17,13 @@ const AnchorKycVerify = () => {
       <View className="pt-10">
         <Text className="text-white text-2xl font-semibold">Anchor KYC</Text>
         <Text className="text-gray-400 mt-2">
-          KYC verification now happens inside the Anchor Account flow.
+          KYC verification now happens inside Virtual Accounts.
         </Text>
         <TouchableOpacity
-          onPress={() => router.replace('/anchor-account')}
+          onPress={() => router.replace('/accounts')}
           className="bg-app-primary py-4 rounded-xl mt-6"
         >
-          <Text className="text-white text-center font-medium">Go to Anchor Account</Text>
+          <Text className="text-white text-center font-medium">Go to Virtual Accounts</Text>
         </TouchableOpacity>
       </View>
     </View>

@@ -11,6 +11,8 @@ export type NormalizedAnchorOnboarding = {
   kycState: AnchorKycState
   hasAccountNumber: boolean
   accountNumber: string | null
+  rawAccountNumber: string | null
+  displayAccountNumber: string | null
   accountName: string | null
   bankName: string | null
   depositReady: boolean
@@ -93,10 +95,13 @@ const extractAccountsList = (raw: unknown): any[] => {
 const normalizeKycState = (
   raw: unknown,
   hasAnchorAccount: boolean,
-  detailResponse?: any
+  detailResponse?: any,
+  hasAccountNumber?: boolean
 ): AnchorKycState => {
   const value = String(raw ?? '').trim().toLowerCase()
   if (!hasAnchorAccount) return 'unknown'
+  if (value === 'active') return 'verified'
+  if (hasAccountNumber) return 'verified'
   if (!value) return 'not_started'
   if (
     ['completed', 'verified', 'approved', 'success', 'successful'].some((v) =>
@@ -235,6 +240,12 @@ export const normalizeAnchorOnboarding = (
     anchorAccount?.account_number,
     anchorAccount?.accountNumber
   )
+  const rawAccountNumber = accountNumber && accountNumber.includes('*') ? '' : accountNumber
+  const displayAccountNumber = accountNumber
+    ? accountNumber.includes('*')
+      ? accountNumber
+      : `****${accountNumber.slice(-4)}`
+    : null
 
   const accountName = pickString(
     extractAccountNameFromDetail(detailData),
@@ -249,7 +260,12 @@ export const normalizeAnchorOnboarding = (
     anchorAccount?.bank
   )
 
-  const kycState = normalizeKycState(extractStatusFromDetail(detailData), hasAnchorAccount, detailResponse)
+  const kycState = normalizeKycState(
+    extractStatusFromDetail(detailData),
+    hasAnchorAccount,
+    detailResponse,
+    Boolean(accountNumber)
+  )
   const hasAccountNumber = Boolean(accountNumber)
   const depositReady = kycState === 'verified' && hasAccountNumber
 
@@ -267,6 +283,8 @@ export const normalizeAnchorOnboarding = (
     kycState,
     hasAccountNumber,
     accountNumber: accountNumber || null,
+    rawAccountNumber: rawAccountNumber || null,
+    displayAccountNumber,
     accountName: accountName || null,
     bankName: bankName || null,
     depositReady,
@@ -286,6 +304,11 @@ export const getAnchorNextStep = (state: {
 }
 
 let didLogShapes = false
+
+const shouldLogDev = () => {
+  const isJest = typeof process !== 'undefined' && !!process.env?.JEST_WORKER_ID
+  return __DEV__ && !isJest
+}
 
 const findKeyPaths = (
   value: unknown,
@@ -427,8 +450,7 @@ const logNestedKeyGroups = (
 }
 
 const logResponseShapes = (detailResponse: any, userAccountsResponse: any) => {
-  const isJest = typeof process !== 'undefined' && !!process.env?.JEST_WORKER_ID
-  if (!__DEV__ || isJest || didLogShapes) return
+  if (!shouldLogDev() || didLogShapes) return
   didLogShapes = true
 
   const detailKeys = Object.keys(detailResponse || {})
@@ -524,6 +546,17 @@ const logResponseShapes = (detailResponse: any, userAccountsResponse: any) => {
   console.log('[Anchor Onboarding] user_accounts account number value paths', userAccountsValuePaths.accountNumberPaths)
 }
 
+const logDerivedState = (state: NormalizedAnchorOnboarding) => {
+  if (!shouldLogDev()) return
+  console.log('[Anchor Onboarding] derived state', {
+    hasAnchorAccount: state.hasAnchorAccount,
+    kycState: state.kycState,
+    hasAccountNumber: state.hasAccountNumber,
+    depositReady: state.depositReady,
+    step: state.nextStep,
+  })
+}
+
 const fetchAnchorOnboarding = async (options?: { force?: boolean }): Promise<RefreshResponse> => {
   if (!options?.force && store.detailResponse !== undefined && !isStale(store.lastFetchedAt)) {
     return {
@@ -556,6 +589,10 @@ const fetchAnchorOnboarding = async (options?: { force?: boolean }): Promise<Ref
         error: null,
         lastFetchedAt: Date.now(),
       })
+
+      logDerivedState(
+        normalizeAnchorOnboarding(detailResponse ?? null, userAccountsResponse)
+      )
 
       return { detailResponse: detailResponse ?? null, userAccountsResponse }
     } catch (error) {

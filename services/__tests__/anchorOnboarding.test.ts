@@ -64,10 +64,10 @@ describe('normalizeAnchorOnboarding', () => {
     })
     expect(ready.depositReady).toBe(true)
 
-    const notReady = normalizeAnchorOnboarding({
+    const statusPendingNumber = normalizeAnchorOnboarding({
       data: { status: 'pending', account_number: '1112223334' },
       has_anchor_account: true,
     })
-    expect(notReady.depositReady).toBe(false)
+    expect(statusPendingNumber.depositReady).toBe(true)
   })
 })
