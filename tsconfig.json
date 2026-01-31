@@ -8,7 +8,7 @@
       ],
       "@/utils/*": [
         "./utils/*",
-        "./app/utils/*"
+        "./app/_utils/*"
       ]
     }
   },

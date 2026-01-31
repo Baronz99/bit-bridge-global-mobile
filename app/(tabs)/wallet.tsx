@@ -18,7 +18,7 @@ import { getTransactions } from '@/api/transactions'
 import { dateFormat } from '@/utils/dateFormat'
 import { useRouter } from 'expo-router'
 import { activateTunnel, getUserWallet } from '@/api/wallet'
-import { getUserAnchorAccountDetail } from '@/api/account'
+import { useAnchorOnboarding } from '@/services/useAnchorOnboarding'
 import AppModal from '@/components/modal/Modal'
 
 const WalletScreen = () => {
@@ -100,10 +100,13 @@ const WalletScreen = () => {
   const { data, loading, refetch } = useFetch(fetchTransactions)
   const { data: walletData, refetch: refetchWallet } = useFetch(() => getUserWallet())
   const {
-    data: anchorStatus,
     loading: anchorLoading,
-    refetch: refetchAnchor,
-  } = useFetch(() => getUserAnchorAccountDetail())
+    isHydrated: anchorHydrated,
+    hasAnchorAccount,
+    accountNumber,
+    accountName,
+    bankName,
+  } = useAnchorOnboarding({ autoFetchOnMount: false, autoFetchOnFocus: false })
 
   const [tunnelLoading, setTunnelLoading] = useState(false)
   const [tunnelNotice, setTunnelNotice] = useState<string | null>(null)
@@ -118,11 +121,6 @@ const WalletScreen = () => {
   const tunnelWallet = walletData?.data?.tunnel
   const tunnelBalanceValue = Number(tunnelWallet?.balance ?? tunnelWallet?.amount ?? 0)
 
-  const hasAnchorAccount = anchorStatus?.has_anchor_account === true
-  const anchorData = anchorStatus?.data ?? null
-  const accountNumber = anchorData?.account_number ?? anchorData?.accountNumber
-  const accountName = anchorData?.account_name ?? anchorData?.accountName ?? anchorData?.name
-  const bankName = anchorData?.bank_name ?? anchorData?.bankName ?? anchorData?.bank
 
   // Refetch when switching wallets or changing filters
   useEffect(() => {
@@ -304,11 +302,11 @@ const WalletScreen = () => {
   const onRefresh = useCallback(async () => {
     setRefreshing(true)
     try {
-      await Promise.allSettled([refetch(), refetchWallet(), refetchAnchor()])
+      await Promise.allSettled([refetch(), refetchWallet()])
     } finally {
       setRefreshing(false)
     }
-  }, [refetch, refetchWallet, refetchAnchor])
+  }, [refetch, refetchWallet])
 
   const heroContent = (
     <>
@@ -368,11 +366,11 @@ const WalletScreen = () => {
             <Text className="text-white text-sm font-semibold">Bridge account (NGN)</Text>
             <Text className="text-gray-400 text-xs mt-1">Use this virtual account for Naira deposits.</Text>
 
-            {anchorLoading ? (
+            {anchorLoading && anchorHydrated ? (
               <View className="py-4 items-center">
                 <ActivityIndicator size="small" color="#f59e0b" />
               </View>
-            ) : hasAnchorAccount && accountNumber ? (
+            ) : anchorHydrated && hasAnchorAccount && accountNumber ? (
               <View className="mt-3">
                 <View className="flex-row items-center justify-between">
                   <View>
@@ -396,13 +394,17 @@ const WalletScreen = () => {
                   </TouchableOpacity>
                 </View>
 
-                {accountName ? <Text className="text-gray-300 text-xs mt-2">{accountName}</Text> : null}
-                {bankName ? <Text className="text-gray-500 text-xs mt-1">{bankName}</Text> : null}
+                {accountName ? (
+                  <Text className="text-gray-300 text-xs mt-2">{accountName}</Text>
+                ) : null}
+                {bankName ? (
+                  <Text className="text-gray-500 text-xs mt-1">{bankName}</Text>
+                ) : null}
               </View>
             ) : (
               <View className="mt-3">
                 <Text className="text-gray-300 text-xs">
-                  Create your Bridge account after completing the required profile and KYC checks.
+                  Manage your Anchor account to enable Bridge deposits and generate a virtual account.
                 </Text>
 
                 <TouchableOpacity

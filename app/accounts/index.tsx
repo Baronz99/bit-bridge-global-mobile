@@ -2,37 +2,27 @@ import React, { useMemo } from 'react'
 import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native'
 import { Link } from 'expo-router'
 import useFetch from '@/services/useFetch'
-import { getAccounts, getUserAccountDetail } from '@/api/account'
+import { getAccounts } from '@/api/account'
+import { useAnchorOnboarding } from '@/services/useAnchorOnboarding'
 import { buildApiErrorMessage } from '@/utils/apiErrorMessage'
 
 type AnyObj = Record<string, any>
 
 const asObj = (v: unknown): AnyObj => (v && typeof v === 'object' ? (v as AnyObj) : {})
-const asArray = (v: unknown): any[] => (Array.isArray(v) ? v : [])
 
 const extractAccountsList = (raw: unknown): any[] => {
   const root = asObj(raw)
   const payload = root?.data ?? root
 
-  // common list containers
   if (Array.isArray(payload)) return payload
 
   const p = asObj(payload)
-
-  // try common keys
-  const candidates = [
-    p.accounts,
-    p.items,
-    p.results,
-    p.data, // sometimes nested
-    p.user_accounts,
-  ]
+  const candidates = [p.accounts, p.items, p.results, p.data, p.user_accounts]
 
   for (const c of candidates) {
     if (Array.isArray(c)) return c
   }
 
-  // sometimes: { data: { items: [...] } }
   const nested = asObj(p.data)
   const nestedCandidates = [nested.items, nested.accounts, nested.results]
   for (const c of nestedCandidates) {
@@ -42,66 +32,50 @@ const extractAccountsList = (raw: unknown): any[] => {
   return []
 }
 
-const extractAccountDetail = (raw: unknown): AnyObj | null => {
-  const root = asObj(raw)
-  const payload = root?.data ?? root
-  if (!payload) return null
-
-  // sometimes API returns the detail object directly
-  if (typeof payload === 'object' && !Array.isArray(payload)) {
-    const p = asObj(payload)
-
-    // common keys for "primary account"
-    const candidate =
-      p.account ??
-      p.detail ??
-      p.details ??
-      p.primary ??
-      p.primary_account ??
-      p.user_account ??
-      p.data // sometimes nested
-
-    if (candidate && typeof candidate === 'object' && !Array.isArray(candidate)) {
-      const c = asObj(candidate)
-      // if it looks like a detail object
-      if (c.account_number || c.account_name || c.bank_name || c.bank) return c
-    }
-
-    // if payload itself looks like a detail object
-    if (p.account_number || p.account_name || p.bank_name || p.bank) return p
-  }
-
-  return null
+const hasAccountNumber = (account: AnyObj | null): boolean => {
+  if (!account) return false
+  const number = String(account.account_number ?? account.number ?? '').trim()
+  return Boolean(number)
 }
 
 const AccountsScreen = () => {
   const accountsFetch = useFetch(() => getAccounts())
-  const detailsFetch = useFetch(() => getUserAccountDetail())
+  const anchorState = useAnchorOnboarding({ autoFetchOnMount: false, autoFetchOnFocus: false })
 
   const accounts = useMemo(() => extractAccountsList(accountsFetch.data), [accountsFetch.data])
 
-  const accountDetail = useMemo(
-    () => extractAccountDetail(detailsFetch.data),
-    [detailsFetch.data]
+  const primaryAccount = useMemo(
+    () => accounts.find((account) => hasAccountNumber(account as AnyObj)) || null,
+    [accounts]
   )
 
-  const hasError = Boolean(accountsFetch.error || detailsFetch.error)
+  const hasDepositAccount = useMemo(() => {
+    if (anchorState.hasAccountNumber) return true
+    return accounts.some((account) => hasAccountNumber(account as AnyObj))
+  }, [anchorState.hasAccountNumber, accounts])
+
+  const hasError = Boolean(accountsFetch.error || anchorState.error)
 
   const errorMessage = useMemo(() => {
     if (!hasError) return null
 
     return (
       accountsFetch.error?.message ||
-      detailsFetch.error?.message ||
+      anchorState.error?.message ||
       buildApiErrorMessage({
-        status: accountsFetch.error?.response?.status || detailsFetch.error?.response?.status,
-        data: accountsFetch.error?.response?.data || detailsFetch.error?.response?.data,
+        status: accountsFetch.error?.response?.status || anchorState.error?.response?.status,
+        data: accountsFetch.error?.response?.data || anchorState.error?.response?.data,
         fallback: 'Something went wrong',
       })
     )
-  }, [hasError, accountsFetch.error, detailsFetch.error])
+  }, [hasError, accountsFetch.error, anchorState.error])
 
-  const loading = Boolean(accountsFetch.loading || detailsFetch.loading)
+  const loading = Boolean(accountsFetch.loading || anchorState.loading)
+  const showCreate =
+    anchorState.isHydrated &&
+    anchorState.hasAnchorAccount &&
+    anchorState.kycState === 'verified' &&
+    !anchorState.hasAccountNumber
 
   return (
     <View className="flex-1 bg-primary px-4">
@@ -127,20 +101,28 @@ const AccountsScreen = () => {
           </View>
         ) : null}
 
-        {accountDetail ? (
+        {anchorState.accountNumber || primaryAccount ? (
           <View className="bg-gray-900 border border-gray-800 rounded-2xl p-4 mt-6">
             <Text className="text-white font-semibold">Primary Account</Text>
-            {accountDetail?.account_number ? (
+            {anchorState.accountNumber ? (
               <Text className="text-gray-300 mt-2">
-                Account Number: {accountDetail.account_number}
+                Account Number: {anchorState.accountNumber}
+              </Text>
+            ) : primaryAccount?.account_number ? (
+              <Text className="text-gray-300 mt-2">
+                Account Number: {primaryAccount.account_number}
               </Text>
             ) : null}
-            {accountDetail?.account_name ? (
-              <Text className="text-gray-300">Account Name: {accountDetail.account_name}</Text>
+            {anchorState.accountName ? (
+              <Text className="text-gray-300">Account Name: {anchorState.accountName}</Text>
+            ) : primaryAccount?.account_name ? (
+              <Text className="text-gray-300">Account Name: {primaryAccount.account_name}</Text>
             ) : null}
-            {accountDetail?.bank_name || accountDetail?.bank ? (
+            {anchorState.bankName ? (
+              <Text className="text-gray-300">Bank: {anchorState.bankName}</Text>
+            ) : primaryAccount?.bank_name || primaryAccount?.bank ? (
               <Text className="text-gray-300">
-                Bank: {accountDetail.bank_name || accountDetail.bank}
+                Bank: {primaryAccount.bank_name || primaryAccount.bank}
               </Text>
             ) : null}
           </View>
@@ -172,14 +154,16 @@ const AccountsScreen = () => {
         </View>
 
         <View className="mt-8 gap-3">
-          <Link href="/accounts/create" asChild>
-            <TouchableOpacity className="bg-app-primary py-4 rounded-xl">
-              <Text className="text-white text-center font-medium">Create Deposit Account</Text>
-            </TouchableOpacity>
-          </Link>
+          {showCreate ? (
+            <Link href="/accounts/create" asChild>
+              <TouchableOpacity className="bg-app-primary py-4 rounded-xl">
+                <Text className="text-white text-center font-medium">Create Deposit Account</Text>
+              </TouchableOpacity>
+            </Link>
+          ) : null}
           <Link href="/anchor-account" asChild>
             <TouchableOpacity className="bg-gray-900 border border-gray-800 py-4 rounded-xl">
-              <Text className="text-white text-center font-medium">View Anchor Account</Text>
+              <Text className="text-white text-center font-medium">Manage Anchor Account</Text>
             </TouchableOpacity>
           </Link>
         </View>

@@ -10,12 +10,12 @@ import TransactionPinModal from '@/components/TransactionPinModal'
 import {
   getBanks,
   getBeneficiaries,
-  getUserAnchorAccountDetail,
   initiateFundTransfer,
   resolveAccountName,
 } from '@/api/account'
 import { getTransactionPinStatus } from '@/api/transactionPin'
 import { useAuth } from '@/services/useAuth'
+import { useAnchorOnboarding } from '@/services/useAnchorOnboarding'
 import { buildApiErrorMessage } from '@/utils/apiErrorMessage'
 
 type NoticeState = { message: string | null; error: boolean; data: any | null }
@@ -28,8 +28,7 @@ const BankTransferScreen = () => {
   const [beneficiaries, setBeneficiaries] = useState<any[]>([])
   const [pinModalOpen, setPinModalOpen] = useState(false)
   const [pinError, setPinError] = useState<string | null>(null)
-  const [anchorData, setAnchorData] = useState<any | null>(null)
-  const [hasAnchorAccount, setHasAnchorAccount] = useState<boolean>(false)
+  const anchorState = useAnchorOnboarding({ autoFetchOnMount: false, autoFetchOnFocus: false })
   const [showAnchorCta, setShowAnchorCta] = useState(false)
   const [formData, setFormData] = useState({
     bank_code: '',
@@ -47,7 +46,7 @@ const BankTransferScreen = () => {
     error: false,
     data: null,
   })
-  const hasAnchor = hasAnchorAccount === true
+  const hasAnchor = anchorState.hasAnchorAccount === true
   const canResolve =
     String(formData.account_number || '').trim().length === 10 && !!formData.bank_code
 
@@ -90,28 +89,15 @@ const BankTransferScreen = () => {
       }
     }
 
-    const fetchAnchor = async () => {
-      try {
-        const response = await getUserAnchorAccountDetail()
-        const anchorStatus = response || {}
-        const hasAnchorValue = anchorStatus?.has_anchor_account === true
-        const anchorAccount = anchorStatus?.data ?? null
-        setAnchorData(anchorAccount)
-        setHasAnchorAccount(hasAnchorValue)
-      } catch (error: any) {
-        const status = error?.response?.status
-        if (status === 401) {
-          await onLogout()
-          router.replace('/login')
-          return
-        }
-      }
-    }
-
     fetchBanks()
     fetchBeneficiaries()
-    fetchAnchor()
   }, [onLogout, router])
+
+  useEffect(() => {
+    if (anchorState.error?.response?.status === 401) {
+      onLogout().then(() => router.replace('/login')).catch(() => {})
+    }
+  }, [anchorState.error, onLogout, router])
 
   const bankOptions = useMemo(
     () =>
