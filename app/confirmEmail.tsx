@@ -59,7 +59,10 @@ const ConfirmEmail = () => {
     <View className="flex-1 bg-primary flex justify-center items-center px-4">
       <View>
         <Text className="text-white my-4 text-center font-semibold text-xl">
-          An Email has been sent to {email ?? 'you'}
+          Check your inbox to verify your email
+        </Text>
+        <Text className="text-gray-400 text-center text-sm">
+          We sent a confirmation email to {email ?? 'you'}. Open it to finish setup.
         </Text>
       </View>
       <Image source={icons.email} className="w-40 h-40 mb-5 mx-auto" />
@@ -78,7 +81,7 @@ const ConfirmEmail = () => {
           </TouchableOpacity>
         </View>
 
-        <Text className="text-red-600">{errorMessage} </Text>
+        {!!errorMessage && <Text className="text-red-600 mt-2">{errorMessage}</Text>}
         <TouchableOpacity onPress={handleResend} className="w-full m-auto mt-auto py-3 flex-row">
           <Text className="text-white  w-full  border-b py-2 text-center">Resend Email</Text>
         </TouchableOpacity>

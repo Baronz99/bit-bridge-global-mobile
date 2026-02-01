@@ -1,22 +1,10 @@
-import {
-  ActivityIndicator,
-  Image,
-  KeyboardAvoidingView,
-  Linking,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native'
+import { ActivityIndicator, Image, Linking, Text, TouchableOpacity, View } from 'react-native'
 import React, { useState } from 'react'
 import { icons } from '@/constants/icons'
-import { Link, router, useRouter } from 'expo-router'
-import { Formik } from 'formik'
+import { useRouter } from 'expo-router'
 import { useAuth } from '@/services/useAuth'
 import FormInput from '@/components/FormInput'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
-import ConsentCheckbox from '@/components/CheckInput'
 
 const SignUp = () => {
   const router = useRouter()
@@ -24,14 +12,9 @@ const SignUp = () => {
 
   const [formInput, setFormInput] = useState({
     email: '',
-    first_name: '',
-    last_name: '',
-    phone: '',
     password: '',
     confirm_password: '',
   })
-
-  const [checked, setChecked] = useState(false)
 
   const [loading, setLoading] = useState(false)
 
@@ -39,15 +22,17 @@ const SignUp = () => {
 
   const { onRegister } = useAuth()
 
-  const handleLogin = async () => {
+  const handleSignUp = async () => {
     setLoading(true)
     try {
-      if (!checked) {
-        setErrorMessage('You must consent before signing up')
+      setErrorMessage(null)
+      if (!formInput.email || !formInput.password || !formInput.confirm_password) {
+        setErrorMessage('Please fill in all fields.')
+        setLoading(false)
         return
       }
       if (formInput.password !== formInput.confirm_password) {
-        throw new Error('Passwords do not match')
+        throw new Error('Passwords do not match.')
       }
 
       const result = await onRegister(formInput)
@@ -90,40 +75,12 @@ const SignUp = () => {
               onChangeText={(value: string) => setFormInput({ ...formInput, confirm_password: value })}
               className="border-gray-600 text-white border-b py-4 my-0  border-b-1 text-base font-semibold px-3 "
             />
-            <FormInput
-              placeholder="First Name (optional)"
-              onChangeText={(value: string) => setFormInput({ ...formInput, first_name: value })}
-              className="border-gray-800 border-b text-white  my-0 py-4 border-b-1 text-base font-semibold px-3 "
-            />
-            <FormInput
-              placeholder="Last Name (optional)"
-              onChangeText={(value: string) => setFormInput({ ...formInput, last_name: value })}
-              className="border-gray-600 border-b text-white  my-0 py-4 border-b-1 text-base font-semibold px-3 "
-            />
-            <FormInput
-              placeholder="Phone Number (optional)"
-              onChangeText={(value: string) => setFormInput({ ...formInput, phone: value })}
-              className="border-gray-600 border-b text-white  my-0 py-4 border-b-1 text-base font-semibold px-3 "
-            />
-            <View className="flex flex-row items-center">
-              <ConsentCheckbox checked={checked} setChecked={setChecked} />
-
-              <Text className="text-gray-400">
-                I hereby give my e-signature and consent to use this platform in accordance with the{' '}
-                <Text
-                  className="text-white "
-                  onPress={() => Linking.openURL('https://yourapp.com/terms')}
-                >
-                  Terms & Conditions
-                </Text>
-                .
-              </Text>
-            </View>
             <Text className="text-red-600">{errorMessage} </Text>
 
             <TouchableOpacity
               className="py-3  flex-row items-center flex justify-center mt-10  bg-app-primary rounded-lg"
-              onPress={handleLogin}
+              onPress={handleSignUp}
+              disabled={loading}
             >
               {loading ? (
                 <ActivityIndicator />
@@ -131,6 +88,16 @@ const SignUp = () => {
                 <Text className=" font-semibold text-base text-gray-100">Register</Text>
               )}
             </TouchableOpacity>
+            <Text className="text-gray-400 text-xs mt-4 text-center">
+              By continuing, you agree to BitBridge&apos;s{' '}
+              <Text
+                className="text-white underline"
+                onPress={() => Linking.openURL('https://bitbridgeglobal.com')}
+              >
+                Terms & Privacy Policy
+              </Text>
+              .
+            </Text>
           </View>
         </View>
       </KeyboardAvoidWrapper>
@@ -139,5 +106,3 @@ const SignUp = () => {
 }
 
 export default SignUp
-
-const styles = StyleSheet.create({})

@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { Text, TouchableOpacity, View } from 'react-native'
-import { useRouter } from 'expo-router'
 import Loader from '@/components/Loader'
 import NotificationAlert from '@/components/notification'
 import { getUserCardTokens, updateCardToken } from '@/api/cardTokens'
@@ -35,7 +34,6 @@ const getTokenStatus = (token: TokenRecord) => {
 }
 
 const SavedCardTokensScreen = () => {
-  const router = useRouter()
   const { onLogout } = useAuth()
   const [loading, setLoading] = useState(false)
   const [updatingId, setUpdatingId] = useState<string | number | null>(null)
@@ -43,8 +41,7 @@ const SavedCardTokensScreen = () => {
   const [notice, setNotice] = useState<NoticeState>({
     message: null,
     error: false,
-    data: null,
-  })
+    data: null })
 
   const loadTokens = useCallback(async () => {
     setLoading(true)
@@ -55,20 +52,18 @@ const SavedCardTokensScreen = () => {
     } catch (error: any) {
       const status = error?.response?.status
       if (status === 401) {
-        await onLogout()
-        router.replace('/login')
+        await onLogout().catch(() => {})
         return
       }
       const message = buildApiErrorMessage({
         status,
         data: error?.response?.data,
-        fallback: error?.message || 'Unable to load card tokens',
-      })
+        fallback: error?.message || 'Unable to load card tokens' })
       setNotice({ message, error: true, data: null })
     } finally {
       setLoading(false)
     }
-  }, [onLogout, router])
+  }, [onLogout])
 
   useEffect(() => {
     loadTokens()
@@ -83,8 +78,7 @@ const SavedCardTokensScreen = () => {
     try {
       const response = await updateCardToken(tokenId, {
         active: nextActive,
-        status: nextActive ? 'active' : 'inactive',
-      })
+        status: nextActive ? 'active' : 'inactive' })
       const payload: any = response
       const updated = payload?.data ?? payload
       setTokens((prev) =>
@@ -93,20 +87,17 @@ const SavedCardTokensScreen = () => {
       setNotice({
         message: payload?.message || 'Token updated.',
         error: false,
-        data: payload?.data || null,
-      })
+        data: payload?.data || null })
     } catch (error: any) {
       const status = error?.response?.status
       if (status === 401) {
-        await onLogout()
-        router.replace('/login')
+        await onLogout().catch(() => {})
         return
       }
       const message = buildApiErrorMessage({
         status,
         data: error?.response?.data,
-        fallback: error?.message || 'Unable to update token',
-      })
+        fallback: error?.message || 'Unable to update token' })
       setNotice({ message, error: true, data: null })
     } finally {
       setUpdatingId(null)
@@ -171,3 +162,6 @@ const SavedCardTokensScreen = () => {
 }
 
 export default SavedCardTokensScreen
+
+
+

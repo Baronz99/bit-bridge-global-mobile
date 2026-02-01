@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ActivityIndicator, FlatList, Text, TouchableOpacity, View } from 'react-native'
 import { Link, useRouter } from 'expo-router'
 import { createCircle, listCircles } from '@/api/circles'
@@ -48,8 +48,9 @@ const detectCategory = (circle: Record<string, unknown>) => {
 
 const CirclesScreen = () => {
   const router = useRouter()
-  const { userProfileData, loadProfile } = useAuth()
-  const [loading, setLoading] = useState(true)
+  const { userProfileData, loadProfile, authState, authHydrated } = useAuth()
+  const didKickoffProfileRef = useRef(false)
+  const [screenLoading, setScreenLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [data, setData] = useState<unknown>(null)
   const [createOpen, setCreateOpen] = useState(false)
@@ -79,11 +80,11 @@ const CirclesScreen = () => {
 
   const loadCircles = useCallback(async () => {
     if (needsTier2) {
-      setLoading(false)
+      setScreenLoading(false)
       setError(null)
       return
     }
-    setLoading(true)
+    setScreenLoading(true)
     setError(null)
     try {
       const res = await listCircles()
@@ -98,14 +99,23 @@ const CirclesScreen = () => {
         setError('Unable to load shared groups right now.')
       }
     } finally {
-      setLoading(false)
+      setScreenLoading(false)
     }
   }, [needsTier2])
 
   useEffect(() => {
     if (!FEATURE_CIRCLES) return
+    if (!authHydrated) return
+    if (!authState?.authenticated) return
+    if (didKickoffProfileRef.current) return
+    didKickoffProfileRef.current = true
     loadProfile().catch(() => {})
-  }, [loadProfile])
+  }, [authHydrated, authState?.authenticated, loadProfile])
+
+  useEffect(() => {
+    if (authState?.authenticated) return
+    didKickoffProfileRef.current = false
+  }, [authState?.authenticated])
 
   useEffect(() => {
     if (!FEATURE_CIRCLES) return
@@ -216,7 +226,7 @@ const CirclesScreen = () => {
       ) : null}
 
       {!needsTier2 &&
-        (loading ? (
+        (screenLoading ? (
           <View className="flex-1 justify-center items-center">
             <ActivityIndicator size="small" color="#ffcc00" />
             <Text className="text-white mt-3">Loading circles...</Text>

@@ -11,8 +11,21 @@ export const setTransactionPin = async (pin: string) => {
 }
 
 export const verifyTransactionPin = async (pin: string) => {
-  const res = await client.post('/transaction_pin/verify', { pin })
-  return res.data
+  const endpoint = '/transaction_pin/verify'
+  try {
+    const payload = { pin }
+    if (__DEV__) {
+      const base = client.defaults.baseURL || '(no-base)'
+      console.log('[PIN_VERIFY] url', `${base}${endpoint}`, 'payloadKeys', Object.keys(payload))
+    }
+    const res = await client.post(endpoint, payload)
+    if (__DEV__) console.log('[PIN_VERIFY] res', res?.data)
+    return res.data
+  } catch (err: any) {
+    const status = err?.response?.status
+    if (__DEV__) console.log('[PIN_VERIFY] error', status, err?.response?.data || err?.message)
+    throw err
+  }
 }
 
 export const changeTransactionPin = async (payload: {

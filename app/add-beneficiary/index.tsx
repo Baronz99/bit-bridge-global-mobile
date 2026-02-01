@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native'
-import { useRouter } from 'expo-router'
 import FormInput from '@/components/FormInput'
 import FormSelect from '@/components/FormSelect'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
@@ -10,20 +9,17 @@ import { createCounterParty, getBanks } from '@/api/account'
 import { useAuth } from '@/services/useAuth'
 
 const AddBeneficiaryScreen = () => {
-  const router = useRouter()
   const { onLogout } = useAuth()
   const [loading, setLoading] = useState(false)
   const [banks, setBanks] = useState<any[]>([])
   const [formData, setFormData] = useState({
     bank_code: '',
     account_number: '',
-    account_name: '',
-  })
+    account_name: '' })
   const [notice, setNotice] = useState<{ message: string | null; error: boolean; data: any }>({
     message: null,
     error: false,
-    data: null,
-  })
+    data: null })
 
   useEffect(() => {
     const fetchBanks = async () => {
@@ -42,29 +38,26 @@ const AddBeneficiaryScreen = () => {
       } catch (error: any) {
         const status = error?.response?.status
         if (status === 401) {
-          await onLogout()
-          router.replace('/login')
+          await onLogout().catch(() => {})
           return
         }
         setNotice({
           message: error?.response?.data?.message || error?.message || 'Something went wrong',
           error: true,
-          data: null,
-        })
+          data: null })
       } finally {
         setLoading(false)
       }
     }
 
     fetchBanks()
-  }, [onLogout, router])
+  }, [onLogout])
 
   const options = useMemo(
     () =>
       banks.map((bank) => ({
         label: bank?.name || bank?.bank_name || bank?.label || 'Unknown bank',
-        value: bank?.code || bank?.bank_code || bank?.value || bank?.id || bank?.name,
-      })),
+        value: bank?.code || bank?.bank_code || bank?.value || bank?.id || bank?.name })),
     [banks]
   )
 
@@ -81,28 +74,23 @@ const AddBeneficiaryScreen = () => {
         account: {
           bank_code: formData.bank_code,
           account_number: formData.account_number.trim(),
-          account_name: formData.account_name.trim() || undefined,
-        },
-      })
+          account_name: formData.account_name.trim() || undefined } })
 
       setNotice({
         message: response?.message || 'Beneficiary added.',
         error: false,
-        data: response?.data || null,
-      })
+        data: response?.data || null })
       setFormData({ bank_code: '', account_number: '', account_name: '' })
     } catch (error: any) {
       const status = error?.response?.status
       if (status === 401) {
-        await onLogout()
-        router.replace('/login')
+        await onLogout().catch(() => {})
         return
       }
       setNotice({
         message: error?.response?.data?.message || error?.message || 'Something went wrong',
         error: true,
-        data: null,
-      })
+        data: null })
     } finally {
       setLoading(false)
     }
@@ -154,3 +142,6 @@ const AddBeneficiaryScreen = () => {
 }
 
 export default AddBeneficiaryScreen
+
+
+

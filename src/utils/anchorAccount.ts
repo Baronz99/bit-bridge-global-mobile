@@ -19,14 +19,8 @@ export const hasDepositAccountNumber = (statusOrData: any): boolean => {
 
 export const isKycAlreadyCompleted = (error: any): boolean => {
   const status = error?.response?.status ?? error?.status
-  const message =
-    error?.response?.data?.message ||
-    error?.message ||
-    ''
-  return (
-    status === 422 &&
-    String(message).toLowerCase().includes('kyc already completed')
-  )
+  const message = error?.response?.data?.message || error?.message || ''
+  return status === 422 && String(message).toLowerCase().includes('kyc already completed')
 }
 
 export const getVirtualAccountPendingMessage = (

@@ -1,6 +1,5 @@
 import React, { useState } from 'react'
 import { Text, TouchableOpacity, View } from 'react-native'
-import { useRouter } from 'expo-router'
 import FormInput from '@/components/FormInput'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
 import Loader from '@/components/Loader'
@@ -12,7 +11,6 @@ import { buildApiErrorMessage } from '@/utils/apiErrorMessage'
 type NoticeState = { message: string | null; error: boolean; data: any | null }
 
 const RefOrderScreen = () => {
-  const router = useRouter()
   const { onLogout } = useAuth()
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<any | null>(null)
@@ -20,8 +18,7 @@ const RefOrderScreen = () => {
   const [notice, setNotice] = useState<NoticeState>({
     message: null,
     error: false,
-    data: null,
-  })
+    data: null })
 
   const handleLookup = async () => {
     if (!formValue.trim()) {
@@ -37,20 +34,17 @@ const RefOrderScreen = () => {
       setNotice({
         message: payload?.message || 'Reference order fetched.',
         error: false,
-        data: payload?.data || null,
-      })
+        data: payload?.data || null })
     } catch (error: any) {
       const status = error?.response?.status
       if (status === 401) {
-        await onLogout()
-        router.replace('/login')
+        await onLogout().catch(() => {})
         return
       }
       const message = buildApiErrorMessage({
         status,
         data: error?.response?.data,
-        fallback: error?.message || 'Unable to get reference order',
-      })
+        fallback: error?.message || 'Unable to get reference order' })
       setNotice({ message, error: true, data: null })
     } finally {
       setLoading(false)
@@ -100,3 +94,6 @@ const RefOrderScreen = () => {
 }
 
 export default RefOrderScreen
+
+
+

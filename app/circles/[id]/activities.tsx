@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Text, TouchableOpacity, View } from 'react-native'
-import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useLocalSearchParams } from 'expo-router'
 import FormInput from '@/components/FormInput'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
 import Loader from '@/components/Loader'
@@ -34,7 +34,7 @@ const extractCreatedActivity = (payload: unknown): ActivityRecord | null => {
 const ActivitiesScreen = () => {
   const { id } = useLocalSearchParams<{ id?: string | string[] }>()
   const circleId = Array.isArray(id) ? id[0] : id
-  const router = useRouter()
+
   const { onLogout } = useAuth()
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -43,13 +43,11 @@ const ActivitiesScreen = () => {
     name: '',
     target_amount: '',
     deadline_at: '',
-    contribution_frequency: 'one_time',
-  })
+    contribution_frequency: 'one_time' })
   const [notice, setNotice] = useState<NoticeState>({
     message: null,
     error: false,
-    data: null,
-  })
+    data: null })
 
   const loadActivities = useCallback(async () => {
     if (!circleId) return
@@ -61,20 +59,18 @@ const ActivitiesScreen = () => {
     } catch (error: any) {
       const status = error?.response?.status
       if (status === 401) {
-        await onLogout()
-        router.replace('/login')
+        await onLogout().catch(() => {})
         return
       }
       const message = buildApiErrorMessage({
         status,
         data: error?.response?.data,
-        fallback: error?.message || 'Unable to load activities',
-      })
+        fallback: error?.message || 'Unable to load activities' })
       setNotice({ message, error: true, data: null })
     } finally {
       setLoading(false)
     }
-  }, [circleId, onLogout, router])
+  }, [circleId, onLogout])
 
   useEffect(() => {
     loadActivities()
@@ -103,8 +99,7 @@ const ActivitiesScreen = () => {
         name,
         target_amount_cents: Math.round(targetAmount * 100),
         deadline_at: formData.deadline_at,
-        contribution_frequency: formData.contribution_frequency,
-      })
+        contribution_frequency: formData.contribution_frequency })
       const created = extractCreatedActivity(response)
       if (created) {
         setActivities((prev) => [created, ...prev])
@@ -115,21 +110,18 @@ const ActivitiesScreen = () => {
         name: '',
         target_amount: '',
         deadline_at: '',
-        contribution_frequency: 'one_time',
-      })
+        contribution_frequency: 'one_time' })
       setNotice({ message: 'Activity created.', error: false, data: null })
     } catch (error: any) {
       const status = error?.response?.status
       if (status === 401) {
-        await onLogout()
-        router.replace('/login')
+        await onLogout().catch(() => {})
         return
       }
       const message = buildApiErrorMessage({
         status,
         data: error?.response?.data,
-        fallback: error?.message || 'Unable to post activity',
-      })
+        fallback: error?.message || 'Unable to post activity' })
       setNotice({ message, error: true, data: null })
     } finally {
       setSubmitting(false)
@@ -234,3 +226,5 @@ const ActivitiesScreen = () => {
 }
 
 export default ActivitiesScreen
+
+

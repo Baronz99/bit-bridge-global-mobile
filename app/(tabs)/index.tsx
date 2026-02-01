@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   FlatList,
@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native'
 import Constants from 'expo-constants'
-import { Link, Redirect, useRouter } from 'expo-router'
+import { Link, useRouter } from 'expo-router'
 import { AntDesign, Feather } from '@expo/vector-icons'
 
 import { getUserOrders } from '@/api/orders'
@@ -28,6 +28,7 @@ import { decideHomeNavigation, extractReceiptReference } from '@/utils/timelineR
 
 import AppModal from '@/components/modal/Modal'
 import Loader from '@/components/Loader'
+import LoaderScreen from '../LoaderScreen'
 import NotificationAlert from '@/components/notification'
 import useNotification from '@/hooks/useNotification'
 import ScreenContainer from '@/components/ScreenContainer'
@@ -219,9 +220,9 @@ const getHomeRowCurrency = (t: TimelineItem) => {
 // Main screen
 // ---------------------------
 export default function Index() {
-  const { authState, userProfileData, loadProfile } = useAuth()
+  const { authState, userProfileData, loadProfile, loading, authHydrated } = useAuth()
   const router = useRouter()
-  const token = authState?.token
+  const didKickoffProfileRef = useRef(false)
 
   const [billOrder, setBillOrder] = useState<any | null>(null)
   const [openModal, setOpenModal] = useState(false)
@@ -242,10 +243,20 @@ export default function Index() {
   }, [])
 
   useEffect(() => {
+    if (!authHydrated) return
+    if (!authState?.authenticated) return
+    if (didKickoffProfileRef.current) return
+    didKickoffProfileRef.current = true
     loadProfile().catch(() => {})
-  }, [loadProfile])
+  }, [authHydrated, authState?.authenticated, loadProfile])
 
-  if (!token) return <Redirect href={'/login' as any} />
+  useEffect(() => {
+    if (authState?.authenticated) return
+    didKickoffProfileRef.current = false
+  }, [authState?.authenticated])
+
+  if (loading) return <LoaderScreen />
+  if (!authState?.authenticated) return <LoaderScreen />
 
   // -------- Fetches (keep existing behavior) --------
   const fetchRecentPurchases = useCallback(() => getRescentPurchaseOrder(), [])

@@ -1,12 +1,13 @@
 // app/(tabs)/_layout.tsx
 import React, { useState } from 'react'
-import { Tabs, Redirect } from 'expo-router'
+import { Redirect, Tabs } from 'expo-router'
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs'
 import { Image, Platform, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { icons } from '@/constants/icons'
 import { FEATURE_TIMELINE } from '@/constants/featureFlags'
 import { useAuth } from '@/services/useAuth'
+import { useAppLock } from '../../services/useAppLock'
 import LoaderScreen from '../LoaderScreen'
 import AppModal from '@/components/modal/Modal'
 
@@ -150,16 +151,14 @@ const CustomTabBar = ({ state, descriptors, navigation }: BottomTabBarProps) => 
 }
 
 export default function TabsLayout() {
-  const { loading, authState, userProfileData, onLogout } = useAuth()
+  const { loading, authHydrated, authState, userProfileData, onLogout } = useAuth()
+  const { locked } = useAppLock()
   const [toggleModal, setToggleModal] = useState(false)
   const insets = useSafeAreaInsets()
 
-  if (loading) return <LoaderScreen />
-
-  // ✅ Proper protection: redirect out of tabs
-  if (!authState?.authenticated) {
-    return <Redirect href={"/login" as any} />
-  }
+  if (loading || !authHydrated) return <LoaderScreen />
+  if (!authState?.authenticated) return <Redirect href="/welcome" />
+  if (locked) return <Redirect href="/lock" />
 
   return (
     <>

@@ -60,8 +60,7 @@ const BankTransferScreen = () => {
       } catch (error: any) {
         const status = error?.response?.status
         if (status === 401) {
-          await onLogout()
-          router.replace('/login')
+          await onLogout().catch(() => {})
           return
         }
         const message = buildApiErrorMessage({
@@ -82,8 +81,7 @@ const BankTransferScreen = () => {
       } catch (error: any) {
         const status = error?.response?.status
         if (status === 401) {
-          await onLogout()
-          router.replace('/login')
+          await onLogout().catch(() => {})
           return
         }
       }
@@ -91,13 +89,13 @@ const BankTransferScreen = () => {
 
     fetchBanks()
     fetchBeneficiaries()
-  }, [onLogout, router])
+  }, [onLogout])
 
   useEffect(() => {
     if (anchorState.error?.response?.status === 401) {
-      onLogout().then(() => router.replace('/login')).catch(() => {})
+      onLogout().catch(() => {})
     }
-  }, [anchorState.error, onLogout, router])
+  }, [anchorState.error, onLogout])
 
   const bankOptions = useMemo(
     () =>
@@ -218,8 +216,7 @@ const BankTransferScreen = () => {
     } catch (error: any) {
       const status = error?.response?.status
       if (status === 401) {
-        await onLogout()
-        router.replace('/login')
+        await onLogout().catch(() => {})
         return
       }
     }
@@ -308,8 +305,7 @@ const BankTransferScreen = () => {
     } catch (error: any) {
       const status = error?.response?.status
       if (status === 401) {
-        await onLogout()
-        router.replace('/login')
+        await onLogout().catch(() => {})
         return
       }
       const message = buildApiErrorMessage({
@@ -484,3 +480,6 @@ const BankTransferScreen = () => {
 }
 
 export default BankTransferScreen
+
+
+

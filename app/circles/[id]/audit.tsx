@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { Linking, Text, TouchableOpacity, View } from 'react-native'
-import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useLocalSearchParams } from 'expo-router'
 import Loader from '@/components/Loader'
 import NotificationAlert from '@/components/notification'
 import { exportCircleCsv, getCircleAuditSummary } from '@/api/circles'
@@ -12,7 +12,7 @@ type NoticeState = { message: string | null; error: boolean; data: any | null }
 const AuditSummaryScreen = () => {
   const { id } = useLocalSearchParams<{ id?: string | string[] }>()
   const circleId = Array.isArray(id) ? id[0] : id
-  const router = useRouter()
+
   const { onLogout } = useAuth()
   const [loading, setLoading] = useState(false)
   const [exporting, setExporting] = useState(false)
@@ -20,8 +20,7 @@ const AuditSummaryScreen = () => {
   const [notice, setNotice] = useState<NoticeState>({
     message: null,
     error: false,
-    data: null,
-  })
+    data: null })
 
   const loadSummary = useCallback(async () => {
     if (!circleId) return
@@ -34,20 +33,18 @@ const AuditSummaryScreen = () => {
     } catch (error: any) {
       const status = error?.response?.status
       if (status === 401) {
-        await onLogout()
-        router.replace('/login')
+        await onLogout().catch(() => {})
         return
       }
       const message = buildApiErrorMessage({
         status,
         data: error?.response?.data,
-        fallback: error?.message || 'Unable to load audit summary',
-      })
+        fallback: error?.message || 'Unable to load audit summary' })
       setNotice({ message, error: true, data: null })
     } finally {
       setLoading(false)
     }
-  }, [circleId, onLogout, router])
+  }, [circleId, onLogout])
 
   useEffect(() => {
     loadSummary()
@@ -73,21 +70,18 @@ const AuditSummaryScreen = () => {
         setNotice({
           message: 'Export requested. Check your email or dashboard for the file.',
           error: false,
-          data: payload || null,
-        })
+          data: payload || null })
       }
     } catch (error: any) {
       const status = error?.response?.status
       if (status === 401) {
-        await onLogout()
-        router.replace('/login')
+        await onLogout().catch(() => {})
         return
       }
       const message = buildApiErrorMessage({
         status,
         data: error?.response?.data,
-        fallback: error?.message || 'Unable to export CSV',
-      })
+        fallback: error?.message || 'Unable to export CSV' })
       setNotice({ message, error: true, data: null })
     } finally {
       setExporting(false)
@@ -144,3 +138,5 @@ const AuditSummaryScreen = () => {
 }
 
 export default AuditSummaryScreen
+
+

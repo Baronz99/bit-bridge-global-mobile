@@ -40,9 +40,7 @@ const Login = () => {
 
       setLoading(true)
       await onLogin({ email, password })
-
-      // ✅ go to the authenticated area
-      router.replace('/(tabs)' as any)
+      router.replace('/' as any)
     } catch (error: any) {
       setErrorMessage(error?.message || 'Login failed')
       console.error('Login error:', error?.message || error)

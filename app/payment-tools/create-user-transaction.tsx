@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from 'react'
 import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native'
-import { useRouter } from 'expo-router'
 import FormInput from '@/components/FormInput'
 import FormSelect from '@/components/FormSelect'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
@@ -10,21 +9,18 @@ import { buildApiErrorMessage } from '@/utils/apiErrorMessage'
 import { useAuth } from '@/services/useAuth'
 
 const CreateUserTransactionScreen = () => {
-  const router = useRouter()
   const { userProfileData, onLogout } = useAuth()
   const [loading, setLoading] = useState(false)
   const [notice, setNotice] = useState<{ message: string | null; error: boolean }>({
     message: null,
-    error: false,
-  })
+    error: false })
   const [form, setForm] = useState({
     amount: '',
     transaction_type: 'deposit',
     status: 'approved',
     wallet_type: 'ngn',
     description: '',
-    email: '',
-  })
+    email: '' })
 
   const isAdmin = useMemo(() => {
     const role = userProfileData?.role || userProfileData?.user_profile?.role
@@ -47,33 +43,27 @@ const CreateUserTransactionScreen = () => {
           status: form.status,
           wallet_type: form.wallet_type,
           description: form.description.trim() || undefined,
-          email: form.email.trim() || undefined,
-        },
-      })
+          email: form.email.trim() || undefined } })
       setNotice({
         message: response?.message || 'Transaction created.',
-        error: false,
-      })
+        error: false })
       setForm({
         amount: '',
         transaction_type: 'deposit',
         status: 'approved',
         wallet_type: 'ngn',
         description: '',
-        email: '',
-      })
+        email: '' })
     } catch (error: any) {
       const status = error?.response?.status
       if (status === 401) {
-        await onLogout()
-        router.replace('/login')
+        await onLogout().catch(() => {})
         return
       }
       const message = buildApiErrorMessage({
         status,
         data: error?.response?.data,
-        fallback: error?.message || 'Unable to create transaction',
-      })
+        fallback: error?.message || 'Unable to create transaction' })
       setNotice({ message, error: true })
     } finally {
       setLoading(false)
@@ -171,3 +161,6 @@ const CreateUserTransactionScreen = () => {
 }
 
 export default CreateUserTransactionScreen
+
+
+

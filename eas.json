@@ -11,11 +11,19 @@
     },
     "preview": {
       "distribution": "internal",
-      "channel": "preview"
+      "channel": "preview",
+      "env": {
+        "EXPO_PUBLIC_ENV": "staging",
+        "EXPO_PUBLIC_BASE_URL_STAGING": "https://bitbridge-backend-prod-5f0b6abe68d7.herokuapp.com"
+      }
     },
     "production": {
       "autoIncrement": true,
-      "channel": "production"
+      "channel": "production",
+      "env": {
+        "EXPO_PUBLIC_ENV": "production",
+        "EXPO_PUBLIC_BASE_URL_PROD": "https://bitbridgeglobal-fa54ecb89f7d.herokuapp.com"
+      }
     }
   },
   "submit": {

@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Text, TouchableOpacity, View } from 'react-native'
-import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useLocalSearchParams } from 'expo-router'
 import FormInput from '@/components/FormInput'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
 import Loader from '@/components/Loader'
@@ -14,17 +14,15 @@ type NoticeState = { message: string | null; error: boolean; data: any | null }
 const InviteCircleMemberScreen = () => {
   const { id } = useLocalSearchParams<{ id?: string | string[] }>()
   const circleId = Array.isArray(id) ? id[0] : id
-  const router = useRouter()
+
   const { onLogout } = useAuth()
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
-    email: '',
-  })
+    email: '' })
   const [notice, setNotice] = useState<NoticeState>({
     message: null,
     error: false,
-    data: null,
-  })
+    data: null })
 
   const handleInvite = async () => {
     if (!circleId) {
@@ -46,20 +44,17 @@ const InviteCircleMemberScreen = () => {
       setNotice({
         message: payload?.message || `Invitation sent to ${email}.`,
         error: false,
-        data: payload?.data || null,
-      })
+        data: payload?.data || null })
     } catch (error: any) {
       const status = error?.response?.status
       if (status === 401) {
-        await onLogout()
-        router.replace('/login')
+        await onLogout().catch(() => {})
         return
       }
       const message = buildApiErrorMessage({
         status,
         data: error?.response?.data,
-        fallback: error?.message || 'Unable to invite member',
-      })
+        fallback: error?.message || 'Unable to invite member' })
       setNotice({ message, error: true, data: null })
     } finally {
       setLoading(false)
@@ -98,3 +93,5 @@ const InviteCircleMemberScreen = () => {
 }
 
 export default InviteCircleMemberScreen
+
+

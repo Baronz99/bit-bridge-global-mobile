@@ -61,8 +61,7 @@ const CircleFundScreen = () => {
     } catch (error: any) {
       const statusCode = error?.response?.status
       if (statusCode === 401) {
-        await onLogout()
-        router.replace('/login')
+        await onLogout().catch(() => {})
         return
       }
     }
@@ -97,8 +96,7 @@ const CircleFundScreen = () => {
     } catch (error: any) {
       const status = error?.response?.status
       if (status === 401) {
-        await onLogout()
-        router.replace('/login')
+        await onLogout().catch(() => {})
         return
       }
 
@@ -172,3 +170,5 @@ const CircleFundScreen = () => {
 }
 
 export default CircleFundScreen
+
+

@@ -1,5 +1,6 @@
 import {
   extractAccountNumber,
+  extractPrimaryError,
   getVirtualAccountPendingMessage,
   hasDepositAccountNumber,
   hasPersistedAccountNumber,
@@ -14,6 +15,18 @@ describe('extractAccountNumber', () => {
   it('returns empty string when missing', () => {
     expect(extractAccountNumber({ data: {} })).toBe('')
     expect(extractAccountNumber(null as any)).toBe('')
+  })
+})
+
+describe('extractPrimaryError', () => {
+  it('returns first error from errors array', () => {
+    const err = { response: { data: { errors: ['bad input'] } } }
+    expect(extractPrimaryError(err)).toBe('bad input')
+  })
+
+  it('falls back to message when errors missing', () => {
+    const err = { response: { data: { message: 'failed' } } }
+    expect(extractPrimaryError(err)).toBe('failed')
   })
 })
 

@@ -1,14 +1,19 @@
 {
   "extends": "./node_modules/expo/tsconfig.base.json",
   "compilerOptions": {
+    "baseUrl": ".",
+    "rootDir": ".",
     "strict": true,
     "paths": {
       "@/*": [
         "./*"
       ],
+      "@/services/*": [
+        "./services/*"
+      ],
       "@/utils/*": [
         "./utils/*",
-        "./app/_utils/*"
+        "./src/utils/*"
       ]
     }
   },

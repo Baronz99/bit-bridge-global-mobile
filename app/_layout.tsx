@@ -4,10 +4,12 @@ import { StatusBar } from 'react-native'
 import './globals.css'
 
 import { AuthProvider } from '@/services/useAuth'
+import { AppLockProvider } from '../services/useAppLock'
 
 export default function RootLayout() {
   return (
     <AuthProvider>
+      <AppLockProvider>
       <StatusBar hidden={false} barStyle="light-content" backgroundColor="black" />
 
       <Stack
@@ -23,6 +25,7 @@ export default function RootLayout() {
         <Stack.Screen name="index" options={{ headerShown: false }} />
 
         <Stack.Screen name="(tabs)" options={{ headerShown: false, headerTitle: 'Home' }} />
+        <Stack.Screen name="lock" options={{ headerShown: false }} />
 
         <Stack.Screen name="login" options={{ headerShown: false }} />
         <Stack.Screen name="sign-up" options={{ headerTitle: 'Register' }} />
@@ -134,6 +137,7 @@ export default function RootLayout() {
         <Stack.Screen name="circles/[id]/invite" options={{ headerTitle: 'Invite Member' }} />
         <Stack.Screen name="confirmEmail" options={{ headerTitle: 'Email Confirmation' }} />
       </Stack>
+      </AppLockProvider>
     </AuthProvider>
   )
 }

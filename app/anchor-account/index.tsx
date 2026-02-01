@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ActivityIndicator, ScrollView, Text, View } from 'react-native'
-import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useLocalSearchParams } from 'expo-router'
 import NotificationAlert from '@/components/notification'
 import DepositAccountSection from '@/components/DepositAccountSection'
 import AnchorAccountView from '@/components/AnchorAccountView'
@@ -11,7 +11,6 @@ import { useAuth } from '@/services/useAuth'
 import { isKycAlreadyCompleted } from '@/utils/anchorAccount'
 
 const AnchorAccountScreen = () => {
-  const router = useRouter()
   const params = useLocalSearchParams()
   const { onLogout, userProfileData } = useAuth()
   const [loading, setLoading] = useState(false)
@@ -50,17 +49,17 @@ const AnchorAccountScreen = () => {
     } catch (error: any) {
       const status = error?.response?.status
       if (status === 401) {
-        await onLogout()
-        router.replace('/login')
+        await onLogout().catch(() => {})
+        return
       }
     }
-  }, [anchorState, onLogout, router])
+  }, [anchorState, onLogout])
 
   useEffect(() => {
     if (anchorState.error?.response?.status === 401) {
-      onLogout().then(() => router.replace('/login')).catch(() => {})
+      onLogout().catch(() => {})
     }
-  }, [anchorState.error, onLogout, router])
+  }, [anchorState.error, onLogout])
 
   useEffect(() => {
     if (params?.refresh === '1' && !refreshHandledRef.current) {
@@ -77,6 +76,7 @@ const AnchorAccountScreen = () => {
     setLoading(true)
     setNotice({ message: null, error: false })
     let shouldRefresh = true
+    let didLogout = false
     try {
       const response = await createAnchorAccount()
       setNotice({ message: response?.message || 'Anchor account created.', error: false })
@@ -98,8 +98,8 @@ const AnchorAccountScreen = () => {
         return
       }
       if (status === 401) {
-        await onLogout()
-        router.replace('/login')
+        didLogout = true
+        await onLogout().catch(() => {})
         return
       }
       const message = buildApiErrorMessage({
@@ -110,7 +110,7 @@ const AnchorAccountScreen = () => {
       setNotice({ message, error: true })
     } finally {
       setLoading(false)
-      if (shouldRefresh) {
+      if (!didLogout && shouldRefresh) {
         await anchorState.refresh()
       }
     }
@@ -125,6 +125,7 @@ const AnchorAccountScreen = () => {
     setLoading(true)
     setNotice({ message: null, error: false })
     let shouldRefresh = true
+    let didLogout = false
     try {
       await createDepositAccount()
       const refreshed = await anchorState.refresh({ force: true })
@@ -143,8 +144,8 @@ const AnchorAccountScreen = () => {
     } catch (error: any) {
       const status = error?.response?.status
       if (status === 401) {
-        await onLogout()
-        router.replace('/login')
+        didLogout = true
+        await onLogout().catch(() => {})
         return
       }
       const message = buildApiErrorMessage({
@@ -155,7 +156,7 @@ const AnchorAccountScreen = () => {
       setNotice({ message, error: true })
     } finally {
       setLoading(false)
-      if (shouldRefresh) {
+      if (!didLogout && shouldRefresh) {
         await anchorState.refresh()
       }
     }
@@ -182,8 +183,7 @@ const AnchorAccountScreen = () => {
         error?.response?.data?.message || error?.message || ''
       ).toLowerCase()
       if (status === 401) {
-        await onLogout()
-        router.replace('/login')
+        await onLogout().catch(() => {})
         return
       }
       if (status === 422 && messageText.includes('already completed')) {

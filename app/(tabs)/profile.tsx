@@ -4,7 +4,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native'
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { images } from '@/constants/images'
 import { Link } from 'expo-router'
 import { useAuth } from '@/services/useAuth'
@@ -34,11 +34,21 @@ type RowItem = {
 
 const Profile = () => {
   const [toggleModal, setToggleModal] = useState(false)
-  const { userProfileData, onLogout, loadProfile } = useAuth()
+  const { userProfileData, onLogout, loadProfile, authState, authHydrated } = useAuth()
+  const didKickoffProfileRef = useRef(false)
 
   useEffect(() => {
-    loadProfile()
-  }, [loadProfile])
+    if (!authHydrated) return
+    if (!authState?.authenticated) return
+    if (didKickoffProfileRef.current) return
+    didKickoffProfileRef.current = true
+    loadProfile().catch(() => {})
+  }, [authHydrated, authState?.authenticated, loadProfile])
+
+  useEffect(() => {
+    if (authState?.authenticated) return
+    didKickoffProfileRef.current = false
+  }, [authState?.authenticated])
 
   const kycLabel = (userProfileData?.kyc_level || 'unverified')
     .toString()

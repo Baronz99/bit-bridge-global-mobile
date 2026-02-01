@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native'
-import { useRouter } from 'expo-router'
+import { usePathname, useRouter } from 'expo-router'
 import FormInput from '@/components/FormInput'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
 import { saveOnboardingUseCase, updateBasicProfile } from '@/api/onboarding'
@@ -87,8 +87,9 @@ const KYC_REQUIRED_NOW = ['send_receive', 'virtual_cards', 'taxes']
 
 const UseCaseScreen = () => {
   const router = useRouter()
-  const { userProfileData, loadProfile } = useAuth()
-  const [loading, setLoading] = useState(false)
+  const pathname = usePathname()
+  const { userProfileData, loadProfile, authState, authHydrated } = useAuth()
+  const [submitting, setSubmitting] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const [selectedUseCase, setSelectedUseCase] = useState('')
   const [basicProfile, setBasicProfile] = useState({
@@ -98,10 +99,20 @@ const UseCaseScreen = () => {
   })
 
   const hydratedRef = useRef(false)
+  const didKickoffProfileRef = useRef(false)
 
   useEffect(() => {
-    loadProfile()
-  }, [loadProfile])
+    if (!authHydrated) return
+    if (!authState?.authenticated) return
+    if (didKickoffProfileRef.current) return
+    didKickoffProfileRef.current = true
+    loadProfile().catch(() => {})
+  }, [authHydrated, authState?.authenticated, loadProfile])
+
+  useEffect(() => {
+    if (authState?.authenticated) return
+    didKickoffProfileRef.current = false
+  }, [authState?.authenticated])
 
   useEffect(() => {
     if (!userProfileData || hydratedRef.current) return
@@ -142,7 +153,7 @@ const UseCaseScreen = () => {
       return
     }
 
-    setLoading(true)
+    setSubmitting(true)
     setNotice(null)
     try {
       const first_name = basicProfile.first_name.trim()
@@ -175,7 +186,7 @@ const UseCaseScreen = () => {
       })
       setNotice(message)
     } finally {
-      setLoading(false)
+      setSubmitting(false)
     }
   }
 
@@ -277,20 +288,26 @@ const UseCaseScreen = () => {
           {notice ? <Text className="text-yellow-400 mt-3">{notice}</Text> : null}
 
           <View className="flex-row items-center justify-between mt-6">
-            <TouchableOpacity onPress={() => router.replace('/(tabs)')}>
+            <TouchableOpacity
+              onPress={() => {
+                if (!pathname?.startsWith('/(tabs)')) {
+                  router.replace('/(tabs)')
+                }
+              }}
+            >
               <Text className="text-xs text-gray-400">Skip for now</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               onPress={handleContinue}
               className={`px-5 py-3 rounded-full ${
-                !selectedUseCase || loading
+                !selectedUseCase || submitting
                   ? 'bg-gray-800'
                   : 'bg-app-primary'
               }`}
-              disabled={!selectedUseCase || loading}
+              disabled={!selectedUseCase || submitting}
             >
-              {loading ? (
+              {submitting ? (
                 <ActivityIndicator />
               ) : (
                 <Text className="text-black text-sm font-semibold">Continue</Text>

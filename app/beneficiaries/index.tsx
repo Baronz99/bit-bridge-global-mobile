@@ -27,8 +27,7 @@ const BeneficiariesScreen = () => {
       } catch (error: any) {
         const status = error?.response?.status
         if (status === 401) {
-          await onLogout()
-          router.replace('/login')
+          await onLogout().catch(() => {})
           return
         }
         setNotice({
@@ -42,7 +41,7 @@ const BeneficiariesScreen = () => {
     }
 
     fetchBeneficiaries()
-  }, [onLogout, router])
+  }, [onLogout])
 
   return (
     <View className="flex-1 bg-primary px-4">
@@ -86,3 +85,6 @@ const BeneficiariesScreen = () => {
 }
 
 export default BeneficiariesScreen
+
+
+

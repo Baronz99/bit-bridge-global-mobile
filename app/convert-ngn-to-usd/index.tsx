@@ -34,8 +34,7 @@ const ConvertNgnToUsdScreen = () => {
   const handleError = async (error: any, options?: { forPin?: boolean }) => {
     const status = error?.response?.status
     if (status === 401) {
-      await onLogout()
-      router.replace('/login')
+      await onLogout().catch(() => {})
       return
     }
 
@@ -206,3 +205,6 @@ const ConvertNgnToUsdScreen = () => {
 }
 
 export default ConvertNgnToUsdScreen
+
+
+

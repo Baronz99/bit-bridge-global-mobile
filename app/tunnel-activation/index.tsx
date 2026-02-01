@@ -20,8 +20,7 @@ const TunnelActivationScreen = () => {
   const handleError = async (error: any) => {
     const status = error?.response?.status
     if (status === 401) {
-      await onLogout()
-      router.replace('/login')
+      await onLogout().catch(() => {})
       return
     }
 
@@ -91,3 +90,6 @@ const TunnelActivationScreen = () => {
 }
 
 export default TunnelActivationScreen
+
+
+

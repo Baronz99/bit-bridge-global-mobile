@@ -18,6 +18,7 @@ import client, {
 import APP_CONFIG from '@/api/baseUrl'
 import { signup as signupApi } from '@/api/auth'
 import { setEmailForVerification } from '@/auth/tokenstore'
+import { clearAppLockPersisted } from '@/services/useAppLock'
 
 type LoginPayload = { email: string; password: string }
 
@@ -28,6 +29,10 @@ type LegacyAuthState = {
 
 export type AuthContextValue = {
   loading: boolean
+  authHydrated: boolean
+  profileLoading: boolean
+  profileError: string | null
+  profileErrorStatus: number | null
 
   token: string | null
   refreshToken: string | null
@@ -71,6 +76,10 @@ async function clearTokens() {
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
+  const [authHydrated, setAuthHydrated] = useState(false)
+  const [profileLoading, setProfileLoading] = useState(false)
+  const [profileError, setProfileError] = useState<string | null>(null)
+  const [profileErrorStatus, setProfileErrorStatus] = useState<number | null>(null)
   const [token, setToken] = useState<string | null>(null)
   const [refreshToken, setRefreshToken] = useState<string | null>(null)
   const [user, setUser] = useState<any | null>(null)
@@ -81,8 +90,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const authenticated = !!token
 
-  const refreshProfile = useCallback(async (options?: { force?: boolean }) => {
+  const refreshProfile = useCallback(async (options?: { force?: boolean; tokenOverride?: string | null }) => {
     const force = options?.force === true
+    const tokenOverride = options?.tokenOverride ?? null
+
+    if (!token && !tokenOverride) return userRef.current
 
     if (!force) {
       if (profileFetchInFlightRef.current) return userRef.current
@@ -90,17 +102,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     profileFetchInFlightRef.current = true
+    setProfileLoading(true)
+    setProfileError(null)
+    setProfileErrorStatus(null)
     try {
+      if (tokenOverride) {
+        client.defaults.headers.Authorization = `Bearer ${tokenOverride}`
+      }
       const res = await client.get('/users/user_profile')
       const data = res?.data?.data ?? res?.data
       userRef.current = data
       setUser(data)
       profileLoadedRef.current = true
       return data
+    } catch (error: any) {
+      const status = error?.response?.status
+      if (status === 401 || status === 403) {
+        await clearTokens()
+        setToken(null)
+        setRefreshToken(null)
+        setUser(null)
+        userRef.current = null
+        profileLoadedRef.current = false
+        profileFetchInFlightRef.current = false
+        setProfileError('Session expired. Please log in again.')
+        setProfileErrorStatus(status)
+        return null
+      }
+      const message =
+        error?.response?.data?.message ||
+        error?.message ||
+        'Unable to load profile'
+      setProfileError(String(message))
+      setProfileErrorStatus(status ?? null)
+      return null
     } finally {
       profileFetchInFlightRef.current = false
+      setProfileLoading(false)
     }
-  }, [])
+  }, [token])
 
   const bootstrap = useCallback(async () => {
     try {
@@ -120,17 +160,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       else setRefreshToken(null)
 
       if (storedAccess) {
-        await refreshProfile({ force: true }).catch(async () => {
+        const cleanAccess = normalize(storedAccess)
+        await refreshProfile({ force: true, tokenOverride: cleanAccess }).catch(async () => {
           await clearTokens()
           setToken(null)
           setRefreshToken(null)
           setUser(null)
           userRef.current = null
           profileLoadedRef.current = false
+          setProfileError(null)
+          setProfileErrorStatus(null)
         })
       }
     } finally {
       setLoading(false)
+      setAuthHydrated(true)
     }
   }, [refreshProfile])
 
@@ -146,6 +190,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(null)
       userRef.current = null
       profileLoadedRef.current = false
+      profileFetchInFlightRef.current = false
+      setProfileError(null)
+      setProfileErrorStatus(null)
     }
 
     const unsubscribe = authEvents.on('unauthorized', onUnauthorized)
@@ -157,6 +204,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     userRef.current = user
   }, [user])
+
+  useEffect(() => {
+    if (token) return
+    profileLoadedRef.current = false
+    profileFetchInFlightRef.current = false
+    userRef.current = null
+    setProfileError(null)
+    setProfileErrorStatus(null)
+  }, [token])
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
@@ -225,6 +281,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async () => {
     await clearTokens()
+    await clearAppLockPersisted().catch(() => {})
     setToken(null)
     setRefreshToken(null)
     setUser(null)
@@ -264,6 +321,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return {
       loading,
+      authHydrated,
+      profileLoading,
+      profileError,
+      profileErrorStatus,
 
       token,
       refreshToken,

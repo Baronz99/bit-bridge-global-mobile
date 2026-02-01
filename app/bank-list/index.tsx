@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { ScrollView, Text, View } from 'react-native'
-import { useRouter } from 'expo-router'
 import FormSelect from '@/components/FormSelect'
 import Loader from '@/components/Loader'
 import NotificationAlert from '@/components/notification'
@@ -8,7 +7,6 @@ import { getBanks } from '@/api/account'
 import { useAuth } from '@/services/useAuth'
 
 const BankListScreen = () => {
-  const router = useRouter()
   const { onLogout } = useAuth()
   const [loading, setLoading] = useState(false)
   const [banks, setBanks] = useState<any[]>([])
@@ -16,8 +14,7 @@ const BankListScreen = () => {
   const [notice, setNotice] = useState({
     message: null,
     error: false,
-    data: null,
-  })
+    data: null })
 
   useEffect(() => {
     const fetchBanks = async () => {
@@ -29,29 +26,26 @@ const BankListScreen = () => {
       } catch (error: any) {
         const status = error?.response?.status
         if (status === 401) {
-          await onLogout()
-          router.replace('/login')
+          await onLogout().catch(() => {})
           return
         }
         setNotice({
           message: error?.response?.data?.message || error?.message || 'Something went wrong',
           error: true,
-          data: null,
-        })
+          data: null })
       } finally {
         setLoading(false)
       }
     }
 
     fetchBanks()
-  }, [onLogout, router])
+  }, [onLogout])
 
   const options = useMemo(
     () =>
       banks.map((bank) => ({
         label: bank?.name || bank?.bank_name || bank?.label || 'Unknown bank',
-        value: bank?.code || bank?.bank_code || bank?.value || bank?.id || bank?.name,
-      })),
+        value: bank?.code || bank?.bank_code || bank?.value || bank?.id || bank?.name })),
     [banks]
   )
 
@@ -92,3 +86,6 @@ const BankListScreen = () => {
 }
 
 export default BankListScreen
+
+
+

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Text, TouchableOpacity, View } from 'react-native'
-import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useLocalSearchParams } from 'expo-router'
 import Loader from '@/components/Loader'
 import NotificationAlert from '@/components/notification'
 import { verifyTransfer } from '@/api/account'
@@ -10,7 +10,6 @@ import { buildApiErrorMessage } from '@/utils/apiErrorMessage'
 type NoticeState = { message: string | null; error: boolean; data: any | null }
 
 const TransferStatusScreen = () => {
-  const router = useRouter()
   const { transfer_id } = useLocalSearchParams<{ transfer_id?: string }>()
   const { onLogout } = useAuth()
   const [loading, setLoading] = useState(false)
@@ -18,8 +17,7 @@ const TransferStatusScreen = () => {
   const [notice, setNotice] = useState<NoticeState>({
     message: null,
     error: false,
-    data: null,
-  })
+    data: null })
 
   const handleVerify = async () => {
     if (!transfer_id) {
@@ -35,20 +33,17 @@ const TransferStatusScreen = () => {
       setNotice({
         message: response?.message || 'Transfer verified.',
         error: false,
-        data: response?.data || null,
-      })
+        data: response?.data || null })
     } catch (error: any) {
       const status = error?.response?.status
       if (status === 401) {
-        await onLogout()
-        router.replace('/login')
+        await onLogout().catch(() => {})
         return
       }
       const message = buildApiErrorMessage({
         status,
         data: error?.response?.data,
-        fallback: error?.message || 'Something went wrong',
-      })
+        fallback: error?.message || 'Something went wrong' })
       setNotice({ message, error: true, data: null })
     } finally {
       setLoading(false)
@@ -96,3 +91,6 @@ const TransferStatusScreen = () => {
 }
 
 export default TransferStatusScreen
+
+
+
