@@ -1,16 +1,17 @@
-import { View, Text, Linking, Switch, TouchableOpacity } from 'react-native'
+import { View, Text, Linking, Switch, TouchableOpacity, Alert } from 'react-native'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import useNotification from '@/hooks/useNotification'
 import useFetch from '@/services/useFetch'
 import { useAuth } from '@/services/useAuth'
-import { confirmBillPayment, getPurchaseOrder } from '@/api/billOrder'
+import { confirmBillPayment, getPurchaseOrder, initializeBillOrderPayment } from '@/api/billOrder'
 import Summary from '@/components/cards/Summary'
 import Loader from '@/components/Loader'
 import AppModal from '@/components/modal/Modal'
 import NotificationAlert from '@/components/notification'
 import TransactionButtons from '@/components/transactionButtons/TransactionButtons'
 import moneyFormat from '@/utils/moneyFormat'
+import { log } from '@/utils/log'
 const confirmDetails = () => {
   const { orderId } = useLocalSearchParams()
   const [loader, setLoader] = useState(false)
@@ -18,6 +19,7 @@ const confirmDetails = () => {
   const [retryCount, setRetryCount] = useState(0)
   const [lastPaymentMethod, setLastPaymentMethod] = useState<string | null>(null)
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const idempotencyKeyRef = useRef<string | null>(null)
   const { notification, setNotification } = useNotification()
   const [applyCommission, setApplyCommission] = useState(false)
   const router = useRouter()
@@ -27,15 +29,42 @@ const confirmDetails = () => {
     //   duration: 300,
     //   useNativeDriver: true
     // }).start();
-    setApplyCommission((prev) => !prev)
+    setApplyCommission((prev) => {
+      const next = !prev
+      if (__DEV__) {
+        log('[BONUS] toggle', { next })
+      }
+      return next
+    })
   }
 
   const { userProfileData, loadProfile } = useAuth()
   const [textInfo, setTextInfo] = useState('')
+  const confirmingRef = useRef(false)
+
+  const generateIdempotencyKey = () => {
+    try {
+      if (typeof crypto?.randomUUID === 'function') return crypto.randomUUID()
+    } catch {
+      // ignore
+    }
+    return `${Date.now()}-${Math.random()}`
+  }
+
+  const getStableIdempotencyKey = useCallback(() => {
+    if (!idempotencyKeyRef.current) {
+      idempotencyKeyRef.current = generateIdempotencyKey()
+    }
+    return idempotencyKeyRef.current
+  }, [])
 
   const fetchOrder = useCallback(() => getPurchaseOrder(orderId as string), [orderId])
   const { data } = useFetch(fetchOrder)
   // const [getstarted, setOpenStarted] = useState(false)
+
+  useEffect(() => {
+    idempotencyKeyRef.current = null
+  }, [orderId])
 
   const clearRetryTimer = () => {
     if (retryTimerRef.current) {
@@ -50,60 +79,84 @@ const confirmDetails = () => {
     setRetryCount(0)
   }, [])
 
-  const handleConfirmation = useCallback(async (payment_method: string) => {
-    // setTextInfo("Please wait while we process your payment")
-    setLastPaymentMethod(payment_method)
-    setLoader(true)
-
-    try {
-      const response = await confirmBillPayment({
-        queryId: orderId as string,
-        payment_method,
-      })
-      setLoader(false)
-
-      if (response?.pending || response?.status === 'pending') {
-        setPendingRetry(true)
-        setNotification({
-          error: true,
-          message:
-            response?.message || 'Payment pending. Please try again in a moment.',
-          data: null,
-        })
+  const handleConfirmation = useCallback(
+    async (payment_method: string) => {
+      if (confirmingRef.current) return
+      const queryId = String(orderId || '').trim()
+      if (!queryId) {
+        setNotification({ error: true, message: 'Missing order id', data: null })
         return
       }
 
-      if (payment_method === 'card') {
-        Linking.openURL(response.responseBody.checkoutUrl)
-      }
+      confirmingRef.current = true
+      setLoader(true)
+      setLastPaymentMethod(payment_method)
 
-      if (response) {
+      try {
+        if (payment_method === 'card') {
+          const initResponse = await initializeBillOrderPayment({
+            queryId,
+            payment_method: 'card',
+            redirect_url: `bitbridge://transaction/confirm?orderId=${queryId}`,
+            use_commission: applyCommission,
+          })
+          const checkoutUrl = initResponse?.responseBody?.checkoutUrl
+          if (!checkoutUrl) {
+            throw new Error(initResponse?.message || 'Unable to initialize card payment')
+          }
+          await Linking.openURL(checkoutUrl)
+          setNotification({
+            error: false,
+            message: 'Card payment initialized. Complete payment in checkout.',
+            data: null,
+          })
+          resetPending()
+          return
+        }
+
+        const idempotencyKey = getStableIdempotencyKey()
+        const response = await confirmBillPayment({
+          queryId,
+          payment_method,
+          use_commission: applyCommission,
+          idempotencyKey,
+        })
+
+        if (response?.pending || response?.status === 'pending' || response?.http_status === 202) {
+          const nextOrderId = response?.ui?.order_id ?? response?.data?.id ?? response?.id ?? queryId
+          setPendingRetry(true)
+          router.push({
+            pathname: '/transaction/confirm',
+            params: { orderId: String(nextOrderId) },
+          })
+          return
+        }
+
+        const nextOrderId = response?.ui?.order_id ?? response?.data?.id ?? response?.id ?? queryId
         router.push({
           pathname: '/transaction/confirm',
-          params: {
-            orderId: response.data.id,
-          },
+          params: { orderId: String(nextOrderId) },
         })
+        setNotification({
+          error: false,
+          message: response?.message || 'Recharge Successful',
+          data: null,
+        })
+        resetPending()
+        loadProfile({ force: true })
+      } catch (error: any) {
+        const message =
+          error?.response?.data?.message || error?.response?.data?.error || error?.message || 'Something went wrong'
+        Alert.alert('Payment failed', message)
+        resetPending()
+        setNotification({ error: true, message, data: null })
+      } finally {
+        setLoader(false)
+        confirmingRef.current = false
       }
-
-      setNotification({
-        error: false,
-        message: response?.message || 'Recharge Successful',
-        data: null,
-      })
-
-      resetPending()
-      loadProfile({ force: true })
-    } catch (error: any) {
-      setLoader(false)
-      resetPending()
-      setNotification({
-        error: true,
-        message: error.message || 'something went wrong',
-        data: null,
-      })
-    }
-  }, [loadProfile, orderId, resetPending, setNotification])
+    },
+    [orderId, applyCommission, loadProfile, resetPending, router, setNotification, getStableIdempotencyKey]
+  )
 
   useEffect(() => {
     if (!pendingRetry || !lastPaymentMethod) return
@@ -117,7 +170,7 @@ const confirmDetails = () => {
       clearRetryTimer()
     }
   }, [handleConfirmation, lastPaymentMethod, pendingRetry, retryCount])
-  console.log(applyCommission, '[Data info]')
+  log(applyCommission, '[Data info]')
   return (
     <View className="flex-1 p-4 bg-primary">
       <View className="mb-6">

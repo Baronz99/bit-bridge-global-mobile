@@ -1,6 +1,7 @@
 // src/api/billOrder.ts (MOBILE APP) — SAFE + NORMALIZED (NO AUTO-DECLINE)
 import client from '@/api/client'
 import moneyFormat from '@/utils/moneyFormat'
+import { log } from '@/utils/log'
 
 /**
  * ⚠️ IMPORTANT:
@@ -123,6 +124,15 @@ export const getPurchaseOrder = async (id: string) => {
   }
 }
 
+export const getBillOrder = async (id: string) => {
+  try {
+    const res = await client.get(`/bill_orders/${id}`)
+    return res.data?.data ?? res.data
+  } catch (err: any) {
+    throw new Error(errMsg(err))
+  }
+}
+
 export const confirmPayment = async ({
   queryId,
   payment_method,
@@ -140,42 +150,94 @@ export const confirmPayment = async ({
   }
 }
 
+export const initializeBillOrderPayment = async ({
+  queryId,
+  payment_method = 'card',
+  redirect_url,
+  use_commission = false,
+}: {
+  queryId: string
+  payment_method?: 'card' | 'wallet'
+  redirect_url?: string
+  use_commission?: boolean
+}) => {
+  try {
+    const res = await client.get(`/bill_orders/${queryId}/initialize_confirm_payment`, {
+      params: {
+        payment_method,
+        redirect_url,
+        use_commission,
+      },
+    })
+    return res.data
+  } catch (err: any) {
+    throw new Error(errMsg(err, 'Unable to initialize payment'))
+  }
+}
+
 /**
  * BillOrders confirm endpoint (kept as-is with your "pending" tolerant behavior)
  */
 export const confirmBillPayment = async ({
   queryId,
   payment_method,
+  use_commission = false,
+  idempotencyKey,
 }: {
   queryId: string
   payment_method: string
+  use_commission?: boolean
+  idempotencyKey?: string
 }) => {
   try {
-    const res = await client.get(`/bill_orders/${queryId}/initialize_confirm_payment`, {
-      params: { payment_method },
+    const payload = {
+      bill_order: {
+        payment_method,
+        use_commission,
+      },
+    }
+    if (__DEV__) {
+      log('[API] confirmBillPayment payload', {
+        payment_method,
+        use_commission,
+        idempotencyKey,
+      })
+    }
+    const res = await client.patch(`/bill_orders/${queryId}/confirm_bill_payment`, payload, {
+      headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
     })
-    return res.data
+    return { ...(res.data || {}), http_status: res.status }
   } catch (err: any) {
     const status = err?.response?.status
-    if (status === 503 || isTimeoutError(err)) {
+    const respData = err?.response?.data
+    if (__DEV__) {
+      log('[API] confirmBillPayment error', {
+        status,
+        data: respData,
+        message: err?.message,
+      })
+    }
+    const message = respData?.message || respData?.error || err?.message || 'Payment failed'
+
+    if (status === 503 || isTimeoutError(err) || isPendingResponse(respData)) {
       if (isHtmlResponse(err)) {
         return {
           pending: true,
           status: 'pending',
           message: 'Payment pending. Please try again in a moment.',
+          ui: respData?.ui,
         }
       }
 
-      const respData = err?.response?.data
-      if (isPendingResponse(respData) || status === 503 || isTimeoutError(err)) {
-        return {
-          pending: true,
-          status: 'pending',
-          message: respData?.message || 'Payment pending. Please try again in a moment.',
-        }
+      return {
+        pending: true,
+        status: 'pending',
+        message: respData?.message || 'Payment pending. Please try again in a moment.',
+        ui: respData?.ui,
       }
     }
-    throw new Error(errMsg(err))
+
+    throw new Error(message)
   }
 }
 
@@ -307,7 +369,9 @@ export default {
   createPurchaseOrder,
   cancelPayment,
   getPurchaseOrder,
+  getBillOrder,
   confirmPayment,
+  initializeBillOrderPayment,
   confirmBillPayment,
   confirmOrderPayment,
   repurchaseOrder,
