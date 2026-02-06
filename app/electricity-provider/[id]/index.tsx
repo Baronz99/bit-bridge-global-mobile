@@ -3,6 +3,7 @@ import React, { useState } from 'react'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { images } from '@/constants/images'
 import FormInput from '@/components/FormInput'
+import FormSelect from '@/components/FormSelect'
 import { useAuth } from '@/services/useAuth'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
 import { createPurchaseOrder } from '@/api/billOrder'
@@ -17,6 +18,17 @@ const getImageByKey = (key: string) => {
   return dict[key] ?? images.fail ?? images.bg
 }
 
+const normalizeBiller = (raw: string) => {
+  const biller = String(raw || '').trim().toLowerCase()
+  if (biller === 'ph') return 'ph'
+  return biller
+}
+
+const METER_TYPE_OPTIONS = [
+  { label: 'Prepaid', value: 'PREPAID' },
+  { label: 'Postpaid', value: 'POSTPAID' },
+]
+
 const ProvideDertails = () => {
   const { id } = useLocalSearchParams()
   const router = useRouter()
@@ -28,20 +40,49 @@ const ProvideDertails = () => {
 
   const [formValue, setFormValue] = useState({
     billersCode: '',
-    amount: 0,
+    amount: '',
+    meter_type: 'PREPAID',
     phone: '',
     description: 'Electric Bills',
   })
 
   const handleFormSubmit = async () => {
+    const meterNumber = String(formValue.billersCode || '').trim()
+    const phone = String(formValue.phone || '').trim()
+    const amountRaw = String(formValue.amount || '').trim()
+    const meterType = String(formValue.meter_type || '').trim().toUpperCase()
+    const amountValue = Number(amountRaw)
+
+    if (!meterNumber) {
+      setNotification({ error: true, message: 'Meter number is required', data: null })
+      return
+    }
+    if (!phone) {
+      setNotification({ error: true, message: 'Phone number is required', data: null })
+      return
+    }
+    if (!METER_TYPE_OPTIONS.some((opt) => opt.value === meterType)) {
+      setNotification({ error: true, message: 'Select a valid meter type', data: null })
+      return
+    }
+    if (!Number.isFinite(amountValue) || amountValue <= 0) {
+      setNotification({ error: true, message: 'Enter a valid amount greater than 0', data: null })
+      return
+    }
+
     setLoader(true)
 
     try {
       const response = await createPurchaseOrder({
-        ...formValue,
+        billersCode: meterNumber,
+        amount: amountValue,
+        meter_type: meterType,
+        vendType: meterType,
+        phone: phone,
+        description: formValue.description,
         email: userProfileData.email,
         service_type: 'ELECTRICITY',
-        biller: data?.biller,
+        biller: normalizeBiller(String(data?.biller || '')),
       })
 
       setLoader(false)
@@ -103,6 +144,16 @@ const ProvideDertails = () => {
                 value={formValue.billersCode}
               />
 
+              <FormSelect
+                label="Meter Type"
+                selectedValue={formValue.meter_type}
+                options={METER_TYPE_OPTIONS}
+                placeholder="Select meter type"
+                onValueChange={(value: string) =>
+                  setFormValue({ ...formValue, meter_type: String(value || '').toUpperCase() })
+                }
+              />
+
               <FormInput
                 name="phone"
                 label="Phone Number"
@@ -115,9 +166,8 @@ const ProvideDertails = () => {
                 name="amount"
                 label="Amount"
                 placeHolder="Enter Amount"
-                onChangeText={(text: string) =>
-                  setFormValue({ ...formValue, amount: parseInt(text.trim()) })
-                }
+                keyboardType="decimal-pad"
+                onChangeText={(text: string) => setFormValue({ ...formValue, amount: text.trim() })}
                 value={formValue.amount}
               />
 
