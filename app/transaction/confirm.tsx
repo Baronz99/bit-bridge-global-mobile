@@ -273,6 +273,17 @@ export default function TransactionSuccessScreen() {
     return () => sub.remove()
   }, [data, safeRefetch])
 
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (nextState) => {
+      if (nextState !== 'active') return
+      const status = String((data as any)?.status || '')
+      if (isStillProcessing(status)) {
+        refetch?.()
+      }
+    })
+    return () => sub.remove()
+  }, [data, refetch])
+
   // Resolve reference when route param is UUID by fetching transaction_record once
   useEffect(() => {
     if (resolvedReference || attemptedResolveRef.current) return
