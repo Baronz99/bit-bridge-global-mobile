@@ -59,12 +59,26 @@ const confirmDetails = () => {
   }, [])
 
   const fetchOrder = useCallback(() => getPurchaseOrder(orderId as string), [orderId])
-  const { data } = useFetch(fetchOrder)
+  const { data, refetch } = useFetch(fetchOrder)
   // const [getstarted, setOpenStarted] = useState(false)
 
   useEffect(() => {
     idempotencyKeyRef.current = null
   }, [orderId])
+
+  const statusRaw = String(data?.status || '').toLowerCase()
+  const isElectricityVerificationPending =
+    String(data?.service_type || '').toUpperCase() === 'ELECTRICITY' &&
+    statusRaw === 'pending' &&
+    !String(data?.name || '').trim()
+
+  useEffect(() => {
+    if (!isElectricityVerificationPending) return
+    const timer = setInterval(() => {
+      refetch?.()
+    }, 4000)
+    return () => clearInterval(timer)
+  }, [isElectricityVerificationPending, refetch])
 
   const clearRetryTimer = () => {
     if (retryTimerRef.current) {
@@ -85,6 +99,14 @@ const confirmDetails = () => {
       const queryId = String(orderId || '').trim()
       if (!queryId) {
         setNotification({ error: true, message: 'Missing order id', data: null })
+        return
+      }
+      if (isElectricityVerificationPending) {
+        setNotification({
+          error: true,
+          message: 'Meter verification still in progress. Please wait a few seconds.',
+          data: null,
+        })
         return
       }
 
@@ -155,7 +177,16 @@ const confirmDetails = () => {
         confirmingRef.current = false
       }
     },
-    [orderId, applyCommission, loadProfile, resetPending, router, setNotification, getStableIdempotencyKey]
+    [
+      orderId,
+      applyCommission,
+      loadProfile,
+      resetPending,
+      router,
+      setNotification,
+      getStableIdempotencyKey,
+      isElectricityVerificationPending,
+    ]
   )
 
   useEffect(() => {
@@ -226,6 +257,14 @@ const confirmDetails = () => {
       )}
       <Text className="text-white text-center">{textInfo}</Text>
 
+      {isElectricityVerificationPending ? (
+        <View className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 mb-3">
+          <Text className="text-blue-200 text-center">
+            Verifying meter details with provider. Please wait...
+          </Text>
+        </View>
+      ) : null}
+
       {pendingRetry ? (
         <View className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 mb-3">
           <Text className="text-yellow-200 text-center">
@@ -245,7 +284,10 @@ const confirmDetails = () => {
         </View>
       ) : null}
 
-      <TransactionButtons handleConfirmation={handleConfirmation} disabled={loader || pendingRetry} />
+      <TransactionButtons
+        handleConfirmation={handleConfirmation}
+        disabled={loader || pendingRetry || isElectricityVerificationPending}
+      />
 
       <TouchableOpacity
         onPress={() =>
