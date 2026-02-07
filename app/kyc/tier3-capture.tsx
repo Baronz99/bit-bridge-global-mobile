@@ -9,6 +9,12 @@ import { useAuth } from '@/services/useAuth'
 const prettyTier3Error = (value?: string) => {
   const msg = (value || '').toLowerCase()
   if (!msg) return 'Liveness failed. Please try again in good lighting.'
+  if (msg.includes('abnormal_texture_variance')) return 'Texture quality check failed. Retake in bright front lighting and avoid filters.'
+  if (msg.includes('professional_color_grading')) return 'Photo looks filtered. Disable beauty filters and retake with natural colors.'
+  if (msg.includes('insufficient_detail')) return 'Image detail is too low. Move closer, improve lighting, and retake.'
+  if (msg.includes('professional_intensity_profile')) return 'Lighting appears unnatural. Use soft front light and avoid overhead-only lighting.'
+  if (msg.includes('unnatural_sharpness_uniformity')) return 'Image appears over-processed. Retake without portrait/beauty effects.'
+  if (msg.includes('some_professional_characteristics')) return 'Photo quality appears synthetic. Retake with normal camera settings and natural light.'
   if (msg.includes('payload too large')) return 'Image is too large. Try a smaller photo.'
   if (msg.includes('temporarily unavailable')) return 'Service is temporarily unavailable. Try again later.'
   if (msg.includes('confidence')) return 'Face not clear enough. Retake with better lighting.'
@@ -18,6 +24,8 @@ const prettyTier3Error = (value?: string) => {
 
 // 2MB backend limit; base64 is ~4/3 of binary. Guard at ~1.8MB base64 length.
 const MAX_BASE64_LEN = Math.floor(1.8 * 1024 * 1024 * (4 / 3))
+// Extremely small payloads often fail provider liveness quality checks.
+const MIN_BASE64_LEN = 110_000
 
 type Tier3State = 'idle' | 'pending' | 'processing' | 'verified' | 'failed' | 'error'
 type CaptureStep = 'guidance' | 'camera' | 'review'
@@ -216,16 +224,25 @@ const Tier3CaptureScreen = () => {
     try {
       const photo = await cameraRef.current.takePictureAsync({
         base64: true,
-        quality: 0.35,
+        quality: 0.85,
+        skipProcessing: true,
       })
 
       if (!photo?.base64) {
         setMessage('Unable to read image. Please try again.')
         return
       }
+      if ((photo.width || 0) < 600 || (photo.height || 0) < 600) {
+        setMessage('Image resolution is too low. Retake in better light and keep your face closer.')
+        return
+      }
 
       if (photo.base64.length > MAX_BASE64_LEN) {
         setMessage('Selfie is too large. Retake closer with less background to reduce size.')
+        return
+      }
+      if (photo.base64.length < MIN_BASE64_LEN) {
+        setMessage('Image detail is too low. Improve front lighting and retake.')
         return
       }
 
@@ -265,8 +282,9 @@ const Tier3CaptureScreen = () => {
       {showCaptureFlow && step === 'guidance' ? (
         <View className="rounded-2xl border border-gray-800 bg-gray-900/70 p-4 mb-4">
           <Text className="text-white font-semibold mb-2">Before You Capture</Text>
-          <Text className="text-gray-300 text-xs mb-1">- Use bright lighting and avoid heavy shadows.</Text>
+          <Text className="text-gray-300 text-xs mb-1">- Use bright front lighting and avoid heavy shadows.</Text>
           <Text className="text-gray-300 text-xs mb-1">- Keep your full face centered in the oval frame.</Text>
+          <Text className="text-gray-300 text-xs mb-1">- Disable beauty filters/portrait effects and use normal camera mode.</Text>
           <Text className="text-gray-300 text-xs mb-1">- Remove cap, mask, or dark glasses.</Text>
           <Text className="text-gray-300 text-xs mb-3">- Hold still to avoid blur.</Text>
 
