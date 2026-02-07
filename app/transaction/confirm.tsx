@@ -1,4 +1,4 @@
-import { Alert, Pressable, Share, Text, View } from 'react-native'
+import { Alert, AppState, Pressable, Share, Text, View } from 'react-native'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 
@@ -35,6 +35,8 @@ const isStillProcessing = (s?: string) => {
   const v = norm(s)
   return ['initialized', 'pending', 'processing', 'in_progress', 'queued'].includes(v)
 }
+
+const isElectricity = (serviceType?: any) => String(serviceType || '').trim().toUpperCase() === 'ELECTRICITY'
 
 const pickFirst = (...values: any[]) => {
   for (const v of values) {
@@ -123,8 +125,21 @@ export default function TransactionSuccessScreen() {
   }, [hasReceiptRef, orderId, receiptRef, reference])
   const canOpenReceipt = useMemo(() => {
     const status = String((data as any)?.status || '')
-    return Boolean(String(fallbackReceiptRef || '').trim()) && isSuccessfulStatus(status)
+    const hasReceiptRefValue = Boolean(String(fallbackReceiptRef || '').trim())
+    const electricityFlow = isElectricity((data as any)?.service_type)
+    const tokenPresent = String((data as any)?.token || '').trim().length > 0
+    if (!hasReceiptRefValue || !isSuccessfulStatus(status)) return false
+    if (electricityFlow) return tokenPresent
+    return true
   }, [data, fallbackReceiptRef])
+  const isBillSuccess = useMemo(() => {
+    const status = String((data as any)?.status || '')
+    if (!isSuccessfulStatus(status)) return false
+    if (isElectricity((data as any)?.service_type)) {
+      return String((data as any)?.token || '').trim().length > 0
+    }
+    return true
+  }, [data])
   const effectiveReference = useMemo(
     () => pickFirst(resolvedReference, isBillRef(receiptRef) ? receiptRef : '', reference),
     [resolvedReference, receiptRef, reference]
@@ -227,6 +242,17 @@ export default function TransactionSuccessScreen() {
       }, 5000)
     }
   }, [data, effectiveReference, refetch, loadProfile, stopPolling])
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (nextState) => {
+      if (nextState !== 'active') return
+      const status = String((data as any)?.status || '')
+      if (isStillProcessing(status)) {
+        refetch?.()
+      }
+    })
+    return () => sub.remove()
+  }, [data, refetch])
 
   // Resolve reference when route param is UUID by fetching transaction_record once
   useEffect(() => {
@@ -375,7 +401,7 @@ export default function TransactionSuccessScreen() {
   // ---- UI blocks ----
   const billContent = (
     <>
-      {(data as any)?.status === 'completed' ? (
+      {isBillSuccess ? (
         <View className="items-center pt-14 pb-8 px-6">
           <View className="w-16 h-16 rounded-full bg-green-100 items-center justify-center mb-4">
             <Ionicons name="checkmark" size={36} color="#16a34a" />
@@ -394,7 +420,9 @@ export default function TransactionSuccessScreen() {
             {(data as any)?.status ? `Status: ${(data as any)?.status}` : 'Processing...'}
           </Text>
           <Text className="text-gray-400 mt-1">
-            If this stays pending, please wait a moment — it may be confirming.
+            {isElectricity((data as any)?.service_type) && isSuccessfulStatus((data as any)?.status)
+              ? 'Payment succeeded. Finalizing electricity token...'
+              : 'If this stays pending, please wait a moment — it may be confirming.'}
           </Text>
         </View>
       )}
