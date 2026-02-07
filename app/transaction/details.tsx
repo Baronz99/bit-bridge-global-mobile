@@ -245,7 +245,7 @@ const confirmDetails = () => {
         </View>
       ) : null}
 
-      <TransactionButtons handleConfirmation={handleConfirmation} />
+      <TransactionButtons handleConfirmation={handleConfirmation} disabled={loader || pendingRetry} />
 
       <TouchableOpacity
         onPress={() =>
