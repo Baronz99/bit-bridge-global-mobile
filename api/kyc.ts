@@ -50,6 +50,7 @@ export type BvnVerifyResponse = {
   verified_at?: string
   reason?: string
   locked_until?: string
+  bvn_locked_until?: string
   message?: string
 }
 
@@ -68,6 +69,7 @@ export type KycStatusResponse = {
       full_name?: string
       phone_number?: string
       date_of_birth?: string
+      phone_verified_at?: string
       role?: string
       primary_use_case?: string
       id_type?: string
@@ -96,6 +98,10 @@ export type KycStatusResponse = {
       bvn_attempts_count?: number
       bvn_failed_attempts_count?: number
       bvn_locked_until?: string
+      tier3_status?: string
+      tier3_error?: string
+      tier3_reference?: string
+      tier3_verified_at?: string
     }
   }
 }
@@ -116,6 +122,18 @@ export type Tier3StatusResponse = {
   tier3_error?: string
   tier3_reference?: string
   tier3_verified_at?: string
+}
+
+export type Tier3StartResponse = {
+  status?: string
+  message?: string
+  error?: string
+}
+
+export type Tier3LivenessResponse = {
+  status?: string
+  message?: string
+  error?: string
 }
 
 export const requestPhoneOtp = async (payload: PhoneVerificationRequestPayload) => {
@@ -155,4 +173,14 @@ export const submitTier3 = async (payload: Tier3SubmitPayload) => {
 export const getTier3Status = async () => {
   const res = await client.get('/verification/tier3/status')
   return res.data as Tier3StatusResponse
+}
+
+export const startTier3 = async (payload?: { image?: string; image_url?: string }) => {
+  const res = await client.post('/verification/tier3/start', payload || {})
+  return res.data as Tier3StartResponse
+}
+
+export const submitTier3Liveness = async (image: string) => {
+  const res = await client.post('/verification/tier3/liveness', { image })
+  return res.data as Tier3LivenessResponse
 }

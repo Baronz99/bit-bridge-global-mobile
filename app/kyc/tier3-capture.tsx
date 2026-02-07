@@ -1,13 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native'
 import { useRouter } from 'expo-router'
-import { submitTier3Liveness, getTier3Status } from '@/api/kyc'
+import { startTier3, getTier3Status } from '@/api/kyc'
 import { useAuth } from '@/services/useAuth'
 import * as ImagePicker from 'expo-image-picker'
-
-const IS_DEV = __DEV__ === true
-const DUMMY_IMAGE =
-  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII='
 
 const prettyTier3Error = (value?: string) => {
   const msg = (value || '').toLowerCase()
@@ -30,7 +26,7 @@ const extractApiErrorMessage = (error: any) =>
   error?.message ||
   'Unable to continue. Please retry.'
 
-const normalizeLivenessState = (res: any): Tier3State => {
+const normalizeTier3State = (res: any): Tier3State => {
   const topStatus = res?.status
   if (typeof topStatus === 'string') {
     const s = topStatus.toLowerCase()
@@ -116,7 +112,7 @@ const Tier3CaptureScreen = () => {
     setTookTooLong(false)
     setStatus('processing')
     try {
-      const payloadImage = IS_DEV ? DUMMY_IMAGE : imageBase64Ref.current || ''
+      const payloadImage = imageBase64Ref.current || ''
       if (!payloadImage) {
         setStatus('idle')
         setMessage('Capture a selfie to continue.')
@@ -124,8 +120,8 @@ const Tier3CaptureScreen = () => {
         return
       }
 
-      const res = await submitTier3Liveness(payloadImage)
-      const next = normalizeLivenessState(res)
+      const res = await startTier3({ image: payloadImage })
+      const next = normalizeTier3State(res)
       if (next === 'verified') {
         setStatus('verified')
       } else if (next === 'processing') {
@@ -207,10 +203,8 @@ const Tier3CaptureScreen = () => {
             <TouchableOpacity
               disabled={!canCapture}
               onPress={async () => {
-                if (!IS_DEV) {
-                  const captured = await requestCameraAndCapture()
-                  if (!captured) return
-                }
+                const captured = await requestCameraAndCapture()
+                if (!captured) return
                 await handleCapture()
               }}
               className={`rounded-xl py-3 items-center ${
