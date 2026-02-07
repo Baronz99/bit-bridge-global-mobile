@@ -1,6 +1,7 @@
 // src/api/account.ts (MOBILE APP)
 import client from '@/api/client'
 import { normalizeBank, normalizeBeneficiary } from '@/utils/normalize'
+import { log, warn } from '@/utils/log'
 
 const errMsg = (err: any, fallback = 'Something went wrong') =>
   err?.response?.data?.message || err?.message || fallback
@@ -25,7 +26,7 @@ export const createBankAccount = async (payload: CreateAccountPayload) => {
     return res.data
   } catch (err: any) {
     const msg = errMsg(err)
-    console.log('[createBankAccount error]', {
+    warn('[createBankAccount error]', {
       message: msg,
       status: err?.response?.status,
       data: err?.response?.data,
@@ -41,7 +42,7 @@ export const getUserAnchorAccountDetail = async () => {
     return res.data
   } catch (err: any) {
     const msg = errMsg(err)
-    console.log('[getUserAnchorAccountDetail error]', {
+    warn('[getUserAnchorAccountDetail error]', {
       message: msg,
       status: err?.response?.status,
       data: err?.response?.data,
@@ -62,6 +63,18 @@ const parseAccountError = (err: any) => {
   }
 }
 
+const parseAnchorApiError = (err: any) => {
+  const data = err?.response?.data || {}
+  return {
+    status: err?.response?.status,
+    message: data?.message || err?.message || 'Something went wrong',
+    error: data?.error,
+    errors: Array.isArray(data?.errors) ? data.errors : [],
+    meta: data?.meta || null,
+    response: err?.response,
+  }
+}
+
 export const createAnchorAccount = async (payload?: { account?: Record<string, unknown> }) => {
   try {
     const accountPayload = {
@@ -72,7 +85,7 @@ export const createAnchorAccount = async (payload?: { account?: Record<string, u
     return res.data
   } catch (err: any) {
     const parsed = parseAccountError(err)
-    console.log('[createAnchorAccount error]', {
+    warn('[createAnchorAccount error]', {
       message: parsed.message,
       status: parsed.status,
       error_code: parsed.error_code,
@@ -94,16 +107,14 @@ export const getBanks = async (): Promise<any> => {
       payload?.banks ||
       payload
     const list = Array.isArray(raw) ? raw : []
-    console.log('[getBanks] payload keys', Object.keys(payload || {}))
-    console.log('[getBanks] raw sample', list.slice(0, 2))
+    log('[getBanks] payload keys', Object.keys(payload || {}))
+    log('[getBanks] raw sample', list.slice(0, 2))
     const normalized = list.map((item) => normalizeBank(item || {}))
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('[getBanks] normalized sample', normalized[0])
-    }
+    log('[getBanks] normalized sample', normalized[0])
     return normalized
   } catch (err: any) {
     const msg = errMsg(err)
-    console.log('[getBanks error]', {
+    warn('[getBanks error]', {
       message: msg,
       status: err?.response?.status,
       data: err?.response?.data,
@@ -127,7 +138,7 @@ export const getBeneficiaries = async (): Promise<any> => {
     return list.map((item) => normalizeBeneficiary(item || {}))
   } catch (err: any) {
     const msg = errMsg(err)
-    console.log('[getBeneficiaries error]', {
+    warn('[getBeneficiaries error]', {
       message: msg,
       status: err?.response?.status,
       data: err?.response?.data,
@@ -149,7 +160,7 @@ export const createCounterParty = async (payload: {
     return res.data
   } catch (err: any) {
     const msg = errMsg(err)
-    console.log('[createCounterParty error]', {
+    warn('[createCounterParty error]', {
       message: msg,
       status: err?.response?.status,
       data: err?.response?.data,
@@ -165,7 +176,7 @@ export const getUserAccountDetail = async () => {
     return res.data
   } catch (err: any) {
     const msg = errMsg(err)
-    console.log('[getUserAccountDetail error]', {
+    warn('[getUserAccountDetail error]', {
       message: msg,
       status: err?.response?.status,
       data: err?.response?.data,
@@ -192,7 +203,7 @@ export const initiateFundTransfer = async (payload: {
     return res.data
   } catch (err: any) {
     const msg = errMsg(err)
-    console.log('[initiateFundTransfer error]', {
+    warn('[initiateFundTransfer error]', {
       message: msg,
       status: err?.response?.status,
       data: err?.response?.data,
@@ -213,7 +224,7 @@ export const resolveAccountName = async (payload: {
     return res.data
   } catch (err: any) {
     const msg = errMsg(err)
-    console.log('[resolveAccountName error]', {
+    warn('[resolveAccountName error]', {
       message: msg,
       status: err?.response?.status,
       data: err?.response?.data,
@@ -231,7 +242,7 @@ export const verifyTransfer = async (transferId: string) => {
     return res.data
   } catch (err: any) {
     const msg = errMsg(err)
-    console.log('[verifyTransfer error]', {
+    warn('[verifyTransfer error]', {
       message: msg,
       status: err?.response?.status,
       data: err?.response?.data,
@@ -247,7 +258,7 @@ export const getAccounts = async () => {
     return res.data
   } catch (err: any) {
     const msg = errMsg(err, 'Failed to fetch accounts')
-    console.log('[getAccounts error]', {
+    warn('[getAccounts error]', {
       message: msg,
       status: err?.response?.status,
       data: err?.response?.data,
@@ -262,14 +273,14 @@ export const createDepositAccount = async () => {
     const res = await client.get('/accounts/get_account_number')
     return res.data
   } catch (err: any) {
-    const msg = errMsg(err, 'Failed to create deposit account')
-    console.log('[createDepositAccount error]', {
-      message: msg,
-      status: err?.response?.status,
+    const parsed = parseAnchorApiError(err)
+    warn('[createDepositAccount error]', {
+      message: parsed.message,
+      status: parsed.status,
       data: err?.response?.data,
       url: err?.config?.url,
     })
-    throw new Error(msg)
+    throw parsed
   }
 }
 
@@ -285,7 +296,7 @@ export const verifyKyc = async (payload: {
     return res.data
   } catch (err: any) {
     const msg = errMsg(err, 'Failed to verify KYC')
-    console.log('[verifyKyc error]', {
+    warn('[verifyKyc error]', {
       message: msg,
       status: err?.response?.status,
       data: err?.response?.data,

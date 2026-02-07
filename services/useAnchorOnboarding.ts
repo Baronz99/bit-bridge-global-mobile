@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useFocusEffect } from '@react-navigation/native'
 import { getAccounts, getUserAnchorAccountDetail } from '@/api/account'
+import { log } from '@/utils/log'
 
 export type AnchorKycState = 'unknown' | 'not_started' | 'pending' | 'verified'
 export type AnchorNextStep = 'CREATE_ANCHOR' | 'DO_KYC' | 'GENERATE_NUMBER' | 'DONE'
@@ -96,12 +97,19 @@ const normalizeKycState = (
   raw: unknown,
   hasAnchorAccount: boolean,
   detailResponse?: any,
-  hasAccountNumber?: boolean
+  hasAccountNumber?: boolean,
+  anchorAccount?: any
 ): AnchorKycState => {
   const value = String(raw ?? '').trim().toLowerCase()
   if (!hasAnchorAccount) return 'unknown'
+  const accountStatus = String(anchorAccount?.status ?? '').trim().toLowerCase()
+  if (['completed', 'verified', 'approved', 'active'].some((v) => accountStatus.includes(v))) {
+    return 'verified'
+  }
+  if (accountStatus === 'verifying') {
+    return 'pending'
+  }
   if (value === 'active') return 'verified'
-  if (hasAccountNumber) return 'verified'
   if (!value) return 'not_started'
   if (
     ['completed', 'verified', 'approved', 'success', 'successful'].some((v) =>
@@ -264,7 +272,8 @@ export const normalizeAnchorOnboarding = (
     extractStatusFromDetail(detailData),
     hasAnchorAccount,
     detailResponse,
-    Boolean(accountNumber)
+    Boolean(accountNumber),
+    anchorAccount
   )
   const hasAccountNumber = Boolean(accountNumber)
   const depositReady = kycState === 'verified' && hasAccountNumber
@@ -444,7 +453,7 @@ const logNestedKeyGroups = (
   for (const key of candidates) {
     const value = detailData[key]
     if (value && typeof value === 'object' && !Array.isArray(value)) {
-      console.log(`[Anchor Onboarding] detail.${label}.${key} keys`, Object.keys(value))
+        log(`[Anchor Onboarding] detail.${label}.${key} keys`, Object.keys(value))
     }
   }
 }
@@ -504,27 +513,27 @@ const logResponseShapes = (detailResponse: any, userAccountsResponse: any) => {
     (key) => key.toLowerCase().includes('account_number') || key.includes('accountNumber')
   )
 
-  console.log('[Anchor Onboarding] get_user_account_detail keys', detailKeys)
-  console.log('[Anchor Onboarding] detail.data keys', detailDataKeys)
-  console.log('[Anchor Onboarding] user_accounts keys', userAccountsKeys)
-  console.log('[Anchor Onboarding] user_accounts.data keys', userAccountsDataKeys)
-  console.log('[Anchor Onboarding] detail has_anchor_account key paths', detailHasAnchorPaths)
-  console.log('[Anchor Onboarding] detail has_anchor_account value', hasAnchorAccountValue)
-  console.log('[Anchor Onboarding] detail.attributes.status value', detailStatusValue)
-  console.log(
+  log('[Anchor Onboarding] get_user_account_detail keys', detailKeys)
+  log('[Anchor Onboarding] detail.data keys', detailDataKeys)
+  log('[Anchor Onboarding] user_accounts keys', userAccountsKeys)
+  log('[Anchor Onboarding] user_accounts.data keys', userAccountsDataKeys)
+  log('[Anchor Onboarding] detail has_anchor_account key paths', detailHasAnchorPaths)
+  log('[Anchor Onboarding] detail has_anchor_account value', hasAnchorAccountValue)
+  log('[Anchor Onboarding] detail.attributes.status value', detailStatusValue)
+  log(
     '[Anchor Onboarding] detail account number present/last4',
     Boolean(detailAccountNumber),
     detailAccountMasked
   )
   if (accountNumbersCount !== null) {
-    console.log('[Anchor Onboarding] detail.relationships.accountNumbers count', accountNumbersCount)
+    log('[Anchor Onboarding] detail.relationships.accountNumbers count', accountNumbersCount)
   }
   if (virtualNubansCount !== null) {
-    console.log('[Anchor Onboarding] detail.relationships.virtualNubans count', virtualNubansCount)
+    log('[Anchor Onboarding] detail.relationships.virtualNubans count', virtualNubansCount)
   }
-  console.log('[Anchor Onboarding] detail.data.attributes keys', detailAttrKeys)
-  console.log('[Anchor Onboarding] detail.data.relationships keys', detailRelKeys)
-  console.log('[Anchor Onboarding] detail status-like keys', statusKeys)
+  log('[Anchor Onboarding] detail.data.attributes keys', detailAttrKeys)
+  log('[Anchor Onboarding] detail.data.relationships keys', detailRelKeys)
+  log('[Anchor Onboarding] detail status-like keys', statusKeys)
   logNestedKeyGroups('data', detailData, [
     'account',
     'account_detail',
@@ -535,23 +544,23 @@ const logResponseShapes = (detailResponse: any, userAccountsResponse: any) => {
     'user',
     'verification',
   ])
-  console.log('[Anchor Onboarding] user_accounts[0] keys', accountSampleKeys)
-  console.log('[Anchor Onboarding] account number paths', accountNumberPaths)
-  console.log('[Anchor Onboarding] detail account number key paths', detailAccountNumberPaths)
-  console.log('[Anchor Onboarding] detail account number value paths', detailAccountNumberValuePaths)
-  console.log('[Anchor Onboarding] detail status key paths', detailStatusPaths)
-  console.log('[Anchor Onboarding] detail status value paths', detailStatusValuePaths)
-  console.log('[Anchor Onboarding] detail adjacent name paths', detailAdjacentNamePaths)
-  console.log('[Anchor Onboarding] user_accounts account number key paths', userAccountsNumberKeyPaths)
-  console.log('[Anchor Onboarding] user_accounts account number value paths', userAccountsValuePaths.accountNumberPaths)
+  log('[Anchor Onboarding] user_accounts[0] keys', accountSampleKeys)
+  log('[Anchor Onboarding] account number paths', accountNumberPaths)
+  log('[Anchor Onboarding] detail account number key paths', detailAccountNumberPaths)
+  log('[Anchor Onboarding] detail account number value paths', detailAccountNumberValuePaths)
+  log('[Anchor Onboarding] detail status key paths', detailStatusPaths)
+  log('[Anchor Onboarding] detail status value paths', detailStatusValuePaths)
+  log('[Anchor Onboarding] detail adjacent name paths', detailAdjacentNamePaths)
+  log('[Anchor Onboarding] user_accounts account number key paths', userAccountsNumberKeyPaths)
+  log('[Anchor Onboarding] user_accounts account number value paths', userAccountsValuePaths.accountNumberPaths)
 }
 
 const logDerivedState = (state: NormalizedAnchorOnboarding) => {
   if (!shouldLogDev()) return
-  console.log('[Anchor Onboarding] derived state', {
-    hasAnchorAccount: state.hasAnchorAccount,
-    kycState: state.kycState,
-    hasAccountNumber: state.hasAccountNumber,
+    log('[Anchor Onboarding] derived state', {
+      hasAnchorAccount: state.hasAnchorAccount,
+      kycState: state.kycState,
+      hasAccountNumber: state.hasAccountNumber,
     depositReady: state.depositReady,
     step: state.nextStep,
   })

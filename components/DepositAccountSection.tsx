@@ -11,10 +11,34 @@ export type DepositAccountSectionProps = {
   onVerifyKyc: () => Promise<void>
   onGenerateAccount: () => Promise<void>
   onRefresh: () => Promise<void>
-  kycForm: { bvn: string; dob: string; gender: string }
-  setKycForm: (next: { bvn: string; dob: string; gender: string }) => void
+  anchorForm: {
+    address: string
+    city: string
+    state: string
+    postal_code: string
+    bvn: string
+    dob: string
+    gender: string
+  }
+  setAnchorForm: (next: {
+    address: string
+    city: string
+    state: string
+    postal_code: string
+    bvn: string
+    dob: string
+    gender: string
+  }) => void
   prefilledDob?: string
   prefilledGender?: string
+  prefilledAddress?: string
+  prefilledCity?: string
+  prefilledState?: string
+  prefilledPostal?: string
+  platformTier2?: boolean
+  onGoToKyc?: () => void
+  prefilledPhone?: string
+  onGoToProfile?: () => void
 }
 
 const DepositAccountSection = ({
@@ -24,10 +48,18 @@ const DepositAccountSection = ({
   onVerifyKyc,
   onGenerateAccount,
   onRefresh,
-  kycForm,
-  setKycForm,
+  anchorForm,
+  setAnchorForm,
   prefilledDob,
   prefilledGender,
+  prefilledAddress,
+  prefilledCity,
+  prefilledState,
+  prefilledPostal,
+  platformTier2 = false,
+  onGoToKyc,
+  prefilledPhone,
+  onGoToProfile,
 }: DepositAccountSectionProps) => {
   const step = useMemo(() => getAnchorNextStep(normalized), [normalized])
   const maskedAccountNumber = normalized.displayAccountNumber || '----'
@@ -43,23 +75,26 @@ const DepositAccountSection = ({
   }, [normalized.kycState])
 
   const explanation = useMemo(() => {
-    if (!normalized.hasAnchorAccount) return 'Create your Anchor account to get started.'
-    if (normalized.kycState !== 'verified') return 'Finish verification to unlock deposits.'
+    if (!platformTier2)
+      return 'Complete Tier 2 verification before setting up a deposit account.'
+    if (!normalized.hasAnchorAccount) return 'Provide your details to create a deposit profile.'
+    if (normalized.kycState != 'verified') return 'Finish Anchor verification to unlock deposits.'
     if (!normalized.hasAccountNumber) return 'Generate your account number to fund your wallet.'
     return 'You are ready to fund your wallet.'
-  }, [normalized])
+  }, [normalized, platformTier2])
 
   const inactiveNumberMessage =
-    normalized.hasAnchorAccount && normalized.hasAccountNumber && normalized.kycState !== 'verified'
+    normalized.hasAnchorAccount && normalized.hasAccountNumber && normalized.kycState != 'verified'
       ? 'Account number created. Deposits will activate after verification.'
       : null
 
   const primaryAction = useMemo(() => {
+    if (!platformTier2) return null
     switch (step) {
       case 'CREATE_ANCHOR':
-        return { label: 'Create Anchor Account', onPress: onCreateAnchor }
+        return { label: 'Create deposit profile', onPress: onCreateAnchor }
       case 'DO_KYC':
-        return { label: 'Verify Anchor KYC', onPress: onVerifyKyc }
+        return { label: 'Verify identity', onPress: onVerifyKyc }
       case 'GENERATE_NUMBER':
         return { label: 'Generate Account Number', onPress: onGenerateAccount }
       default:
@@ -67,7 +102,7 @@ const DepositAccountSection = ({
     }
   }, [step, onCreateAnchor, onVerifyKyc, onGenerateAccount])
 
-  if (step === 'DONE') {
+  if (step == 'DONE') {
     return (
       <View className="bg-gray-900 border border-gray-800 rounded-2xl p-4 mt-6">
         <Text className="text-white font-semibold">Deposit Account</Text>
@@ -140,7 +175,7 @@ const DepositAccountSection = ({
       </View>
 
       <View className="mt-1">
-        <Text className="text-gray-200 text-sm">Step 1: Anchor account</Text>
+        <Text className="text-gray-200 text-sm">Step 1: Customer details</Text>
         <Text className="text-gray-400 text-xs">
           {normalized.hasAnchorAccount ? 'Account exists' : 'Not created yet'}
         </Text>
@@ -173,35 +208,131 @@ const DepositAccountSection = ({
         </View>
       ) : null}
 
-      {normalized.hasAnchorAccount && normalized.kycState !== 'verified' ? (
+      {!platformTier2 ? (
         <View className="mt-4">
-          <Text className="text-gray-200 text-sm mb-2">Verify Anchor KYC</Text>
+          <Text className="text-gray-200 text-sm mb-2">Tier 2 required</Text>
+          <Text className="text-gray-500 text-xs">
+            Complete Tier 2 verification in your profile to enable deposit accounts.
+          </Text>
+          {onGoToKyc ? (
+            <TouchableOpacity
+              onPress={onGoToKyc}
+              className="bg-gray-950 border border-gray-800 py-3 rounded-xl mt-3"
+            >
+              <Text className="text-white text-center text-xs">Complete Tier 2</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      ) : !normalized.hasAnchorAccount ? (
+        <View className="mt-4">
+          <Text className="text-gray-200 text-sm mb-2">Customer details</Text>
           <Text className="text-gray-500 text-xs mb-3">
-            Why can’t I deposit yet? Verification is still pending.
+            These details are required to create your deposit profile with Anchor.
           </Text>
           <FormInput
+            label="Phone number"
+            value={prefilledPhone || ''}
+            editable={false}
+          />
+          {onGoToProfile ? (
+            <TouchableOpacity onPress={onGoToProfile} className="mt-2 self-start">
+              <Text className="text-alt text-xs">Edit phone in profile</Text>
+            </TouchableOpacity>
+          ) : null}
+          <FormInput
+            label="Address"
+            value={anchorForm.address}
+            editable={!prefilledAddress}
+            onChangeText={(value: string) => setAnchorForm({ ...anchorForm, address: value })}
+          />
+          <FormInput
+            label="City"
+            value={anchorForm.city}
+            editable={!prefilledCity}
+            onChangeText={(value: string) => setAnchorForm({ ...anchorForm, city: value })}
+          />
+          <FormInput
+            label="State"
+            value={anchorForm.state}
+            editable={!prefilledState}
+            onChangeText={(value: string) => setAnchorForm({ ...anchorForm, state: value })}
+          />
+          <FormInput
+            label="Postal code"
+            value={anchorForm.postal_code}
+            editable={!prefilledPostal}
+            onChangeText={(value: string) => setAnchorForm({ ...anchorForm, postal_code: value })}
+          />
+          <FormInput
             label="BVN"
-            value={kycForm.bvn}
-            onChangeText={(value: string) => setKycForm({ ...kycForm, bvn: value })}
+            value={anchorForm.bvn}
+            onChangeText={(value: string) => setAnchorForm({ ...anchorForm, bvn: value })}
             keyboardType="numeric"
           />
           <FormInput
             label="Date of Birth (YYYY-MM-DD)"
-            value={kycForm.dob}
+            value={anchorForm.dob}
             editable={!prefilledDob}
-            onChangeText={(value: string) => setKycForm({ ...kycForm, dob: value })}
+            onChangeText={(value: string) => setAnchorForm({ ...anchorForm, dob: value })}
           />
           <FormSelect
             label="Gender (optional)"
-            selectedValue={kycForm.gender}
+            selectedValue={anchorForm.gender}
             disabled={!!prefilledGender}
-            onValueChange={(value: string) => setKycForm({ ...kycForm, gender: value })}
+            onValueChange={(value: string) => setAnchorForm({ ...anchorForm, gender: value })}
             options={[
               { label: 'Select gender', value: '' },
               { label: 'Male', value: 'male' },
               { label: 'Female', value: 'female' },
             ]}
           />
+        </View>
+      ) : normalized.kycState === 'not_started' ? (
+        <View className="mt-4">
+          <Text className="text-gray-200 text-sm mb-2">Verify identity</Text>
+          <Text className="text-gray-500 text-xs mb-3">
+            Submit your Anchor KYC to unlock deposits.
+          </Text>
+          <FormInput
+            label="Phone number"
+            value={prefilledPhone || ''}
+            editable={false}
+          />
+          {onGoToProfile ? (
+            <TouchableOpacity onPress={onGoToProfile} className="mt-2 self-start">
+              <Text className="text-alt text-xs">Edit phone in profile</Text>
+            </TouchableOpacity>
+          ) : null}
+          <FormInput
+            label="BVN"
+            value={anchorForm.bvn}
+            onChangeText={(value: string) => setAnchorForm({ ...anchorForm, bvn: value })}
+            keyboardType="numeric"
+          />
+          <FormInput
+            label="Date of Birth (YYYY-MM-DD)"
+            value={anchorForm.dob}
+            editable={!prefilledDob}
+            onChangeText={(value: string) => setAnchorForm({ ...anchorForm, dob: value })}
+          />
+          <FormSelect
+            label="Gender (optional)"
+            selectedValue={anchorForm.gender}
+            disabled={!!prefilledGender}
+            onValueChange={(value: string) => setAnchorForm({ ...anchorForm, gender: value })}
+            options={[
+              { label: 'Select gender', value: '' },
+              { label: 'Male', value: 'male' },
+              { label: 'Female', value: 'female' },
+            ]}
+          />
+        </View>
+      ) : normalized.kycState === 'pending' ? (
+        <View className="mt-4">
+          <Text className="text-gray-200 text-sm mb-2">Verification in progress</Text>
+          <Text className="text-gray-500 text-xs">
+            Anchor is verifying your identity. Tap refresh to update the status.
+          </Text>
         </View>
       ) : null}
 

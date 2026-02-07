@@ -68,6 +68,7 @@ describe('normalizeAnchorOnboarding', () => {
       data: { status: 'pending', account_number: '1112223334' },
       has_anchor_account: true,
     })
-    expect(statusPendingNumber.depositReady).toBe(true)
+    expect(statusPendingNumber.depositReady).toBe(false)
+    expect(statusPendingNumber.kycState).toBe('pending')
   })
 })
