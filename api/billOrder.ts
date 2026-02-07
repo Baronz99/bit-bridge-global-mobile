@@ -86,6 +86,10 @@ export const createPurchaseOrder = async (orderData: any) => {
     const res = await client.post('/payment_processors/process_payment', orderData)
     return res.data
   } catch (err: any) {
+    const status = err?.response?.status
+    if (status === 503 || isHtmlResponse(err) || isTimeoutError(err)) {
+      throw new Error('Provider timeout. Please retry in a few seconds.')
+    }
     throw new Error(errMsg(err))
   }
 }
