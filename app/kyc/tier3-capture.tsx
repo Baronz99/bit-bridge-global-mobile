@@ -78,8 +78,10 @@ const Tier3CaptureScreen = () => {
     const current = res?.tier3_status?.toLowerCase()
     if (current === 'verified') setStatus('verified')
     else if (current === 'processing' || current === 'pending') setStatus('processing')
-    else if (current === 'failed') setStatus('failed')
-    else setStatus('idle')
+    else if (current === 'failed' || current === 'rejected') {
+      setStatus('failed')
+      if (res?.tier3_error) setMessage(prettyTier3Error(res.tier3_error))
+    } else setStatus('idle')
   }
 
   useEffect(() => {
