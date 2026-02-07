@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { ActivityIndicator, Image, ScrollView, Text, TouchableOpacity, View } from 'react-native'
 import { useRouter } from 'expo-router'
+import { useIsFocused } from '@react-navigation/native'
+import { CameraView, useCameraPermissions } from 'expo-camera'
 import { startTier3, getTier3Status } from '@/api/kyc'
 import { useAuth } from '@/services/useAuth'
-import * as ImagePicker from 'expo-image-picker'
 
 const prettyTier3Error = (value?: string) => {
   const msg = (value || '').toLowerCase()
@@ -19,6 +20,7 @@ const prettyTier3Error = (value?: string) => {
 const MAX_BASE64_LEN = Math.floor(1.8 * 1024 * 1024 * (4 / 3))
 
 type Tier3State = 'idle' | 'pending' | 'processing' | 'verified' | 'failed' | 'error'
+type CaptureStep = 'guidance' | 'camera' | 'review'
 
 const extractApiErrorMessage = (error: any) =>
   error?.response?.data?.error ||
@@ -52,13 +54,20 @@ const normalizeTier3State = (res: any): Tier3State => {
 
 const Tier3CaptureScreen = () => {
   const router = useRouter()
+  const isFocused = useIsFocused()
   const { loadProfile } = useAuth()
+  const [permission, requestPermission] = useCameraPermissions()
+  const cameraRef = useRef<CameraView | null>(null)
+
   const [status, setStatus] = useState<Tier3State>('idle')
+  const [step, setStep] = useState<CaptureStep>('guidance')
   const [message, setMessage] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [capturing, setCapturing] = useState(false)
   const [tookTooLong, setTookTooLong] = useState(false)
   const [selfiePreviewUri, setSelfiePreviewUri] = useState<string | null>(null)
   const [hasReadGuidance, setHasReadGuidance] = useState(false)
+
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pollStartRef = useRef<number | null>(null)
   const statusRef = useRef<Tier3State>('idle')
@@ -91,7 +100,7 @@ const Tier3CaptureScreen = () => {
     statusRef.current = status
   }, [status])
 
-  const canCapture = useMemo(
+  const canOpenCamera = useMemo(
     () => (status === 'idle' || status === 'failed') && hasReadGuidance,
     [hasReadGuidance, status]
   )
@@ -104,6 +113,7 @@ const Tier3CaptureScreen = () => {
       setTookTooLong(true)
       return
     }
+
     pollRef.current = setTimeout(async () => {
       await loadProfile({ force: true })
       await fetchStatus()
@@ -116,6 +126,7 @@ const Tier3CaptureScreen = () => {
     setMessage(null)
     setTookTooLong(false)
     setStatus('processing')
+
     try {
       const payloadImage = imageBase64Ref.current || ''
       if (!payloadImage) {
@@ -127,6 +138,7 @@ const Tier3CaptureScreen = () => {
 
       const res = await startTier3({ image: payloadImage })
       const next = normalizeTier3State(res)
+
       if (next === 'verified') {
         setStatus('verified')
         setSelfiePreviewUri(null)
@@ -137,6 +149,7 @@ const Tier3CaptureScreen = () => {
         setStatus('failed')
         setMessage(prettyTier3Error(res?.error || res?.message || res?.detail))
       }
+
       await loadProfile({ force: true })
       await fetchStatus()
     } catch (err: any) {
@@ -152,6 +165,7 @@ const Tier3CaptureScreen = () => {
       const t = setTimeout(() => router.replace('/kyc'), 1200)
       return () => clearTimeout(t)
     }
+
     return () => {
       if (pollRef.current) clearTimeout(pollRef.current)
     }
@@ -163,39 +177,59 @@ const Tier3CaptureScreen = () => {
     }
   }, [])
 
-  const requestCameraAndCapture = async () => {
+  const openCamera = async () => {
     setMessage(null)
-    const { status: perm } = await ImagePicker.requestCameraPermissionsAsync()
-    if (perm !== 'granted') {
-      setMessage('Camera permission is required to capture your selfie.')
-      return null
+    const granted = permission?.granted
+    if (!granted) {
+      const req = await requestPermission()
+      if (!req.granted) {
+        setMessage('Camera permission is required to capture your selfie.')
+        return
+      }
     }
-
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 0.35,
-      base64: true,
-    })
-
-    if (result.canceled) return null
-
-    const asset = result.assets?.[0]
-    if (!asset?.base64) {
-      setMessage('Unable to read image. Please try again.')
-      return null
-    }
-
-    const dataUrl = `data:${asset.type || 'image/jpeg'};base64,${asset.base64}`
-    if (asset.base64.length > MAX_BASE64_LEN) {
-      setMessage('Selfie is too large. Retake closer with less background to reduce size.')
-      return null
-    }
-
-    imageBase64Ref.current = dataUrl
-    setSelfiePreviewUri(asset.uri || null)
-    return dataUrl
+    setStep('camera')
   }
+
+  const takeSelfie = async () => {
+    if (!cameraRef.current || capturing) return
+    setCapturing(true)
+    setMessage(null)
+
+    try {
+      const photo = await cameraRef.current.takePictureAsync({
+        base64: true,
+        quality: 0.35,
+      })
+
+      if (!photo?.base64) {
+        setMessage('Unable to read image. Please try again.')
+        return
+      }
+
+      if (photo.base64.length > MAX_BASE64_LEN) {
+        setMessage('Selfie is too large. Retake closer with less background to reduce size.')
+        return
+      }
+
+      const dataUrl = `data:image/jpeg;base64,${photo.base64}`
+      imageBase64Ref.current = dataUrl
+      setSelfiePreviewUri(photo.uri || null)
+      setStep('review')
+    } catch {
+      setMessage('Unable to capture image. Please try again.')
+    } finally {
+      setCapturing(false)
+    }
+  }
+
+  const resetCapture = () => {
+    imageBase64Ref.current = null
+    setSelfiePreviewUri(null)
+    setStep('camera')
+    setMessage(null)
+  }
+
+  const showCaptureFlow = status !== 'processing' && status !== 'verified'
 
   return (
     <ScrollView className="flex-1 bg-primary px-5" contentContainerStyle={{ paddingVertical: 32 }}>
@@ -205,101 +239,152 @@ const Tier3CaptureScreen = () => {
       </Text>
 
       <View className="rounded-2xl border border-gray-800 bg-gray-900/70 p-4 mb-4">
-        <Text className="text-white font-semibold mb-2">Before You Capture</Text>
-        <Text className="text-gray-300 text-xs mb-1">- Use bright lighting and avoid heavy shadows.</Text>
-        <Text className="text-gray-300 text-xs mb-1">- Keep your full face centered in frame.</Text>
-        <Text className="text-gray-300 text-xs mb-1">- Remove cap, mask, or dark glasses.</Text>
-        <Text className="text-gray-300 text-xs mb-3">- Hold still to avoid blur.</Text>
-
-        <TouchableOpacity
-          disabled={status === 'processing' || status === 'verified'}
-          onPress={() => setHasReadGuidance((v) => !v)}
-          className={`rounded-xl py-2 items-center ${
-            hasReadGuidance ? 'bg-emerald-600/80' : 'bg-gray-800'
-          }`}
-        >
-          <Text className="text-white text-xs font-semibold">
-            {hasReadGuidance ? 'Guidance Confirmed' : 'I Understand The Guidance'}
-          </Text>
-        </TouchableOpacity>
+        <Text className="text-white font-semibold mb-1">Current Status</Text>
+        <Text className="text-gray-300 text-sm capitalize">{status}</Text>
+        {message ? <Text className="text-red-400 text-xs mt-2">{message}</Text> : null}
       </View>
 
-      <View className="rounded-2xl border border-gray-800 bg-gray-900/70 p-4 space-y-3">
-        <Text className="text-white font-semibold">Status</Text>
-        <Text className="text-gray-300 text-sm capitalize">{status}</Text>
-        {message ? <Text className="text-red-400 text-xs">{message}</Text> : null}
+      {showCaptureFlow && step === 'guidance' ? (
+        <View className="rounded-2xl border border-gray-800 bg-gray-900/70 p-4 mb-4">
+          <Text className="text-white font-semibold mb-2">Before You Capture</Text>
+          <Text className="text-gray-300 text-xs mb-1">- Use bright lighting and avoid heavy shadows.</Text>
+          <Text className="text-gray-300 text-xs mb-1">- Keep your full face centered in the oval frame.</Text>
+          <Text className="text-gray-300 text-xs mb-1">- Remove cap, mask, or dark glasses.</Text>
+          <Text className="text-gray-300 text-xs mb-3">- Hold still to avoid blur.</Text>
 
-        {selfiePreviewUri ? (
-          <View className="mt-1">
-            <Text className="text-gray-300 text-xs mb-2">Selfie preview</Text>
+          <TouchableOpacity
+            disabled={status === 'processing' || status === 'verified'}
+            onPress={() => setHasReadGuidance((v) => !v)}
+            className={`rounded-xl py-2 items-center mb-3 ${
+              hasReadGuidance ? 'bg-emerald-600/80' : 'bg-gray-800'
+            }`}
+          >
+            <Text className="text-white text-xs font-semibold">
+              {hasReadGuidance ? 'Guidance Confirmed' : 'I Understand The Guidance'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            disabled={!canOpenCamera}
+            onPress={openCamera}
+            className={`rounded-xl py-3 items-center ${canOpenCamera ? 'bg-app-primary' : 'bg-gray-800'}`}
+          >
+            <Text className="text-white font-semibold">Open Camera</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+
+      {showCaptureFlow && step === 'camera' ? (
+        <View className="rounded-2xl border border-gray-800 bg-gray-900/70 p-3 mb-4">
+          <Text className="text-white font-semibold mb-2">Align Your Face</Text>
+          <View className="relative overflow-hidden rounded-2xl" style={{ height: 460 }}>
+            <CameraView
+              ref={cameraRef}
+              facing="front"
+              style={{ flex: 1 }}
+              active={isFocused && step === 'camera'}
+            />
+
+            <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
+              <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '18%', backgroundColor: 'rgba(0,0,0,0.45)' }} />
+              <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '18%', backgroundColor: 'rgba(0,0,0,0.45)' }} />
+              <View style={{ position: 'absolute', top: '18%', bottom: '18%', left: 0, width: '12%', backgroundColor: 'rgba(0,0,0,0.45)' }} />
+              <View style={{ position: 'absolute', top: '18%', bottom: '18%', right: 0, width: '12%', backgroundColor: 'rgba(0,0,0,0.45)' }} />
+
+              <View
+                style={{
+                  position: 'absolute',
+                  top: '18%',
+                  bottom: '18%',
+                  left: '12%',
+                  right: '12%',
+                  borderWidth: 3,
+                  borderColor: '#10b981',
+                  borderRadius: 999,
+                }}
+              />
+            </View>
+          </View>
+
+          <Text className="text-gray-300 text-xs text-center mt-3">
+            Center your face in the oval, keep eyes open, then capture.
+          </Text>
+
+          <View className="flex-row gap-2 mt-3">
+            <TouchableOpacity
+              onPress={() => setStep('guidance')}
+              className="flex-1 border border-gray-700 rounded-xl py-3 items-center"
+            >
+              <Text className="text-white">Back</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              disabled={capturing}
+              onPress={takeSelfie}
+              className={`flex-1 rounded-xl py-3 items-center ${capturing ? 'bg-gray-700' : 'bg-app-primary'}`}
+            >
+              <Text className="text-white font-semibold">{capturing ? 'Capturing...' : 'Capture'}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : null}
+
+      {showCaptureFlow && step === 'review' ? (
+        <View className="rounded-2xl border border-gray-800 bg-gray-900/70 p-4 mb-4">
+          <Text className="text-white font-semibold mb-2">Review Selfie</Text>
+          {selfiePreviewUri ? (
             <Image
               source={{ uri: selfiePreviewUri }}
-              style={{ width: '100%', height: 220, borderRadius: 12 }}
+              style={{ width: '100%', height: 300, borderRadius: 12 }}
               resizeMode="cover"
             />
-          </View>
-        ) : null}
+          ) : null}
+          <Text className="text-gray-300 text-xs text-center mt-3">
+            Ensure your face is clear, centered, and fully visible before submitting.
+          </Text>
 
-        {loading ? (
+          <View className="flex-row gap-2 mt-3">
+            <TouchableOpacity
+              onPress={resetCapture}
+              className="flex-1 border border-gray-700 rounded-xl py-3 items-center"
+            >
+              <Text className="text-white">Retake</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              disabled={loading || !imageBase64Ref.current}
+              onPress={handleCaptureSubmit}
+              className={`flex-1 rounded-xl py-3 items-center ${
+                loading || !imageBase64Ref.current ? 'bg-gray-700' : 'bg-emerald-600'
+              }`}
+            >
+              <Text className="text-white font-semibold">Submit</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : null}
+
+      {(status === 'processing' || loading) ? (
+        <View className="rounded-2xl border border-gray-800 bg-gray-900/70 p-4 mb-4 items-center">
           <ActivityIndicator />
-        ) : (
-          <View className="space-y-2">
-            <TouchableOpacity
-              disabled={!canCapture}
-              onPress={async () => {
-                await requestCameraAndCapture()
-              }}
-              className={`rounded-xl py-3 items-center ${
-                canCapture ? 'bg-app-primary' : 'bg-gray-800'
-              }`}
-            >
-              <Text className="text-white font-semibold">
-                {status === 'failed' ? 'Retake Selfie' : 'Capture Selfie'}
-              </Text>
-            </TouchableOpacity>
+          <Text className="text-gray-300 text-xs text-center mt-2">
+            Verifying your liveness. This may take a moment.
+          </Text>
+          {tookTooLong ? (
+            <Text className="text-gray-300 text-xs text-center mt-2">
+              Verification is taking longer than usual. You can leave this screen; we will update your status shortly.
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
 
-            <TouchableOpacity
-              disabled={!imageBase64Ref.current || status === 'processing'}
-              onPress={async () => {
-                await handleCaptureSubmit()
-              }}
-              className={`rounded-xl py-3 items-center ${
-                imageBase64Ref.current && status !== 'processing' ? 'bg-emerald-600' : 'bg-gray-800'
-              }`}
-            >
-              <Text className="text-white font-semibold">Submit For Verification</Text>
-            </TouchableOpacity>
-
-            {status === 'processing' ? (
-              <Text className="text-gray-400 text-xs text-center">
-                Verifying your liveness. This may take a moment.
-              </Text>
-            ) : null}
-
-            {status === 'verified' ? (
-              <Text className="text-emerald-400 text-xs text-center">Verified! Redirecting...</Text>
-            ) : null}
-
-            {tookTooLong && status === 'processing' ? (
-              <View className="mt-2 space-y-2">
-                <Text className="text-gray-300 text-xs text-center">
-                  Verification is taking longer than usual. You can leave this screen; we will update your status shortly.
-                </Text>
-                <TouchableOpacity
-                  onPress={() => router.replace('/kyc')}
-                  className="bg-app-primary rounded-xl py-3 items-center"
-                >
-                  <Text className="text-white font-semibold">Back to KYC</Text>
-                </TouchableOpacity>
-              </View>
-            ) : null}
-          </View>
-        )}
-      </View>
+      {status === 'verified' ? (
+        <View className="rounded-2xl border border-emerald-700 bg-emerald-900/30 p-4 mb-4">
+          <Text className="text-emerald-300 text-center text-sm">Verified! Redirecting...</Text>
+        </View>
+      ) : null}
 
       <TouchableOpacity
         onPress={() => router.back()}
-        className="border border-gray-800 py-3 rounded-xl mt-6 items-center"
+        className="border border-gray-800 py-3 rounded-xl mt-2 items-center"
       >
         <Text className="text-white">Back to KYC</Text>
       </TouchableOpacity>
