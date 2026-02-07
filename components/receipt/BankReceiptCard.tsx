@@ -214,6 +214,8 @@ const BankReceiptCard = ({
   const isElectricityReceipt = serviceType === 'ELECTRICITY'
   const electricityToken = clean(meta?.token)
   const electricityUnits = clean(meta?.units)
+  const electricityCustomerName = clean(meta?.customerName) || clean(meta?.customer_name) || clean(meta?.name)
+  const electricityAddress = clean(meta?.address)
   const electricityMeter = clean(meta?.meter_number) || clean(parties?.recipient)
   const electricityMeterType = clean(meta?.meter_type)
   const electricityBiller = clean(meta?.biller) || clean(parties?.biller) || clean(provider?.name)
@@ -343,6 +345,8 @@ const BankReceiptCard = ({
           <Divider />
           <Text className="text-gray-400 text-[11px] uppercase tracking-widest mb-2">Electricity details</Text>
           <Row label="Provider" value={electricityBiller} />
+          <Row label="Customer Name" value={electricityCustomerName} />
+          <Row label="Address" value={electricityAddress} />
           <Row label="Meter Number" value={electricityMeter} mono />
           <Row label="Meter Type" value={electricityMeterType} />
           <Row label="Units (kWh)" value={electricityUnits} />

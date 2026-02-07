@@ -152,6 +152,25 @@ export default function TransactionSuccessScreen() {
   const hasLoadedProfileRef = useRef(false)
   const didRefreshOnTerminalRef = useRef(false)
   const mountedRef = useRef(true)
+  const refetchInFlightRef = useRef(false)
+  const lastRefetchAtRef = useRef(0)
+
+  const safeRefetch = useCallback(
+    async (force = false) => {
+      const now = Date.now()
+      if (!force && now - lastRefetchAtRef.current < 3500) return
+      if (refetchInFlightRef.current) return
+
+      refetchInFlightRef.current = true
+      lastRefetchAtRef.current = now
+      try {
+        await refetch?.()
+      } finally {
+        refetchInFlightRef.current = false
+      }
+    },
+    [refetch]
+  )
 
   const stopPolling = useCallback(() => {
     if (pollTimerRef.current) {
@@ -217,7 +236,7 @@ export default function TransactionSuccessScreen() {
         } catch {
           // ignore
         } finally {
-          refetch?.()
+          safeRefetch(true)
         }
       })()
     }
@@ -238,21 +257,21 @@ export default function TransactionSuccessScreen() {
           return
         }
 
-        refetch?.()
+        safeRefetch()
       }, 5000)
     }
-  }, [data, effectiveReference, refetch, loadProfile, stopPolling])
+  }, [data, effectiveReference, safeRefetch, loadProfile, stopPolling])
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (nextState) => {
       if (nextState !== 'active') return
       const status = String((data as any)?.status || '')
       if (isStillProcessing(status)) {
-        refetch?.()
+        safeRefetch(true)
       }
     })
     return () => sub.remove()
-  }, [data, refetch])
+  }, [data, safeRefetch])
 
   // Resolve reference when route param is UUID by fetching transaction_record once
   useEffect(() => {
@@ -496,7 +515,7 @@ export default function TransactionSuccessScreen() {
           </Pressable>
         ) : (
           <Pressable
-            onPress={() => refetch?.()}
+            onPress={() => safeRefetch(true)}
             className="mt-4 w-full rounded-2xl border border-slate-600 py-3 items-center"
           >
             <Text className="text-slate-200 font-semibold">Refresh Status</Text>
