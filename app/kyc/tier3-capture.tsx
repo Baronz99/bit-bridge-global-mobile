@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native'
+import { ActivityIndicator, Image, ScrollView, Text, TouchableOpacity, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { startTier3, getTier3Status } from '@/api/kyc'
 import { useAuth } from '@/services/useAuth'
@@ -57,6 +57,8 @@ const Tier3CaptureScreen = () => {
   const [message, setMessage] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [tookTooLong, setTookTooLong] = useState(false)
+  const [selfiePreviewUri, setSelfiePreviewUri] = useState<string | null>(null)
+  const [hasReadGuidance, setHasReadGuidance] = useState(false)
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pollStartRef = useRef<number | null>(null)
   const statusRef = useRef<Tier3State>('idle')
@@ -89,7 +91,10 @@ const Tier3CaptureScreen = () => {
     statusRef.current = status
   }, [status])
 
-  const canCapture = useMemo(() => status === 'idle' || status === 'failed', [status])
+  const canCapture = useMemo(
+    () => (status === 'idle' || status === 'failed') && hasReadGuidance,
+    [hasReadGuidance, status]
+  )
 
   const schedulePoll = () => {
     if (pollRef.current) clearTimeout(pollRef.current)
@@ -106,7 +111,7 @@ const Tier3CaptureScreen = () => {
     }, 2300)
   }
 
-  const handleCapture = async () => {
+  const handleCaptureSubmit = async () => {
     setLoading(true)
     setMessage(null)
     setTookTooLong(false)
@@ -124,6 +129,7 @@ const Tier3CaptureScreen = () => {
       const next = normalizeTier3State(res)
       if (next === 'verified') {
         setStatus('verified')
+        setSelfiePreviewUri(null)
       } else if (next === 'processing') {
         setStatus('processing')
         schedulePoll()
@@ -164,24 +170,30 @@ const Tier3CaptureScreen = () => {
       setMessage('Camera permission is required to capture your selfie.')
       return null
     }
+
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       quality: 0.35,
       base64: true,
     })
+
     if (result.canceled) return null
+
     const asset = result.assets?.[0]
     if (!asset?.base64) {
       setMessage('Unable to read image. Please try again.')
       return null
     }
+
     const dataUrl = `data:${asset.type || 'image/jpeg'};base64,${asset.base64}`
     if (asset.base64.length > MAX_BASE64_LEN) {
       setMessage('Selfie is too large. Retake closer with less background to reduce size.')
       return null
     }
+
     imageBase64Ref.current = dataUrl
+    setSelfiePreviewUri(asset.uri || null)
     return dataUrl
   }
 
@@ -189,13 +201,45 @@ const Tier3CaptureScreen = () => {
     <ScrollView className="flex-1 bg-primary px-5" contentContainerStyle={{ paddingVertical: 32 }}>
       <Text className="text-white text-2xl font-semibold mb-2">Tier 3 Liveness</Text>
       <Text className="text-gray-300 text-sm mb-4">
-        Capture a live selfie to complete Tier 3 verification. Ensure good lighting and your face is fully visible.
+        Complete a live selfie check to finish Tier 3 verification.
       </Text>
+
+      <View className="rounded-2xl border border-gray-800 bg-gray-900/70 p-4 mb-4">
+        <Text className="text-white font-semibold mb-2">Before You Capture</Text>
+        <Text className="text-gray-300 text-xs mb-1">- Use bright lighting and avoid heavy shadows.</Text>
+        <Text className="text-gray-300 text-xs mb-1">- Keep your full face centered in frame.</Text>
+        <Text className="text-gray-300 text-xs mb-1">- Remove cap, mask, or dark glasses.</Text>
+        <Text className="text-gray-300 text-xs mb-3">- Hold still to avoid blur.</Text>
+
+        <TouchableOpacity
+          disabled={status === 'processing' || status === 'verified'}
+          onPress={() => setHasReadGuidance((v) => !v)}
+          className={`rounded-xl py-2 items-center ${
+            hasReadGuidance ? 'bg-emerald-600/80' : 'bg-gray-800'
+          }`}
+        >
+          <Text className="text-white text-xs font-semibold">
+            {hasReadGuidance ? 'Guidance Confirmed' : 'I Understand The Guidance'}
+          </Text>
+        </TouchableOpacity>
+      </View>
 
       <View className="rounded-2xl border border-gray-800 bg-gray-900/70 p-4 space-y-3">
         <Text className="text-white font-semibold">Status</Text>
         <Text className="text-gray-300 text-sm capitalize">{status}</Text>
         {message ? <Text className="text-red-400 text-xs">{message}</Text> : null}
+
+        {selfiePreviewUri ? (
+          <View className="mt-1">
+            <Text className="text-gray-300 text-xs mb-2">Selfie preview</Text>
+            <Image
+              source={{ uri: selfiePreviewUri }}
+              style={{ width: '100%', height: 220, borderRadius: 12 }}
+              resizeMode="cover"
+            />
+          </View>
+        ) : null}
+
         {loading ? (
           <ActivityIndicator />
         ) : (
@@ -203,30 +247,43 @@ const Tier3CaptureScreen = () => {
             <TouchableOpacity
               disabled={!canCapture}
               onPress={async () => {
-                const captured = await requestCameraAndCapture()
-                if (!captured) return
-                await handleCapture()
+                await requestCameraAndCapture()
               }}
               className={`rounded-xl py-3 items-center ${
                 canCapture ? 'bg-app-primary' : 'bg-gray-800'
               }`}
             >
               <Text className="text-white font-semibold">
-                {status === 'failed' ? 'Retry capture' : 'Capture selfie'}
+                {status === 'failed' ? 'Retake Selfie' : 'Capture Selfie'}
               </Text>
             </TouchableOpacity>
+
+            <TouchableOpacity
+              disabled={!imageBase64Ref.current || status === 'processing'}
+              onPress={async () => {
+                await handleCaptureSubmit()
+              }}
+              className={`rounded-xl py-3 items-center ${
+                imageBase64Ref.current && status !== 'processing' ? 'bg-emerald-600' : 'bg-gray-800'
+              }`}
+            >
+              <Text className="text-white font-semibold">Submit For Verification</Text>
+            </TouchableOpacity>
+
             {status === 'processing' ? (
               <Text className="text-gray-400 text-xs text-center">
                 Verifying your liveness. This may take a moment.
               </Text>
             ) : null}
+
             {status === 'verified' ? (
-              <Text className="text-emerald-400 text-xs text-center">Verified! Redirecting…</Text>
+              <Text className="text-emerald-400 text-xs text-center">Verified! Redirecting...</Text>
             ) : null}
+
             {tookTooLong && status === 'processing' ? (
               <View className="mt-2 space-y-2">
                 <Text className="text-gray-300 text-xs text-center">
-                  Verification is taking longer than usual. You can leave this screen; we’ll update your status shortly.
+                  Verification is taking longer than usual. You can leave this screen; we will update your status shortly.
                 </Text>
                 <TouchableOpacity
                   onPress={() => router.replace('/kyc')}
