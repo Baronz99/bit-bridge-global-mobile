@@ -70,18 +70,33 @@ const Tier3CaptureScreen = () => {
 
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pollStartRef = useRef<number | null>(null)
+  const submitStartedAtRef = useRef<number | null>(null)
   const statusRef = useRef<Tier3State>('idle')
   const imageBase64Ref = useRef<string | null>(null)
 
   const fetchStatus = async () => {
     const res = await getTier3Status().catch(() => null)
     const current = res?.tier3_status?.toLowerCase()
-    if (current === 'verified') setStatus('verified')
-    else if (current === 'processing' || current === 'pending') setStatus('processing')
+    if (current === 'verified') {
+      submitStartedAtRef.current = null
+      setStatus('verified')
+    } else if (current === 'processing' || current === 'pending') {
+      setStatus('processing')
+    }
     else if (current === 'failed' || current === 'rejected') {
+      submitStartedAtRef.current = null
       setStatus('failed')
       if (res?.tier3_error) setMessage(prettyTier3Error(res.tier3_error))
-    } else setStatus('idle')
+    } else {
+      const withinSubmitGraceWindow =
+        submitStartedAtRef.current !== null && Date.now() - submitStartedAtRef.current < 45_000
+      if (withinSubmitGraceWindow) {
+        setStatus('processing')
+        setMessage((prev) => prev || 'Selfie submitted. Verification in progress.')
+      } else {
+        setStatus('idle')
+      }
+    }
   }
 
   useEffect(() => {
@@ -128,6 +143,7 @@ const Tier3CaptureScreen = () => {
     setMessage(null)
     setTookTooLong(false)
     setStatus('processing')
+    submitStartedAtRef.current = Date.now()
 
     try {
       const payloadImage = imageBase64Ref.current || ''
