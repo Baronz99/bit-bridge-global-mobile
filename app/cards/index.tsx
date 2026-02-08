@@ -3,7 +3,7 @@ import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native'
 import { Link } from 'expo-router'
 import useFetch from '@/services/useFetch'
 import { getUserCards } from '@/api/cards'
-import { useAuth } from '@/services/useAuth'
+import { resolveUserProfile, useAuth } from '@/services/useAuth'
 import ScreenContainer from '@/components/ScreenContainer'
 import moneyFormat from '@/utils/moneyFormat'
 
@@ -24,9 +24,9 @@ const CardsScreen = () => {
   }, [data])
 
   const hasKycAccess = useMemo(() => {
-    const payload = userProfileData?.data ?? userProfileData
-    const kycLevel = payload?.kyc_level || payload?.user_kyc?.kyc_level
-    const phoneVerified = payload?.phone_verified === true || payload?.phone_verified_at
+    const profileRoot = resolveUserProfile(userProfileData)
+    const kycLevel = profileRoot?.kyc_level || profileRoot?.user_kyc?.kyc_level
+    const phoneVerified = profileRoot?.phone_verified === true || profileRoot?.phone_verified_at
     if (!kycLevel && !phoneVerified) return false
     if (kycLevel && String(kycLevel).toLowerCase() === 'tier_0') return false
     return true
