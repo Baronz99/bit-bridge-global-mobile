@@ -6,6 +6,7 @@ import { createTransaction, initiateMonnifyTransaction } from '@/api/transaction
 import Loader from '@/components/Loader'
 import NotificationAlert from '@/components/notification'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
+import { log } from '@/utils/log'
 
 const index = () => {
   const {
@@ -26,7 +27,7 @@ const index = () => {
 
   const handleSubmit = async () => {
     setLoading(true)
-    console.log(formData)
+    log('[FundWallet] submit', { amount: formData.amount, hasCoupon: Boolean(formData.coupon_code) })
     try {
       const response = await initiateMonnifyTransaction({
         data: {
@@ -36,7 +37,6 @@ const index = () => {
           transaction_type: 'deposit',
           customer_name: userProfileData.email,
           description: 'fund wallet',
-          redirect_url: 'https://bitbridge-staging.netlify.app/app-redirect',
         },
       })
 
@@ -52,7 +52,7 @@ const index = () => {
       Linking.openURL(response.responseBody.checkoutUrl)
     } catch (error: any) {
       setLoading(false)
-      console.log(error)
+      log('[FundWallet] submit failed', error?.message || error)
 
       setNotice({
         error: true,
