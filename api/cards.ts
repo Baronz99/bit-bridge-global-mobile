@@ -169,7 +169,7 @@ export const registerCardholder = async (payload: {
   country?: string
 }) => {
   try {
-    const res = await client.post('/cards/register_cardholder', payload)
+    const res = await client.post('/cards/register_cardholder', { card: payload })
     return res.data
   } catch (err: any) {
     throw new Error(errMsg(err, 'Failed to register cardholder'))
@@ -178,7 +178,7 @@ export const registerCardholder = async (payload: {
 
 export const createCard = async (payload: { cardholder_id?: Id; currency?: string }) => {
   try {
-    const res = await client.post('/cards/create_card', payload)
+    const res = await client.post('/cards/create_card', { card: payload })
     return res.data
   } catch (err: any) {
     throw new Error(errMsg(err, 'Failed to create card'))

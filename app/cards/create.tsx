@@ -30,6 +30,8 @@ const CreateCard = () => {
   })
 
   const profileRoot = useMemo(() => resolveUserProfile(userProfileData) || {}, [userProfileData])
+  const bvnStatus = String(profileRoot?.user_kyc?.bvn_status || '').toLowerCase()
+  const bvnVerified = bvnStatus === 'verified'
   const profileDefaults = useMemo(() => {
     const first = String(profileRoot?.first_name || '').trim()
     const last = String(profileRoot?.last_name || '').trim()
@@ -85,6 +87,11 @@ const CreateCard = () => {
     if (!hasKycAccess()) {
       setNotice('Complete KYC to create a card.')
       router.push('/kyc')
+      return
+    }
+    if (!bvnVerified) {
+      setNotice('Verify your BVN to create a card.')
+      router.push('/kyc/bvn')
       return
     }
     setLoading(true)
