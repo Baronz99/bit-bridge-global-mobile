@@ -1,10 +1,10 @@
-import React, { useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import FormInput from '@/components/FormInput'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
 import { createCard, registerCardholder } from '@/api/cards'
-import { useAuth } from '@/services/useAuth'
+import { resolveUserProfile, useAuth } from '@/services/useAuth'
 import { buildApiErrorMessage } from '@/utils/apiErrorMessage'
 import AppModal from '@/components/modal/Modal'
 import NotificationAlert from '@/components/notification'
@@ -29,10 +29,53 @@ const CreateCard = () => {
     currency: 'USD',
   })
 
+  const profileRoot = useMemo(() => resolveUserProfile(userProfileData) || {}, [userProfileData])
+  const profileDefaults = useMemo(() => {
+    const first = String(profileRoot?.first_name || '').trim()
+    const last = String(profileRoot?.last_name || '').trim()
+    const email = String(profileRoot?.email || userProfileData?.email || '').trim()
+    const phone = String(
+      profileRoot?.phone_number || profileRoot?.phone || profileRoot?.phone_e164 || ''
+    ).trim()
+    const address = String(profileRoot?.address_line1 || profileRoot?.address || '').trim()
+    const city = String(profileRoot?.city || '').trim()
+    const state = String(profileRoot?.state || '').trim()
+    const postal = String(profileRoot?.postal_code || profileRoot?.zip || '').trim()
+    const country = String(profileRoot?.country || 'NG').trim().toUpperCase()
+
+    return {
+      first_name: first,
+      last_name: last,
+      email,
+      phone_number: phone,
+      address_line1: address,
+      city,
+      state,
+      postal_code: postal,
+      country: country || 'NG',
+      currency: 'USD',
+    }
+  }, [profileRoot, userProfileData?.email])
+
+  useEffect(() => {
+    setForm((prev) => ({
+      ...prev,
+      first_name: prev.first_name || profileDefaults.first_name,
+      last_name: prev.last_name || profileDefaults.last_name,
+      email: prev.email || profileDefaults.email,
+      phone_number: prev.phone_number || profileDefaults.phone_number,
+      address_line1: prev.address_line1 || profileDefaults.address_line1,
+      city: prev.city || profileDefaults.city,
+      state: prev.state || profileDefaults.state,
+      postal_code: prev.postal_code || profileDefaults.postal_code,
+      country: prev.country || profileDefaults.country,
+      currency: prev.currency || 'USD',
+    }))
+  }, [profileDefaults])
+
   const hasKycAccess = () => {
-    const payload = userProfileData?.data ?? userProfileData
-    const kycLevel = payload?.kyc_level || payload?.user_kyc?.kyc_level
-    const phoneVerified = payload?.phone_verified === true || payload?.phone_verified_at
+    const kycLevel = profileRoot?.kyc_level || profileRoot?.user_kyc?.kyc_level
+    const phoneVerified = profileRoot?.phone_verified === true || profileRoot?.phone_verified_at
     if (!kycLevel && !phoneVerified) return false
     if (kycLevel && String(kycLevel).toLowerCase() === 'tier_0') return false
     return true
@@ -47,17 +90,36 @@ const CreateCard = () => {
     setLoading(true)
     setNotice(null)
     try {
-      const profile = userProfileData?.user_profile ?? userProfileData?.data?.user_profile ?? {}
       const payload = {
-        first_name: form.first_name || profile?.first_name,
-        last_name: form.last_name || profile?.last_name,
-        email: form.email || userProfileData?.email,
-        phone_number: form.phone_number || profile?.phone_number,
-        address_line1: form.address_line1 || profile?.address_line1,
-        city: form.city || profile?.city,
-        state: form.state || profile?.state,
-        postal_code: form.postal_code || profile?.postal_code,
-        country: form.country || 'NG',
+        first_name: String(form.first_name || profileDefaults.first_name || '').trim(),
+        last_name: String(form.last_name || profileDefaults.last_name || '').trim(),
+        email: String(form.email || profileDefaults.email || userProfileData?.email || '').trim(),
+        phone_number: String(form.phone_number || profileDefaults.phone_number || '').trim(),
+        address_line1: String(form.address_line1 || profileDefaults.address_line1 || '').trim(),
+        city: String(form.city || profileDefaults.city || '').trim(),
+        state: String(form.state || profileDefaults.state || '').trim(),
+        postal_code: String(form.postal_code || profileDefaults.postal_code || '').trim(),
+        country: String(form.country || profileDefaults.country || 'NG').trim().toUpperCase(),
+      }
+
+      const missing = Object.entries({
+        first_name: payload.first_name,
+        last_name: payload.last_name,
+        email: payload.email,
+        phone_number: payload.phone_number,
+        address_line1: payload.address_line1,
+        city: payload.city,
+        state: payload.state,
+        postal_code: payload.postal_code,
+        country: payload.country,
+      })
+        .filter(([, value]) => !String(value || '').trim())
+        .map(([key]) => key.replace('_', ' '))
+
+      if (missing.length) {
+        setNotice(`Complete profile fields: ${missing.join(', ')}`)
+        setLoading(false)
+        return
       }
 
       const registerRes = await registerCardholder(payload)
