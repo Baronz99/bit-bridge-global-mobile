@@ -536,28 +536,23 @@ const WalletScreen = () => {
                 const description = getWalletDescription(item)
                 const currency = isTunnelMode ? 'USD' : 'NGN'
 
-                return (
-                  <TouchableOpacity
-                    key={`${item?.id ?? reference ?? item?.created_at}-${index}`}
-                    onPress={() => {
-                      router.push({
-                        pathname: '/transaction/wallet-receipt',
-                        params: {
-                          id: String(item?.id ?? ''),
-                          reference: String(reference ?? ''),
-                          amount: String(item?.amount ?? 0),
-                          currency,
-                          status: String(status),
-                          description: String(description),
-                          created_at: String(item?.created_at ?? ''),
-                          wallet_type: expectedWalletType,
-                          transaction_type: String(item?.transaction_type || item?.type || ''),
-                          address: String(item?.address || ''),
-                        },
-                      })
-                    }}
-                    className="mb-3 rounded-2xl border border-gray-800 bg-gray-900/70 px-4 py-4"
-                  >
+	                return (
+	                  <TouchableOpacity
+	                    key={`${item?.id ?? reference ?? item?.created_at}-${index}`}
+	                    onPress={() => {
+                      const rawRef = String(reference ?? '').trim()
+                      const canonicalReference = /^[0-9a-f-]{36}$/i.test(rawRef)
+                        ? `wallet-tx-${String(item?.id ?? '').trim()}`
+                        : rawRef || `wallet-tx-${String(item?.id ?? '').trim()}`
+	                      router.push({
+	                        pathname: '/transaction/receipt',
+	                        params: {
+	                          reference: canonicalReference,
+	                        },
+	                      })
+	                    }}
+	                    className="mb-3 rounded-2xl border border-gray-800 bg-gray-900/70 px-4 py-4"
+	                  >
                     <View className="flex-row justify-between items-start">
                       <View className="flex-1 pr-3">
                         <Text className="text-white font-semibold">{description}</Text>

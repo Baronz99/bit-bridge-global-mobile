@@ -220,6 +220,31 @@ const BankReceiptCard = ({
   const electricityMeterType = clean(meta?.meter_type)
   const electricityBiller = clean(meta?.biller) || clean(parties?.biller) || clean(provider?.name)
   const electricityServiceCharge = Number(meta?.service_charge ?? 0)
+  const conversionMeta = meta?.fx && typeof meta.fx === 'object' ? (meta.fx as Record<string, any>) : null
+  const isConversionReceipt =
+    Boolean(meta?.conversion) ||
+    clean(event).toLowerCase().includes('conversion') ||
+    clean(title).toLowerCase().includes('conversion') ||
+    clean(meta?.conversion_direction).length > 0
+  const conversionDirection = clean(meta?.conversion_direction || conversionMeta?.direction)
+  const conversionDirectionLabel =
+    conversionDirection === 'ngn_to_usd'
+      ? 'NGN → USD'
+      : conversionDirection === 'usd_to_ngn'
+        ? 'USD → NGN'
+        : clean(conversionMeta?.from) && clean(conversionMeta?.to)
+          ? `${clean(conversionMeta?.from)} → ${clean(conversionMeta?.to)}`
+          : ''
+  const conversionFrom = clean(conversionMeta?.from)
+  const conversionTo = clean(conversionMeta?.to)
+  const conversionAmountIn = Number(conversionMeta?.amount_in)
+  const conversionFeeAmount = Number(conversionMeta?.fee_amount)
+  const conversionFeeCurrency = clean(conversionMeta?.fee_currency)
+  const conversionAmountAfterFee = Number(conversionMeta?.amount_after_fee)
+  const conversionAmountOut = Number(conversionMeta?.amount_out)
+  const conversionRate = Number(conversionMeta?.execution_rate)
+  const conversionBaseRate = Number(conversionMeta?.base_rate)
+  const conversionMarkup = Number(conversionMeta?.markup)
 
   const monnifyMetaKeys =
     meta && Object.keys(meta).some((key) => /monnify/i.test(key))
@@ -339,6 +364,35 @@ const BankReceiptCard = ({
       <Row label="Reference" value={receiptNo} mono />
       <Row label="Channel" value={channelValue} />
       <Row label="Narration" value={narration} />
+
+      {isConversionReceipt && conversionMeta ? (
+        <>
+          <Divider />
+          <Text className="text-gray-400 text-[11px] uppercase tracking-widest mb-2">Conversion details</Text>
+          <Row label="Direction" value={conversionDirectionLabel} />
+          {Number.isFinite(conversionAmountIn) && conversionFrom ? (
+            <Row label="Amount in" value={moneyFormat(conversionAmountIn, conversionFrom)} />
+          ) : null}
+          {Number.isFinite(conversionFeeAmount) && conversionFeeCurrency ? (
+            <Row label="Conversion fee" value={moneyFormat(conversionFeeAmount, conversionFeeCurrency)} />
+          ) : null}
+          {Number.isFinite(conversionAmountAfterFee) && conversionFrom ? (
+            <Row label="Amount after fee" value={moneyFormat(conversionAmountAfterFee, conversionFrom)} />
+          ) : null}
+          {Number.isFinite(conversionRate) ? (
+            <Row label="Execution rate" value={String(conversionRate)} />
+          ) : null}
+          {Number.isFinite(conversionBaseRate) ? (
+            <Row label="Base rate" value={String(conversionBaseRate)} />
+          ) : null}
+          {Number.isFinite(conversionMarkup) ? (
+            <Row label="Markup" value={String(conversionMarkup)} />
+          ) : null}
+          {Number.isFinite(conversionAmountOut) && conversionTo ? (
+            <Row label="Amount out" value={moneyFormat(conversionAmountOut, conversionTo)} />
+          ) : null}
+        </>
+      ) : null}
 
       {isElectricityReceipt ? (
         <>
