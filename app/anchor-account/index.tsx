@@ -39,7 +39,7 @@ const AnchorAccountScreen = () => {
   const kycLevel = String(profileRoot?.kyc_level || profileRoot?.user_kyc?.kyc_level || 'tier_0')
     .trim()
     .toLowerCase()
-  const platformTier2 = kycLevel === 'tier_2' || kycLevel === 'tier2'
+  const platformTier2 = kycLevel === 'tier_2' || kycLevel === 'tier2' || kycLevel === 'tier_3' || kycLevel === 'tier3'
 
   const normalizePhone = (value?: string | null) => {
     const raw = String(value || '').trim()

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native'
 import { Link } from 'expo-router'
-import { useAuth } from '@/services/useAuth'
+import { resolveUserProfile, useAuth } from '@/services/useAuth'
 import { getKycStatus, KycStatusResponse } from '@/api/kyc'
 import { FEATURE_BVN, FEATURE_KYC_CENTER, FEATURE_OTP } from '@/constants/featureFlags'
 
@@ -52,13 +52,19 @@ const TIER_CONFIG = {
     title: 'Tier 2 - Full access',
     description: 'BVN verified + ID upload + address. Unlocks cards, tunnel, transfers.',
   },
+  tier_3: {
+    title: 'Tier 3 - Advanced verification',
+    description: 'Liveness + advanced checks. Includes all Tier 2 capabilities.',
+  },
 }
 
-const tierOrder = ['tier_0', 'tier_1', 'tier_2'] as const
+const tierOrder = ['tier_0', 'tier_1', 'tier_2', 'tier_3'] as const
 
 const normalizeTierKey = (raw: string | undefined) => {
   const key = (raw || 'tier_0').toString().toLowerCase()
   if (key === 'nil' || key === '') return 'tier_0'
+  if (key === 'tier2') return 'tier_2'
+  if (key === 'tier3') return 'tier_3'
   return (tierOrder.includes(key as typeof tierOrder[number]) ? key : 'tier_0') as typeof tierOrder[number]
 }
 
@@ -76,12 +82,14 @@ const StepRow = ({
   done,
   cta,
   href,
+  disabled,
 }: {
   title: string
   description: string
   done: boolean
   cta: string
-  href: string
+  href?: string
+  disabled?: boolean
 }) => (
   <View className="flex-row items-start gap-3 rounded-2xl border border-gray-800 bg-gray-900/70 p-4">
     <View
@@ -99,12 +107,23 @@ const StepRow = ({
         <StatusPill label={done ? 'Done' : 'Pending'} ok={done} />
       </View>
       <Text className="text-gray-400 text-xs mt-1">{description}</Text>
-      {!done ? (
-        <Link href={href as any} asChild>
-          <TouchableOpacity className="bg-gray-950 border border-gray-800 py-2 rounded-xl items-center mt-3">
-            <Text className="text-white text-xs font-semibold">{cta}</Text>
+      {!done && href ? (
+        <Link href={href} asChild>
+          <TouchableOpacity
+            className={`border border-gray-800 py-2 rounded-xl items-center mt-3 ${
+              disabled ? 'bg-gray-800' : 'bg-gray-950'
+            }`}
+            disabled={disabled}
+          >
+            <Text className={`text-xs font-semibold ${disabled ? 'text-gray-400' : 'text-white'}`}>
+              {cta}
+            </Text>
           </TouchableOpacity>
         </Link>
+      ) : !done && !href ? (
+        <View className="border border-gray-800 py-2 rounded-xl items-center mt-3 bg-gray-800">
+          <Text className="text-gray-400 text-xs font-semibold">{cta}</Text>
+        </View>
       ) : null}
     </View>
   </View>
@@ -147,30 +166,29 @@ export default function KycCenter() {
   const profile = status?.user_profile || {}
   const idType = status?.id_type || profile?.id_type || ''
   const hasAddress = Boolean(
-    profile?.address_line1 && profile?.city && profile?.state && profile?.postal_code
+    profile?.address_line1 && profile?.city && profile?.state && profile?.country
   )
   const proofType = profile?.proof_of_address_type
   const idDocUrl = profile?.id_document_url
   const proofUrl = profile?.proof_of_address_url
-  const needsIdDoc = idType && idType !== 'nin'
-  const docsComplete = Boolean(
-    idType && hasAddress && proofType && proofUrl && (!needsIdDoc || idDocUrl)
-  )
+  const docsComplete = Boolean(idType && hasAddress && proofType && proofUrl && idDocUrl)
   const useCase = String(status?.primary_use_case || status?.user_profile?.primary_use_case || '')
     .trim()
     .toLowerCase()
   const useCaseLabel = USE_CASE_LABELS[useCase] || 'Choose a use case'
   const useCaseRequirement = USE_CASE_REQUIREMENTS[useCase]
   const hasBasicProfile = Boolean(
-    status?.user_profile?.first_name ||
-      status?.user_profile?.last_name ||
-      status?.user_profile?.phone_number ||
-      status?.user_profile?.date_of_birth
+    profile?.first_name && profile?.last_name && profile?.phone_number && profile?.date_of_birth
   )
+  const phoneVerifiedAt = profile?.phone_verified_at || status?.phone_verified_at
+  const tier1Complete = hasBasicProfile && (phoneVerified || !!phoneVerifiedAt)
   const tier3Verified = rawTier === 'tier_3'
   const tier2Complete =
-    normalizedTier === 'tier_2' || (phoneVerified && hasBasicProfile && bvnVerified && docsComplete)
+    normalizedTier === 'tier_2' || normalizedTier === 'tier_3' || (tier1Complete && bvnVerified && docsComplete)
   const tier3Enabled = FEATURE_KYC_CENTER
+  const tier3Status = status?.user_kyc?.tier3_status || ''
+  const tier3Pending = ['pending', 'processing'].includes(tier3Status)
+  const tier3Error = status?.user_kyc?.tier3_error
 
   if (!FEATURE_KYC_CENTER) {
     return (
@@ -259,13 +277,28 @@ export default function KycCenter() {
             cta={docsComplete ? 'View documents' : 'Upload documents'}
             href="/kyc/documents"
           />
-          {tier3Enabled && tier2Complete && !tier3Verified ? (
+          {tier3Enabled && tier2Complete ? (
             <StepRow
               title="Tier 3 live selfie"
-              description="Capture a live selfie to complete Tier 3 verification."
-              done={false}
-              cta="Capture selfie"
-              href="/kyc/tier3-capture"
+              description={
+                tier3Verified
+                  ? 'Your liveness check is verified.'
+                  : tier3Pending
+                  ? 'Liveness submitted. Awaiting result.'
+                  : tier3Error
+                  ? tier3Error
+                  : 'Capture a live selfie to complete Tier 3 verification.'
+              }
+              done={tier3Verified}
+              cta={
+                tier3Verified
+                  ? 'Verified'
+                : tier3Pending
+                ? 'Verifying'
+                : 'Retry verification'
+              }
+              href={tier3Verified ? undefined : tier3Pending ? undefined : '/kyc/tier3-capture'}
+              disabled={tier3Pending || tier3Verified}
             />
           ) : null}
         </View>
