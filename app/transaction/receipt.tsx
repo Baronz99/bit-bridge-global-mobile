@@ -33,6 +33,15 @@ type ReceiptDTO = {
   reason?: string
   message?: string
   error?: string
+  timeline?: {
+    step_key?: string
+    label?: string
+    description?: string
+    state?: string
+    occurred_at?: string
+    source?: string
+    sequence?: number
+  }[]
 }
 
 const cleanText = (value?: any) => {
@@ -147,6 +156,7 @@ const ReceiptScreen = () => {
       total_display: raw.total_display ?? computedValue,
       commission_used: raw.commission_used,
       reason: failReason,
+      timeline: Array.isArray(raw.timeline) ? raw.timeline : [],
     } as ReceiptDTO
   }, [raw, reference, timelineId])
 
@@ -261,6 +271,7 @@ const ReceiptScreen = () => {
                 walletAmount={receipt.wallet_amount_charged ?? receipt.total_amount ?? receipt.amount}
                 rewardAmount={receipt.reward_applied}
                 reason={receipt.reason}
+                timeline={receipt.timeline}
               />
             </View>
 

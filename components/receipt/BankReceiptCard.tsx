@@ -43,6 +43,15 @@ type BankReceiptCardProps = {
   walletAmount?: number
   rewardAmount?: number
   reason?: string
+  timeline?: {
+    step_key?: string
+    label?: string
+    description?: string
+    state?: string
+    occurred_at?: string
+    source?: string
+    sequence?: number
+  }[]
 }
 
 const normalizeStatus = (statusRaw: string) => {
@@ -159,6 +168,7 @@ const BankReceiptCard = ({
   walletAmount,
   rewardAmount,
   reason,
+  timeline,
 }: BankReceiptCardProps) => {
   const [showAdvanced, setShowAdvanced] = useState(false)
 
@@ -243,8 +253,9 @@ const BankReceiptCard = ({
   const conversionAmountAfterFee = Number(conversionMeta?.amount_after_fee)
   const conversionAmountOut = Number(conversionMeta?.amount_out)
   const conversionRate = Number(conversionMeta?.execution_rate)
-  const conversionBaseRate = Number(conversionMeta?.base_rate)
-  const conversionMarkup = Number(conversionMeta?.markup)
+  const normalizedTimeline = Array.isArray(timeline)
+    ? [...timeline].sort((a, b) => Number(b?.sequence || 0) - Number(a?.sequence || 0))
+    : []
 
   const monnifyMetaKeys =
     meta && Object.keys(meta).some((key) => /monnify/i.test(key))
@@ -382,12 +393,6 @@ const BankReceiptCard = ({
           {Number.isFinite(conversionRate) ? (
             <Row label="Execution rate" value={String(conversionRate)} />
           ) : null}
-          {Number.isFinite(conversionBaseRate) ? (
-            <Row label="Base rate" value={String(conversionBaseRate)} />
-          ) : null}
-          {Number.isFinite(conversionMarkup) ? (
-            <Row label="Markup" value={String(conversionMarkup)} />
-          ) : null}
           {Number.isFinite(conversionAmountOut) && conversionTo ? (
             <Row label="Amount out" value={moneyFormat(conversionAmountOut, conversionTo)} />
           ) : null}
@@ -455,6 +460,50 @@ const BankReceiptCard = ({
               ))}
             </View>
           ) : null}
+        </>
+      ) : null}
+
+      {normalizedTimeline.length ? (
+        <>
+          <Divider />
+          <Text className="text-gray-400 text-[11px] uppercase tracking-widest mb-2">Timeline</Text>
+          <View className="bg-gray-900 border border-gray-800 rounded-xl p-4">
+            {normalizedTimeline.map((item, index) => {
+              const state = clean(item?.state).toLowerCase()
+              const isDone = state === 'done' || state === 'completed'
+              const isFailed = state === 'failed'
+              const isCurrent = state === 'current'
+              const dotClass = isDone
+                ? 'bg-emerald-400'
+                : isFailed
+                  ? 'bg-red-400'
+                : isCurrent
+                  ? 'bg-amber-400'
+                  : 'bg-gray-600'
+
+              return (
+                <View key={`${clean(item?.step_key) || 'step'}-${index}`} className="flex-row items-start">
+                  <View className="items-center mr-3 mt-1">
+                    <View className={`h-2.5 w-2.5 rounded-full ${dotClass}`} />
+                    {index < normalizedTimeline.length - 1 ? (
+                      <View className="w-[1px] flex-1 bg-gray-700 mt-1.5" />
+                    ) : null}
+                  </View>
+                  <View className="flex-1 pb-4">
+                    <Text className="text-gray-200 text-[13px] font-semibold">
+                      {clean(item?.label) || 'Update'}
+                    </Text>
+                    {clean(item?.description) ? (
+                      <Text className="text-gray-400 text-[12px] mt-0.5">{clean(item?.description)}</Text>
+                    ) : null}
+                    {clean(item?.occurred_at) ? (
+                      <Text className="text-gray-500 text-[11px] mt-1">{formatReceiptDate(clean(item?.occurred_at))}</Text>
+                    ) : null}
+                  </View>
+                </View>
+              )
+            })}
+          </View>
         </>
       ) : null}
 
