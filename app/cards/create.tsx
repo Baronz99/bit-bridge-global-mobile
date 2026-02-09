@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native'
+import { ActivityIndicator, Image, Text, TouchableOpacity, View } from 'react-native'
 import { useRouter } from 'expo-router'
+import * as ImagePicker from 'expo-image-picker'
 import FormInput from '@/components/FormInput'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
-import { createCard, registerCardholder } from '@/api/cards'
+import { createCard, getUserCards, registerCardholder } from '@/api/cards'
+import { uploadSelfieToCloudinary } from '@/api/uploads'
 import { resolveUserProfile, useAuth } from '@/services/useAuth'
 import { buildApiErrorMessage } from '@/utils/apiErrorMessage'
 import AppModal from '@/components/modal/Modal'
@@ -13,9 +15,14 @@ const CreateCard = () => {
   const router = useRouter()
   const { userProfileData } = useAuth()
   const [loading, setLoading] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [createdCardId, setCreatedCardId] = useState<string | null>(null)
+  const [selfieLocalUri, setSelfieLocalUri] = useState<string | null>(null)
+  const [selfieImageUrl, setSelfieImageUrl] = useState<string | null>(null)
+  const [cardholderStatus, setCardholderStatus] = useState<string>('idle')
+  const [existingCardholderId, setExistingCardholderId] = useState<string | null>(null)
   const [form, setForm] = useState({
     first_name: '',
     last_name: '',
@@ -27,6 +34,7 @@ const CreateCard = () => {
     postal_code: '',
     country: 'NG',
     currency: 'USD',
+    transaction_pin: '',
   })
 
   const profileRoot = useMemo(() => resolveUserProfile(userProfileData) || {}, [userProfileData])
@@ -83,6 +91,80 @@ const CreateCard = () => {
     return true
   }
 
+  const refreshCardholderState = async () => {
+    try {
+      const raw = await getUserCards()
+      const payload = raw?.data ?? raw
+      let card: any = null
+      if (Array.isArray(payload)) card = payload[0] || null
+      else if (payload?.card) card = payload.card
+      else if (payload?.data) card = payload.data
+      else if (payload?.card_id || payload?.cardholder_id || payload?.id) card = payload
+
+      if (!card) {
+        setCardholderStatus('idle')
+        setExistingCardholderId(null)
+        return
+      }
+
+      const meta = card?.meta_data || {}
+      const kycStatus = String(meta?.cardholder_kyc_status || '').toLowerCase()
+      const status = kycStatus || (card?.card_id ? 'verified' : 'idle')
+      setCardholderStatus(status)
+      setExistingCardholderId(String(card?.cardholder_id || '').trim() || null)
+      if (card?.id || card?.card_id) setCreatedCardId(String(card.id || card.card_id))
+    } catch {
+      // no-op
+    }
+  }
+
+  useEffect(() => {
+    void refreshCardholderState()
+  }, [])
+
+  const chooseSelfie = async (fromCamera: boolean) => {
+    setNotice(null)
+    const permissionResult = fromCamera
+      ? await ImagePicker.requestCameraPermissionsAsync()
+      : await ImagePicker.requestMediaLibraryPermissionsAsync()
+
+    if (!permissionResult.granted) {
+      setNotice(fromCamera ? 'Camera permission is required.' : 'Photo library permission is required.')
+      return
+    }
+
+    const result = fromCamera
+      ? await ImagePicker.launchCameraAsync({
+          allowsEditing: true,
+          quality: 0.9,
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          cameraType: ImagePicker.CameraType.front,
+        })
+      : await ImagePicker.launchImageLibraryAsync({
+          allowsEditing: true,
+          quality: 0.9,
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        })
+
+    if (result.canceled || !result.assets?.[0]?.uri) return
+    setSelfieLocalUri(result.assets[0].uri)
+    setSelfieImageUrl(null)
+  }
+
+  const ensureSelfieUrl = async () => {
+    if (selfieImageUrl) return selfieImageUrl
+    if (!selfieLocalUri) throw new Error('Capture or select a selfie image first.')
+
+    setUploading(true)
+    try {
+      const secureUrl = await uploadSelfieToCloudinary(selfieLocalUri)
+      setSelfieImageUrl(secureUrl)
+      return secureUrl
+    } finally {
+      setUploading(false)
+    }
+  }
+
   const handleSubmit = async () => {
     if (!hasKycAccess()) {
       setNotice('Complete KYC to create a card.')
@@ -129,20 +211,59 @@ const CreateCard = () => {
         return
       }
 
-      const registerRes = await registerCardholder(payload)
-      const cardholderId =
-        registerRes?.data?.id ||
-        registerRes?.data?.cardholder_id ||
-        registerRes?.cardholder_id ||
-        registerRes?.id
+      // Step 1: ensure cardholder verification record exists (async)
+      const normalizedStatus = String(cardholderStatus || '').toLowerCase()
+      let cardholderId = existingCardholderId
 
+      if (!['verified', 'pending_verification', 'manual_review'].includes(normalizedStatus)) {
+        if (!bvnVerified) {
+          setNotice('BVN must be verified before cardholder registration.')
+          setLoading(false)
+          return
+        }
+
+        const selfieUrl = await ensureSelfieUrl()
+        const registerRes = await registerCardholder({
+          ...payload,
+          registration_mode: 'async',
+          id_type: 'NIGERIAN_BVN_VERIFICATION',
+          selfie_image: selfieUrl,
+        })
+
+        cardholderId =
+          registerRes?.data?.cardholder_id ||
+          registerRes?.data?.id ||
+          registerRes?.cardholder_id ||
+          registerRes?.id ||
+          null
+
+        await refreshCardholderState()
+        setNotice(registerRes?.message || 'Cardholder submitted. Verification in progress.')
+        setLoading(false)
+        return
+      }
+
+      if (['pending_verification', 'manual_review'].includes(normalizedStatus)) {
+        setNotice('Cardholder verification is still in progress. Please wait for approval.')
+        setLoading(false)
+        return
+      }
+
+      if (!String(form.transaction_pin || '').trim()) {
+        setNotice('Transaction PIN is required to create card.')
+        setLoading(false)
+        return
+      }
+
+      // Step 2: create card only when verified
       const cardRes = await createCard({
-        cardholder_id: cardholderId,
+        cardholder_id: cardholderId || undefined,
         currency: form.currency || 'USD',
+        wallet_type: 'usd',
+        transaction_pin: String(form.transaction_pin || '').trim(),
       })
 
-      const cardId =
-        cardRes?.data?.id || cardRes?.data?.card_id || cardRes?.card_id || cardRes?.id
+      const cardId = cardRes?.data?.id || cardRes?.data?.card_id || cardRes?.card_id || cardRes?.id
 
       setSuccess(cardRes?.message || 'Card created successfully.')
       if (cardId) setCreatedCardId(String(cardId))
@@ -220,6 +341,43 @@ const CreateCard = () => {
               value={form.currency}
               onChangeText={(value: string) => setForm({ ...form, currency: value })}
             />
+            <FormInput
+              label="Transaction PIN"
+              value={form.transaction_pin}
+              secureTextEntry
+              keyboardType="number-pad"
+              onChangeText={(value: string) => setForm({ ...form, transaction_pin: value })}
+            />
+            <View className="mt-3">
+              <Text className="text-gray-300 text-xs mb-2">Selfie (required for cardholder verification)</Text>
+              {selfieLocalUri ? (
+                <Image source={{ uri: selfieLocalUri }} className="w-full h-40 rounded-xl mb-2" />
+              ) : null}
+              <View className="flex-row gap-2">
+                <TouchableOpacity
+                  disabled={loading || uploading}
+                  onPress={() => chooseSelfie(true)}
+                  className="bg-gray-800 py-3 rounded-xl flex-1"
+                >
+                  <Text className="text-white text-center">Capture Selfie</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  disabled={loading || uploading}
+                  onPress={() => chooseSelfie(false)}
+                  className="bg-gray-800 py-3 rounded-xl flex-1"
+                >
+                  <Text className="text-white text-center">Upload from Gallery</Text>
+                </TouchableOpacity>
+              </View>
+              {selfieImageUrl ? (
+                <Text className="text-emerald-400 text-xs mt-2">Selfie upload ready.</Text>
+              ) : null}
+            </View>
+            <View className="mt-3">
+              <Text className="text-gray-400 text-xs">
+                Cardholder status: {cardholderStatus.replace('_', ' ') || 'idle'}
+              </Text>
+            </View>
           </View>
 
           {notice ? <Text className="text-yellow-400 mt-2">{notice}</Text> : null}
@@ -227,12 +385,18 @@ const CreateCard = () => {
           <TouchableOpacity
             onPress={handleSubmit}
             className="bg-app-primary py-4 rounded-xl mt-6"
-            disabled={loading}
+            disabled={loading || uploading}
           >
-            {loading ? (
+            {loading || uploading ? (
               <ActivityIndicator />
             ) : (
-              <Text className="text-white text-center font-medium">Create Card</Text>
+              <Text className="text-white text-center font-medium">
+                {['pending_verification', 'manual_review'].includes(cardholderStatus)
+                  ? 'Verification Pending'
+                  : cardholderStatus === 'verified'
+                    ? 'Create Card'
+                    : 'Verify Cardholder'}
+              </Text>
             )}
           </TouchableOpacity>
         </View>

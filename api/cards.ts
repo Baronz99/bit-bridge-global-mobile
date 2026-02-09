@@ -167,6 +167,12 @@ export const registerCardholder = async (payload: {
   state?: string
   postal_code?: string
   country?: string
+  registration_mode?: 'async' | 'sync'
+  id_type?: string
+  bvn?: string
+  selfie_image?: string
+  id_no?: string
+  id_image?: string
 }) => {
   try {
     const res = await client.post('/cards/register_cardholder', { card: payload })
@@ -176,7 +182,12 @@ export const registerCardholder = async (payload: {
   }
 }
 
-export const createCard = async (payload: { cardholder_id?: Id; currency?: string }) => {
+export const createCard = async (payload: {
+  cardholder_id?: Id
+  currency?: string
+  wallet_type?: string
+  transaction_pin?: string
+}) => {
   try {
     const res = await client.post('/cards/create_card', { card: payload })
     return res.data
