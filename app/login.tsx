@@ -12,6 +12,7 @@ import { Link, useRouter } from 'expo-router'
 import { useAuth } from '@/services/useAuth'
 import FormInput from '@/components/FormInput'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
+import { error as logError } from '@/utils/log'
 
 const Login = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -41,9 +42,9 @@ const Login = () => {
       setLoading(true)
       await onLogin({ email, password })
       router.replace('/' as any)
-    } catch (error: any) {
-      setErrorMessage(error?.message || 'Login failed')
-      console.error('Login error:', error?.message || error)
+    } catch (err: any) {
+      setErrorMessage(err?.message || 'Login failed')
+      logError('Login error:', err?.message || err)
     } finally {
       setLoading(false)
     }
@@ -99,10 +100,11 @@ const Login = () => {
 
           {!!errorMessage && <Text className="text-red-600 mt-3">{errorMessage}</Text>}
 
-          {/* Debug */}
-          <Text className="text-gray-400 mt-2 text-xs">
-            Authenticated: {String(authState?.authenticated)}
-          </Text>
+          {__DEV__ ? (
+            <Text className="text-gray-400 mt-2 text-xs">
+              Authenticated: {String(authState?.authenticated)}
+            </Text>
+          ) : null}
 
           <TouchableOpacity className="w-full m-auto mt-auto py-3 flex-row">
             <Text className="text-white w-full border-gray-800 border-b py-2 text-center">

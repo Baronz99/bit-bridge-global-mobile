@@ -13,8 +13,8 @@
       "distribution": "internal",
       "channel": "preview",
       "env": {
-        "EXPO_PUBLIC_ENV": "staging",
-        "EXPO_PUBLIC_BASE_URL_STAGING": "https://bitbridge-backend-prod-5f0b6abe68d7.herokuapp.com"
+        "EXPO_PUBLIC_ENV": "production",
+        "EXPO_PUBLIC_API_BASE_URL": "https://bitbridgeglobal-fa54ecb89f7d.herokuapp.com/api/v1"
       }
     },
     "production": {
@@ -22,7 +22,7 @@
       "channel": "production",
       "env": {
         "EXPO_PUBLIC_ENV": "production",
-        "EXPO_PUBLIC_BASE_URL_PROD": "https://bitbridgeglobal-fa54ecb89f7d.herokuapp.com"
+        "EXPO_PUBLIC_API_BASE_URL": "https://bitbridgeglobal-fa54ecb89f7d.herokuapp.com/api/v1"
       }
     }
   },
