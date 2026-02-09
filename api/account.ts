@@ -69,8 +69,10 @@ const parseAnchorApiError = (err: any) => {
     status: err?.response?.status,
     message: data?.message || err?.message || 'Something went wrong',
     error: data?.error,
+    error_code: data?.error_code || data?.error,
     errors: Array.isArray(data?.errors) ? data.errors : [],
     meta: data?.meta || null,
+    flow: data?.flow || data?.meta?.flow || null,
     response: err?.response,
   }
 }
@@ -270,9 +272,26 @@ export const getAccounts = async () => {
 
 export const createDepositAccount = async () => {
   try {
-    const res = await client.get('/accounts/get_account_number')
+    const res = await client.post('/accounts/provision_account_number')
     return res.data
   } catch (err: any) {
+    const status = err?.response?.status
+    // Backward compatibility for older backend deployments.
+    if (status === 404 || status === 405) {
+      try {
+        const legacy = await client.get('/accounts/get_account_number')
+        return legacy.data
+      } catch (legacyErr: any) {
+        const parsedLegacy = parseAnchorApiError(legacyErr)
+        warn('[createDepositAccount legacy error]', {
+          message: parsedLegacy.message,
+          status: parsedLegacy.status,
+          data: legacyErr?.response?.data,
+          url: legacyErr?.config?.url,
+        })
+        throw parsedLegacy
+      }
+    }
     const parsed = parseAnchorApiError(err)
     warn('[createDepositAccount error]', {
       message: parsed.message,

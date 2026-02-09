@@ -77,6 +77,12 @@ const DepositAccountSection = ({
   const explanation = useMemo(() => {
     if (!platformTier2)
       return 'Complete Tier 2 verification before setting up a deposit account.'
+    if (normalized.backendFlowState === 'blocked_profile_incomplete')
+      return 'Your profile is incomplete. Update profile details before continuing.'
+    if (normalized.backendFlowState === 'blocked_phone_exists')
+      return 'Your phone number already exists at provider. Update phone in profile or contact support.'
+    if (normalized.backendFlowState === 'blocked_kyc')
+      return 'Complete KYC to unlock Anchor deposits.'
     if (!normalized.hasAnchorAccount) return 'Provide your details to create a deposit profile.'
     if (normalized.kycState != 'verified') return 'Finish Anchor verification to unlock deposits.'
     if (!normalized.hasAccountNumber) return 'Generate your account number to fund your wallet.'
@@ -90,6 +96,13 @@ const DepositAccountSection = ({
 
   const primaryAction = useMemo(() => {
     if (!platformTier2) return null
+    if (
+      (normalized.backendFlowState === 'blocked_profile_incomplete' ||
+        normalized.backendFlowState === 'blocked_phone_exists') &&
+      onGoToProfile
+    ) {
+      return { label: 'Update Profile', onPress: async () => onGoToProfile() }
+    }
     switch (step) {
       case 'CREATE_ANCHOR':
         return { label: 'Create deposit profile', onPress: onCreateAnchor }
@@ -100,7 +113,7 @@ const DepositAccountSection = ({
       default:
         return null
     }
-  }, [step, onCreateAnchor, onVerifyKyc, onGenerateAccount])
+  }, [step, platformTier2, normalized.backendFlowState, onCreateAnchor, onVerifyKyc, onGenerateAccount, onGoToProfile])
 
   if (step == 'DONE') {
     return (

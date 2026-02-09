@@ -5,6 +5,15 @@ import { log } from '@/utils/log'
 
 export type AnchorKycState = 'unknown' | 'not_started' | 'pending' | 'verified'
 export type AnchorNextStep = 'CREATE_ANCHOR' | 'DO_KYC' | 'GENERATE_NUMBER' | 'DONE'
+export type AnchorFlowState =
+  | 'not_started'
+  | 'blocked_profile_incomplete'
+  | 'blocked_kyc'
+  | 'blocked_phone_exists'
+  | 'customer_created_no_deposit_account'
+  | 'temporary_provider_failure'
+  | 'provisioned'
+  | 'unknown'
 
 export type NormalizedAnchorOnboarding = {
   isHydrated: boolean
@@ -18,6 +27,8 @@ export type NormalizedAnchorOnboarding = {
   bankName: string | null
   depositReady: boolean
   nextStep: AnchorNextStep
+  backendFlowState: AnchorFlowState
+  backendNextAction: string | null
   blockingReason?: string
 }
 
@@ -157,6 +168,26 @@ const extractDetailData = (detailResponse: any) => {
   return payload as Record<string, any>
 }
 
+const parseBackendFlow = (detailResponse: any): { state: AnchorFlowState; nextAction: string | null } => {
+  const flow = detailResponse?.flow || detailResponse?.data?.flow
+  const state = String(flow?.state || '').trim().toLowerCase()
+  const nextAction = String(flow?.next_action || '').trim() || null
+
+  const valid: AnchorFlowState[] = [
+    'not_started',
+    'blocked_profile_incomplete',
+    'blocked_kyc',
+    'blocked_phone_exists',
+    'customer_created_no_deposit_account',
+    'temporary_provider_failure',
+    'provisioned',
+  ]
+  if (valid.includes(state as AnchorFlowState)) {
+    return { state: state as AnchorFlowState, nextAction }
+  }
+  return { state: 'unknown', nextAction }
+}
+
 const extractAccountNumberFromDetail = (detailData: Record<string, any> | null) => {
   if (!detailData) return ''
   const attrs = asObj(detailData.attributes)
@@ -233,6 +264,7 @@ export const normalizeAnchorOnboarding = (
   detailResponse: any,
   userAccountsResponse?: any
 ): NormalizedAnchorOnboarding => {
+  const backendFlow = parseBackendFlow(detailResponse)
   const isHydrated = detailResponse !== undefined || userAccountsResponse !== undefined
   const detailData = extractDetailData(detailResponse)
   const accounts = extractAccountsList(userAccountsResponse)
@@ -276,15 +308,42 @@ export const normalizeAnchorOnboarding = (
     anchorAccount
   )
   const hasAccountNumber = Boolean(accountNumber)
-  const depositReady = kycState === 'verified' && hasAccountNumber
+  const depositReady =
+    backendFlow.state === 'provisioned' || (kycState === 'verified' && hasAccountNumber)
 
-  const nextStep: AnchorNextStep = !hasAnchorAccount
-    ? 'CREATE_ANCHOR'
-    : kycState !== 'verified'
-      ? 'DO_KYC'
-      : !hasAccountNumber
-        ? 'GENERATE_NUMBER'
-        : 'DONE'
+  const nextStep: AnchorNextStep =
+    backendFlow.state === 'not_started'
+      ? 'CREATE_ANCHOR'
+      : backendFlow.state === 'blocked_profile_incomplete'
+        ? 'CREATE_ANCHOR'
+        : backendFlow.state === 'blocked_phone_exists'
+          ? 'CREATE_ANCHOR'
+          : backendFlow.state === 'blocked_kyc'
+            ? 'DO_KYC'
+            : backendFlow.state === 'customer_created_no_deposit_account'
+              ? 'GENERATE_NUMBER'
+              : backendFlow.state === 'temporary_provider_failure'
+                ? hasAnchorAccount
+                  ? 'GENERATE_NUMBER'
+                  : 'CREATE_ANCHOR'
+                : backendFlow.state === 'provisioned'
+                  ? 'DONE'
+                  : !hasAnchorAccount
+                    ? 'CREATE_ANCHOR'
+                    : kycState !== 'verified'
+                      ? 'DO_KYC'
+                      : !hasAccountNumber
+                        ? 'GENERATE_NUMBER'
+                        : 'DONE'
+
+  const blockingReason =
+    backendFlow.state === 'blocked_profile_incomplete'
+      ? 'profile_incomplete'
+      : backendFlow.state === 'blocked_kyc'
+        ? 'kyc_required'
+        : backendFlow.state === 'blocked_phone_exists'
+          ? 'phone_exists'
+          : undefined
 
   return {
     isHydrated,
@@ -298,6 +357,9 @@ export const normalizeAnchorOnboarding = (
     bankName: bankName || null,
     depositReady,
     nextStep,
+    backendFlowState: backendFlow.state,
+    backendNextAction: backendFlow.nextAction,
+    blockingReason,
   }
 }
 

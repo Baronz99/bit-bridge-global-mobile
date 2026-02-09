@@ -173,9 +173,42 @@ const AnchorAccountScreen = () => {
     } catch (error: any) {
       const status = error?.response?.status ?? error?.status
       const data = error?.response?.data ?? error
+      const errorCode = String(data?.error_code || data?.error || '').trim()
+      const flowState = String(data?.flow?.state || data?.meta?.flow?.state || '').trim()
       if (status === 409) {
+        setNotice({
+          message:
+            data?.message ||
+            'This phone number already exists on Anchor. Please contact support or refresh.',
+          error: true,
+        })
         await anchorState.refresh({ force: true })
         shouldRefresh = false
+        return
+      }
+      if (errorCode === 'ANCHOR_ONBOARDING_INCOMPLETE' || flowState === 'blocked_profile_incomplete') {
+        setNotice({
+          message: Array.isArray(data?.missing_fields)
+            ? `Complete your profile: ${data.missing_fields.join(', ')}`
+            : data?.message || 'Complete your profile before continuing.',
+          error: true,
+        })
+        return
+      }
+      if (errorCode === 'ANCHOR_PHONE_EXISTS' || flowState === 'blocked_phone_exists') {
+        setNotice({
+          message:
+            data?.message ||
+            'This phone number already exists on Anchor. Update phone in profile or contact support.',
+          error: true,
+        })
+        return
+      }
+      if (errorCode === 'kyc_required' || data?.error === 'kyc_required' || flowState === 'blocked_kyc') {
+        setNotice({
+          message: data?.message || 'Complete Tier 2 verification first.',
+          error: true,
+        })
         return
       }
       if (status === 422 && Array.isArray(data?.missing_fields)) {
@@ -239,9 +272,24 @@ const AnchorAccountScreen = () => {
       }
     } catch (error: any) {
       const status = error?.response?.status ?? error?.status
+      const errorCode = String(error?.error_code || error?.error || '').trim()
+      const flowState = String(error?.flow?.state || error?.meta?.flow?.state || '').trim()
       if (status === 401) {
         didLogout = true
         await onLogout().catch(() => {})
+        return
+      }
+      if (errorCode === 'kyc_required' || flowState === 'blocked_kyc') {
+        setNotice({ message: error?.message || 'Complete Tier 2 verification first.', error: true })
+        return
+      }
+      if (errorCode === 'anchor_phone_already_exists' || flowState === 'blocked_phone_exists') {
+        setNotice({
+          message:
+            error?.message ||
+            'Phone is already attached at provider. Refresh status or contact support.',
+          error: true,
+        })
         return
       }
       const retryable =
