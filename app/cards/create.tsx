@@ -37,6 +37,7 @@ const CreateCard = () => {
     currency: 'USD',
     card_limit: '500000',
     card_pin: '',
+    card_pin_confirm: '',
     transaction_pin: '',
   })
 
@@ -217,8 +218,14 @@ const CreateCard = () => {
     }
 
     const cardPin = String(form.card_pin || '').trim()
-    if (cardPin && !/^\d{4}$/.test(cardPin)) {
-      setNotice('Card PIN must be exactly 4 digits.')
+    const cardPinConfirm = String(form.card_pin_confirm || '').trim()
+    if (!/^\d{4}$/.test(cardPin)) {
+      setNotice('Card PIN is required and must be exactly 4 digits.')
+      setLoading(false)
+      return
+    }
+    if (cardPin !== cardPinConfirm) {
+      setNotice('Card PIN confirmation does not match.')
       setLoading(false)
       return
     }
@@ -306,7 +313,7 @@ const CreateCard = () => {
         currency: form.currency || 'USD',
         wallet_type: 'usd',
         card_limit: normalizedCardLimit,
-        card_pin: cardPin || undefined,
+        card_pin: cardPin,
         transaction_pin: String(form.transaction_pin || '').trim(),
       })
 
@@ -395,11 +402,18 @@ const CreateCard = () => {
               onChangeText={(value: string) => setForm({ ...form, card_limit: value.replace(/[^0-9]/g, '') })}
             />
             <FormInput
-              label="Card PIN (optional, 4 digits)"
+              label="Card PIN (4 digits)"
               value={form.card_pin}
               secureTextEntry
               keyboardType="number-pad"
               onChangeText={(value: string) => setForm({ ...form, card_pin: value.replace(/[^0-9]/g, '').slice(0, 4) })}
+            />
+            <FormInput
+              label="Confirm Card PIN"
+              value={form.card_pin_confirm}
+              secureTextEntry
+              keyboardType="number-pad"
+              onChangeText={(value: string) => setForm({ ...form, card_pin_confirm: value.replace(/[^0-9]/g, '').slice(0, 4) })}
             />
             <FormInput
               label="Transaction PIN (App Auth)"
