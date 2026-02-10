@@ -158,8 +158,10 @@ const index = () => {
             : null
 
     return transactions.filter((item: any) => {
-      const status = String(item?.status || '').toLowerCase()
-      if (walletStatusFilter !== 'all' && status !== walletStatusFilter) return false
+      if (!isPrimaryTransaction(item)) return false
+
+      const filterStatus = statusFilterValue(item)
+      if (walletStatusFilter !== 'all' && filterStatus !== walletStatusFilter) return false
 
       if (start || end) {
         const createdAt = item?.created_at || item?.createdAt
@@ -178,10 +180,13 @@ const index = () => {
 
       if (!normalizedSearch) return true
       const haystack = [
+        item?.display_message,
         item?.transaction_type,
         item?.type,
         item?.reference,
+        item?.transfer_reference,
         item?.id,
+        item?.lifecycle_state,
         item?.status,
       ]
         .filter(Boolean)
@@ -195,9 +200,26 @@ const index = () => {
   const walletCount = filteredTransactions.length
   const statusTone = (status: string) => {
     if (status === 'completed' || status === 'approved') return 'text-green-400'
-    if (status === 'pending' || status === 'initialized') return 'text-yellow-400'
+    if (status === 'pending' || status === 'initialized' || status === 'reserved') return 'text-yellow-400'
+    if (status === 'released') return 'text-sky-300'
     return 'text-red-400'
   }
+
+  const isPrimaryTransaction = (item: any) => item?.show_in_primary_feed !== false
+
+  const transactionState = (item: any) =>
+    String(item?.lifecycle_state || item?.status || 'pending').toLowerCase()
+
+  const statusFilterValue = (item: any) => {
+    const state = transactionState(item)
+    if (state === 'completed') return 'approved'
+    if (state === 'reserved') return 'initialized'
+    if (state === 'released') return 'failed'
+    return state
+  }
+
+  const displayAmount = (item: any) =>
+    Number(item?.display_total ?? item?.display_amount ?? item?.amount ?? 0)
 
   return (
     <View className="flex-1 bg-primary">
@@ -408,9 +430,10 @@ const index = () => {
                 </View>
               ) : (
                 filteredTransactions.map((item: any, index: number) => {
-                  const reference = item?.reference ?? item?.id
-                  const status = String(item?.status || 'pending').toLowerCase()
+                  const reference = item?.reference ?? item?.transfer_reference ?? item?.id
+                  const status = transactionState(item)
                   const typeLabel = item?.transaction_type || item?.type || 'transaction'
+                  const message = item?.display_message
                   if (!reference) {
                     return (
                       <View
@@ -421,10 +444,11 @@ const index = () => {
                           <View className="flex-1 pr-3">
                             <Text className="text-white font-semibold">{typeLabel}</Text>
                             <Text className="text-gray-500 text-xs mt-1">Reference pending</Text>
+                            {message ? <Text className="text-gray-400 text-xs mt-1">{message}</Text> : null}
                           </View>
                           <View className="items-end">
                             <Text className="text-white font-semibold">
-                              {moneyFormat(item.amount)}
+                              {moneyFormat(displayAmount(item))}
                             </Text>
                             <Text className={`text-xs mt-1 ${statusTone(status)}`}>
                               {status}
@@ -450,10 +474,11 @@ const index = () => {
                             <Text className="text-gray-500 text-xs mt-1">
                               Ref {reference}
                             </Text>
+                            {message ? <Text className="text-gray-400 text-xs mt-1">{message}</Text> : null}
                           </View>
                           <View className="items-end">
                             <Text className="text-white font-semibold">
-                              {moneyFormat(item.amount)}
+                              {moneyFormat(displayAmount(item))}
                             </Text>
                             <Text className={`text-xs mt-1 ${statusTone(status)}`}>
                               {status}

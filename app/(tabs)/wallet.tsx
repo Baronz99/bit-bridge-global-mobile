@@ -163,8 +163,10 @@ const WalletScreen = () => {
             : null
 
     return walletScopedTransactions.filter((item: any) => {
-      const status = String(item?.status || '').toLowerCase()
-      if (statusFilter !== 'all' && status !== statusFilter) return false
+      if (!isPrimaryTransaction(item)) return false
+
+      const filterStatus = statusFilterValue(item)
+      if (statusFilter !== 'all' && filterStatus !== statusFilter) return false
 
       if (start || end) {
         const createdAt = item?.created_at || item?.createdAt
@@ -184,10 +186,13 @@ const WalletScreen = () => {
       if (!normalizedSearch) return true
 
       const haystack = [
+        item?.display_message,
         item?.description,
         item?.reference,
+        item?.transfer_reference,
         item?.transaction_type,
         item?.type,
+        item?.lifecycle_state,
         item?.status,
       ]
         .filter(Boolean)
@@ -199,10 +204,27 @@ const WalletScreen = () => {
   }, [walletScopedTransactions, statusFilter, dateRange, searchTerm, startDate, endDate])
 
   const statusTone = (status: string) => {
-    if (status === 'approved') return 'text-green-400'
-    if (status === 'initialized') return 'text-yellow-400'
+    if (status === 'approved' || status === 'completed') return 'text-green-400'
+    if (status === 'initialized' || status === 'pending' || status === 'reserved') return 'text-yellow-400'
+    if (status === 'released') return 'text-sky-300'
     return 'text-red-400'
   }
+
+  const isPrimaryTransaction = (item: any) => item?.show_in_primary_feed !== false
+
+  const transactionState = (item: any) =>
+    String(item?.lifecycle_state || item?.status || 'pending').toLowerCase()
+
+  const statusFilterValue = (item: any) => {
+    const state = transactionState(item)
+    if (state === 'completed') return 'approved'
+    if (state === 'reserved') return 'initialized'
+    if (state === 'released') return 'failed'
+    return state
+  }
+
+  const displayAmount = (item: any) =>
+    Number(item?.display_total ?? item?.display_amount ?? item?.amount ?? 0)
 
   const getWalletDescription = (item: any) => {
     const address = String(item?.address || item?.description || '').toLowerCase()
@@ -531,10 +553,11 @@ const WalletScreen = () => {
               </View>
             ) : (
               filteredTransactions.map((item: any, index: number) => {
-                const reference = item?.reference ?? item?.id
-                const status = String(item?.status || 'pending').toLowerCase()
+                const reference = item?.reference ?? item?.transfer_reference ?? item?.id
+                const status = transactionState(item)
                 const description = getWalletDescription(item)
                 const currency = isTunnelMode ? 'USD' : 'NGN'
+                const message = item?.display_message
 
 	                return (
 	                  <TouchableOpacity
@@ -554,19 +577,20 @@ const WalletScreen = () => {
 	                    className="mb-3 rounded-2xl border border-gray-800 bg-gray-900/70 px-4 py-4"
 	                  >
                     <View className="flex-row justify-between items-start">
-                      <View className="flex-1 pr-3">
-                        <Text className="text-white font-semibold">{description}</Text>
-                        <Text className="text-gray-500 text-xs mt-1">
-                          Ref {reference || 'pending'}
-                        </Text>
-                      </View>
+                          <View className="flex-1 pr-3">
+                            <Text className="text-white font-semibold">{description}</Text>
+                            <Text className="text-gray-500 text-xs mt-1">
+                              Ref {reference || 'pending'}
+                            </Text>
+                            {message ? <Text className="text-gray-400 text-xs mt-1">{message}</Text> : null}
+                          </View>
 
-                      <View className="items-end">
-                        <Text className="text-white font-semibold">
-                          {moneyFormat(item.amount, currency)}
-                        </Text>
-                        <Text className={`text-xs mt-1 ${statusTone(status)}`}>{status}</Text>
-                      </View>
+                          <View className="items-end">
+                            <Text className="text-white font-semibold">
+                              {moneyFormat(displayAmount(item), currency)}
+                            </Text>
+                            <Text className={`text-xs mt-1 ${statusTone(status)}`}>{status}</Text>
+                          </View>
                     </View>
 
                     <Text className="text-gray-500 text-xs mt-2">{dateFormat(item.created_at)}</Text>
