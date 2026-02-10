@@ -265,7 +265,7 @@ const BankTransferScreen = () => {
           account_number: formData.account_number.trim(),
           bank_code: formData.bank_code,
           amount: amountValue,
-          inter_bank: true,
+          inter_bank: false,
           counter_party_id: formData.beneficiary_id || undefined,
           pin: transactionPin,
           transfer_reference: transferReference || generateTransferReference(),
