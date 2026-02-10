@@ -298,6 +298,27 @@ const CardDetail = () => {
       return
     }
 
+    if (nextAction === 'fund' || nextAction === 'unload') {
+      setActionLoading(true)
+      setPinError(null)
+      try {
+        if (nextAction === 'fund') {
+          await fundCard({ card_id: bridgeCardId, amount: parseAmount(amount) })
+          setNotice('Card funded successfully.')
+        } else {
+          await unloadCard({ card_id: bridgeCardId, amount: parseAmount(amount) })
+          setNotice('Card unloaded successfully.')
+        }
+        setAmount('')
+        await Promise.allSettled([balance.refetch(), history.refetch(), details.refetch(), cardMetaFetch.refetch()])
+      } catch (error: any) {
+        setNotice(error?.message || 'Unable to complete card action.')
+      } finally {
+        setActionLoading(false)
+      }
+      return
+    }
+
     try {
       const status = await getTransactionPinStatus()
       const payload = (status as any)?.data ?? status
@@ -345,50 +366,6 @@ const CardDetail = () => {
       return
     }
 
-    // fund/unload
-    const amountValue = parseAmount(amount)
-    if (!bridgeCardId) {
-      setNotice('Card ID not available yet. Try again in a moment.')
-      return
-    }
-    if (!amountValue || Number.isNaN(amountValue) || amountValue <= 0) {
-      setNotice('Enter a valid amount.')
-      return
-    }
-    if (isFrozen) {
-      setNotice('Card is frozen. Unfreeze to continue.')
-      return
-    }
-    if (cardholderVerificationBlocked) {
-      setNotice(
-        cardholderVerificationFailed
-          ? 'Cardholder verification failed. Re-verify cardholder details before funding/unloading.'
-          : 'Cardholder verification is in progress. Refresh and retry once verified.'
-      )
-      return
-    }
-
-    setActionLoading(true)
-    setPinError(null)
-
-    try {
-      if (action === 'fund') {
-        await fundCard({ card_id: bridgeCardId, amount: amountValue, transaction_pin: transactionPin })
-        setNotice('Card funded successfully.')
-      } else {
-        await unloadCard({ card_id: bridgeCardId, amount: amountValue, transaction_pin: transactionPin })
-        setNotice('Card unloaded successfully.')
-      }
-
-      setPinModalOpen(false)
-      setAmount('')
-
-      await Promise.allSettled([balance.refetch(), history.refetch(), details.refetch(), cardMetaFetch.refetch()])
-    } catch (error: any) {
-      setPinError(error?.message || 'Unable to complete card action.')
-    } finally {
-      setActionLoading(false)
-    }
   }
 
   const handleFreezeToggle = async () => {

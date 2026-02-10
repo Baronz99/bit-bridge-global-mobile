@@ -103,26 +103,27 @@ export const unfreezeCard = async (id: Id) => {
 }
 
 /**
- * ✅ Fund / Unload wallet (aligned to web style payload)
- * Web uses: { card: { card_id, amount, currency:'USD', wallet_type:'usd', transaction_pin } }
+ * ✅ Fund / Unload wallet (aligned to backend card flow)
  * If your backend accepts currency/wallet_type optionally, this still works.
  */
 export const fundCard = async (payload: {
   card_id: Id
   amount: number
-  transaction_pin: string
+  transaction_pin?: string
   currency?: string
   wallet_type?: string
 }) => {
   try {
+    const cardPayload: any = {
+      card_id: payload.card_id,
+      amount: payload.amount,
+      currency: payload.currency || 'USD',
+      wallet_type: payload.wallet_type || 'usd',
+    }
+    if (payload.transaction_pin) cardPayload.transaction_pin = payload.transaction_pin
+
     const res = await client.post('/cards/fund_wallet', {
-      card: {
-        card_id: payload.card_id,
-        amount: payload.amount,
-        currency: payload.currency || 'USD',
-        wallet_type: payload.wallet_type || 'usd',
-        transaction_pin: payload.transaction_pin,
-      },
+      card: cardPayload,
     })
     return res.data
   } catch (err: any) {
@@ -133,19 +134,21 @@ export const fundCard = async (payload: {
 export const unloadCard = async (payload: {
   card_id: Id
   amount: number
-  transaction_pin: string
+  transaction_pin?: string
   currency?: string
   wallet_type?: string
 }) => {
   try {
+    const cardPayload: any = {
+      card_id: payload.card_id,
+      amount: payload.amount,
+      currency: payload.currency || 'USD',
+      wallet_type: payload.wallet_type || 'usd',
+    }
+    if (payload.transaction_pin) cardPayload.transaction_pin = payload.transaction_pin
+
     const res = await client.post('/cards/unload_wallet', {
-      card: {
-        card_id: payload.card_id,
-        amount: payload.amount,
-        currency: payload.currency || 'USD',
-        wallet_type: payload.wallet_type || 'usd',
-        transaction_pin: payload.transaction_pin,
-      },
+      card: cardPayload,
     })
     return res.data
   } catch (err: any) {
@@ -187,7 +190,6 @@ export const createCard = async (payload: {
   currency?: string
   wallet_type?: string
   card_limit?: string
-  transaction_pin?: string
   card_pin?: string
 }) => {
   try {

@@ -38,7 +38,6 @@ const CreateCard = () => {
     card_limit: '500000',
     card_pin: '',
     card_pin_confirm: '',
-    transaction_pin: '',
   })
 
   const profileRoot = useMemo(() => resolveUserProfile(userProfileData) || {}, [userProfileData])
@@ -301,12 +300,6 @@ const CreateCard = () => {
         return
       }
 
-      if (!String(form.transaction_pin || '').trim()) {
-        setNotice('Transaction PIN is required to create card.')
-        setLoading(false)
-        return
-      }
-
       // Step 2: create card only when verified
       const cardRes = await createCard({
         cardholder_id: cardholderId || undefined,
@@ -314,7 +307,6 @@ const CreateCard = () => {
         wallet_type: 'usd',
         card_limit: normalizedCardLimit,
         card_pin: cardPin,
-        transaction_pin: String(form.transaction_pin || '').trim(),
       })
 
       const cardId = cardRes?.data?.id || cardRes?.data?.card_id || cardRes?.card_id || cardRes?.id
@@ -414,13 +406,6 @@ const CreateCard = () => {
               secureTextEntry
               keyboardType="number-pad"
               onChangeText={(value: string) => setForm({ ...form, card_pin_confirm: value.replace(/[^0-9]/g, '').slice(0, 4) })}
-            />
-            <FormInput
-              label="Transaction PIN (App Auth)"
-              value={form.transaction_pin}
-              secureTextEntry
-              keyboardType="number-pad"
-              onChangeText={(value: string) => setForm({ ...form, transaction_pin: value })}
             />
             <View className="mt-3">
               <Text className="text-gray-300 text-xs mb-2">Selfie (required for cardholder verification)</Text>
