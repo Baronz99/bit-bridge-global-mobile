@@ -9,7 +9,6 @@ import { uploadSelfieToCloudinary } from '@/api/uploads'
 import { resolveUserProfile, useAuth } from '@/services/useAuth'
 import { buildApiErrorMessage } from '@/utils/apiErrorMessage'
 import AppModal from '@/components/modal/Modal'
-import NotificationAlert from '@/components/notification'
 
 const CreateCard = () => {
   const router = useRouter()
@@ -22,7 +21,9 @@ const CreateCard = () => {
   const [selfieLocalUri, setSelfieLocalUri] = useState<string | null>(null)
   const [selfieImageUrl, setSelfieImageUrl] = useState<string | null>(null)
   const [cardholderStatus, setCardholderStatus] = useState<string>('idle')
+  const [cardholderStatusUpdatedAt, setCardholderStatusUpdatedAt] = useState<string | null>(null)
   const [existingCardholderId, setExistingCardholderId] = useState<string | null>(null)
+  const [refreshingStatus, setRefreshingStatus] = useState(false)
   const [form, setForm] = useState({
     first_name: '',
     last_name: '',
@@ -103,6 +104,7 @@ const CreateCard = () => {
 
       if (!card) {
         setCardholderStatus('idle')
+        setCardholderStatusUpdatedAt(null)
         setExistingCardholderId(null)
         return
       }
@@ -111,10 +113,30 @@ const CreateCard = () => {
       const kycStatus = String(meta?.cardholder_kyc_status || '').toLowerCase()
       const status = kycStatus || (card?.card_id ? 'verified' : 'idle')
       setCardholderStatus(status)
+      setCardholderStatusUpdatedAt(
+        String(meta?.cardholder_status_updated_at || card?.updated_at || '').trim() || null
+      )
       setExistingCardholderId(String(card?.cardholder_id || '').trim() || null)
       if (card?.id || card?.card_id) setCreatedCardId(String(card.id || card.card_id))
     } catch {
       // no-op
+    }
+  }
+
+  const formatStatusTime = (value: string | null) => {
+    if (!value) return null
+    const dt = new Date(value)
+    if (Number.isNaN(dt.getTime())) return null
+    return dt.toLocaleString()
+  }
+
+  const handleRefreshStatus = async () => {
+    if (refreshingStatus) return
+    setRefreshingStatus(true)
+    try {
+      await refreshCardholderState()
+    } finally {
+      setRefreshingStatus(false)
     }
   }
 
@@ -244,7 +266,7 @@ const CreateCard = () => {
       }
 
       if (['pending_verification', 'manual_review'].includes(normalizedStatus)) {
-        setNotice('Cardholder verification is still in progress. Please wait for approval.')
+        setNotice('Cardholder verification is still in progress. Refresh status and retry once verified.')
         setLoading(false)
         return
       }
@@ -377,6 +399,34 @@ const CreateCard = () => {
               <Text className="text-gray-400 text-xs">
                 Cardholder status: {cardholderStatus.replace('_', ' ') || 'idle'}
               </Text>
+              {formatStatusTime(cardholderStatusUpdatedAt) ? (
+                <Text className="text-gray-500 text-xs mt-1">
+                  Last update: {formatStatusTime(cardholderStatusUpdatedAt)}
+                </Text>
+              ) : null}
+              {['pending_verification', 'manual_review', 'failed'].includes(cardholderStatus) ? (
+                <View className="mt-2 rounded-xl border border-sky-700/40 bg-sky-900/20 p-3">
+                  <Text className="text-sky-100 text-xs font-semibold">
+                    {cardholderStatus === 'failed'
+                      ? 'Cardholder verification failed'
+                      : 'Cardholder verification in progress'}
+                  </Text>
+                  <Text className="text-sky-200 text-[11px] mt-1">
+                    {cardholderStatus === 'failed'
+                      ? 'Re-submit cardholder details to continue.'
+                      : 'Card creation unlocks automatically after provider confirmation webhook.'}
+                  </Text>
+                  <TouchableOpacity
+                    disabled={refreshingStatus || loading}
+                    onPress={handleRefreshStatus}
+                    className="mt-2 border border-sky-400/50 rounded-lg py-2"
+                  >
+                    <Text className="text-sky-100 text-center text-xs font-semibold">
+                      {refreshingStatus ? 'Refreshing...' : 'Refresh Verification Status'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ) : null}
             </View>
           </View>
 

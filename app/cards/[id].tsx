@@ -182,6 +182,21 @@ const CardDetail = () => {
 
   const frozenBy = (cardMeta as any)?.frozen_by || (cardMeta as any)?.frozenBy || ''
   const frozenReason = (cardMeta as any)?.frozen_reason || (cardMeta as any)?.frozenReason || ''
+  const cardholderKycStatus = String((cardMeta as any)?.meta_data?.cardholder_kyc_status || '').toLowerCase()
+  const cardholderStatusUpdatedAt = (cardMeta as any)?.meta_data?.cardholder_status_updated_at || null
+  const cardholderVerificationPending = ['pending_verification', 'manual_review'].includes(cardholderKycStatus)
+  const cardholderVerificationFailed = cardholderKycStatus === 'failed'
+  const cardholderVerificationBlocked = cardholderVerificationPending || cardholderVerificationFailed
+  const cardholderStatusLabel =
+    cardholderKycStatus === 'pending_verification'
+      ? 'Pending verification'
+      : cardholderKycStatus === 'manual_review'
+      ? 'Manual review'
+      : cardholderKycStatus === 'failed'
+      ? 'Verification failed'
+      : cardholderKycStatus === 'verified'
+      ? 'Verified'
+      : null
 
   const cardholderName = useMemo(() => {
     const profile = (userProfileData as any)?.data ?? userProfileData
@@ -243,12 +258,26 @@ const CardDetail = () => {
     setPinError(null)
   }
 
+  const formatStatusTime = (value?: string | null) => {
+    if (!value) return '--'
+    const d = new Date(String(value))
+    return Number.isNaN(d.getTime()) ? '--' : d.toLocaleString()
+  }
+
   const handlePinGate = async (nextAction: CardAction) => {
     clearTransientMessages()
 
     // Block money actions while frozen (this matches expected UX)
     if ((nextAction === 'fund' || nextAction === 'unload') && isFrozen) {
       setNotice('Card is frozen. Unfreeze to continue.')
+      return
+    }
+    if ((nextAction === 'fund' || nextAction === 'unload') && cardholderVerificationBlocked) {
+      setNotice(
+        cardholderVerificationFailed
+          ? 'Cardholder verification failed. Re-verify cardholder details before funding/unloading.'
+          : 'Cardholder verification is in progress. Refresh and retry once verified.'
+      )
       return
     }
 
@@ -328,6 +357,14 @@ const CardDetail = () => {
     }
     if (isFrozen) {
       setNotice('Card is frozen. Unfreeze to continue.')
+      return
+    }
+    if (cardholderVerificationBlocked) {
+      setNotice(
+        cardholderVerificationFailed
+          ? 'Cardholder verification failed. Re-verify cardholder details before funding/unloading.'
+          : 'Cardholder verification is in progress. Refresh and retry once verified.'
+      )
       return
     }
 
@@ -618,6 +655,32 @@ const CardDetail = () => {
               {frozenBy ? <Text className="text-red-200/80 text-[11px] mt-1">Frozen by: {frozenBy}</Text> : null}
             </View>
           ) : null}
+          {cardholderVerificationBlocked ? (
+            <View className="mt-3 rounded-xl border border-sky-700/40 bg-sky-900/20 px-3 py-2">
+              <Text className="text-sky-100 text-xs font-semibold">
+                Cardholder status: {cardholderStatusLabel || 'In progress'}
+              </Text>
+              <Text className="text-sky-200/90 text-[11px] mt-1">
+                {cardholderVerificationFailed
+                  ? 'Verification failed. Re-submit cardholder details to continue.'
+                  : 'Verification is processing. Funding and unload are enabled after provider confirmation webhook.'}
+              </Text>
+              {cardholderStatusUpdatedAt ? (
+                <Text className="text-sky-200/80 text-[11px] mt-1">
+                  Last update: {formatStatusTime(cardholderStatusUpdatedAt)}
+                </Text>
+              ) : null}
+              <TouchableOpacity
+                onPress={onRefresh}
+                disabled={refreshing || actionLoading}
+                className="mt-2 border border-sky-400/50 rounded-lg py-2"
+              >
+                <Text className="text-sky-100 text-center text-xs font-semibold">
+                  {refreshing ? 'Refreshing...' : 'Refresh verification status'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
 
           <FormInput label="Amount" value={amount} keyboardType="numeric" onChangeText={(v: string) => setAmount(v)} />
 
@@ -627,7 +690,7 @@ const CardDetail = () => {
             <TouchableOpacity
               onPress={() => handlePinGate('fund')}
               className="bg-app-primary py-3 rounded-xl flex-1"
-              disabled={actionLoading || !hasKycAccess || isFrozen}
+              disabled={actionLoading || !hasKycAccess || isFrozen || cardholderVerificationBlocked}
             >
               <Text className="text-white text-center font-medium">Fund</Text>
             </TouchableOpacity>
@@ -635,7 +698,7 @@ const CardDetail = () => {
             <TouchableOpacity
               onPress={() => handlePinGate('unload')}
               className="bg-gray-900 border border-gray-800 py-3 rounded-xl flex-1"
-              disabled={actionLoading || !hasKycAccess || isFrozen}
+              disabled={actionLoading || !hasKycAccess || isFrozen || cardholderVerificationBlocked}
             >
               <Text className="text-white text-center font-medium">Unload</Text>
             </TouchableOpacity>
@@ -661,6 +724,13 @@ const CardDetail = () => {
 
           {!hasKycAccess ? (
             <Text className="text-gray-400 text-xs mt-3">Complete verification to fund/unload cards.</Text>
+          ) : null}
+          {cardholderVerificationBlocked ? (
+            <Text className="text-gray-400 text-xs mt-2">
+              {cardholderVerificationFailed
+                ? 'Cardholder verification failed. Re-verify before funding.'
+                : 'Cardholder verification is pending. Funding/unload is disabled for now.'}
+            </Text>
           ) : null}
           {isFrozen ? (
             <Text className="text-gray-400 text-xs mt-2">Card is frozen — fund/unload is disabled.</Text>
