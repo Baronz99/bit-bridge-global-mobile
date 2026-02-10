@@ -35,6 +35,8 @@ const CreateCard = () => {
     postal_code: '',
     country: 'NG',
     currency: 'USD',
+    card_limit: '500000',
+    card_pin: '',
     transaction_pin: '',
   })
 
@@ -200,6 +202,27 @@ const CreateCard = () => {
     }
     setLoading(true)
     setNotice(null)
+    const normalizedLimitInput = String(form.card_limit || '').replace(/[^0-9]/g, '')
+    const normalizedCardLimit =
+      normalizedLimitInput === '5000' || normalizedLimitInput === '500000'
+        ? '500000'
+        : normalizedLimitInput === '10000' || normalizedLimitInput === '1000000'
+          ? '1000000'
+          : ''
+
+    if (!normalizedCardLimit) {
+      setNotice('Card limit must be 5000 or 10000.')
+      setLoading(false)
+      return
+    }
+
+    const cardPin = String(form.card_pin || '').trim()
+    if (cardPin && !/^\d{4}$/.test(cardPin)) {
+      setNotice('Card PIN must be exactly 4 digits.')
+      setLoading(false)
+      return
+    }
+
     try {
       const payload = {
         first_name: String(form.first_name || profileDefaults.first_name || '').trim(),
@@ -282,6 +305,8 @@ const CreateCard = () => {
         cardholder_id: cardholderId || undefined,
         currency: form.currency || 'USD',
         wallet_type: 'usd',
+        card_limit: normalizedCardLimit,
+        card_pin: cardPin || undefined,
         transaction_pin: String(form.transaction_pin || '').trim(),
       })
 
@@ -364,7 +389,20 @@ const CreateCard = () => {
               onChangeText={(value: string) => setForm({ ...form, currency: value })}
             />
             <FormInput
-              label="Transaction PIN"
+              label="Card Limit (5000 or 10000)"
+              value={form.card_limit}
+              keyboardType="number-pad"
+              onChangeText={(value: string) => setForm({ ...form, card_limit: value.replace(/[^0-9]/g, '') })}
+            />
+            <FormInput
+              label="Card PIN (optional, 4 digits)"
+              value={form.card_pin}
+              secureTextEntry
+              keyboardType="number-pad"
+              onChangeText={(value: string) => setForm({ ...form, card_pin: value.replace(/[^0-9]/g, '').slice(0, 4) })}
+            />
+            <FormInput
+              label="Transaction PIN (App Auth)"
               value={form.transaction_pin}
               secureTextEntry
               keyboardType="number-pad"

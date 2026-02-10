@@ -186,7 +186,9 @@ export const createCard = async (payload: {
   cardholder_id?: Id
   currency?: string
   wallet_type?: string
+  card_limit?: string
   transaction_pin?: string
+  card_pin?: string
 }) => {
   try {
     const res = await client.post('/cards/create_card', { card: payload })
