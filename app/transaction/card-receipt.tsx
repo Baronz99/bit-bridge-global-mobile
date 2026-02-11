@@ -18,6 +18,12 @@ const safeStr = (v: any, fallback = '') => {
   return s || fallback
 }
 
+const normalizeLast4 = (value: any) => {
+  const digits = String(value ?? '').replace(/\D/g, '')
+  if (!digits) return null
+  return digits.slice(-4).padStart(4, '0')
+}
+
 const normalizeStatus = (v: any) => safeStr(v, 'pending').toLowerCase()
 
 const statusTone = (status: string) => {
@@ -90,7 +96,12 @@ const CardReceipt = () => {
   const detailsPayload = useMemo(() => (detailsFetch.data as any)?.data ?? detailsFetch.data, [detailsFetch.data])
 
   const last4 =
-    detailsPayload?.last4 || detailsPayload?.last_4 || detailsPayload?.card_last4 || detailsPayload?.cardLast4 || null
+    normalizeLast4(
+      detailsPayload?.last4 ||
+        detailsPayload?.last_4 ||
+        detailsPayload?.card_last4 ||
+        detailsPayload?.cardLast4
+    )
 
   // Find the transaction by reference/id when possible
   const tx = useMemo(() => {

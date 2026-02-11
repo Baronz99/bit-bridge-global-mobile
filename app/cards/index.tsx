@@ -8,6 +8,12 @@ import { resolveUserProfile } from '@/services/auth/resolveUserProfile'
 import ScreenContainer from '@/components/ScreenContainer'
 import moneyFormat from '@/utils/moneyFormat'
 
+const normalizeLast4 = (value: any) => {
+  const digits = String(value ?? '').replace(/\D/g, '')
+  if (!digits) return null
+  return digits.slice(-4).padStart(4, '0')
+}
+
 const CardsScreen = () => {
   const { data, loading, error, refetch } = useFetch(() => getUserCards())
   const {
@@ -191,9 +197,10 @@ const CardsScreen = () => {
         ) : null}
 
         {cards.map((card: any, index: number) => {
-          const id = card?.id ?? card?.card_id ?? index
-          const last4 =
+          const routeId = card?.id ?? card?.card_id ?? null
+          const last4 = normalizeLast4(
             card?.last4 || card?.last_4 || card?.card_last4 || card?.lastFour
+          )
           const status = card?.status || card?.card_status || 'active'
           const cardholder =
             [card?.first_name, card?.last_name].filter(Boolean).join(' ') ||
@@ -227,8 +234,12 @@ const CardsScreen = () => {
 
           return (
             <Link
-              key={String(id)}
-              href={{ pathname: '/cards/[id]', params: { id: String(id) } }}
+              key={String(routeId || `card-${index}`)}
+              href={
+                routeId
+                  ? { pathname: '/cards/[id]', params: { id: String(routeId) } }
+                  : ({ pathname: '/cards' } as any)
+              }
               asChild
             >
               <TouchableOpacity className="bg-gray-900 rounded-2xl p-4 border border-gray-800">
@@ -259,7 +270,9 @@ const CardsScreen = () => {
                     <Text className="text-white text-xs mt-1 text-right">{limit}</Text>
                   </View>
                 </View>
-                <Text className="text-gray-400 text-xs mt-3">Tap to view details</Text>
+                <Text className="text-gray-400 text-xs mt-3">
+                  {routeId ? 'Tap to view details' : 'Card details will be available shortly'}
+                </Text>
               </TouchableOpacity>
             </Link>
           )

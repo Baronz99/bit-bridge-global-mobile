@@ -49,6 +49,12 @@ const parseAmount = (v: any) => {
   return Number.isFinite(n) ? n : NaN
 }
 
+const normalizeLast4 = (value: any) => {
+  const digits = String(value ?? '').replace(/\D/g, '')
+  if (!digits) return null
+  return digits.slice(-4).padStart(4, '0')
+}
+
 /**
  * Handles:
  * - ISO strings: "2026-01-28T..."
@@ -85,16 +91,25 @@ const formatHistoryLabel = (item: any) => {
 
 const CardDetail = () => {
   const { id } = useLocalSearchParams()
-  const cardId = String(id || '')
+  const cardId = String(id || '').trim()
   const router = useRouter()
   const { userProfileData } = useAuth()
 
   // ----------------------------
   // Fetchers
   // ----------------------------
-  const fetchDetails = useCallback(() => getCardDetails(cardId), [cardId])
-  const fetchBalance = useCallback(() => getCardBalance(cardId), [cardId])
-  const fetchHistory = useCallback(() => getCardHistory(cardId), [cardId])
+  const fetchDetails = useCallback(() => {
+    if (!cardId) return Promise.resolve({ data: {} } as any)
+    return getCardDetails(cardId)
+  }, [cardId])
+  const fetchBalance = useCallback(() => {
+    if (!cardId) return Promise.resolve({ data: {} } as any)
+    return getCardBalance(cardId)
+  }, [cardId])
+  const fetchHistory = useCallback(() => {
+    if (!cardId) return Promise.resolve({ data: [] } as any)
+    return getCardHistory(cardId)
+  }, [cardId])
   const fetchCardMeta = useCallback(() => getUserCards(), [])
 
   const details = useFetch(fetchDetails)
@@ -152,10 +167,12 @@ const CardDetail = () => {
   // Derived fields
   // ----------------------------
   const last4 =
-    (detailPayload as any)?.last4 ||
-    (detailPayload as any)?.last_4 ||
-    (detailPayload as any)?.card_last4 ||
-    (detailPayload as any)?.cardLast4
+    normalizeLast4(
+      (detailPayload as any)?.last4 ||
+        (detailPayload as any)?.last_4 ||
+        (detailPayload as any)?.card_last4 ||
+        (detailPayload as any)?.cardLast4
+    )
 
   const bridgeCardId =
     (detailPayload as any)?.card_id ||
@@ -554,6 +571,13 @@ const CardDetail = () => {
         contentContainerStyle={{ paddingBottom: 40 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
+        {!cardId ? (
+          <View className="bg-red-500/20 border border-red-500/30 rounded-xl p-3 mt-4">
+            <Text className="text-white font-semibold">Invalid card link</Text>
+            <Text className="text-white/80 mt-1">Card ID is missing. Go back to cards and open again.</Text>
+          </View>
+        ) : null}
+
         <View className="mt-6 rounded-3xl border border-gray-800 bg-gray-900/80 p-5">
           <Text className="text-white/70 text-xs tracking-widest uppercase">Virtual Card</Text>
           <Text className="text-white text-2xl font-semibold mt-2">Card Details</Text>

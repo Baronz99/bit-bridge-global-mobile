@@ -11,6 +11,16 @@ import { resolveUserProfile } from '@/services/auth/resolveUserProfile'
 import { buildApiErrorMessage } from '@/utils/apiErrorMessage'
 import AppModal from '@/components/modal/Modal'
 
+const resolveCardRouteId = (payload: any): string | null => {
+  const root = payload?.data ?? payload
+  if (Array.isArray(root)) {
+    const first = root[0] || {}
+    return String(first?.id || first?.card_id || '').trim() || null
+  }
+  if (!root || typeof root !== 'object') return null
+  return String(root?.id || root?.card_id || '').trim() || null
+}
+
 const CreateCard = () => {
   const router = useRouter()
   const { userProfileData } = useAuth()
@@ -128,7 +138,8 @@ const CreateCard = () => {
         String(meta?.cardholder_status_updated_at || card?.updated_at || '').trim() || null
       )
       setExistingCardholderId(String(card?.cardholder_id || '').trim() || null)
-      if (card?.id || card?.card_id) setCreatedCardId(String(card.id || card.card_id))
+      const routeId = resolveCardRouteId(card)
+      if (routeId) setCreatedCardId(routeId)
     } catch {
       // no-op
     }
@@ -318,7 +329,11 @@ const CreateCard = () => {
         card_pin: cardPin,
       })
 
-      const cardId = cardRes?.data?.id || cardRes?.data?.card_id || cardRes?.card_id || cardRes?.id
+      let cardId = resolveCardRouteId(cardRes)
+      if (!cardId) {
+        await refreshCardholderState()
+        cardId = resolveCardRouteId((await getUserCards()) as any)
+      }
 
       setSuccess(cardRes?.message || 'Card created successfully.')
       if (cardId) setCreatedCardId(String(cardId))
