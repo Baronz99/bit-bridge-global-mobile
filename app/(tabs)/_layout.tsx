@@ -1,5 +1,5 @@
 // app/(tabs)/_layout.tsx
-import React, { useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { Redirect, Tabs } from 'expo-router'
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs'
 import { Image, Platform, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native'
@@ -151,14 +151,41 @@ const CustomTabBar = ({ state, descriptors, navigation }: BottomTabBarProps) => 
 }
 
 export default function TabsLayout() {
-  const { loading, authHydrated, authState, userProfileData, onLogout } = useAuth()
+  const { loading, authHydrated, authState, token, profileLoading, profileError, userProfileData, onLogout } = useAuth()
   const { locked } = useAppLock()
   const [toggleModal, setToggleModal] = useState(false)
   const insets = useSafeAreaInsets()
+  const hasProfile = !!userProfileData
+
+  const bootTrace = useCallback(
+    (event: string, redirect: string | null = null) => {
+      console.log('[BOOT_TRACE][TABS_GUARD]', {
+        event,
+        hydrated: authHydrated,
+        authed: !!authState?.authenticated,
+        tokenPresent: !!token,
+        profileLoading,
+        hasProfile,
+        lastProfileError: profileError,
+        redirect,
+      })
+    },
+    [authHydrated, authState?.authenticated, token, profileLoading, hasProfile, profileError]
+  )
+
+  useEffect(() => {
+    bootTrace('state_change')
+  }, [bootTrace])
 
   if (loading || !authHydrated) return <LoaderScreen />
-  if (!authState?.authenticated) return <Redirect href="/welcome" />
-  if (locked) return <Redirect href="/lock" />
+  if (!authState?.authenticated) {
+    bootTrace('redirect', '/login')
+    return <Redirect href="/login" />
+  }
+  if (locked) {
+    bootTrace('redirect', '/lock')
+    return <Redirect href="/lock" />
+  }
 
   return (
     <>

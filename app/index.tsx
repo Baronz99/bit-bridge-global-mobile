@@ -1,57 +1,109 @@
-import { useEffect } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { ActivityIndicator, View, Text } from 'react-native'
-import { useRouter, useSegments } from 'expo-router'
+import { useRootNavigationState, useRouter } from 'expo-router'
 import { useAuth } from '../services/useAuth'
 import { useAppLock } from '../services/useAppLock'
 
 export default function Index() {
   const router = useRouter()
-  const segments = useSegments() as string[]
-  const { loading, authenticated, authHydrated, profileLoading, userProfileData } = useAuth()
+  const rootNavigationState = useRootNavigationState()
+  const navigationReady = !!rootNavigationState?.key
+  const {
+    loading,
+    authenticated,
+    authHydrated,
+    profileLoading,
+    profileError,
+    token,
+    userProfileData,
+    onLogout,
+  } = useAuth()
   const { locked } = useAppLock()
+  const lastRedirectRef = useRef<string | null>(null)
+  const failsafeTriggeredRef = useRef(false)
+  const hasProfile = !!userProfileData
+
+  const bootTrace = useCallback(
+    (event: string, redirect: string | null = null, extra: Record<string, unknown> = {}) => {
+      console.log('[BOOT_TRACE][INDEX]', {
+        event,
+        hydrated: authHydrated,
+        authed: authenticated,
+        tokenPresent: !!token,
+        profileLoading,
+        hasProfile,
+        lastProfileError: profileError,
+        redirect,
+        navigationReady,
+        ...extra,
+      })
+    },
+    [authHydrated, authenticated, token, profileLoading, hasProfile, profileError, navigationReady]
+  )
+
+  const safeReplace = useCallback(
+    (target: string, reason: string) => {
+      if (!navigationReady) {
+        bootTrace('redirect_skipped_nav_not_ready', target, { reason })
+        return
+      }
+      if (lastRedirectRef.current === target) return
+      lastRedirectRef.current = target
+      bootTrace('redirect', target, { reason })
+      router.replace(target as any)
+    },
+    [navigationReady, router, bootTrace]
+  )
+
+  useEffect(() => {
+    bootTrace('state_change')
+  }, [bootTrace])
 
   useEffect(() => {
     if (!authHydrated) return
     if (loading) return
-    if (__DEV__) {
-      console.log('[AUTH_GATE] state', {
-        authenticated,
-        authHydrated,
-        profileLoading,
-        hasProfile: !!userProfileData,
-      })
-    }
 
     if (!authenticated) {
-      if (__DEV__) console.log('[AUTH_GATE] unauth -> /welcome')
-      const inWelcome = segments?.[0] === 'welcome'
-      if (!inWelcome) router.replace('/welcome' as any)
+      safeReplace('/login', 'no_token_after_hydration')
       return
     }
 
     if (locked) {
-      const inLock = segments?.[0] === 'lock'
-      if (!inLock) router.replace('/lock' as any)
+      safeReplace('/lock', 'app_lock_enabled')
       return
     }
 
-    if (profileLoading || !userProfileData) {
-      if (__DEV__) console.log('[AUTH_GATE] waiting profile')
+    if (profileLoading || !hasProfile) {
+      bootTrace('waiting_for_profile')
       return
     }
 
-    if (__DEV__) console.log('[AUTH_GATE] tabs -> /(tabs)')
-    const inTabs = segments?.[0] === '(tabs)'
-    if (!inTabs) router.replace('/(tabs)' as any)
+    safeReplace('/(tabs)', 'authed_profile_ready')
   }, [
     authHydrated,
     loading,
     authenticated,
+    locked,
     profileLoading,
-    userProfileData,
-    router,
-    segments,
+    hasProfile,
+    safeReplace,
+    bootTrace,
   ])
+
+  useEffect(() => {
+    if (!authHydrated || !authenticated || hasProfile) {
+      failsafeTriggeredRef.current = false
+      return
+    }
+    const timeout = setTimeout(async () => {
+      if (failsafeTriggeredRef.current) return
+      failsafeTriggeredRef.current = true
+      bootTrace('failsafe_session_clear', '/login', { reason: 'authed_no_profile_8s_timeout' })
+      await onLogout()
+      safeReplace('/login', 'failsafe_authed_no_profile_8s')
+    }, 8000)
+    return () => clearTimeout(timeout)
+  }, [authHydrated, authenticated, hasProfile, onLogout, safeReplace, bootTrace])
 
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#111' }}>
@@ -59,13 +111,16 @@ export default function Index() {
       <View style={{ height: 12 }} />
       <Text style={{ color: 'white' }}>Booting</Text>
       <Text style={{ color: '#aaa', marginTop: 6, fontSize: 12 }}>
-        env: {String(process.env.EXPO_PUBLIC_ENV || '')} | segments: {JSON.stringify(segments)}
+        env: {String(process.env.EXPO_PUBLIC_ENV || '')} | navReady: {String(navigationReady)}
       </Text>
       <Text style={{ color: '#aaa', marginTop: 6, fontSize: 12 }}>
         hydrated: {String(authHydrated)} | loading: {String(loading)} | authed: {String(authenticated)}
       </Text>
       <Text style={{ color: '#aaa', marginTop: 6, fontSize: 12 }}>
-        profileLoading: {String(profileLoading)} | hasProfile: {String(!!userProfileData)}
+        tokenPresent: {String(!!token)} | profileLoading: {String(profileLoading)} | hasProfile: {String(hasProfile)}
+      </Text>
+      <Text style={{ color: '#aaa', marginTop: 6, fontSize: 12 }}>
+        lastProfileError: {profileError ? String(profileError) : 'none'}
       </Text>
     </View>
   )

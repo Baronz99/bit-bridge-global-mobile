@@ -87,8 +87,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const userRef = useRef<any | null>(null)
   const profileLoadedRef = useRef(false)
   const profileFetchInFlightRef = useRef(false)
+  const bootstrapProfileAttemptedForTokenRef = useRef<string | null>(null)
 
   const authenticated = !!token
+  const hasProfile = !!user
+
+  const bootTrace = useCallback(
+    (event: string, extra: Record<string, unknown> = {}) => {
+      console.log('[BOOT_TRACE][AUTH]', {
+        event,
+        hydrated: authHydrated,
+        authed: authenticated,
+        tokenPresent: !!token,
+        profileLoading,
+        hasProfile,
+        lastProfileError: profileError,
+        ...extra,
+      })
+    },
+    [authHydrated, authenticated, token, profileLoading, hasProfile, profileError]
+  )
 
   const refreshProfile = useCallback(async (options?: { force?: boolean; tokenOverride?: string | null }) => {
     const force = options?.force === true
@@ -111,13 +129,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       const res = await client.get('/users/user_profile')
       const data = res?.data?.data ?? res?.data
+      if (!data || typeof data !== 'object') {
+        const parseError = new Error('Invalid profile payload')
+        ;(parseError as any).code = 'PROFILE_PARSE_FAILED'
+        throw parseError
+      }
       userRef.current = data
       setUser(data)
       profileLoadedRef.current = true
+      bootTrace('profile_fetch_success')
       return data
     } catch (error: any) {
       const status = error?.response?.status
-      if (status === 401 || status === 403) {
+      const parseFailed = error?.code === 'PROFILE_PARSE_FAILED'
+      if (status === 401 || status === 403 || parseFailed) {
+        bootTrace('profile_fetch_session_clear', {
+          status: status ?? null,
+          parseFailed,
+          reason: parseFailed ? 'profile_parse_failed' : 'unauthorized',
+        })
         await clearTokens()
         setToken(null)
         setRefreshToken(null)
@@ -133,6 +163,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         error?.response?.data?.message ||
         error?.message ||
         'Unable to load profile'
+      bootTrace('profile_fetch_error', { status: status ?? null, message: String(message) })
       setProfileError(String(message))
       setProfileErrorStatus(status ?? null)
       return null
@@ -140,9 +171,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       profileFetchInFlightRef.current = false
       setProfileLoading(false)
     }
-  }, [token])
+  }, [token, bootTrace])
 
   const bootstrap = useCallback(async () => {
+    bootTrace('bootstrap_start')
     try {
       const storedAccess = await getStoredAccessToken()
       const storedRefresh = await getStoredRefreshToken()
@@ -151,9 +183,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const cleanAccess = normalize(storedAccess)
         setToken(cleanAccess)
         client.defaults.headers.Authorization = `Bearer ${cleanAccess}`
+        bootTrace('bootstrap_token_restored', { tokenPresent: true })
       } else {
         setToken(null)
         delete client.defaults.headers.Authorization
+        bootTrace('bootstrap_token_missing', { tokenPresent: false })
       }
 
       if (storedRefresh) setRefreshToken(normalize(storedRefresh))
@@ -175,8 +209,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false)
       setAuthHydrated(true)
+      bootTrace('bootstrap_done')
     }
-  }, [refreshProfile])
+  }, [refreshProfile, bootTrace])
 
   useEffect(() => {
     void bootstrap()
@@ -212,7 +247,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     userRef.current = null
     setProfileError(null)
     setProfileErrorStatus(null)
+    bootstrapProfileAttemptedForTokenRef.current = null
   }, [token])
+
+  useEffect(() => {
+    if (!authHydrated) return
+    if (!token) {
+      bootstrapProfileAttemptedForTokenRef.current = null
+      return
+    }
+    if (user || profileLoading || profileFetchInFlightRef.current) return
+    if (bootstrapProfileAttemptedForTokenRef.current === token) return
+
+    bootstrapProfileAttemptedForTokenRef.current = token
+    bootTrace('post_hydration_profile_fetch_trigger')
+    void refreshProfile({ force: true })
+  }, [authHydrated, token, user, profileLoading, refreshProfile, bootTrace])
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
@@ -272,14 +322,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setToken(cleanAccess)
       setRefreshToken(bodyRefresh || null)
+      bootTrace('login_success', { status: res.status })
 
       await refreshProfile({ force: true })
       return json
     },
-    [refreshProfile]
+    [refreshProfile, bootTrace]
   )
 
   const logout = useCallback(async () => {
+    bootTrace('logout_start')
     await clearTokens()
     await clearAppLockPersisted().catch(() => {})
     setToken(null)
@@ -287,7 +339,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null)
     userRef.current = null
     profileLoadedRef.current = false
-  }, [])
+    bootstrapProfileAttemptedForTokenRef.current = null
+    bootTrace('logout_done')
+  }, [bootTrace])
+
+  useEffect(() => {
+    bootTrace('state_change')
+  }, [authHydrated, authenticated, token, profileLoading, user, profileError, bootTrace])
 
   const onRegister = async (formData: any) => {
     const userProfile: Record<string, any> = {}

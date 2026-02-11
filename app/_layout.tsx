@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { Stack } from 'expo-router'
 import { StatusBar } from 'react-native'
 import './globals.css'
@@ -7,6 +7,10 @@ import { AuthProvider } from '@/services/useAuth'
 import { AppLockProvider } from '../services/useAppLock'
 
 export default function RootLayout() {
+  useEffect(() => {
+    console.log('[BOOT_TRACE][ROOT_LAYOUT]', { event: 'providers_mounted' })
+  }, [])
+
   return (
     <AuthProvider>
       <AppLockProvider>
