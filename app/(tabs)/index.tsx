@@ -33,6 +33,7 @@ import NotificationAlert from '@/components/notification'
 import useNotification from '@/hooks/useNotification'
 import ScreenContainer from '@/components/ScreenContainer'
 import ViewBox from '@/components/view-box/ViewBoxIcon'
+import { FEATURE_LEGACY_HOME } from '@/constants/featureFlags'
 
 // ---------------------------
 // Types
@@ -480,6 +481,10 @@ export default function Index() {
     return list.slice(0, 3)
   }, [recentOrdersRaw])
 
+  const showLegacyHomeSections = FEATURE_LEGACY_HOME
+  const showLegacyAccountChip = showLegacyHomeSections && Boolean((userProfileData as any)?.account)
+  const showLegacyRecentOrders = showLegacyHomeSections && recentOrders.length > 0
+
   const recentTransactions = useMemo(() => {
     const payload = (recentTransactionsRaw as any)?.data ?? recentTransactionsRaw
     const list = Array.isArray(payload) ? payload : payload?.data
@@ -624,7 +629,7 @@ export default function Index() {
           ) : null}
 
           {/* Account chip */}
-          {(userProfileData as any)?.account ? (
+          {showLegacyAccountChip ? (
             <Link href={'/accountDetails' as any} asChild>
               <TouchableOpacity className="my-4 bg-gray-900 border border-gray-800 py-3 w-52 flex flex-row gap-4 items-center rounded-2xl px-4">
                 <Text className="text-white text-lg text-left font-semibold">Moniepoint</Text>
@@ -678,7 +683,7 @@ export default function Index() {
           </View>
 
           {/* Recent Orders */}
-          {recentOrders.length ? (
+          {showLegacyRecentOrders ? (
             <View className="mb-8">
               <View className="flex-row items-center justify-between mb-3">
                 <Text className="text-white text-lg font-semibold">Recent Orders</Text>

@@ -3,13 +3,22 @@ import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native'
 import { Link } from 'expo-router'
 import useFetch from '@/services/useFetch'
 import { getUserCards } from '@/api/cards'
-import { resolveUserProfile, useAuth } from '@/services/useAuth'
+import { useAuth } from '@/services/useAuth'
+import { resolveUserProfile } from '@/services/auth/resolveUserProfile'
 import ScreenContainer from '@/components/ScreenContainer'
 import moneyFormat from '@/utils/moneyFormat'
 
 const CardsScreen = () => {
   const { data, loading, error, refetch } = useFetch(() => getUserCards())
-  const { userProfileData } = useAuth()
+  const {
+    userProfileData,
+    authHydrated,
+    authenticated,
+    profileError,
+    profileErrorStatus,
+    loadProfile,
+    profileLoading,
+  } = useAuth()
 
   const cards = useMemo(() => {
     const payload = data?.data ?? data
@@ -23,16 +32,88 @@ const CardsScreen = () => {
     return []
   }, [data])
 
+  const profileResolution = useMemo(() => {
+    try {
+      if (typeof resolveUserProfile !== 'function') {
+        if (__DEV__) {
+          console.warn('[Cards] resolveUserProfile export missing; falling back to empty profile')
+        }
+        return { profileRoot: {}, failed: true }
+      }
+      return { profileRoot: resolveUserProfile(userProfileData), failed: false }
+    } catch (err) {
+      if (__DEV__) {
+        console.warn('[Cards] resolveUserProfile failed', (err as any)?.message || err)
+      }
+      return { profileRoot: {}, failed: true }
+    }
+  }, [userProfileData])
+
   const hasKycAccess = useMemo(() => {
-    const profileRoot = resolveUserProfile(userProfileData)
+    const profileRoot = profileResolution.profileRoot
     const kycLevel = profileRoot?.kyc_level || profileRoot?.user_kyc?.kyc_level
     const phoneVerified = profileRoot?.phone_verified === true || profileRoot?.phone_verified_at
     if (!kycLevel && !phoneVerified) return false
     if (kycLevel && String(kycLevel).toLowerCase() === 'tier_0') return false
     return true
-  }, [userProfileData])
+  }, [profileResolution.profileRoot])
 
   const cardsCount = cards.length
+
+  if (!authHydrated) {
+    return (
+      <ScreenContainer>
+        <View className="py-6">
+          <ActivityIndicator />
+        </View>
+      </ScreenContainer>
+    )
+  }
+
+  if (!authenticated) {
+    return (
+      <ScreenContainer>
+        <View className="bg-gray-900 border border-gray-800 rounded-2xl p-4 mt-6">
+          <Text className="text-white text-base font-semibold">Session required</Text>
+          <Text className="text-gray-400 text-xs mt-2">Please log in again to access virtual cards.</Text>
+          <Link href="/login" asChild>
+            <TouchableOpacity className="bg-app-primary py-3 rounded-xl mt-4">
+              <Text className="text-white text-center font-medium">Go to Login</Text>
+            </TouchableOpacity>
+          </Link>
+        </View>
+      </ScreenContainer>
+    )
+  }
+
+  const hasProfileFailure = Boolean(profileError) || profileResolution.failed
+  const sessionExpired = profileErrorStatus === 401 || profileErrorStatus === 403
+
+  if (hasProfileFailure && !profileLoading) {
+    return (
+      <ScreenContainer>
+        <View className="bg-red-500/20 border border-red-500/30 rounded-xl p-3 mt-4">
+          <Text className="text-white font-semibold">Unable to load profile</Text>
+          <Text className="text-white/80 mt-1">
+            {profileError || 'Profile data is not ready. Please retry.'}
+          </Text>
+          <TouchableOpacity
+            onPress={() => loadProfile({ force: true })}
+            className="mt-3 bg-red-600 py-2 rounded-lg"
+          >
+            <Text className="text-white text-center">Retry</Text>
+          </TouchableOpacity>
+          {sessionExpired ? (
+            <Link href="/login" asChild>
+              <TouchableOpacity className="mt-3 border border-red-300/40 py-2 rounded-lg">
+                <Text className="text-white text-center">Go to Login</Text>
+              </TouchableOpacity>
+            </Link>
+          ) : null}
+        </View>
+      </ScreenContainer>
+    )
+  }
 
   return (
     <ScreenContainer>

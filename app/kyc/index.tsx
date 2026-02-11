@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native'
 import { Link } from 'expo-router'
-import { resolveUserProfile, useAuth } from '@/services/useAuth'
+import { useAuth } from '@/services/useAuth'
 import { getKycStatus, KycStatusResponse } from '@/api/kyc'
 import { FEATURE_BVN, FEATURE_KYC_CENTER, FEATURE_OTP } from '@/constants/featureFlags'
 

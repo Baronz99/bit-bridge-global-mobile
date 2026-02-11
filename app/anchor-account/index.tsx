@@ -5,9 +5,14 @@ import NotificationAlert from '@/components/notification'
 import DepositAccountSection from '@/components/DepositAccountSection'
 import AnchorAccountView from '@/components/AnchorAccountView'
 import { createAnchorAccount, createDepositAccount, verifyKyc } from '@/api/account'
-import { useAnchorOnboarding, normalizeAnchorOnboarding } from '@/services/useAnchorOnboarding'
+import {
+  useAnchorOnboarding,
+  normalizeAnchorOnboarding,
+  type NormalizedAnchorOnboarding,
+} from '@/services/useAnchorOnboarding'
 import { buildApiErrorMessage } from '@/utils/apiErrorMessage'
-import { resolveUserProfile, useAuth } from '@/services/useAuth'
+import { useAuth } from '@/services/useAuth'
+import { resolveUserProfile } from '@/services/auth/resolveUserProfile'
 import { isKycAlreadyCompleted } from '@/utils/anchorAccount'
 
 const AnchorAccountScreen = () => {
@@ -33,7 +38,15 @@ const AnchorAccountScreen = () => {
     gender: '',
   })
 
-  const profile = useMemo(() => resolveUserProfile(userProfileData), [userProfileData])
+  const profile = useMemo(() => {
+    if (typeof resolveUserProfile !== 'function') {
+      if (__DEV__) {
+        console.warn('[AnchorAccount] resolveUserProfile export missing; using empty profile fallback')
+      }
+      return {}
+    }
+    return resolveUserProfile(userProfileData)
+  }, [userProfileData])
 
   const profileRoot = userProfileData?.data ?? userProfileData ?? {}
   const kycLevel = String(profileRoot?.kyc_level || profileRoot?.user_kyc?.kyc_level || 'tier_0')
@@ -79,7 +92,7 @@ const AnchorAccountScreen = () => {
     () => normalizeAnchorOnboarding(anchorState.detailResponse, anchorState.userAccountsResponse),
     [anchorState.detailResponse, anchorState.userAccountsResponse]
   )
-  const effectiveNormalized = useMemo(() => {
+  const effectiveNormalized = useMemo<NormalizedAnchorOnboarding>(() => {
     if (!kycOverrideVerified && !kycOverridePending) return normalized
     const hasAccountNumber = normalized.hasAccountNumber
     if (kycOverrideVerified) {
@@ -393,7 +406,6 @@ const AnchorAccountScreen = () => {
         {effectiveNormalized.depositReady ? (
           <AnchorAccountView
             statusLabel="Deposit account ready"
-            helperText="Primary currency: NGN"
             displayAccountNumber={effectiveNormalized.displayAccountNumber || null}
             rawAccountNumber={effectiveNormalized.rawAccountNumber || null}
             accountName={effectiveNormalized.accountName || null}

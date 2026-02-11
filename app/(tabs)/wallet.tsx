@@ -194,11 +194,12 @@ const WalletScreen = () => {
       await Promise.allSettled([
         withTimeout(fetchTransactions(undefined, false), 'transactions_refresh'),
         withTimeout(refetchWallet(), 'wallet_refresh'),
+        withTimeout(anchorState.refresh({ force: true }), 'anchor_onboarding_refresh'),
       ])
     } finally {
       setListRefreshing(false)
     }
-  }, [fetchTransactions, refetchWallet])
+  }, [anchorState.refresh, fetchTransactions, refetchWallet])
 
   const walletBalance =
     walletData?.data?.bridge?.balance ??
@@ -503,10 +504,14 @@ const WalletScreen = () => {
                 </View>
 
                 {anchorNormalized.accountName ? (
-                  <Text className="text-gray-300 text-xs mt-2">{anchorNormalized.accountName}</Text>
+                  <Text className="text-gray-300 text-xs mt-2">
+                    Account Name: {anchorNormalized.accountName}
+                  </Text>
                 ) : null}
                 {anchorNormalized.bankName ? (
-                  <Text className="text-gray-500 text-xs mt-1">{anchorNormalized.bankName}</Text>
+                  <Text className="text-gray-500 text-xs mt-1">
+                    Bank: {anchorNormalized.bankName}
+                  </Text>
                 ) : null}
 
                 <TouchableOpacity

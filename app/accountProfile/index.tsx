@@ -13,7 +13,7 @@ import {
 } from 'react-native'
 import React, { useEffect, useRef, useState } from 'react'
 import { userProfileUpdate } from '@/api/auth'
-import { resolveUserProfile, useAuth } from '@/services/useAuth'
+import { useAuth } from '@/services/useAuth'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
 import FormInput from '@/components/FormInput'
 import { icons } from '@/constants/icons'

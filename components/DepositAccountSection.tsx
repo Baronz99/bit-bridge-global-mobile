@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { Alert, Text, TouchableOpacity, View } from 'react-native'
 import FormInput from '@/components/FormInput'
 import FormSelect from '@/components/FormSelect'
@@ -61,8 +61,18 @@ const DepositAccountSection = ({
   prefilledPhone,
   onGoToProfile,
 }: DepositAccountSectionProps) => {
+  const [showRawAccountNumber, setShowRawAccountNumber] = useState(false)
   const step = useMemo(() => getAnchorNextStep(normalized), [normalized])
   const maskedAccountNumber = normalized.displayAccountNumber || '----'
+  const hasRawAccountNumber = Boolean(normalized.rawAccountNumber)
+  const accountNumberToDisplay =
+    showRawAccountNumber && hasRawAccountNumber
+      ? String(normalized.rawAccountNumber)
+      : maskedAccountNumber
+
+  useEffect(() => {
+    setShowRawAccountNumber(false)
+  }, [normalized.rawAccountNumber, normalized.displayAccountNumber])
 
   const statusLabel = useMemo(() => {
     const map: Record<string, string> = {
@@ -123,7 +133,7 @@ const DepositAccountSection = ({
           <View className="mt-3">
             <Text className="text-gray-400 text-xs">Account number</Text>
             <Text className="text-white text-lg font-semibold mt-1">
-              {normalized.displayAccountNumber}
+              {accountNumberToDisplay}
             </Text>
           </View>
         ) : null}
@@ -133,25 +143,39 @@ const DepositAccountSection = ({
         {normalized.bankName ? (
           <Text className="text-gray-300">Bank: {normalized.bankName}</Text>
         ) : null}
-        <TouchableOpacity
-          onPress={async () => {
-            const raw = normalized.rawAccountNumber
-            if (!raw) {
-              Alert.alert('Account number hidden', 'Open the full account view to copy.')
-              return
-            }
-            try {
-              const Clipboard = await import('expo-clipboard')
-              await Clipboard.setStringAsync(String(raw))
-              Alert.alert('Copied', 'Account number copied.')
-            } catch {
-              Alert.alert('Account number', String(raw))
-            }
-          }}
-          className="bg-gray-950 border border-gray-800 px-3 py-2 rounded-full mt-3 self-start"
-        >
-          <Text className="text-white text-xs">Copy</Text>
-        </TouchableOpacity>
+        <View className="mt-3 flex-row items-center gap-2">
+          <TouchableOpacity
+            onPress={async () => {
+              const raw = normalized.rawAccountNumber
+              if (!raw) {
+                Alert.alert('Account number hidden', 'Open the full account view to copy.')
+                return
+              }
+              try {
+                const Clipboard = await import('expo-clipboard')
+                await Clipboard.setStringAsync(String(raw))
+                Alert.alert('Copied', 'Account number copied.')
+              } catch {
+                Alert.alert('Account number', String(raw))
+              }
+            }}
+            className="bg-gray-950 border border-gray-800 px-3 py-2 rounded-full"
+          >
+            <Text className="text-white text-xs">Copy</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => {
+              if (!hasRawAccountNumber) {
+                Alert.alert('Unavailable', 'Full account number is not available yet.')
+                return
+              }
+              setShowRawAccountNumber((prev) => !prev)
+            }}
+            className="bg-gray-950 border border-gray-800 px-3 py-2 rounded-full"
+          >
+            <Text className="text-white text-xs">{showRawAccountNumber ? 'Hide' : 'Show'}</Text>
+          </TouchableOpacity>
+        </View>
         <Text className="text-gray-400 text-xs mt-3">Use this account to fund your wallet.</Text>
       </View>
     )

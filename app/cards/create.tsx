@@ -6,7 +6,8 @@ import FormInput from '@/components/FormInput'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
 import { createCard, getUserCards, registerCardholder } from '@/api/cards'
 import { uploadSelfieToCloudinary } from '@/api/uploads'
-import { resolveUserProfile, useAuth } from '@/services/useAuth'
+import { useAuth } from '@/services/useAuth'
+import { resolveUserProfile } from '@/services/auth/resolveUserProfile'
 import { buildApiErrorMessage } from '@/utils/apiErrorMessage'
 import AppModal from '@/components/modal/Modal'
 
@@ -40,7 +41,15 @@ const CreateCard = () => {
     card_pin_confirm: '',
   })
 
-  const profileRoot = useMemo(() => resolveUserProfile(userProfileData) || {}, [userProfileData])
+  const profileRoot = useMemo(() => {
+    if (typeof resolveUserProfile !== 'function') {
+      if (__DEV__) {
+        console.warn('[CreateCard] resolveUserProfile export missing; using empty profile fallback')
+      }
+      return {}
+    }
+    return resolveUserProfile(userProfileData) || {}
+  }, [userProfileData])
   const bvnStatus = String(profileRoot?.user_kyc?.bvn_status || '').toLowerCase()
   const bvnVerified = bvnStatus === 'verified'
   const profileDefaults = useMemo(() => {

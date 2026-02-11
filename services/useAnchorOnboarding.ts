@@ -203,26 +203,38 @@ const extractAccountNumberFromDetail = (detailData: Record<string, any> | null) 
 const extractAccountNameFromDetail = (detailData: Record<string, any> | null) => {
   if (!detailData) return ''
   const attrs = asObj(detailData.attributes)
+  const bank = asObj(attrs.bank)
+  const account = asObj(detailData.account)
   return pickString(
     detailData.account_name,
     detailData.accountName,
     detailData.name,
+    account.account_name,
+    account.accountName,
+    account.name,
     attrs.account_name,
     attrs.accountName,
-    attrs.name
+    attrs.name,
+    bank.accountName,
+    bank.account_name
   )
 }
 
 const extractBankNameFromDetail = (detailData: Record<string, any> | null) => {
   if (!detailData) return ''
   const attrs = asObj(detailData.attributes)
+  const bank = asObj(attrs.bank)
+  const account = asObj(detailData.account)
   return pickString(
     detailData.bank_name,
     detailData.bankName,
     detailData.bank,
+    account.bank_name,
+    account.bankName,
+    account.bank,
     attrs.bank_name,
     attrs.bankName,
-    attrs?.bank?.name
+    bank.name
   )
 }
 
@@ -276,9 +288,9 @@ export const normalizeAnchorOnboarding = (
     Boolean(detailData && Object.keys(detailData).length > 0)
 
   const accountNumber = pickString(
-    extractAccountNumberFromDetail(detailData),
     anchorAccount?.account_number,
-    anchorAccount?.accountNumber
+    anchorAccount?.accountNumber,
+    extractAccountNumberFromDetail(detailData)
   )
   const rawAccountNumber = accountNumber && accountNumber.includes('*') ? '' : accountNumber
   const displayAccountNumber = accountNumber
@@ -288,16 +300,16 @@ export const normalizeAnchorOnboarding = (
     : null
 
   const accountName = pickString(
-    extractAccountNameFromDetail(detailData),
     anchorAccount?.account_name,
-    anchorAccount?.accountName
+    anchorAccount?.accountName,
+    extractAccountNameFromDetail(detailData)
   )
 
   const bankName = pickString(
-    extractBankNameFromDetail(detailData),
     anchorAccount?.bank_name,
     anchorAccount?.bankName,
-    anchorAccount?.bank
+    anchorAccount?.bank,
+    extractBankNameFromDetail(detailData)
   )
 
   const kycState = normalizeKycState(
@@ -644,8 +656,18 @@ const fetchAnchorOnboarding = async (options?: { force?: boolean }): Promise<Ref
       const normalized = normalizeAnchorOnboarding(detailResponse)
       let userAccountsResponse: any | undefined
 
-      if (!normalized.hasAccountNumber) {
+      // Always attempt local accounts fetch for parity with backend-canonical account fields.
+      // If it fails, keep detail response unless critical fields are missing.
+      try {
         userAccountsResponse = await getAccounts()
+      } catch (accountsError) {
+        const requiresLocalFallback =
+          !normalized.hasAccountNumber ||
+          !normalized.accountName ||
+          !normalized.bankName
+        if (requiresLocalFallback) {
+          throw accountsError
+        }
       }
 
       if (options?.force) {

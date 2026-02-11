@@ -8,15 +8,15 @@
   useState,
 } from 'react'
 import { AppState, AppStateStatus } from 'react-native'
-import * as SecureStore from 'expo-secure-store'
 import { getTransactionPinStatus } from '@/api/transactionPin'
 import { useAuth } from '@/services/useAuth'
+import {
+  clearAppLockPersisted,
+  getAppLockBackgroundAt,
+  saveAppLockBackgroundAt,
+} from '@/services/appLockStorage'
 
 const LOCK_AFTER_MS = Number(process.env.EXPO_PUBLIC_LOCK_AFTER_MS || 180000)
-const STORE_KEY_BG_AT = 'app-lock-bg-at'
-export const clearAppLockPersisted = async () => {
-  await SecureStore.deleteItemAsync(STORE_KEY_BG_AT)
-}
 
 type AppLockContextValue = {
   locked: boolean
@@ -42,20 +42,18 @@ export const AppLockProvider = ({ children }: { children: React.ReactNode }) => 
   const persistBackground = useCallback(async (value: number) => {
     bgRef.current = value
     setBackgroundAt(value)
-    await SecureStore.setItemAsync(STORE_KEY_BG_AT, String(value))
+    await saveAppLockBackgroundAt(value)
   }, [])
 
   const clearBackground = useCallback(async () => {
     bgRef.current = null
     setBackgroundAt(null)
-    await SecureStore.deleteItemAsync(STORE_KEY_BG_AT)
+    await clearAppLockPersisted()
   }, [])
 
   useEffect(() => {
-    SecureStore.getItemAsync(STORE_KEY_BG_AT).then((raw) => {
-      if (!raw) return
-      const parsed = Number(raw)
-      if (Number.isFinite(parsed)) {
+    getAppLockBackgroundAt().then((parsed) => {
+      if (parsed !== null) {
         bgRef.current = parsed
         setBackgroundAt(parsed)
       }

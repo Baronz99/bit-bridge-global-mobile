@@ -1,4 +1,7 @@
-const flagEnabled = (value: string | undefined) => value === '1'
+const flagEnabled = (value: string | undefined) => {
+  const normalized = String(value ?? '').trim().toLowerCase()
+  return normalized === '1' || normalized === 'true'
+}
 
 export const FEATURE_OTP = flagEnabled(process.env.EXPO_PUBLIC_FEATURE_OTP ?? '0')
 export const FEATURE_BVN = flagEnabled(process.env.EXPO_PUBLIC_FEATURE_BVN ?? '0')
@@ -14,3 +17,4 @@ export const FEATURE_REWARDS = flagEnabled(process.env.EXPO_PUBLIC_FEATURE_REWAR
 export const FEATURE_STATS = flagEnabled(process.env.EXPO_PUBLIC_FEATURE_STATS ?? '0')
 export const FEATURE_CARD_TOKENS = flagEnabled(process.env.EXPO_PUBLIC_FEATURE_CARD_TOKENS ?? '0')
 export const FEATURE_PAYMENT_TOOLS = flagEnabled(process.env.EXPO_PUBLIC_FEATURE_PAYMENT_TOOLS ?? '0')
+export const FEATURE_LEGACY_HOME = flagEnabled(process.env.EXPO_PUBLIC_FEATURE_LEGACY_HOME ?? '0')

@@ -34,6 +34,56 @@ describe('normalizeAnchorOnboarding', () => {
     expect(result.hasAnchorAccount).toBe(true)
   })
 
+  it('falls back to user_accounts for account name and bank name when detail omits them', () => {
+    const result = normalizeAnchorOnboarding(
+      {
+        data: { accountNumber: '1234567890', status: 'verified' },
+        has_anchor_account: true,
+      },
+      {
+        data: [
+          {
+            vendor: 'anchor',
+            account_number: '1234567890',
+            account_name: 'Okafor Cyril',
+            bank_name: 'GTBank Plc',
+          },
+        ],
+      }
+    )
+
+    expect(result.accountName).toBe('Okafor Cyril')
+    expect(result.bankName).toBe('GTBank Plc')
+  })
+
+  it('prefers user_accounts values over detail values for parity', () => {
+    const result = normalizeAnchorOnboarding(
+      {
+        data: {
+          accountNumber: '9999999999',
+          accountName: 'Provider Name',
+          bankName: 'Provider Bank',
+          status: 'verified',
+        },
+        has_anchor_account: true,
+      },
+      {
+        data: [
+          {
+            vendor: 'anchor',
+            account_number: '1234567890',
+            account_name: 'Local Canonical Name',
+            bank_name: 'Local Canonical Bank',
+          },
+        ],
+      }
+    )
+
+    expect(result.accountNumber).toBe('1234567890')
+    expect(result.accountName).toBe('Local Canonical Name')
+    expect(result.bankName).toBe('Local Canonical Bank')
+  })
+
   it('computes nextStep correctly across states', () => {
     const missing = normalizeAnchorOnboarding({ data: null, has_anchor_account: false })
     expect(getAnchorNextStep(missing)).toBe('CREATE_ANCHOR')

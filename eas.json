@@ -15,7 +15,8 @@
       "env": {
         "EXPO_PUBLIC_ENV": "production",
         "EXPO_PUBLIC_API_BASE_URL": "https://bitbridgeglobal-fa54ecb89f7d.herokuapp.com/api/v1",
-        "EXPO_PUBLIC_FEATURE_TIMELINE": "1"
+        "EXPO_PUBLIC_FEATURE_TIMELINE": "1",
+        "EXPO_PUBLIC_FEATURE_LEGACY_HOME": "0"
       }
     },
     "production": {
@@ -24,7 +25,8 @@
       "env": {
         "EXPO_PUBLIC_ENV": "production",
         "EXPO_PUBLIC_API_BASE_URL": "https://bitbridgeglobal-fa54ecb89f7d.herokuapp.com/api/v1",
-        "EXPO_PUBLIC_FEATURE_TIMELINE": "1"
+        "EXPO_PUBLIC_FEATURE_TIMELINE": "1",
+        "EXPO_PUBLIC_FEATURE_LEGACY_HOME": "0"
       }
     }
   },

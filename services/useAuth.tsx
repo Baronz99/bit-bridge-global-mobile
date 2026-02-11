@@ -18,7 +18,7 @@ import client, {
 import APP_CONFIG from '@/api/baseUrl'
 import { signup as signupApi } from '@/api/auth'
 import { setEmailForVerification } from '@/auth/tokenstore'
-import { clearAppLockPersisted } from '@/services/useAppLock'
+import { clearAppLockPersisted } from '@/services/appLockStorage'
 
 type LoginPayload = { email: string; password: string }
 
@@ -458,3 +458,5 @@ export function useAuth() {
   if (!ctx) throw new Error('useAuth must be used within an AuthProvider')
   return ctx
 }
+
+export { resolveUserProfile } from '@/services/auth/resolveUserProfile'
