@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef } from 'react'
-import { ActivityIndicator, View, Text } from 'react-native'
+import { ActivityIndicator, TouchableOpacity, View, Text } from 'react-native'
 import { useRootNavigationState, useRouter } from 'expo-router'
 import { useAuth } from '../services/useAuth'
 import { useAppLock } from '../services/useAppLock'
+import APP_CONFIG from '@/api/baseUrl'
 
 export default function Index() {
   const router = useRouter()
@@ -17,6 +18,7 @@ export default function Index() {
     token,
     userProfileData,
     onLogout,
+    loadProfile,
   } = useAuth()
   const { locked } = useAppLock()
   const lastRedirectRef = useRef<string | null>(null)
@@ -114,6 +116,9 @@ export default function Index() {
         env: {String(process.env.EXPO_PUBLIC_ENV || '')} | navReady: {String(navigationReady)}
       </Text>
       <Text style={{ color: '#aaa', marginTop: 6, fontSize: 12 }}>
+        apiBaseUrl: {String(APP_CONFIG.root_url || process.env.EXPO_PUBLIC_API_BASE_URL || '')}
+      </Text>
+      <Text style={{ color: '#aaa', marginTop: 6, fontSize: 12 }}>
         hydrated: {String(authHydrated)} | loading: {String(loading)} | authed: {String(authenticated)}
       </Text>
       <Text style={{ color: '#aaa', marginTop: 6, fontSize: 12 }}>
@@ -122,6 +127,23 @@ export default function Index() {
       <Text style={{ color: '#aaa', marginTop: 6, fontSize: 12 }}>
         lastProfileError: {profileError ? String(profileError) : 'none'}
       </Text>
+      <TouchableOpacity
+        onPress={() => {
+          if (profileLoading) return
+          bootTrace('manual_retry_profile_fetch')
+          void loadProfile({ force: true })
+        }}
+        style={{
+          marginTop: 12,
+          borderWidth: 1,
+          borderColor: '#555',
+          paddingHorizontal: 14,
+          paddingVertical: 8,
+          borderRadius: 8,
+        }}
+      >
+        <Text style={{ color: '#ddd' }}>{profileLoading ? 'Retrying...' : 'Retry profile fetch'}</Text>
+      </TouchableOpacity>
     </View>
   )
 }

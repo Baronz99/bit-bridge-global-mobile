@@ -61,6 +61,12 @@ const normalize = (v: string | null | undefined) =>
     .replace(/^"+|"+$/g, '')
     .trim()
 
+const redactToken = (value: string | undefined) => {
+  if (!value) return value
+  if (!value.toLowerCase().startsWith('bearer ')) return '[REDACTED]'
+  return 'Bearer [REDACTED]'
+}
+
 async function saveTokens(accessToken: string, refreshToken?: string | null) {
   const cleanAccess = normalize(accessToken)
   if (!cleanAccess) throw new Error('Missing access token')
@@ -123,11 +129,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setProfileLoading(true)
     setProfileError(null)
     setProfileErrorStatus(null)
+    const requestPath = '/users/user_profile'
+    const requestBaseURL = String(client.defaults.baseURL || APP_CONFIG.root_url || '')
+    const fullRequestUrl = requestBaseURL.endsWith('/')
+      ? `${requestBaseURL.slice(0, -1)}${requestPath}`
+      : `${requestBaseURL}${requestPath}`
+    const authHeader =
+      (client.defaults.headers as any)?.Authorization ||
+      (client.defaults.headers as any)?.common?.Authorization
+    const requestHeaders = {
+      Authorization: redactToken(authHeader),
+      Accept:
+        (client.defaults.headers as any)?.Accept ||
+        (client.defaults.headers as any)?.common?.Accept,
+      'Content-Type':
+        (client.defaults.headers as any)?.['Content-Type'] ||
+        (client.defaults.headers as any)?.common?.['Content-Type'],
+    }
     try {
       if (tokenOverride) {
         client.defaults.headers.Authorization = `Bearer ${tokenOverride}`
+        requestHeaders.Authorization = redactToken(`Bearer ${tokenOverride}`)
       }
-      const res = await client.get('/users/user_profile')
+      const res = await client.get(requestPath)
       const data = res?.data?.data ?? res?.data
       if (!data || typeof data !== 'object') {
         const parseError = new Error('Invalid profile payload')
@@ -140,6 +164,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       bootTrace('profile_fetch_success')
       return data
     } catch (error: any) {
+      const responsePreview = (() => {
+        try {
+          const raw =
+            typeof error?.response?.data === 'string'
+              ? error.response.data
+              : JSON.stringify(error?.response?.data ?? '')
+          return String(raw).slice(0, 200)
+        } catch {
+          return String(error?.response?.data ?? '').slice(0, 200)
+        }
+      })()
+      console.log('[AUTH][PROFILE_FETCH_DEBUG]', {
+        baseURL: requestBaseURL,
+        requestUrl: fullRequestUrl,
+        headers: requestHeaders,
+        message: error?.message,
+        code: error?.code,
+        isAxiosError: error?.isAxiosError === true,
+        status: error?.response?.status ?? null,
+        responseDataPreview: responsePreview,
+      })
       const status = error?.response?.status
       const parseFailed = error?.code === 'PROFILE_PARSE_FAILED'
       if (status === 401 || status === 403 || parseFailed) {
