@@ -157,17 +157,8 @@ export const getKycStatus = async () => {
 }
 
 export const submitTier3 = async (payload: Tier3SubmitPayload) => {
-  try {
-    const res = await client.post('/verification/tier3/submit', payload)
-    return res.data as Tier3SubmitResponse
-  } catch (error: any) {
-    const status = error?.response?.status
-    if (status === 404) {
-      const res = await client.post('/verification/tier3/start', payload)
-      return res.data as Tier3SubmitResponse
-    }
-    throw error
-  }
+  const res = await client.post('/verification/tier3/start', payload)
+  return res.data as Tier3SubmitResponse
 }
 
 export const getTier3Status = async () => {
