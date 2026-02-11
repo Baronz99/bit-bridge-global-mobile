@@ -7,7 +7,26 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
-      "channel": "development"
+      "channel": "development",
+      "env": {
+        "EXPO_PUBLIC_ENV": "production",
+        "EXPO_PUBLIC_API_BASE_URL": "https://bitbridgeglobal-fa54ecb89f7d.herokuapp.com/api/v1",
+        "EXPO_PUBLIC_FEATURE_OTP": "1",
+        "EXPO_PUBLIC_FEATURE_BVN": "1",
+        "EXPO_PUBLIC_FEATURE_KYC_CENTER": "1",
+        "EXPO_PUBLIC_FEATURE_CIRCLES": "1",
+        "EXPO_PUBLIC_FEATURE_TIMELINE": "1",
+        "EXPO_PUBLIC_FEATURE_NEW_DASHBOARD": "1",
+        "EXPO_PUBLIC_FEATURE_ONBOARDING": "1",
+        "EXPO_PUBLIC_FEATURE_TRANSACTION_PIN": "1",
+        "EXPO_PUBLIC_FEATURE_ORDERS": "1",
+        "EXPO_PUBLIC_FEATURE_DISPUTES": "0",
+        "EXPO_PUBLIC_FEATURE_REWARDS": "1",
+        "EXPO_PUBLIC_FEATURE_STATS": "1",
+        "EXPO_PUBLIC_FEATURE_CARD_TOKENS": "1",
+        "EXPO_PUBLIC_FEATURE_PAYMENT_TOOLS": "1",
+        "EXPO_PUBLIC_FEATURE_LEGACY_HOME": "0"
+      }
     },
     "preview": {
       "distribution": "internal",
@@ -15,7 +34,20 @@
       "env": {
         "EXPO_PUBLIC_ENV": "production",
         "EXPO_PUBLIC_API_BASE_URL": "https://bitbridgeglobal-fa54ecb89f7d.herokuapp.com/api/v1",
+        "EXPO_PUBLIC_FEATURE_OTP": "1",
+        "EXPO_PUBLIC_FEATURE_BVN": "1",
+        "EXPO_PUBLIC_FEATURE_KYC_CENTER": "1",
+        "EXPO_PUBLIC_FEATURE_CIRCLES": "1",
         "EXPO_PUBLIC_FEATURE_TIMELINE": "1",
+        "EXPO_PUBLIC_FEATURE_NEW_DASHBOARD": "1",
+        "EXPO_PUBLIC_FEATURE_ONBOARDING": "1",
+        "EXPO_PUBLIC_FEATURE_TRANSACTION_PIN": "1",
+        "EXPO_PUBLIC_FEATURE_ORDERS": "1",
+        "EXPO_PUBLIC_FEATURE_DISPUTES": "0",
+        "EXPO_PUBLIC_FEATURE_REWARDS": "1",
+        "EXPO_PUBLIC_FEATURE_STATS": "1",
+        "EXPO_PUBLIC_FEATURE_CARD_TOKENS": "1",
+        "EXPO_PUBLIC_FEATURE_PAYMENT_TOOLS": "1",
         "EXPO_PUBLIC_FEATURE_LEGACY_HOME": "0"
       }
     },
@@ -25,7 +57,20 @@
       "env": {
         "EXPO_PUBLIC_ENV": "production",
         "EXPO_PUBLIC_API_BASE_URL": "https://bitbridgeglobal-fa54ecb89f7d.herokuapp.com/api/v1",
+        "EXPO_PUBLIC_FEATURE_OTP": "1",
+        "EXPO_PUBLIC_FEATURE_BVN": "1",
+        "EXPO_PUBLIC_FEATURE_KYC_CENTER": "1",
+        "EXPO_PUBLIC_FEATURE_CIRCLES": "1",
         "EXPO_PUBLIC_FEATURE_TIMELINE": "1",
+        "EXPO_PUBLIC_FEATURE_NEW_DASHBOARD": "1",
+        "EXPO_PUBLIC_FEATURE_ONBOARDING": "1",
+        "EXPO_PUBLIC_FEATURE_TRANSACTION_PIN": "1",
+        "EXPO_PUBLIC_FEATURE_ORDERS": "1",
+        "EXPO_PUBLIC_FEATURE_DISPUTES": "0",
+        "EXPO_PUBLIC_FEATURE_REWARDS": "1",
+        "EXPO_PUBLIC_FEATURE_STATS": "1",
+        "EXPO_PUBLIC_FEATURE_CARD_TOKENS": "1",
+        "EXPO_PUBLIC_FEATURE_PAYMENT_TOOLS": "1",
         "EXPO_PUBLIC_FEATURE_LEGACY_HOME": "0"
       }
     }

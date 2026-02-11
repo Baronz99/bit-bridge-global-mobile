@@ -5,6 +5,7 @@ import useFetch from '@/services/useFetch'
 import { getTransactionRecord } from '@/api/transactions'
 import moneyFormat from '@/utils/moneyFormat'
 import PerfTrace from '@/utils/perfTrace'
+import { FEATURE_DISPUTES } from '@/constants/featureFlags'
 
 const Row = ({ label, value }: { label: string; value?: string | number }) => (
   <View className="flex-row justify-between py-2">
@@ -196,22 +197,19 @@ const TransactionRecordScreen = () => {
             <Text className="text-white text-center">Copy Reference</Text>
           </TouchableOpacity>
 
-          {/* NOTE:
-              This route expects an order id in many apps.
-              If your dispute system really uses transaction reference, keep it.
-              Otherwise, you should wire this to the correct order id field when available.
-          */}
-          <TouchableOpacity
-            onPress={() =>
-              router.push({
-                pathname: '/orders/[id]/dispute',
-                params: { id: String((data as any)?.reference || (data as any)?.id || ref) },
-              })
-            }
-            className="bg-gray-900 py-4 mt-3 rounded-xl"
-          >
-            <Text className="text-red-300 text-center">Raise Dispute</Text>
-          </TouchableOpacity>
+          {FEATURE_DISPUTES && String((data as any)?.meta?.circle_transaction_id || '').trim() ? (
+            <TouchableOpacity
+              onPress={() =>
+                router.push({
+                  pathname: '/orders/[id]/dispute',
+                  params: { id: String((data as any)?.meta?.circle_transaction_id) },
+                })
+              }
+              className="bg-gray-900 py-4 mt-3 rounded-xl"
+            >
+              <Text className="text-red-300 text-center">Raise Dispute</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
       </View>
     </View>

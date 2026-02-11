@@ -3,6 +3,7 @@ import { ActivityIndicator, Alert, ScrollView, Text, TouchableOpacity, View } fr
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { getTimelineItem } from '@/api/timeline'
 import moneyFormat from '@/utils/moneyFormat'
+import { FEATURE_DISPUTES } from '@/constants/featureFlags'
 
 const StatusStep = ({ label, active }: { label: string; active: boolean }) => (
   <View className="flex-row items-center mb-2">
@@ -41,6 +42,7 @@ const ActivityDetailsScreen = () => {
   const currency = (meta.currency as string) || 'NGN'
   const amount = amountCents ? moneyFormat(amountCents / 100, currency) : '-'
   const reference = (meta.reference as string) || (record?.id as string) || ''
+  const disputeTargetId = String(meta.circle_transaction_id || '').trim()
   const actor = record?.actor as Record<string, unknown> | undefined
   const actorName = (actor?.name as string) || 'You'
   const isFailed = status.includes('failed') || status.includes('declined')
@@ -148,16 +150,16 @@ const ActivityDetailsScreen = () => {
               >
                 <Text className="text-white text-sm">View receipt</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() =>
-                  reference
-                    ? router.push({ pathname: '/orders/[id]/dispute', params: { id: reference } })
-                    : null
-                }
-                className="bg-gray-900 py-3 rounded-xl items-center mt-3"
-              >
-                <Text className="text-red-300 text-sm">Raise dispute</Text>
-              </TouchableOpacity>
+              {FEATURE_DISPUTES && disputeTargetId ? (
+                <TouchableOpacity
+                  onPress={() =>
+                    router.push({ pathname: '/orders/[id]/dispute', params: { id: disputeTargetId } })
+                  }
+                  className="bg-gray-900 py-3 rounded-xl items-center mt-3"
+                >
+                  <Text className="text-red-300 text-sm">Raise dispute</Text>
+                </TouchableOpacity>
+              ) : null}
             </View>
           </>
         ) : (

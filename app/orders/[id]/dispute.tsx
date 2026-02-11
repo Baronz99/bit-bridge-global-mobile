@@ -58,7 +58,7 @@ const OrderDispute = () => {
 
           <View className="mt-6">
             <FormInput
-              label="Transaction ID"
+              label="Circle Transaction ID"
               value={form.transaction_id}
               onChangeText={(value: string) =>
                 setForm({ ...form, transaction_id: value })

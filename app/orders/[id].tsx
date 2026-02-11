@@ -24,6 +24,8 @@ const OrderDetail = () => {
 
   const payload = data?.data ?? data
   const amount = Number(payload?.total_amount ?? payload?.amount ?? 0)
+  const disputeTargetId = String(payload?.circle_transaction_id || '').trim()
+  const canRaiseDispute = FEATURE_DISPUTES && disputeTargetId.length > 0
 
   return (
     <View className="flex-1 bg-primary px-4">
@@ -64,8 +66,8 @@ const OrderDetail = () => {
           </Text>
         </View>
 
-        {FEATURE_DISPUTES ? (
-          <Link href={`/orders/${orderId}/dispute`} asChild>
+        {canRaiseDispute ? (
+          <Link href={`/orders/${disputeTargetId}/dispute`} asChild>
             <TouchableOpacity className="bg-gray-800 py-4 rounded-xl mt-6">
               <Text className="text-white text-center font-medium">Raise a Dispute</Text>
             </TouchableOpacity>
