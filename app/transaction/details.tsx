@@ -12,6 +12,7 @@ import NotificationAlert from '@/components/notification'
 import TransactionButtons from '@/components/transactionButtons/TransactionButtons'
 import moneyFormat from '@/utils/moneyFormat'
 import { log } from '@/utils/log'
+import PerfTrace from '@/utils/perfTrace'
 const confirmDetails = () => {
   const { orderId } = useLocalSearchParams()
   const [loader, setLoader] = useState(false)
@@ -41,6 +42,7 @@ const confirmDetails = () => {
   const { userProfileData, loadProfile } = useAuth()
   const [textInfo, setTextInfo] = useState('')
   const confirmingRef = useRef(false)
+  const uiAfterDataTraceRef = useRef<string | null>(null)
 
   const generateIdempotencyKey = () => {
     try {
@@ -58,7 +60,25 @@ const confirmDetails = () => {
     return idempotencyKeyRef.current
   }, [])
 
-  const fetchOrder = useCallback(() => getPurchaseOrder(orderId as string), [orderId])
+  const fetchOrder = useCallback(async () => {
+    const id = String(orderId || '').trim() || 'missing'
+    const traceLabel = `tx_details:api:${id}`
+    PerfTrace.start(traceLabel, { orderId: id })
+    try {
+      const result = await getPurchaseOrder(orderId as string)
+      PerfTrace.end(traceLabel, { ok: true })
+      uiAfterDataTraceRef.current = `tx_details:ui_after_data:${id}`
+      PerfTrace.start(uiAfterDataTraceRef.current)
+      return result
+    } catch (error: any) {
+      PerfTrace.end(traceLabel, {
+        ok: false,
+        message: error?.message || 'request_failed',
+        status: error?.response?.status ?? null,
+      })
+      throw error
+    }
+  }, [orderId])
   const { data, refetch } = useFetch(fetchOrder)
   // const [getstarted, setOpenStarted] = useState(false)
 
@@ -67,10 +87,25 @@ const confirmDetails = () => {
   }, [orderId])
 
   const statusRaw = String(data?.status || '').toLowerCase()
+  PerfTrace.mark('tx_details:transform:status', {
+    orderId: String(orderId || ''),
+    status: statusRaw,
+    serviceType: String(data?.service_type || ''),
+  })
   const isElectricityVerificationPending =
     String(data?.service_type || '').toUpperCase() === 'ELECTRICITY' &&
     statusRaw === 'pending' &&
     !String(data?.name || '').trim()
+
+  useEffect(() => {
+    if (!data || !uiAfterDataTraceRef.current) return
+    const label = uiAfterDataTraceRef.current
+    const frame = requestAnimationFrame(() => {
+      PerfTrace.end(label, { rendered: true })
+      uiAfterDataTraceRef.current = null
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [data])
 
   useEffect(() => {
     if (!isElectricityVerificationPending) return

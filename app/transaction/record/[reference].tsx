@@ -1,9 +1,10 @@
-import React, { useCallback } from 'react'
+import React, { useCallback, useEffect, useRef } from 'react'
 import { ActivityIndicator, Alert, Share, Text, TouchableOpacity, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import useFetch from '@/services/useFetch'
 import { getTransactionRecord } from '@/api/transactions'
 import moneyFormat from '@/utils/moneyFormat'
+import PerfTrace from '@/utils/perfTrace'
 
 const Row = ({ label, value }: { label: string; value?: string | number }) => (
   <View className="flex-row justify-between py-2">
@@ -16,16 +17,42 @@ const TransactionRecordScreen = () => {
   const router = useRouter()
   const { reference } = useLocalSearchParams<{ reference?: string | string[] }>()
   const ref = Array.isArray(reference) ? reference[0] : reference
+  const uiAfterDataTraceRef = useRef<string | null>(null)
 
-  const fetchRecord = useCallback(() => {
+  const fetchRecord = useCallback(async () => {
     if (!ref) return Promise.resolve(null)
-    return getTransactionRecord(ref)
+    const traceLabel = `tx_record:api:${ref}`
+    PerfTrace.start(traceLabel, { reference: ref })
+    try {
+      const result = await getTransactionRecord(ref)
+      PerfTrace.end(traceLabel, { ok: true })
+      uiAfterDataTraceRef.current = `tx_record:ui_after_data:${ref}`
+      PerfTrace.start(uiAfterDataTraceRef.current)
+      return result
+    } catch (error: any) {
+      PerfTrace.end(traceLabel, {
+        ok: false,
+        status: error?.response?.status ?? null,
+        message: error?.message || 'request_failed',
+      })
+      throw error
+    }
   }, [ref])
 
   // IMPORTANT:
   // - Do NOT manually logout on 401 here.
   // - client.ts already handles refresh/retry and emits unauthorized → AuthProvider clears session.
   const { data, loading, error, refetch } = useFetch(fetchRecord)
+
+  useEffect(() => {
+    if (!data || !uiAfterDataTraceRef.current) return
+    const label = uiAfterDataTraceRef.current
+    const frame = requestAnimationFrame(() => {
+      PerfTrace.end(label, { rendered: true })
+      uiAfterDataTraceRef.current = null
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [data])
 
   if (!ref) {
     return (

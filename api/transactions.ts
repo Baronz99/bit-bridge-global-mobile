@@ -8,6 +8,8 @@ export const getTransactions = async ({
     type?: string
     transaction_type?: 'deposit' | 'withdraw'
     wallet_type?: 'ngn' | 'usd'
+    limit?: number
+    cursor?: string
   }
 }) => {
   try {

@@ -1,12 +1,16 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, ActivityIndicator, ScrollView, Share, Text, TouchableOpacity, View } from 'react-native'
 import { useLocalSearchParams } from 'expo-router'
 import moneyFormat from '@/utils/moneyFormat'
 import BankReceiptCard from '@/components/receipt/BankReceiptCard'
 import client from '@/api/client'
 import { isValidReceiptReference } from '../../src/navigation/receiptNav'
+import PerfTrace from '@/utils/perfTrace'
 
 type ReceiptParams = { reference?: string; timelineId?: string }
+type ReceiptCacheEntry = { data: ReceiptDTO; cachedAt: number }
+const RECEIPT_CACHE_TTL_MS = 60_000
+const receiptCache = new Map<string, ReceiptCacheEntry>()
 
 type ReceiptDTO = {
   reference: string
@@ -60,6 +64,21 @@ const normalizeReceiptReference = (value?: string) => {
   return raw
 }
 
+const readReceiptCache = (reference: string): ReceiptDTO | null => {
+  const entry = receiptCache.get(reference)
+  if (!entry) return null
+  const isFresh = Date.now() - entry.cachedAt < RECEIPT_CACHE_TTL_MS
+  if (!isFresh) {
+    receiptCache.delete(reference)
+    return null
+  }
+  return entry.data
+}
+
+const writeReceiptCache = (reference: string, data: ReceiptDTO) => {
+  receiptCache.set(reference, { data, cachedAt: Date.now() })
+}
+
 const ReceiptScreen = () => {
   const { reference, timelineId } = useLocalSearchParams<ReceiptParams>()
 
@@ -68,34 +87,63 @@ const ReceiptScreen = () => {
   const [invalidRef, setInvalidRef] = useState(false)
   const [notFound, setNotFound] = useState(false)
   const [error, setError] = useState(false)
+  const uiAfterDataTraceRef = useRef<string | null>(null)
 
   const load = useCallback(async () => {
     const ref0 = normalizeReceiptReference(String(reference ?? timelineId ?? '').trim())
-
-    setLoading(true)
-    setInvalidRef(false)
-    setNotFound(false)
-    setError(false)
-    setRaw(null)
+    const apiTraceLabel = `receipt:api:${ref0 || 'missing'}`
 
     if (!ref0 || !isValidReceiptReference(ref0)) {
+      setRaw(null)
       setInvalidRef(true)
+      setNotFound(false)
+      setError(false)
       setLoading(false)
+      PerfTrace.mark('receipt:invalid_reference', { reference: ref0 })
       return
     }
 
+    const cached = readReceiptCache(ref0)
+    if (cached) {
+      setRaw(cached)
+      setInvalidRef(false)
+      setNotFound(false)
+      setError(false)
+      setLoading(false)
+    } else {
+      setLoading(true)
+      setInvalidRef(false)
+      setNotFound(false)
+      setError(false)
+      setRaw(null)
+    }
+
     try {
+      PerfTrace.start(apiTraceLabel, { reference: ref0 })
       const res = await client.get(`/receipts/${encodeURIComponent(ref0)}`)
       const payload = (res as any)?.data?.data ?? (res as any)?.data ?? res
+      PerfTrace.end(apiTraceLabel, { status: (res as any)?.status ?? null })
+      uiAfterDataTraceRef.current = `receipt:ui_after_data:${ref0}`
+      PerfTrace.start(uiAfterDataTraceRef.current)
       setRaw(payload as ReceiptDTO)
+      writeReceiptCache(ref0, payload as ReceiptDTO)
+      setInvalidRef(false)
+      setNotFound(false)
+      setError(false)
     } catch (err: any) {
+      PerfTrace.end(apiTraceLabel, {
+        status: err?.response?.status ?? null,
+        message: err?.message || 'request_failed',
+      })
       const status = err?.response?.status
-      if (status === 404) {
-        setNotFound(true)
-      } else {
-        setError(true)
+      if (!cached) {
+        if (status === 404) {
+          setNotFound(true)
+        } else {
+          setError(true)
+        }
+        setRaw(null)
       }
-      setRaw(null)
     } finally {
       setLoading(false)
     }
@@ -105,8 +153,22 @@ const ReceiptScreen = () => {
     load()
   }, [load])
 
+  useEffect(() => {
+    if (!raw || !uiAfterDataTraceRef.current) return
+    const label = uiAfterDataTraceRef.current
+    const frame = requestAnimationFrame(() => {
+      PerfTrace.end(label, { rendered: true })
+      uiAfterDataTraceRef.current = null
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [raw])
+
   const receipt = useMemo<ReceiptDTO | null>(() => {
-    if (!raw) return null
+    PerfTrace.start('receipt:transform', { hasRaw: !!raw })
+    if (!raw) {
+      PerfTrace.end('receipt:transform', { hasReceipt: false })
+      return null
+    }
 
     const statusRaw = String(raw.status || 'pending').toLowerCase()
     const isSuccess = ['success', 'completed'].includes(statusRaw)
@@ -134,7 +196,7 @@ const ReceiptScreen = () => {
           ? [{ label: 'service charge', amount: serviceChargeFromMeta, currency: raw.currency || 'NGN' }]
           : []
 
-    return {
+    const normalized = {
       reference: raw.reference || String(reference || timelineId || '--'),
       kind: raw.kind,
       event: raw.event,
@@ -158,6 +220,12 @@ const ReceiptScreen = () => {
       reason: failReason,
       timeline: Array.isArray(raw.timeline) ? raw.timeline : [],
     } as ReceiptDTO
+    PerfTrace.end('receipt:transform', {
+      hasReceipt: true,
+      timeline_count: Array.isArray(normalized.timeline) ? normalized.timeline.length : 0,
+      fees_count: Array.isArray(normalized.fees) ? normalized.fees.length : 0,
+    })
+    return normalized
   }, [raw, reference, timelineId])
 
   const uiTitle = useMemo(() => {

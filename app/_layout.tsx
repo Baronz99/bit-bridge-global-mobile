@@ -1,28 +1,102 @@
 import React, { useEffect } from 'react'
 import { Stack } from 'expo-router'
-import { StatusBar } from 'react-native'
+import { StatusBar, Text, View } from 'react-native'
 import './globals.css'
 
 import { AuthProvider } from '@/services/useAuth'
 import { AppLockProvider } from '../services/useAppLock'
+import { setLastFatalError } from '@/services/fatalError'
+import { FEATURE_TIMELINE } from '@/constants/featureFlags'
+
+type ErrorBoundaryState = { hasError: boolean; message: string | null }
+
+class RootErrorBoundary extends React.Component<{ children: React.ReactNode }, ErrorBoundaryState> {
+  state: ErrorBoundaryState = { hasError: false, message: null }
+
+  static getDerivedStateFromError(error: any): ErrorBoundaryState {
+    const message = [error?.message || 'Unknown render error', error?.stack || '']
+      .filter(Boolean)
+      .join('\n')
+      .slice(0, 4000)
+    setLastFatalError(message)
+    return { hasError: true, message }
+  }
+
+  componentDidCatch(error: any, errorInfo: any) {
+    const stack = errorInfo?.componentStack || ''
+    const payload = [error?.message || 'Unknown render error', error?.stack || '', stack]
+      .filter(Boolean)
+      .join('\n')
+      .slice(0, 4000)
+    setLastFatalError(payload)
+    console.log('[FATAL][RENDER]', payload)
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View style={{ flex: 1, backgroundColor: '#111', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <Text style={{ color: 'white', fontSize: 16, fontWeight: '600' }}>Something went wrong</Text>
+          <Text style={{ color: '#aaa', marginTop: 8, fontSize: 12, textAlign: 'center' }}>
+            {this.state.message || 'Unknown render failure'}
+          </Text>
+        </View>
+      )
+    }
+    return this.props.children
+  }
+}
 
 export default function RootLayout() {
   useEffect(() => {
     console.log('[BOOT_TRACE][ROOT_LAYOUT]', { event: 'providers_mounted' })
+    if (__DEV__) {
+      console.log('[FEATURE_FLAG][TIMELINE]', {
+        EXPO_PUBLIC_FEATURE_TIMELINE: String(process.env.EXPO_PUBLIC_FEATURE_TIMELINE ?? ''),
+        resolved: FEATURE_TIMELINE,
+      })
+    }
+
+    const utils = (global as any).ErrorUtils
+    const previousHandler = typeof utils?.getGlobalHandler === 'function' ? utils.getGlobalHandler() : null
+    if (typeof utils?.setGlobalHandler === 'function') {
+      utils.setGlobalHandler((error: any, isFatal?: boolean) => {
+        const payload = [
+          isFatal ? 'Fatal JS Error' : 'JS Error',
+          error?.message || String(error),
+          error?.stack || '',
+        ]
+          .filter(Boolean)
+          .join('\n')
+          .slice(0, 4000)
+        setLastFatalError(payload)
+        console.log('[FATAL][GLOBAL]', payload)
+        if (typeof previousHandler === 'function') {
+          previousHandler(error, isFatal)
+        }
+      })
+    }
+
+    return () => {
+      if (typeof utils?.setGlobalHandler === 'function' && typeof previousHandler === 'function') {
+        utils.setGlobalHandler(previousHandler)
+      }
+    }
   }, [])
 
   return (
-    <AuthProvider>
-      <AppLockProvider>
-      <StatusBar hidden={false} barStyle="light-content" backgroundColor="black" />
+    <RootErrorBoundary>
+      <AuthProvider>
+        <AppLockProvider>
+          <StatusBar hidden={false} barStyle="light-content" backgroundColor="black" />
 
-      <Stack
-        screenOptions={{
-          headerTitleStyle: { color: 'orange' },
-          headerStyle: { backgroundColor: '#030014' },
-          headerTintColor: 'white',
-        }}
-      >
+          <Stack
+            screenOptions={{
+              headerTitleStyle: { color: 'orange' },
+              headerStyle: { backgroundColor: '#030014' },
+              headerTintColor: 'white',
+            }}
+          >
         {/* ✅ IMPORTANT:
             Let app/index.tsx decide whether we land in (tabs) or login.
             So we keep both screens, but we do NOT assume (tabs) is the start. */}
@@ -140,8 +214,9 @@ export default function RootLayout() {
         <Stack.Screen name="circles/[id]/audit" options={{ headerTitle: 'Audit Summary' }} />
         <Stack.Screen name="circles/[id]/invite" options={{ headerTitle: 'Invite Member' }} />
         <Stack.Screen name="confirmEmail" options={{ headerTitle: 'Email Confirmation' }} />
-      </Stack>
-      </AppLockProvider>
-    </AuthProvider>
+          </Stack>
+        </AppLockProvider>
+      </AuthProvider>
+    </RootErrorBoundary>
   )
 }

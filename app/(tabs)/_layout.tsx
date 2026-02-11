@@ -248,7 +248,6 @@ export default function TabsLayout() {
               title: 'Timeline',
               headerShown: true,
               href: FEATURE_TIMELINE ? undefined : null,
-              tabBarButton: FEATURE_TIMELINE ? undefined : () => null,
               tabBarIcon: ({ focused }) => <TabIcon focused={focused} icon={icons.transaction} />,
             }}
           />

@@ -3,14 +3,12 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { ActivityIndicator, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { listTimeline, TimelineQuery } from '@/api/timeline'
-import { FEATURE_TIMELINE } from '@/constants/featureFlags'
 import ScreenContainer from '@/components/ScreenContainer'
 import PremiumTabs from '@/components/timeline/PremiumTabs'
 import TimelineSectionList from '@/components/timeline/TimelineSectionList'
 import SkeletonTimeline from '@/components/timeline/SkeletonTimeline'
 import FilterBottomSheet, { TimelineFilterState } from '@/components/timeline/FilterBottomSheet'
 import AppModal from '@/components/modal/Modal'
-import { MOCK_TIMELINE } from '@/components/timeline/mockData'
 import { extractReceiptReference, getTimelineId, isWalletTimelineId } from '@/utils/timelineRefs'
 
 const PRIMARY_TABS = [
@@ -129,6 +127,19 @@ const extractTimeline = (payload: unknown) => {
     return Array.isArray(data) ? data : []
   }
   return []
+}
+
+const logTimelineSource = (
+  source: 'API' | 'EMPTY',
+  list: Record<string, unknown>[],
+  extra?: Record<string, unknown>
+) => {
+  console.log('[TimelineData]', {
+    SOURCE: source,
+    count: list.length,
+    first2: list.slice(0, 2),
+    ...(extra || {}),
+  })
 }
 
 /**
@@ -273,12 +284,6 @@ const TimelineScreen = () => {
   )
 
   const loadTimeline = useCallback(async () => {
-    if (!FEATURE_TIMELINE) {
-      setItems(MOCK_TIMELINE as unknown as Record<string, unknown>[])
-      setLoading(false)
-      return
-    }
-
     setLoading(true)
     setError(null)
     try {
@@ -288,6 +293,13 @@ const TimelineScreen = () => {
       const cursor = (payload?.next_cursor as string) || (payload as any)?.data?.next_cursor || null
       setItems(list as Record<string, unknown>[])
       setNextCursor(cursor)
+      logTimelineSource('API', list as Record<string, unknown>[], {
+        next_cursor: cursor || null,
+      })
+
+      if ((list as any[])?.length === 0) {
+        logTimelineSource('EMPTY', [], { reason: 'api_response_empty_or_unexpected_shape' })
+      }
 
       if (__DEV__) {
         const kinds = Array.from(
@@ -297,7 +309,7 @@ const TimelineScreen = () => {
       }
     } catch {
       setError('Unable to load timeline right now.')
-      if (__DEV__) setItems(MOCK_TIMELINE as unknown as Record<string, unknown>[])
+      setItems([])
     } finally {
       setLoading(false)
     }

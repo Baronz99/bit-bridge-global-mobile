@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ActivityIndicator, TouchableOpacity, View, Text } from 'react-native'
 import { useRootNavigationState, useRouter } from 'expo-router'
+import Constants from 'expo-constants'
 import { useAuth } from '../services/useAuth'
 import { useAppLock } from '../services/useAppLock'
 import APP_CONFIG from '@/api/baseUrl'
+import { getLastFatalError, subscribeLastFatalError } from '@/services/fatalError'
 
 export default function Index() {
   const router = useRouter()
@@ -24,6 +26,16 @@ export default function Index() {
   const lastRedirectRef = useRef<string | null>(null)
   const failsafeTriggeredRef = useRef(false)
   const hasProfile = !!userProfileData
+  const [lastFatalError, setLastFatalErrorState] = useState<string | null>(getLastFatalError())
+  const buildProfile =
+    (Constants.expoConfig as any)?.extra?.eas?.buildProfile ||
+    (Constants as any)?.easConfig?.buildProfile ||
+    ''
+  const showFatalDiagnostics = useMemo(() => __DEV__ || buildProfile === 'preview', [buildProfile])
+
+  useEffect(() => {
+    return subscribeLastFatalError(setLastFatalErrorState)
+  }, [])
 
   const bootTrace = useCallback(
     (event: string, redirect: string | null = null, extra: Record<string, unknown> = {}) => {
@@ -127,6 +139,11 @@ export default function Index() {
       <Text style={{ color: '#aaa', marginTop: 6, fontSize: 12 }}>
         lastProfileError: {profileError ? String(profileError) : 'none'}
       </Text>
+      {showFatalDiagnostics ? (
+        <Text style={{ color: '#f97316', marginTop: 6, fontSize: 11, paddingHorizontal: 12 }} numberOfLines={8}>
+          lastFatalError: {lastFatalError || 'none'}
+        </Text>
+      ) : null}
       <TouchableOpacity
         onPress={() => {
           if (profileLoading) return

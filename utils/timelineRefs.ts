@@ -3,6 +3,7 @@ export type TimelineLike = {
   uuid?: string
   reference?: string
   meta?: Record<string, any>
+  show_in_primary_feed?: boolean
 }
 
 const RECEIPT_PREFIXES = ['bbg-', 'fbg-', 'trx-', 'txn-', 'bill-', 'trf-', 'wallet-tx-', 'card-evt-']
@@ -10,6 +11,9 @@ const RECEIPT_PREFIXES = ['bbg-', 'fbg-', 'trx-', 'txn-', 'bill-', 'trf-', 'wall
 const clean = (value: unknown) => String(value ?? '').trim()
 
 export const isWalletTimelineId = (value: string) => clean(value).toLowerCase().startsWith('wallet-tx-')
+
+export const isPrimaryTransaction = (item: TimelineLike | null | undefined) =>
+  item?.show_in_primary_feed !== false
 
 export const getTimelineId = (item: TimelineLike | null | undefined) => {
   return clean(item?.id || item?.uuid || '')

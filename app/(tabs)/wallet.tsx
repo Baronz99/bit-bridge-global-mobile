@@ -20,6 +20,10 @@ import { useRouter } from 'expo-router'
 import { activateTunnel, getUserWallet } from '@/api/wallet'
 import { normalizeAnchorOnboarding, useAnchorOnboarding } from '@/services/useAnchorOnboarding'
 import AppModal from '@/components/modal/Modal'
+import { isPrimaryTransaction as isPrimaryTransactionFromUtils } from '@/utils/timelineRefs'
+
+const REFRESH_TIMEOUT_MS = 15000
+const TX_PAGE_LIMIT = 30
 
 const WalletScreen = () => {
   const { userProfileData } = useAuth()
@@ -36,6 +40,13 @@ const WalletScreen = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [sendOpen, setSendOpen] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [listRefreshing, setListRefreshing] = useState(false)
+  const [txLoading, setTxLoading] = useState(false)
+  const [txError, setTxError] = useState<string | null>(null)
+  const [txRows, setTxRows] = useState<any[]>([])
+  const [txNextCursor, setTxNextCursor] = useState<string | null>(null)
+  const [txLoadingMore, setTxLoadingMore] = useState(false)
 
   const isTunnelMode = walletMode === 'tunnel'
   const expectedWalletType: 'ngn' | 'usd' = isTunnelMode ? 'usd' : 'ngn'
@@ -81,24 +92,75 @@ const WalletScreen = () => {
     return null
   }
 
-  const fetchTransactions = useCallback(() => {
-    const baseParams =
-      transactionFilter === 'all'
-        ? {}
-        : {
-            transaction_type: transactionFilter,
-          }
+  const parseTransactionsPayload = useCallback((payload: any) => {
+    const list = payload?.data ?? payload?.transactions ?? payload
+    const rows = Array.isArray(list) ? list : []
+    const nextCursor = payload?.next_cursor ?? payload?.data?.next_cursor ?? null
+    return { rows, nextCursor: nextCursor ? String(nextCursor) : null }
+  }, [])
 
-    return getTransactions({
-      params: {
-        ...baseParams,
-        wallet_type: expectedWalletType,
-      },
-    })
-  }, [transactionFilter, expectedWalletType])
+  const fetchTransactions = useCallback(
+    async (cursor?: string, append = false) => {
+      if (append) {
+        setTxLoadingMore(true)
+      } else {
+        setTxLoading(true)
+      }
+      setTxError(null)
+      try {
+        const baseParams =
+          transactionFilter === 'all'
+            ? {}
+            : {
+                transaction_type: transactionFilter,
+              }
 
-  const { data, loading, refetch } = useFetch(fetchTransactions)
-  const { data: walletData, refetch: refetchWallet } = useFetch(() => getUserWallet())
+        const payload = await getTransactions({
+          params: {
+            ...baseParams,
+            wallet_type: expectedWalletType,
+            limit: TX_PAGE_LIMIT,
+            cursor,
+          },
+        })
+
+        const { rows, nextCursor } = parseTransactionsPayload(payload)
+        setTxNextCursor(nextCursor)
+        setTxRows((prev) => {
+          if (!append) return rows
+          const merged = [...prev, ...rows]
+          const seen = new Set<string>()
+          return merged.filter((item) => {
+            const key = String(item?.id ?? item?.reference ?? item?.transfer_reference ?? '')
+            if (!key) return true
+            if (seen.has(key)) return false
+            seen.add(key)
+            return true
+          })
+        })
+      } catch (error: any) {
+        setTxError(error?.message || 'Unable to load transactions.')
+        if (!append) {
+          setTxRows([])
+          setTxNextCursor(null)
+        }
+      } finally {
+        if (append) {
+          setTxLoadingMore(false)
+        } else {
+          setTxLoading(false)
+        }
+      }
+    },
+    [expectedWalletType, parseTransactionsPayload, transactionFilter]
+  )
+
+  const loadMoreTransactions = useCallback(async () => {
+    if (!txNextCursor || txLoading || txLoadingMore) return
+    await fetchTransactions(txNextCursor, true)
+  }, [fetchTransactions, txLoading, txLoadingMore, txNextCursor])
+
+  const { data: walletData, refetch: refetchWallet } = useFetch(() => getUserWallet(), false)
   const anchorState = useAnchorOnboarding({ autoFetchOnMount: false, autoFetchOnFocus: false })
   const anchorNormalized = useMemo(
     () => normalizeAnchorOnboarding(anchorState.detailResponse, anchorState.userAccountsResponse),
@@ -107,6 +169,36 @@ const WalletScreen = () => {
 
   const [tunnelLoading, setTunnelLoading] = useState(false)
   const [tunnelNotice, setTunnelNotice] = useState<string | null>(null)
+
+  const isPrimaryTransactionSafe = useCallback((item: any) => {
+    if (typeof isPrimaryTransactionFromUtils === 'function') {
+      return isPrimaryTransactionFromUtils(item)
+    }
+    if (__DEV__) {
+      console.warn('[WalletScreen] isPrimaryTransaction missing/invalid; using fallback')
+    }
+    return item?.show_in_primary_feed !== false
+  }, [])
+
+  const refreshWalletFetches = useCallback(async () => {
+    setListRefreshing(true)
+    try {
+      const withTimeout = <T,>(promise: Promise<T>, label: string) =>
+        Promise.race([
+          promise,
+          new Promise<T>((_, reject) =>
+            setTimeout(() => reject(new Error(`${label}_timeout`)), REFRESH_TIMEOUT_MS)
+          ),
+        ])
+
+      await Promise.allSettled([
+        withTimeout(fetchTransactions(undefined, false), 'transactions_refresh'),
+        withTimeout(refetchWallet(), 'wallet_refresh'),
+      ])
+    } finally {
+      setListRefreshing(false)
+    }
+  }, [fetchTransactions, refetchWallet])
 
   const walletBalance =
     walletData?.data?.bridge?.balance ??
@@ -121,23 +213,17 @@ const WalletScreen = () => {
 
   // Refetch when switching wallets or changing filters
   useEffect(() => {
-    refetch()
-  }, [refetch, transactionFilter, walletMode])
-
-  const transactions = useMemo(() => {
-    const payload = (data as any)?.data ?? data
-    const list = payload?.data ?? payload?.transactions ?? payload
-    return Array.isArray(list) ? list : []
-  }, [data])
+    void refreshWalletFetches()
+  }, [refreshWalletFetches, transactionFilter, walletMode])
 
   // ✅ HARD FILTER by wallet type so NGN cannot leak into USD (or vice versa)
   const walletScopedTransactions = useMemo(() => {
-    return transactions.filter((item: any) => {
+    return txRows.filter((item: any) => {
       const t = getItemWalletType(item)
       if (!t) return true // if backend doesn't provide type, keep (but ideally backend should)
       return t === expectedWalletType
     })
-  }, [transactions, expectedWalletType])
+  }, [txRows, expectedWalletType])
 
   const filteredTransactions = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase()
@@ -163,7 +249,7 @@ const WalletScreen = () => {
             : null
 
     return walletScopedTransactions.filter((item: any) => {
-      if (!isPrimaryTransaction(item)) return false
+      if (!isPrimaryTransactionSafe(item)) return false
 
       const filterStatus = statusFilterValue(item)
       if (statusFilter !== 'all' && filterStatus !== statusFilter) return false
@@ -201,7 +287,7 @@ const WalletScreen = () => {
 
       return haystack.includes(normalizedSearch)
     })
-  }, [walletScopedTransactions, statusFilter, dateRange, searchTerm, startDate, endDate])
+  }, [walletScopedTransactions, statusFilter, dateRange, searchTerm, startDate, endDate, isPrimaryTransactionSafe])
 
   const statusTone = (status: string) => {
     if (status === 'approved' || status === 'completed') return 'text-green-400'
@@ -210,12 +296,11 @@ const WalletScreen = () => {
     return 'text-red-400'
   }
 
-  const isPrimaryTransaction = (item: any) => item?.show_in_primary_feed !== false
+  function transactionState(item: any) {
+    return String(item?.lifecycle_state || item?.status || 'pending').toLowerCase()
+  }
 
-  const transactionState = (item: any) =>
-    String(item?.lifecycle_state || item?.status || 'pending').toLowerCase()
-
-  const statusFilterValue = (item: any) => {
+  function statusFilterValue(item: any) {
     const state = transactionState(item)
     if (state === 'completed') return 'approved'
     if (state === 'reserved') return 'initialized'
@@ -304,7 +389,7 @@ const WalletScreen = () => {
     setTunnelNotice(null)
     try {
       await activateTunnel()
-      await refetchWallet()
+      await refreshWalletFetches()
       setWalletMode('tunnel')
     } catch (error: any) {
       const message =
@@ -316,16 +401,14 @@ const WalletScreen = () => {
   }
 
   // ✅ Pull-to-refresh
-  const [refreshing, setRefreshing] = useState(false)
-
   const onRefresh = useCallback(async () => {
     setRefreshing(true)
     try {
-      await Promise.allSettled([refetch(), refetchWallet()])
+      await refreshWalletFetches()
     } finally {
       setRefreshing(false)
     }
-  }, [refetch, refetchWallet])
+  }, [refreshWalletFetches])
 
   const heroContent = (
     <>
@@ -545,8 +628,20 @@ const WalletScreen = () => {
           </View>
 
           <View className="mt-6">
-            {loading ? (
+            {((txLoading || listRefreshing) && filteredTransactions.length < 1) ? (
               <ActivityIndicator className="mt-10" size={'large'} />
+            ) : txError ? (
+              <View className="rounded-2xl border border-red-500/40 bg-red-900/20 px-4 py-4">
+                <Text className="text-center text-red-200 text-sm">
+                  Unable to load transactions right now.
+                </Text>
+                <TouchableOpacity
+                  onPress={() => void refreshWalletFetches()}
+                  className="mt-3 rounded-xl border border-red-400/40 bg-red-950/40 py-2"
+                >
+                  <Text className="text-center text-red-100 text-xs font-semibold">Retry</Text>
+                </TouchableOpacity>
+              </View>
             ) : filteredTransactions.length < 1 ? (
               <View className="rounded-2xl border border-gray-800 bg-gray-900/70 px-4 py-4">
                 <Text className="text-center text-white">No transaction</Text>
@@ -598,6 +693,21 @@ const WalletScreen = () => {
                 )
               })
             )}
+            {filteredTransactions.length > 0 && txNextCursor ? (
+              <View className="mt-2 mb-4 items-center">
+                <TouchableOpacity
+                  onPress={() => void loadMoreTransactions()}
+                  disabled={txLoadingMore}
+                  className="bg-gray-900 border border-gray-800 px-4 py-2 rounded-full"
+                >
+                  {txLoadingMore ? (
+                    <ActivityIndicator size="small" color="#f59e0b" />
+                  ) : (
+                    <Text className="text-white text-xs font-semibold">Load more</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            ) : null}
           </View>
         </View>
       </ScrollView>

@@ -12,6 +12,8 @@ const useFetch = <T>(fetchFunction: AnyFn<T>, autoFetch = true) => {
 
   // Prevent request spam
   const inFlightRef = useRef(false)
+  const queuedRefetchRef = useRef(false)
+  const runFetchRef = useRef<null | (() => Promise<void>)>(null)
 
   // Ensure autoFetch runs once per mount (but can be refetched manually)
   const didAutoFetchRef = useRef(false)
@@ -31,7 +33,10 @@ const useFetch = <T>(fetchFunction: AnyFn<T>, autoFetch = true) => {
   }, [])
 
   const fetchData = useCallback(async () => {
-    if (inFlightRef.current) return
+    if (inFlightRef.current) {
+      queuedRefetchRef.current = true
+      return
+    }
     inFlightRef.current = true
 
     try {
@@ -70,11 +75,19 @@ const useFetch = <T>(fetchFunction: AnyFn<T>, autoFetch = true) => {
       }
     } finally {
       inFlightRef.current = false
+      if (queuedRefetchRef.current && mountedRef.current) {
+        queuedRefetchRef.current = false
+        void runFetchRef.current?.()
+      }
       if (mountedRef.current) {
         setLoading(false)
       }
     }
   }, [])
+
+  useEffect(() => {
+    runFetchRef.current = fetchData
+  }, [fetchData])
 
   useEffect(() => {
     if (!autoFetch) return

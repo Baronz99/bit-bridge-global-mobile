@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { ActivityIndicator, Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { getTimelineItem } from '@/api/timeline'
-import { MOCK_TIMELINE } from '@/components/timeline/mockData'
 import moneyFormat from '@/utils/moneyFormat'
 
 const StatusStep = ({ label, active }: { label: string; active: boolean }) => (
@@ -26,8 +25,7 @@ const ActivityDetailsScreen = () => {
       const payload = res?.data ?? res
       setRecord(payload ?? null)
     } catch {
-      const fallback = MOCK_TIMELINE.find((item) => String(item.id) === String(id)) as any
-      setRecord(fallback ?? null)
+      setRecord(null)
     } finally {
       setLoading(false)
     }
