@@ -192,16 +192,57 @@ export const initiateFundTransfer = async (payload: {
   account: {
     account_number: string
     bank_code: string
+    bank: string
+    account_name: string
     amount: number
     inter_bank: boolean
     counter_party_id?: string
     pin: string
-    transfer_reference?: string
+    transfer_reference: string
+    description: string
     save_beneficiary?: boolean
   }
 }) => {
+  const account = payload?.account || ({} as any)
+  const accountNumber = String(account.account_number || '').trim()
+  const bankCode = String(account.bank_code || '').trim()
+  const bank = String(account.bank || '').trim()
+  const accountName = String(account.account_name || '').trim()
+  const description = String(account.description || '').trim()
+  const pin = String(account.pin || '').trim()
+  const transferReference = String(account.transfer_reference || '').trim()
+  const counterPartyId = String(account.counter_party_id || '').trim()
+  const amount = Number(account.amount)
+
+  if (!/^\d{10}$/.test(accountNumber)) {
+    throw new Error('Account number must be exactly 10 digits.')
+  }
+  if (!bankCode) throw new Error('Bank code is required.')
+  if (!bank) throw new Error('Bank is required.')
+  if (!accountName) throw new Error('Account name is required.')
+  if (!description) throw new Error('Description is required.')
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new Error('Amount must be greater than 0 (in Naira).')
+  }
+  if (typeof account.inter_bank !== 'boolean') {
+    throw new Error('inter_bank must be true or false.')
+  }
+  if (!/^\d{4}$/.test(pin)) {
+    throw new Error('PIN must be exactly 4 digits.')
+  }
+  if (!transferReference) {
+    throw new Error('transfer_reference is required.')
+  }
+  if (account.inter_bank === true && !counterPartyId) {
+    throw new Error('counter_party_id is required when inter_bank is true.')
+  }
+
   try {
-    const res = await client.post('/accounts/initiate_fund_transfer', payload)
+    const res = await client.post('/accounts/initiate_fund_transfer', payload, {
+      headers: {
+        Accept: 'application/json',
+      },
+    })
     return res.data
   } catch (err: any) {
     const msg = errMsg(err)
@@ -211,7 +252,20 @@ export const initiateFundTransfer = async (payload: {
       data: err?.response?.data,
       url: err?.config?.url,
     })
-    throw err
+    const data = err?.response?.data || {}
+    const enhanced = new Error(msg) as Error & {
+      status?: number
+      error_code?: string
+      attempts_remaining?: number
+      retry_after_seconds?: number
+      response?: any
+    }
+    enhanced.status = err?.response?.status
+    enhanced.error_code = data?.error_code
+    enhanced.attempts_remaining = data?.attempts_remaining
+    enhanced.retry_after_seconds = data?.retry_after_seconds
+    enhanced.response = err?.response
+    throw enhanced
   }
 }
 

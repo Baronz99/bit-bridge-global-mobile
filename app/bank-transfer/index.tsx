@@ -8,6 +8,7 @@ import Loader from '@/components/Loader'
 import NotificationAlert from '@/components/notification'
 import TransactionPinModal from '@/components/TransactionPinModal'
 import {
+  createCounterParty,
   getBanks,
   getBeneficiaries,
   initiateFundTransfer,
@@ -35,7 +36,10 @@ const BankTransferScreen = () => {
     account_number: '',
     account_name: '',
     amount: '',
+    inter_bank: false,
     beneficiary_id: '',
+    counter_party_id: '',
+    description: 'Fund Transfer',
   })
   const [accountLookupStatus, setAccountLookupStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [accountLookupError, setAccountLookupError] = useState<string | null>(null)
@@ -116,6 +120,28 @@ const BankTransferScreen = () => {
     }))
     return list
   }, [beneficiaries])
+  const transferTypeOptions = useMemo(
+    () => [
+      { label: 'Within Bank', value: 'false' },
+      { label: 'Inter Bank', value: 'true' },
+    ],
+    []
+  )
+
+  const extractCounterPartyId = (payload: any): string => {
+    const direct =
+      payload?.counter_party_id ||
+      payload?.counterPartyId ||
+      payload?.id ||
+      payload?.beneficiary_id
+    if (direct) return String(direct)
+    const nested =
+      payload?.data?.counter_party_id ||
+      payload?.data?.counterPartyId ||
+      payload?.data?.id ||
+      payload?.data?.beneficiary_id
+    return nested ? String(nested) : ''
+  }
 
   const generateTransferReference = () => {
     const cryptoObj = (globalThis as any)?.crypto
@@ -180,9 +206,15 @@ const BankTransferScreen = () => {
       return
     }
     const amountValue = Number(formData.amount)
-    if (!formData.bank_code || !formData.account_number.trim() || !amountValue) {
+    if (
+      !formData.bank_code ||
+      !formData.account_number.trim() ||
+      !formData.account_name.trim() ||
+      !formData.description.trim() ||
+      !amountValue
+    ) {
       setNotice({
-        message: 'Amount, bank, and account number are required.',
+        message: 'Amount, bank, account number, account name, and description are required.',
         error: true,
         data: null,
       })
@@ -228,6 +260,42 @@ const BankTransferScreen = () => {
     setPinModalOpen(true)
   }
 
+  const resolveInterBankCounterPartyId = async () => {
+    const existingId = String(formData.counter_party_id || formData.beneficiary_id || '').trim()
+    if (existingId) return existingId
+
+    const resolvePayload = {
+      account: {
+        account_number: String(formData.account_number || '').trim(),
+        bank_code: formData.bank_code,
+      },
+    }
+    const resolved = await resolveAccountName(resolvePayload)
+    const resolvedName = String(resolved?.account_name || '').trim()
+    if (resolvedName && resolvedName !== formData.account_name) {
+      setFormData((prev) => ({ ...prev, account_name: resolvedName }))
+    }
+    const resolvedCounterPartyId = extractCounterPartyId(resolved)
+    if (resolvedCounterPartyId) {
+      setFormData((prev) => ({ ...prev, counter_party_id: resolvedCounterPartyId }))
+      return resolvedCounterPartyId
+    }
+
+    const created = await createCounterParty({
+      account: {
+        bank_code: formData.bank_code,
+        account_number: String(formData.account_number || '').trim(),
+        account_name: String(resolvedName || formData.account_name || '').trim() || undefined,
+      },
+    })
+    const createdCounterPartyId = extractCounterPartyId(created)
+    if (createdCounterPartyId) {
+      setFormData((prev) => ({ ...prev, counter_party_id: createdCounterPartyId }))
+      return createdCounterPartyId
+    }
+    return ''
+  }
+
   const handleSubmit = async (transactionPin: string) => {
     if (!hasAnchor) {
       setShowAnchorCta(true)
@@ -239,9 +307,15 @@ const BankTransferScreen = () => {
       return
     }
     const amountValue = Number(formData.amount)
-    if (!formData.bank_code || !formData.account_number.trim() || !amountValue) {
+    if (
+      !formData.bank_code ||
+      !formData.account_number.trim() ||
+      !formData.account_name.trim() ||
+      !formData.description.trim() ||
+      !amountValue
+    ) {
       setNotice({
-        message: 'Amount, bank, and account number are required.',
+        message: 'Amount, bank, account number, account name, and description are required.',
         error: true,
         data: null,
       })
@@ -259,16 +333,30 @@ const BankTransferScreen = () => {
     setLoading(true)
     setNotice({ message: null, error: false, data: null })
     try {
+      const counterPartyId = formData.inter_bank
+        ? await resolveInterBankCounterPartyId()
+        : String(formData.counter_party_id || formData.beneficiary_id || '').trim()
+      if (formData.inter_bank && !counterPartyId) {
+        setNotice({
+          message: 'Inter-bank transfer requires a resolved beneficiary. Please try again.',
+          error: true,
+          data: null,
+        })
+        return
+      }
       console.log('[BankTransfer] initiate start')
       const response = await initiateFundTransfer({
         account: {
           account_number: formData.account_number.trim(),
           bank_code: formData.bank_code,
+          bank: bankOptions.find((item) => item.value === formData.bank_code)?.label || 'Unknown bank',
+          account_name: formData.account_name.trim(),
           amount: amountValue,
-          inter_bank: false,
-          counter_party_id: formData.beneficiary_id || undefined,
+          inter_bank: formData.inter_bank,
+          counter_party_id: counterPartyId || undefined,
           pin: transactionPin,
           transfer_reference: transferReference || generateTransferReference(),
+          description: formData.description.trim(),
         },
       })
 
@@ -282,7 +370,10 @@ const BankTransferScreen = () => {
         account_number: '',
         account_name: '',
         amount: '',
+        inter_bank: false,
         beneficiary_id: '',
+        counter_party_id: '',
+        description: 'Fund Transfer',
       })
       setAccountLookupStatus('idle')
       setAccountLookupError(null)
@@ -308,11 +399,18 @@ const BankTransferScreen = () => {
         await onLogout().catch(() => {})
         return
       }
-      const message = buildApiErrorMessage({
-        status,
-        data: error?.response?.data,
+      const apiData = error?.response?.data || {}
+      const messageBase = buildApiErrorMessage({
+        status: status || error?.status,
+        data: apiData,
         fallback: error?.message || 'Something went wrong',
       })
+      const message =
+        typeof error?.retry_after_seconds === 'number'
+          ? `${messageBase} Try again in ${error.retry_after_seconds}s.`
+          : typeof error?.attempts_remaining === 'number'
+          ? `${messageBase} Attempts remaining: ${error.attempts_remaining}.`
+          : messageBase
       if (message.toLowerCase().includes('no anchor account')) {
         setShowAnchorCta(true)
       }
@@ -350,6 +448,22 @@ const BankTransferScreen = () => {
           ) : null}
 
           <FormSelect
+            label="Transfer Type"
+            selectedValue={String(formData.inter_bank)}
+            onValueChange={(value: string) => {
+              const nextInterBank = String(value) === 'true'
+              setFormData((prev) => ({
+                ...prev,
+                inter_bank: nextInterBank,
+                counter_party_id: nextInterBank ? prev.counter_party_id : '',
+              }))
+              setTransferReference('')
+            }}
+            options={transferTypeOptions}
+            placeholder="Select transfer type"
+          />
+
+          <FormSelect
             label="Bank"
             selectedValue={formData.bank_code}
             onValueChange={(value: string) => {
@@ -357,6 +471,8 @@ const BankTransferScreen = () => {
                 ...prev,
                 bank_code: value,
                 account_name: '',
+                beneficiary_id: '',
+                counter_party_id: '',
               }))
               setAccountLookupStatus('idle')
               setAccountLookupError(null)
@@ -383,6 +499,8 @@ const BankTransferScreen = () => {
                 ...prev,
                 account_number: text,
                 account_name: '',
+                beneficiary_id: '',
+                counter_party_id: '',
               }))
               setAccountLookupStatus('idle')
               setAccountLookupError(null)
@@ -417,6 +535,16 @@ const BankTransferScreen = () => {
             }}
           />
 
+          <FormInput
+            label="Description"
+            value={formData.description}
+            name="description"
+            onChangeText={(text: string) => {
+              setFormData((prev) => ({ ...prev, description: text }))
+              setTransferReference('')
+            }}
+          />
+
           <FormSelect
             label="Beneficiary (optional)"
             selectedValue={formData.beneficiary_id}
@@ -426,6 +554,7 @@ const BankTransferScreen = () => {
                 setFormData((prev) => ({
                   ...prev,
                   beneficiary_id: value,
+                  counter_party_id: String(value || ''),
                   account_number: selected.data.account_number || prev.account_number,
                   bank_code: selected.data.bank_code || prev.bank_code,
                   account_name: selected.data.account_name || prev.account_name,
@@ -436,7 +565,7 @@ const BankTransferScreen = () => {
                   selected.data.account_number || ''
                 }`
               } else {
-                setFormData((prev) => ({ ...prev, beneficiary_id: value }))
+                setFormData((prev) => ({ ...prev, beneficiary_id: value, counter_party_id: '' }))
                 setAccountLookupStatus('idle')
                 setAccountLookupError(null)
                 lastLookupKeyRef.current = ''
