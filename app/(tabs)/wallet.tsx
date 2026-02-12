@@ -21,6 +21,7 @@ import { activateTunnel, getUserWallet } from '@/api/wallet'
 import { normalizeAnchorOnboarding, useAnchorOnboarding } from '@/services/useAnchorOnboarding'
 import AppModal from '@/components/modal/Modal'
 import { isPrimaryTransaction as isPrimaryTransactionFromUtils } from '@/utils/timelineRefs'
+import { getTierFromProfile, isTierEligibleForBankTransfer } from '@/utils/bankTransfer'
 
 const REFRESH_TIMEOUT_MS = 15000
 const TX_PAGE_LIMIT = 30
@@ -161,6 +162,10 @@ const WalletScreen = () => {
   }, [fetchTransactions, txLoading, txLoadingMore, txNextCursor])
 
   const { data: walletData, refetch: refetchWallet } = useFetch(() => getUserWallet(), false)
+  const canUseBankTransfer = useMemo(
+    () => isTierEligibleForBankTransfer(getTierFromProfile(userProfileData)),
+    [userProfileData]
+  )
   const anchorState = useAnchorOnboarding({ autoFetchOnMount: false, autoFetchOnFocus: false })
   const anchorNormalized = useMemo(
     () => normalizeAnchorOnboarding(anchorState.detailResponse, anchorState.userAccountsResponse),
@@ -839,12 +844,23 @@ const WalletScreen = () => {
           <TouchableOpacity
             onPress={() => {
               setSendOpen(false)
-              router.push('/bank-transfer')
+              if (canUseBankTransfer) {
+                router.push('/bank-transfer')
+              } else {
+                router.push('/bank-transfer/locked')
+              }
             }}
-            className="bg-gray-950 border border-gray-800 py-3 rounded-xl items-center mt-3"
+            className={`border py-3 rounded-xl items-center mt-3 ${
+              canUseBankTransfer ? 'bg-gray-950 border-gray-800' : 'bg-gray-900 border-gray-700'
+            }`}
           >
             <Text className="text-white text-sm font-semibold">Bank transfer</Text>
           </TouchableOpacity>
+          {!canUseBankTransfer ? (
+            <Text className="text-gray-400 text-xs mt-2 text-center">
+              Bank transfer requires Tier 2 verification.
+            </Text>
+          ) : null}
         </View>
       </AppModal>
     </>

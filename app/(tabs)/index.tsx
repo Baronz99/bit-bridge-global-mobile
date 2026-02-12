@@ -34,6 +34,7 @@ import useNotification from '@/hooks/useNotification'
 import ScreenContainer from '@/components/ScreenContainer'
 import ViewBox from '@/components/view-box/ViewBoxIcon'
 import { FEATURE_LEGACY_HOME } from '@/constants/featureFlags'
+import { getTierFromProfile, isTierEligibleForBankTransfer } from '@/utils/bankTransfer'
 
 // ---------------------------
 // Types
@@ -323,6 +324,10 @@ export default function Index() {
     const match = kycLevel.match(/tier[_\s-]?(\d+)/)
     return match ? Number(match[1]) : 0
   }, [kycLevel])
+  const canUseBankTransfer = useMemo(
+    () => isTierEligibleForBankTransfer(getTierFromProfile(userProfileData)),
+    [userProfileData]
+  )
 
   const hasCardAccess = useMemo(() => {
     const payload = (userProfileData as any)?.data ?? userProfileData
@@ -980,12 +985,19 @@ export default function Index() {
           <TouchableOpacity
             onPress={() => {
               setSendOpen(false)
-              router.push('/bank-transfer' as any)
+              router.push((canUseBankTransfer ? '/bank-transfer' : '/bank-transfer/locked') as any)
             }}
-            className="bg-gray-950 border border-gray-800 py-3 rounded-xl items-center mt-3"
+            className={`border py-3 rounded-xl items-center mt-3 ${
+              canUseBankTransfer ? 'bg-gray-950 border-gray-800' : 'bg-gray-900 border-gray-700'
+            }`}
           >
             <Text className="text-white text-sm font-semibold">Bank transfer</Text>
           </TouchableOpacity>
+          {!canUseBankTransfer ? (
+            <Text className="text-gray-400 text-xs mt-2 text-center">
+              Bank transfer requires Tier 2 verification.
+            </Text>
+          ) : null}
         </View>
       </AppModal>
 

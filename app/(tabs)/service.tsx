@@ -4,9 +4,13 @@ import { icons } from '@/constants/icons'
 import { useRouter } from 'expo-router'
 import ViewBox from '@/components/view-box/ViewBoxIcon'
 import ScreenContainer from '@/components/ScreenContainer'
+import { useAuth } from '@/services/useAuth'
+import { getTierFromProfile, isTierEligibleForBankTransfer } from '@/utils/bankTransfer'
 
 const Utilities = () => {
   const router = useRouter()
+  const { userProfileData } = useAuth()
+  const canUseBankTransfer = isTierEligibleForBankTransfer(getTierFromProfile(userProfileData))
   const sections = useMemo(
     () => [
       {
@@ -24,7 +28,9 @@ const Utilities = () => {
         description: 'Send, transfer, and manage recipients.',
         items: [
           { id: 7, label: 'Send Money', link: '/send-money', image: icons.transfer },
-          { id: 8, label: 'Bank Transfer', link: '/bank-transfer', image: icons.transaction },
+          ...(canUseBankTransfer
+            ? [{ id: 8, label: 'Bank Transfer', link: '/bank-transfer', image: icons.transaction }]
+            : []),
           { id: 5, label: 'Beneficiaries', link: '/beneficiaries', image: icons.user },
         ],
       },
@@ -34,7 +40,7 @@ const Utilities = () => {
         items: [{ id: 12, label: 'Virtual Accounts', link: '/accounts', image: icons.wallet }],
       },
     ],
-    []
+    [canUseBankTransfer]
   )
 
   return (

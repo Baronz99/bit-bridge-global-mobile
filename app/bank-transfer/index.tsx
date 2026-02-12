@@ -1,183 +1,234 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Text, TouchableOpacity, View } from 'react-native'
+import { ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import { useRouter } from 'expo-router'
-import FormInput from '@/components/FormInput'
-import FormSelect from '@/components/FormSelect'
-import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
-import Loader from '@/components/Loader'
 import NotificationAlert from '@/components/notification'
-import TransactionPinModal from '@/components/TransactionPinModal'
-import {
-  createCounterParty,
-  getBanks,
-  getBeneficiaries,
-  initiateFundTransfer,
-  resolveAccountName,
-} from '@/api/account'
-import { getTransactionPinStatus } from '@/api/transactionPin'
+import SearchablePicker from '@/components/bankTransfer/SearchablePicker'
+import BankPickerSheet from '@/components/bankTransfer/BankPickerSheet'
+import RecipientVerificationState from '@/components/bankTransfer/RecipientVerificationState'
+import TierGateCard from '@/components/bankTransfer/TierGateCard'
+import { getBanks, getBeneficiaries, resolveAccountName } from '@/api/account'
+import { getUserWallet } from '@/api/wallet'
+import { estimateTransferFee, getTodayTransferSpent } from '@/services/bankTransfer'
 import { useAuth } from '@/services/useAuth'
-import { useAnchorOnboarding } from '@/services/useAnchorOnboarding'
+import {
+  BANK_TRANSFER_TIER_REQUIREMENT_COPY,
+  computeDailyRemainingAfterTransfer,
+  formatAmountInput,
+  formatNaira,
+  getTierDailyLimit,
+  getTierFromProfile,
+  isTierEligibleForBankTransfer,
+  parseAmountInput,
+  validateTransferAmount,
+} from '@/utils/bankTransfer'
 import { buildApiErrorMessage } from '@/utils/apiErrorMessage'
 
 type NoticeState = { message: string | null; error: boolean; data: any | null }
 
+type TransferDraft = {
+  bank_code: string
+  bank_name: string
+  account_number: string
+  account_name: string
+  amount: number
+  fee: number
+  total_debit: number
+  inter_bank: boolean
+  counter_party_id?: string
+  beneficiary_id?: string
+  save_beneficiary: boolean
+  description: string
+  daily_limit: number
+  today_spent: number
+  daily_remaining_before: number
+}
+
+const QUICK_AMOUNTS = [5000, 10000, 20000, 50000]
+
+const sanitizeDigits = (value: string) => String(value || '').replace(/\D/g, '')
+
+const extractCounterPartyId = (payload: any): string => {
+  const direct =
+    payload?.counter_party_id ||
+    payload?.counterPartyId ||
+    payload?.id ||
+    payload?.beneficiary_id
+  if (direct) return String(direct)
+  const nested =
+    payload?.data?.counter_party_id ||
+    payload?.data?.counterPartyId ||
+    payload?.data?.id ||
+    payload?.data?.beneficiary_id
+  return nested ? String(nested) : ''
+}
+
 const BankTransferScreen = () => {
   const router = useRouter()
-  const { onLogout } = useAuth()
+  const { userProfileData, onLogout } = useAuth()
+  const accountNumberRef = useRef<TextInput | null>(null)
+  const amountRef = useRef<TextInput | null>(null)
+  const resolveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastLookupKeyRef = useRef('')
+
   const [loading, setLoading] = useState(false)
+  const [notice, setNotice] = useState<NoticeState>({ message: null, error: false, data: null })
   const [banks, setBanks] = useState<any[]>([])
   const [beneficiaries, setBeneficiaries] = useState<any[]>([])
-  const [pinModalOpen, setPinModalOpen] = useState(false)
-  const [pinError, setPinError] = useState<string | null>(null)
-  const anchorState = useAnchorOnboarding({ autoFetchOnMount: false, autoFetchOnFocus: false })
-  const [showAnchorCta, setShowAnchorCta] = useState(false)
+  const [availableBalance, setAvailableBalance] = useState(0)
+  const [todaySpent, setTodaySpent] = useState(0)
+  const [saveBeneficiary, setSaveBeneficiary] = useState(false)
+  const [selectedBeneficiary, setSelectedBeneficiary] = useState('')
+  const [recentBankCodes, setRecentBankCodes] = useState<string[]>([])
   const [formData, setFormData] = useState({
     bank_code: '',
     account_number: '',
     account_name: '',
     amount: '',
-    inter_bank: false,
-    beneficiary_id: '',
+    inter_bank: true,
+    description: '',
     counter_party_id: '',
-    description: 'Fund Transfer',
   })
   const [accountLookupStatus, setAccountLookupStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [accountLookupError, setAccountLookupError] = useState<string | null>(null)
-  const lastLookupKeyRef = useRef('')
-  const [transferReference, setTransferReference] = useState('')
-  const [notice, setNotice] = useState<NoticeState>({
-    message: null,
-    error: false,
-    data: null,
-  })
-  const hasAnchor = anchorState.hasAnchorAccount === true
-  const canResolve =
-    String(formData.account_number || '').trim().length === 10 && !!formData.bank_code
 
-  useEffect(() => {
-    const fetchBanks = async () => {
-      setLoading(true)
-      setNotice({ message: null, error: false, data: null })
-      try {
-        const list = await getBanks()
-        setBanks(list)
-      } catch (error: any) {
-        const status = error?.response?.status
-        if (status === 401) {
-          await onLogout().catch(() => {})
-          return
-        }
-        const message = buildApiErrorMessage({
-          status,
-          data: error?.response?.data,
-          fallback: error?.message || 'Something went wrong',
-        })
-        setNotice({ message, error: true, data: null })
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    const fetchBeneficiaries = async () => {
-      try {
-        const list = await getBeneficiaries()
-        setBeneficiaries(list)
-      } catch (error: any) {
-        const status = error?.response?.status
-        if (status === 401) {
-          await onLogout().catch(() => {})
-          return
-        }
-      }
-    }
-
-    fetchBanks()
-    fetchBeneficiaries()
-  }, [onLogout])
-
-  useEffect(() => {
-    if (anchorState.error?.response?.status === 401) {
-      onLogout().catch(() => {})
-    }
-  }, [anchorState.error, onLogout])
+  const tier = useMemo(() => getTierFromProfile(userProfileData), [userProfileData])
+  const tierEligible = isTierEligibleForBankTransfer(tier)
+  const dailyLimit = getTierDailyLimit(tier)
+  const dailyLimitRemaining = Math.max(0, dailyLimit - todaySpent)
+  const beneficiaryLocked = Boolean(selectedBeneficiary)
 
   const bankOptions = useMemo(
     () =>
       banks.map((bank) => ({
         label: bank?.name || bank?.bank_name || bank?.label || 'Unknown bank',
-        value: bank?.code || bank?.bank_code || bank?.value || bank?.id || bank?.name,
+        value: String(bank?.code || bank?.bank_code || bank?.value || bank?.id || bank?.name || ''),
+        data: bank,
       })),
     [banks]
   )
 
-  const beneficiaryOptions = useMemo(() => {
-    const list = beneficiaries.map((item) => ({
-      label: `${item?.account_name || item?.name || item?.beneficiary_name || 'Beneficiary'} - ${
-        item?.bank_name || item?.bank || 'Bank'
-      }`,
-      value: item?.id || item?.beneficiary_id || item?.counter_party_id,
-      data: item,
-    }))
-    return list
-  }, [beneficiaries])
-  const transferTypeOptions = useMemo(
-    () => [
-      { label: 'Within Bank', value: 'false' },
-      { label: 'Inter Bank', value: 'true' },
-    ],
-    []
+  const beneficiaryOptions = useMemo(
+    () =>
+      beneficiaries.map((item) => ({
+        label: `${item?.account_name || item?.name || 'Beneficiary'} - ${item?.bank_name || item?.bank || 'Bank'}`,
+        value: String(item?.id || item?.beneficiary_id || item?.counter_party_id || ''),
+        data: item,
+      })),
+    [beneficiaries]
   )
 
-  const extractCounterPartyId = (payload: any): string => {
-    const direct =
-      payload?.counter_party_id ||
-      payload?.counterPartyId ||
-      payload?.id ||
-      payload?.beneficiary_id
-    if (direct) return String(direct)
-    const nested =
-      payload?.data?.counter_party_id ||
-      payload?.data?.counterPartyId ||
-      payload?.data?.id ||
-      payload?.data?.beneficiary_id
-    return nested ? String(nested) : ''
-  }
+  const selectedBankLabel = useMemo(() => {
+    const selected = bankOptions.find((item) => String(item.value) === String(formData.bank_code))
+    return selected?.label || ''
+  }, [bankOptions, formData.bank_code])
 
-  const generateTransferReference = () => {
-    const cryptoObj = (globalThis as any)?.crypto
-    if (cryptoObj?.randomUUID) return cryptoObj.randomUUID()
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (ch) => {
-      const rand = (Math.random() * 16) | 0
-      const val = ch === 'x' ? rand : (rand & 0x3) | 0x8
-      return val.toString(16)
-    })
-  }
+  const amountValue = parseAmountInput(formData.amount)
+  const fee = estimateTransferFee(amountValue)
+  const amountValidation = validateTransferAmount({
+    amount: amountValue,
+    fee,
+    availableBalance,
+    dailyLimitRemaining,
+  })
 
-  const fetchAccountName = async (force = false) => {
+  const narrationValue = formData.description.trim()
+  const dailyRemainingAfterTransfer = computeDailyRemainingAfterTransfer({
+    dailyLimitRemaining,
+    totalDebit: amountValidation.totalDebit,
+  })
+
+  const canResolve =
+    sanitizeDigits(formData.account_number).length === 10 &&
+    !!formData.bank_code
+
+  const canContinue =
+    tierEligible &&
+    !!formData.bank_code &&
+    sanitizeDigits(formData.account_number).length === 10 &&
+    narrationValue.length > 0 &&
+    accountLookupStatus === 'success' &&
+    amountValidation.valid
+
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true)
+      setNotice({ message: null, error: false, data: null })
+      try {
+        const [bankList, beneficiaryList, walletResult, todaySpentResult] = await Promise.all([
+          getBanks(),
+          getBeneficiaries().catch(() => []),
+          getUserWallet().catch(() => ({})),
+          getTodayTransferSpent().catch(() => 0),
+        ])
+        setBanks(Array.isArray(bankList) ? bankList : [])
+        const safeBeneficiaries = Array.isArray(beneficiaryList) ? beneficiaryList : []
+        setBeneficiaries(safeBeneficiaries)
+        const seededRecentBanks = safeBeneficiaries
+          .map((item: any) => String(item?.bank_code || '').trim())
+          .filter(Boolean)
+          .slice(0, 4)
+        setRecentBankCodes(seededRecentBanks)
+        const walletBalance =
+          walletResult?.data?.bridge?.balance ??
+          walletResult?.data?.bridge?.amount ??
+          userProfileData?.wallet?.balance ??
+          0
+        setAvailableBalance(Number(walletBalance || 0))
+        setTodaySpent(Number(todaySpentResult || 0))
+      } catch (error: any) {
+        const status = error?.response?.status
+        if (status === 401) {
+          await onLogout().catch(() => {})
+          return
+        }
+        setNotice({
+          message: buildApiErrorMessage({
+            status,
+            data: error?.response?.data,
+            fallback: error?.message || 'Unable to load transfer form',
+          }),
+          error: true,
+          data: null,
+        })
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadData()
+  }, [onLogout, userProfileData?.wallet?.balance])
+
+  const runResolveAccount = async (force = false) => {
     if (!canResolve) return
+    const lookupKey = `${formData.bank_code}:${sanitizeDigits(formData.account_number)}`
+    if (!force && accountLookupStatus === 'success' && lastLookupKeyRef.current === lookupKey) return
+
     try {
-      const payload = {
-        account: {
-          account_number: String(formData.account_number || '').trim(),
-          bank_code: formData.bank_code,
-        },
-      }
-      const lookupKey = `${payload.account.bank_code}:${payload.account.account_number}`
-      if (!force && accountLookupStatus === 'success' && lastLookupKeyRef.current === lookupKey) {
-        return
-      }
       setAccountLookupStatus('loading')
       setAccountLookupError(null)
-      const res = await resolveAccountName(payload)
+      const response = await resolveAccountName({
+        account: {
+          account_number: sanitizeDigits(formData.account_number),
+          bank_code: formData.bank_code,
+        },
+      })
+      const accountName = String(response?.account_name || '').trim()
+      if (!accountName) {
+        setAccountLookupStatus('error')
+        setAccountLookupError('Recipient verification failed. Confirm account number and bank.')
+        return
+      }
+      const counterPartyId = extractCounterPartyId(response)
       setFormData((prev) => ({
         ...prev,
-        account_name: res?.account_name || prev.account_name,
+        account_name: accountName,
+        counter_party_id: counterPartyId || prev.counter_party_id,
       }))
       setAccountLookupStatus('success')
       lastLookupKeyRef.current = lookupKey
-    } catch (_err) {
+      amountRef.current?.focus()
+    } catch {
       setAccountLookupStatus('error')
-      setAccountLookupError('Account not found. Check details.')
+      setAccountLookupError('Recipient verification failed. Confirm account number and bank.')
     }
   }
 
@@ -187,428 +238,258 @@ const BankTransferScreen = () => {
       setAccountLookupError(null)
       return
     }
-    const lookupKey = `${formData.bank_code}:${formData.account_number}`
-    if (accountLookupStatus === 'success' && lastLookupKeyRef.current === lookupKey) return
-    const timer = setTimeout(() => {
-      fetchAccountName()
-    }, 500)
-    return () => clearTimeout(timer)
-  }, [formData.bank_code, formData.account_number, canResolve, accountLookupStatus])
 
-  const handleOpenPin = async () => {
-    if (!hasAnchor) {
-      setShowAnchorCta(true)
-      setNotice({
-        message: 'Create an Anchor account to continue.',
-        error: true,
-        data: null,
-      })
-      return
-    }
-    const amountValue = Number(formData.amount)
-    if (
-      !formData.bank_code ||
-      !formData.account_number.trim() ||
-      !formData.account_name.trim() ||
-      !formData.description.trim() ||
-      !amountValue
-    ) {
-      setNotice({
-        message: 'Amount, bank, account number, account name, and description are required.',
-        error: true,
-        data: null,
-      })
-      return
-    }
-    if (accountLookupStatus !== 'success') {
-      setNotice({
-        message: 'Please verify the account details.',
-        error: true,
-        data: null,
-      })
-      return
-    }
+    if (resolveTimerRef.current) clearTimeout(resolveTimerRef.current)
+    resolveTimerRef.current = setTimeout(() => {
+      runResolveAccount()
+    }, 550)
 
-    try {
-      const status = await getTransactionPinStatus()
-      const payload = status?.data ?? status
-      const hasPin =
-        payload?.has_pin === true ||
-        payload?.status === 'set' ||
-        payload?.pin_set === true
-      if (!hasPin) {
-        setNotice({
-          message: 'Set your transaction PIN to continue.',
-          error: true,
-          data: null,
-        })
-        router.push('/settings/pin/set')
-        return
-      }
-    } catch (error: any) {
-      const status = error?.response?.status
-      if (status === 401) {
-        await onLogout().catch(() => {})
-        return
-      }
+    return () => {
+      if (resolveTimerRef.current) clearTimeout(resolveTimerRef.current)
     }
+  }, [formData.bank_code, formData.account_number, canResolve])
 
-    if (!transferReference) {
-      setTransferReference(generateTransferReference())
+  const handleContinue = () => {
+    if (!canContinue) return
+    const draft: TransferDraft = {
+      bank_code: formData.bank_code,
+      bank_name: selectedBankLabel,
+      account_number: sanitizeDigits(formData.account_number),
+      account_name: formData.account_name,
+      amount: amountValue,
+      fee,
+      total_debit: amountValidation.totalDebit,
+      inter_bank: formData.inter_bank,
+      counter_party_id: formData.counter_party_id || undefined,
+      beneficiary_id: selectedBeneficiary || undefined,
+      save_beneficiary: saveBeneficiary,
+      description: narrationValue,
+      daily_limit: dailyLimit,
+      today_spent: todaySpent,
+      daily_remaining_before: dailyLimitRemaining,
     }
-    setPinError(null)
-    setPinModalOpen(true)
-  }
-
-  const resolveInterBankCounterPartyId = async () => {
-    const existingId = String(formData.counter_party_id || formData.beneficiary_id || '').trim()
-    if (existingId) return existingId
-
-    const resolvePayload = {
-      account: {
-        account_number: String(formData.account_number || '').trim(),
-        bank_code: formData.bank_code,
-      },
-    }
-    const resolved = await resolveAccountName(resolvePayload)
-    const resolvedName = String(resolved?.account_name || '').trim()
-    if (resolvedName && resolvedName !== formData.account_name) {
-      setFormData((prev) => ({ ...prev, account_name: resolvedName }))
-    }
-    const resolvedCounterPartyId = extractCounterPartyId(resolved)
-    if (resolvedCounterPartyId) {
-      setFormData((prev) => ({ ...prev, counter_party_id: resolvedCounterPartyId }))
-      return resolvedCounterPartyId
-    }
-
-    const created = await createCounterParty({
-      account: {
-        bank_code: formData.bank_code,
-        account_number: String(formData.account_number || '').trim(),
-        account_name: String(resolvedName || formData.account_name || '').trim() || undefined,
-      },
+    router.push({
+      pathname: '/bank-transfer/review',
+      params: { draft: JSON.stringify(draft) },
     })
-    const createdCounterPartyId = extractCounterPartyId(created)
-    if (createdCounterPartyId) {
-      setFormData((prev) => ({ ...prev, counter_party_id: createdCounterPartyId }))
-      return createdCounterPartyId
-    }
-    return ''
   }
 
-  const handleSubmit = async (transactionPin: string) => {
-    if (!hasAnchor) {
-      setShowAnchorCta(true)
-      setNotice({
-        message: 'Create an Anchor account to continue.',
-        error: true,
-        data: null,
-      })
-      return
-    }
-    const amountValue = Number(formData.amount)
-    if (
-      !formData.bank_code ||
-      !formData.account_number.trim() ||
-      !formData.account_name.trim() ||
-      !formData.description.trim() ||
-      !amountValue
-    ) {
-      setNotice({
-        message: 'Amount, bank, account number, account name, and description are required.',
-        error: true,
-        data: null,
-      })
-      return
-    }
-    if (accountLookupStatus !== 'success') {
-      setNotice({
-        message: 'Please verify the account details.',
-        error: true,
-        data: null,
-      })
-      return
-    }
-
-    setLoading(true)
-    setNotice({ message: null, error: false, data: null })
-    try {
-      const counterPartyId = formData.inter_bank
-        ? await resolveInterBankCounterPartyId()
-        : String(formData.counter_party_id || formData.beneficiary_id || '').trim()
-      if (formData.inter_bank && !counterPartyId) {
-        setNotice({
-          message: 'Inter-bank transfer requires a resolved beneficiary. Please try again.',
-          error: true,
-          data: null,
-        })
-        return
-      }
-      console.log('[BankTransfer] initiate start')
-      const response = await initiateFundTransfer({
-        account: {
-          account_number: formData.account_number.trim(),
-          bank_code: formData.bank_code,
-          bank: bankOptions.find((item) => item.value === formData.bank_code)?.label || 'Unknown bank',
-          account_name: formData.account_name.trim(),
-          amount: amountValue,
-          inter_bank: formData.inter_bank,
-          counter_party_id: counterPartyId || undefined,
-          pin: transactionPin,
-          transfer_reference: transferReference || generateTransferReference(),
-          description: formData.description.trim(),
-        },
-      })
-
-      setPinModalOpen(false)
-      console.log('[BankTransfer] initiate success', {
-        status: response?.status,
-        message: response?.message,
-      })
-      setFormData({
-        bank_code: '',
-        account_number: '',
-        account_name: '',
-        amount: '',
-        inter_bank: false,
-        beneficiary_id: '',
-        counter_party_id: '',
-        description: 'Fund Transfer',
-      })
-      setAccountLookupStatus('idle')
-      setAccountLookupError(null)
-      lastLookupKeyRef.current = ''
-      setTransferReference('')
-      setNotice({
-        message: response?.message || 'Transfer initiated.',
-        error: false,
-        data: response?.data || null,
-      })
-
-      const transferId =
-        response?.data?.transfer_id ||
-        response?.data?.id ||
-        response?.transfer_id ||
-        response?.id
-      if (transferId) {
-        router.push({ pathname: '/transfer-status', params: { transfer_id: String(transferId) } })
-      }
-    } catch (error: any) {
-      const status = error?.response?.status
-      if (status === 401) {
-        await onLogout().catch(() => {})
-        return
-      }
-      const apiData = error?.response?.data || {}
-      const messageBase = buildApiErrorMessage({
-        status: status || error?.status,
-        data: apiData,
-        fallback: error?.message || 'Something went wrong',
-      })
-      const message =
-        typeof error?.retry_after_seconds === 'number'
-          ? `${messageBase} Try again in ${error.retry_after_seconds}s.`
-          : typeof error?.attempts_remaining === 'number'
-          ? `${messageBase} Attempts remaining: ${error.attempts_remaining}.`
-          : messageBase
-      if (message.toLowerCase().includes('no anchor account')) {
-        setShowAnchorCta(true)
-      }
-      console.log('[BankTransfer] initiate failed', {
-        status,
-        message,
-      })
-      setPinError(message)
-      setNotice({ message, error: true, data: null })
-    } finally {
-      setLoading(false)
-    }
+  if (!tierEligible) {
+    return (
+      <View className="flex-1 bg-primary px-4">
+        <View className="pt-10">
+          <Text className="text-white text-2xl mb-2">Bank Transfer</Text>
+          <TierGateCard onUpgrade={() => router.replace('/kyc')} />
+        </View>
+      </View>
+    )
   }
 
   return (
     <View className="flex-1 bg-primary px-4">
-      <KeyboardAvoidWrapper>
-        <View className="flex-1 pt-10">
+      <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+        <View className="pt-10">
           <Text className="text-white text-2xl mb-2">Bank Transfer</Text>
-          <Text className="text-gray-300 mb-6">Send money to a bank account.</Text>
+          <Text className="text-gray-300 mb-4">Step 1 of 3: Recipient and amount</Text>
 
-          <NotificationAlert message={notice.message} data={notice.data} error={notice.error} />
-          {!hasAnchor ? (
-            <View className="bg-gray-900 rounded-xl p-3 mb-4">
-              <Text className="text-gray-300 text-center mb-3">
-                No Anchor account found. Create one to continue.
-              </Text>
-              <TouchableOpacity
-                onPress={() => router.push('/accounts')}
-                className="bg-theme-primary py-3 rounded-xl"
-              >
-                <Text className="text-alt text-center font-medium">Manage Virtual Accounts</Text>
-              </TouchableOpacity>
+          <NotificationAlert message={notice.message} error={notice.error} data={notice.data} />
+
+          <View className="bg-gray-900 border border-gray-800 rounded-2xl p-4 mb-4">
+            <Text className="text-gray-400 text-xs uppercase tracking-widest">Available Balance</Text>
+            <Text className="text-white text-2xl font-semibold mt-2">{formatNaira(availableBalance)}</Text>
+            <Text className="text-gray-300 text-xs mt-2">
+              Daily limit remaining: {formatNaira(dailyLimitRemaining)}
+            </Text>
+            <Text className="text-gray-500 text-xs mt-1">Daily limit: {dailyLimit.toLocaleString('en-NG')}</Text>
+          </View>
+
+          <View className="bg-gray-900 border border-gray-800 rounded-2xl p-4 mb-4">
+            <View className="flex-row items-center justify-between mb-3">
+              <Text className="text-white text-base font-semibold">Recipient</Text>
+              {beneficiaryLocked ? (
+                <TouchableOpacity
+                  onPress={() => {
+                    setSelectedBeneficiary('')
+                    setFormData((prev) => ({ ...prev, counter_party_id: '' }))
+                    setAccountLookupStatus('idle')
+                  }}
+                >
+                  <Text className="text-app-primary text-xs">Edit</Text>
+                </TouchableOpacity>
+              ) : null}
             </View>
-          ) : null}
 
-          <FormSelect
-            label="Transfer Type"
-            selectedValue={String(formData.inter_bank)}
-            onValueChange={(value: string) => {
-              const nextInterBank = String(value) === 'true'
-              setFormData((prev) => ({
-                ...prev,
-                inter_bank: nextInterBank,
-                counter_party_id: nextInterBank ? prev.counter_party_id : '',
-              }))
-              setTransferReference('')
-            }}
-            options={transferTypeOptions}
-            placeholder="Select transfer type"
-          />
-
-          <FormSelect
-            label="Bank"
-            selectedValue={formData.bank_code}
-            onValueChange={(value: string) => {
-              setFormData((prev) => ({
-                ...prev,
-                bank_code: value,
-                account_name: '',
-                beneficiary_id: '',
-                counter_party_id: '',
-              }))
-              setAccountLookupStatus('idle')
-              setAccountLookupError(null)
-              lastLookupKeyRef.current = ''
-              setTransferReference('')
-            }}
-            options={bankOptions}
-            placeholder="Select bank"
-          />
-          <TouchableOpacity
-            onPress={() => router.push('/bank-list')}
-            className="bg-gray-900 py-3 rounded-xl mt-2"
-          >
-            <Text className="text-white text-center text-xs">View bank list</Text>
-          </TouchableOpacity>
-
-          <FormInput
-            label="Account Number"
-            value={formData.account_number}
-            name="account_number"
-            keyboardType="numeric"
-            onChangeText={(text: string) => {
-              setFormData((prev) => ({
-                ...prev,
-                account_number: text,
-                account_name: '',
-                beneficiary_id: '',
-                counter_party_id: '',
-              }))
-              setAccountLookupStatus('idle')
-              setAccountLookupError(null)
-              lastLookupKeyRef.current = ''
-              setTransferReference('')
-            }}
-          />
-          {accountLookupStatus === 'loading' && (
-            <View className="bg-blue-900/40 border border-blue-700 px-3 py-2 rounded-full mt-2">
-              <Text className="text-blue-100 text-xs">Fetching account name...</Text>
-            </View>
-          )}
-          {accountLookupStatus === 'success' && formData.account_name ? (
-            <View className="bg-green-900/30 border border-green-700 px-3 py-2 rounded-full mt-2">
-              <Text className="text-green-100 text-xs">Account name: {formData.account_name}</Text>
-            </View>
-          ) : null}
-          {accountLookupStatus === 'error' ? (
-            <View className="bg-red-900/30 border border-red-700 px-3 py-2 rounded-full mt-2">
-              <Text className="text-red-100 text-xs">{accountLookupError || 'Account not found.'}</Text>
-            </View>
-          ) : null}
-
-          <FormInput
-            label="Amount"
-            value={formData.amount}
-            name="amount"
-            keyboardType="numeric"
-            onChangeText={(text: string) => {
-              setFormData((prev) => ({ ...prev, amount: text }))
-              setTransferReference('')
-            }}
-          />
-
-          <FormInput
-            label="Description"
-            value={formData.description}
-            name="description"
-            onChangeText={(text: string) => {
-              setFormData((prev) => ({ ...prev, description: text }))
-              setTransferReference('')
-            }}
-          />
-
-          <FormSelect
-            label="Beneficiary (optional)"
-            selectedValue={formData.beneficiary_id}
-            onValueChange={(value: string) => {
-              const selected = beneficiaryOptions.find((item) => String(item.value) === String(value))
-              if (selected?.data) {
+            <SearchablePicker
+              label="Saved beneficiary (optional)"
+              selectedValue={selectedBeneficiary}
+              options={beneficiaryOptions}
+              placeholder="Select beneficiary"
+              onSelect={(option) => {
+                setSelectedBeneficiary(option.value)
+                const data = option.data || {}
+                const bankCode = String(data?.bank_code || '')
+                const accountNumber = sanitizeDigits(String(data?.account_number || '')).slice(0, 10)
                 setFormData((prev) => ({
                   ...prev,
-                  beneficiary_id: value,
-                  counter_party_id: String(value || ''),
-                  account_number: selected.data.account_number || prev.account_number,
-                  bank_code: selected.data.bank_code || prev.bank_code,
-                  account_name: selected.data.account_name || prev.account_name,
+                  bank_code: bankCode || prev.bank_code,
+                  account_number: accountNumber || prev.account_number,
+                  account_name: '',
+                  counter_party_id: String(
+                    data?.counter_party_id || data?.beneficiary_id || option.value || prev.counter_party_id || ''
+                  ),
                 }))
-                setAccountLookupStatus('success')
-                setAccountLookupError(null)
-                lastLookupKeyRef.current = `${selected.data.bank_code || ''}:${
-                  selected.data.account_number || ''
-                }`
-              } else {
-                setFormData((prev) => ({ ...prev, beneficiary_id: value, counter_party_id: '' }))
+                if (bankCode) {
+                  setRecentBankCodes((prev) => [bankCode, ...prev.filter((item) => item !== bankCode)].slice(0, 6))
+                }
                 setAccountLookupStatus('idle')
                 setAccountLookupError(null)
                 lastLookupKeyRef.current = ''
-              }
-              setTransferReference('')
-            }}
-            options={beneficiaryOptions}
-            placeholder="Select beneficiary (optional)"
-          />
+              }}
+            />
 
+            <View className="mt-4">
+              <BankPickerSheet
+                selectedValue={formData.bank_code}
+                options={bankOptions}
+                recentValues={recentBankCodes}
+                disabled={beneficiaryLocked}
+                onSelect={(option) => {
+                  setFormData((prev) => ({
+                    ...prev,
+                    bank_code: option.value,
+                    account_name: '',
+                    counter_party_id: '',
+                  }))
+                  setRecentBankCodes((prev) => [option.value, ...prev.filter((item) => item !== option.value)].slice(0, 6))
+                  setAccountLookupStatus('idle')
+                  setAccountLookupError(null)
+                  lastLookupKeyRef.current = ''
+                  setTimeout(() => accountNumberRef.current?.focus(), 120)
+                }}
+              />
+            </View>
+
+            <Text className="text-white mb-2 mt-4">Account Number</Text>
+            <TextInput
+              ref={accountNumberRef}
+              value={formData.account_number}
+              onChangeText={(text) => {
+                const next = sanitizeDigits(text).slice(0, 10)
+                setFormData((prev) => ({
+                  ...prev,
+                  account_number: next,
+                  account_name: '',
+                  counter_party_id: '',
+                }))
+                setAccountLookupStatus('idle')
+                setAccountLookupError(null)
+                lastLookupKeyRef.current = ''
+              }}
+              keyboardType="numeric"
+              maxLength={10}
+              editable={!beneficiaryLocked}
+              placeholder="Enter or paste 10-digit account number"
+              placeholderTextColor="gray"
+              className={`${beneficiaryLocked ? 'bg-gray-900' : 'bg-gray-950'} border border-gray-800 rounded-xl px-4 py-4 text-white`}
+            />
+            <Text className="text-gray-500 text-xs mt-2">
+              {sanitizeDigits(formData.account_number).length < 10
+                ? 'Account number must be exactly 10 digits.'
+                : 'Recipient account looks valid. Verifying...'}
+            </Text>
+
+            <RecipientVerificationState
+              status={accountLookupStatus}
+              accountName={formData.account_name}
+              bankName={selectedBankLabel}
+              accountNumber={formData.account_number}
+              error={accountLookupError}
+            />
+
+            <View className="flex-row items-center justify-between mt-4">
+              <Text className="text-white text-sm">Save beneficiary</Text>
+              <Switch value={saveBeneficiary} onValueChange={setSaveBeneficiary} />
+            </View>
+          </View>
+
+          <View className="bg-gray-900 border border-gray-800 rounded-2xl p-4 mb-4">
+            <Text className="text-white text-base font-semibold mb-3">Amount</Text>
+            <Text className="text-white mb-2">Amount (NGN)</Text>
+            <View className="flex-row items-center border border-gray-800 rounded-xl bg-gray-950 px-4">
+              <Text className="text-gray-300 mr-2">N</Text>
+              <TextInput
+                ref={amountRef}
+                value={formData.amount}
+                onChangeText={(text) => setFormData((prev) => ({ ...prev, amount: text.replace(/[^0-9.]/g, '') }))}
+                keyboardType="numeric"
+                placeholder="0.00"
+                placeholderTextColor="gray"
+                className="flex-1 py-4 text-white"
+              />
+            </View>
+            <Text className="text-gray-400 text-xs mt-2">Formatted: {formatAmountInput(formData.amount) || '0'}</Text>
+
+            <View className="flex-row flex-wrap mt-3 gap-2">
+              {QUICK_AMOUNTS.map((quick) => (
+                <TouchableOpacity
+                  key={`quick-${quick}`}
+                  onPress={() => setFormData((prev) => ({ ...prev, amount: String(quick) }))}
+                  className="bg-gray-950 border border-gray-800 rounded-full px-3 py-2"
+                >
+                  <Text className="text-white text-xs">{formatNaira(quick)}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {!amountValidation.valid && formData.amount ? (
+              <Text className="text-red-300 text-xs mt-3">{amountValidation.message}</Text>
+            ) : null}
+
+            <View className="mt-4 bg-gray-950 border border-gray-800 rounded-xl p-3">
+              <View className="flex-row items-center justify-between">
+                <Text className="text-gray-400 text-xs">Fee (Estimated)</Text>
+                <Text className="text-white text-xs">{formatNaira(fee)}</Text>
+              </View>
+              <Text className="text-gray-500 text-[10px] mt-1">Final fee is confirmed on review.</Text>
+              <View className="flex-row items-center justify-between mt-2">
+                <Text className="text-gray-400 text-xs">Total debit</Text>
+                <Text className="text-white text-sm font-semibold">{formatNaira(amountValidation.totalDebit)}</Text>
+              </View>
+              <View className="flex-row items-center justify-between mt-2">
+                <Text className="text-gray-400 text-xs">Daily remaining after transfer</Text>
+                <Text className="text-white text-sm">{formatNaira(dailyRemainingAfterTransfer)}</Text>
+              </View>
+            </View>
+          </View>
+
+          <View className="bg-gray-900 border border-gray-800 rounded-2xl p-4 mb-4">
+            <View className="flex-row items-center justify-between">
+              <Text className="text-white text-base font-semibold">Narration</Text>
+              <Text className="text-gray-400 text-xs">{formData.description.length}/50</Text>
+            </View>
+            <TextInput
+              value={formData.description}
+              onChangeText={(text) => setFormData((prev) => ({ ...prev, description: text.slice(0, 50) }))}
+              placeholder="Narration for this transfer"
+              placeholderTextColor="gray"
+              className="border border-gray-800 rounded-xl px-4 py-4 text-white bg-gray-950 mt-3"
+              maxLength={50}
+            />
+            {!narrationValue ? <Text className="text-red-300 text-xs mt-2">Narration is required.</Text> : null}
+          </View>
+
+          <Text className="text-gray-500 text-xs mb-3">{BANK_TRANSFER_TIER_REQUIREMENT_COPY}</Text>
           <TouchableOpacity
-            onPress={handleOpenPin}
-            className={`${hasAnchor ? 'bg-theme-primary' : 'bg-gray-700'} py-6 mt-6 rounded-xl`}
-            disabled={!hasAnchor}
+            onPress={handleContinue}
+            disabled={!canContinue || accountLookupStatus === 'loading' || loading}
+            className={`${canContinue ? 'bg-theme-primary' : 'bg-gray-700'} py-5 rounded-xl`}
           >
-            <Text className="text-alt font-medium text-center">Continue</Text>
+            <Text className="text-alt font-semibold text-center">Continue to review</Text>
           </TouchableOpacity>
-          {showAnchorCta && hasAnchor ? (
-            <TouchableOpacity
-              onPress={() => router.push('/accounts')}
-              className="bg-gray-900 py-4 mt-4 rounded-xl"
-            >
-              <Text className="text-white text-center">View Virtual Accounts</Text>
-            </TouchableOpacity>
-          ) : null}
         </View>
-      </KeyboardAvoidWrapper>
-
-      <TransactionPinModal
-        open={pinModalOpen}
-        onClose={() => setPinModalOpen(false)}
-        onSubmit={handleSubmit}
-        loading={loading}
-        errorMessage={pinError}
-        title="Enter PIN to Transfer"
-      />
-
-      <Loader open={loading} />
+      </ScrollView>
     </View>
   )
 }
 
 export default BankTransferScreen
-
-
-
