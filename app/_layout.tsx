@@ -215,6 +215,7 @@ export default function RootLayout() {
         <Stack.Screen name="circles/[id]/audit" options={{ headerTitle: 'Audit Summary' }} />
         <Stack.Screen name="circles/[id]/invite" options={{ headerTitle: 'Invite Member' }} />
         <Stack.Screen name="confirmEmail" options={{ headerTitle: 'Email Confirmation' }} />
+        <Stack.Screen name="confirmation" options={{ headerTitle: 'Confirm Email' }} />
           </Stack>
         </AppLockProvider>
       </AuthProvider>

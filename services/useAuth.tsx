@@ -41,6 +41,7 @@ export type AuthContextValue = {
 
   login: (payload: LoginPayload) => Promise<any>
   logout: () => Promise<void>
+  establishSessionFromTokens: (accessToken: string, refreshToken?: string | null) => Promise<void>
   refreshProfile: (options?: { force?: boolean }) => Promise<any>
 
   // legacy
@@ -388,6 +389,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     bootTrace('logout_done')
   }, [bootTrace])
 
+  const establishSessionFromTokens = useCallback(
+    async (accessToken: string, refreshTokenValue?: string | null) => {
+      const cleanAccess = normalize(accessToken)
+      if (!cleanAccess) throw new Error('Missing access token')
+
+      const cleanRefresh = refreshTokenValue ? normalize(refreshTokenValue) : null
+      await saveTokens(cleanAccess, cleanRefresh || null)
+      setToken(cleanAccess)
+      setRefreshToken(cleanRefresh || null)
+      bootTrace('session_established_from_tokens')
+      await refreshProfile({ force: true })
+    },
+    [refreshProfile, bootTrace]
+  )
+
   useEffect(() => {
     bootTrace('state_change')
   }, [authHydrated, authenticated, token, profileLoading, user, profileError, bootTrace])
@@ -436,6 +452,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       login,
       logout,
+      establishSessionFromTokens,
       refreshProfile,
 
       authState: legacyAuthState,

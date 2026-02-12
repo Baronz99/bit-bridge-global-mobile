@@ -110,6 +110,29 @@ export const sendUserConfirmation = async (email: string) => {
   }
 }
 
+export const confirmEmailToken = async (confirmationToken: string) => {
+  try {
+    const response = await client.request({
+      method: 'GET',
+      baseURL: APP_CONFIG.root_url,
+      url: '/confirmation',
+      params: { confirmation_token: confirmationToken },
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      __skipAuth: true,
+      __skipAuthRefresh: true,
+    } as any)
+    return response.data
+  } catch (error: any) {
+    if (error?.response) {
+      throw new Error(error.response.data?.message || 'Email confirmation failed')
+    }
+    throw new Error('Email confirmation failed')
+  }
+}
+
 export const requestPasswordReset = async (email: string) => {
   try {
     const response = await client.get('/users/password_reset', {

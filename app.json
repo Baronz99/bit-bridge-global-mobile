@@ -11,11 +11,37 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.emmykage.bitbridgeapp",
+      "associatedDomains": [
+        "applinks:bitbridgeglobal.com",
+        "applinks:www.bitbridgeglobal.com"
+      ],
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "bitbridgeglobal.com",
+              "pathPrefix": "/confirmation"
+            },
+            {
+              "scheme": "https",
+              "host": "www.bitbridgeglobal.com",
+              "pathPrefix": "/confirmation"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/logos/logo.png",
         "backgroundColor": "#ffffff"
