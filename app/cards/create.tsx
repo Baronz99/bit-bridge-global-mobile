@@ -9,16 +9,17 @@ import { uploadSelfieToCloudinary } from '@/api/uploads'
 import { useAuth } from '@/services/useAuth'
 import { resolveUserProfile } from '@/services/auth/resolveUserProfile'
 import { buildApiErrorMessage } from '@/utils/apiErrorMessage'
+import { pickCardRouteId } from '@/utils/cardIdentifier'
 import AppModal from '@/components/modal/Modal'
 
 const resolveCardRouteId = (payload: any): string | null => {
   const root = payload?.data ?? payload
   if (Array.isArray(root)) {
     const first = root[0] || {}
-    return String(first?.id || first?.card_id || '').trim() || null
+    return pickCardRouteId(first) || null
   }
   if (!root || typeof root !== 'object') return null
-  return String(root?.id || root?.card_id || '').trim() || null
+  return pickCardRouteId(root) || null
 }
 
 const CreateCard = () => {

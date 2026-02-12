@@ -27,9 +27,19 @@ import FormInput from '@/components/FormInput'
 import TransactionPinModal from '@/components/TransactionPinModal'
 import { getTransactionPinStatus } from '@/api/transactionPin'
 import { useAuth } from '@/services/useAuth'
+import {
+  extractRouteCardId,
+  getCardsApiId,
+  isCardNotFoundError,
+  matchCardByIdentifier,
+  shouldShowInvalidCardBanner,
+} from '@/utils/cardIdentifier'
 
 const DEBUG_CARDS =
   String(process.env.EXPO_PUBLIC_DEBUG_CARDS || '').toLowerCase() === 'true' || __DEV__ === true
+const DEBUG_CARDS_LOG = String(process.env.EXPO_PUBLIC_DEBUG_CARDS || '').toLowerCase() === 'true'
+const DEBUG_CARD_DETAILS =
+  DEBUG_CARDS || String(process.env.EXPO_PUBLIC_DEBUG_PERF || '').toLowerCase() === '1'
 
 type CardAction = 'fund' | 'unload' | 'reveal'
 type Id = string | number
@@ -53,6 +63,14 @@ const normalizeLast4 = (value: any) => {
   const digits = String(value ?? '').replace(/\D/g, '')
   if (!digits) return null
   return digits.slice(-4).padStart(4, '0')
+}
+
+const stringifyPreview = (value: any) => {
+  try {
+    return JSON.stringify(value, null, 2)
+  } catch {
+    return String(value ?? '')
+  }
 }
 
 /**
@@ -91,7 +109,8 @@ const formatHistoryLabel = (item: any) => {
 
 const CardDetail = () => {
   const { id } = useLocalSearchParams()
-  const cardId = String(id || '').trim()
+  const routeCardId = extractRouteCardId(id as any)
+  const cardsApiId = routeCardId
   const router = useRouter()
   const { userProfileData } = useAuth()
 
@@ -99,17 +118,41 @@ const CardDetail = () => {
   // Fetchers
   // ----------------------------
   const fetchDetails = useCallback(() => {
-    if (!cardId) return Promise.resolve({ data: {} } as any)
-    return getCardDetails(cardId)
-  }, [cardId])
+    if (!cardsApiId) return Promise.resolve({ data: {} } as any)
+    if (DEBUG_CARD_DETAILS) {
+      console.log('[CARD_DETAILS][request]', {
+        routeParam: id,
+        routeCardId,
+        chosenIdentifier: cardsApiId,
+        endpoint: `/cards/${cardsApiId}/details`,
+      })
+    }
+    return getCardDetails(cardsApiId)
+  }, [cardsApiId, id, routeCardId])
   const fetchBalance = useCallback(() => {
-    if (!cardId) return Promise.resolve({ data: {} } as any)
-    return getCardBalance(cardId)
-  }, [cardId])
+    if (!cardsApiId) return Promise.resolve({ data: {} } as any)
+    if (DEBUG_CARD_DETAILS) {
+      console.log('[CARD_DETAILS][request]', {
+        routeParam: id,
+        routeCardId,
+        chosenIdentifier: cardsApiId,
+        endpoint: `/cards/${cardsApiId}/balance`,
+      })
+    }
+    return getCardBalance(cardsApiId)
+  }, [cardsApiId, id, routeCardId])
   const fetchHistory = useCallback(() => {
-    if (!cardId) return Promise.resolve({ data: [] } as any)
-    return getCardHistory(cardId)
-  }, [cardId])
+    if (!cardsApiId) return Promise.resolve({ data: [] } as any)
+    if (DEBUG_CARD_DETAILS) {
+      console.log('[CARD_DETAILS][request]', {
+        routeParam: id,
+        routeCardId,
+        chosenIdentifier: cardsApiId,
+        endpoint: `/cards/${cardsApiId}/history`,
+      })
+    }
+    return getCardHistory(cardsApiId)
+  }, [cardsApiId, id, routeCardId])
   const fetchCardMeta = useCallback(() => getUserCards(), [])
 
   const details = useFetch(fetchDetails)
@@ -146,13 +189,39 @@ const CardDetail = () => {
 
   const cardMeta = useMemo(() => {
     if (!Array.isArray(cardMetaPayload) || cardMetaPayload.length === 0) return null
-    return (
-      cardMetaPayload.find((item: any) => String(item?.id) === cardId) ||
-      cardMetaPayload.find((item: any) => String(item?.card_id) === String((detailPayload as any)?.card_id)) ||
-      cardMetaPayload[0] ||
-      null
-    )
-  }, [cardMetaPayload, cardId, detailPayload])
+    if (cardsApiId) {
+      const matchedByRoute = matchCardByIdentifier(cardMetaPayload, cardsApiId)
+      if (matchedByRoute) return matchedByRoute
+    }
+    const detailCardId = String((detailPayload as any)?.card_id ?? '').trim()
+    if (detailCardId) {
+      const matchedByProviderId = matchCardByIdentifier(
+        cardMetaPayload.map((item: any) => ({ ...item, id: item?.card_id })),
+        detailCardId
+      )
+      if (matchedByProviderId) return matchedByProviderId
+    }
+    return null
+  }, [cardMetaPayload, cardsApiId, detailPayload])
+
+  useEffect(() => {
+    if (!DEBUG_CARDS_LOG) return
+    const meta: any = (cardMeta as any)?.meta_data ?? (cardMeta as any)?.metaData ?? {}
+    console.log('[CARD_DETAILS][identifier_choice]', {
+      routeParam: id,
+      routeCardId,
+      routeCardsApiId: cardsApiId,
+      selectedCardId: (cardMeta as any)?.id ?? null,
+      selectedProviderCardId: (cardMeta as any)?.card_id ?? null,
+      selectedBridgeCardId:
+        (cardMeta as any)?.bridge_card_id ?? (cardMeta as any)?.bridgecard_id ?? null,
+      selectedProviderId: (cardMeta as any)?.provider_id ?? null,
+      selectedMetaKeys: Object.keys(meta || {}),
+      selectedMetaLocalCardId: meta?.local_card_id ?? meta?.localCardId ?? null,
+      computedCardMetaApiId: getCardsApiId(cardMeta),
+      chosenCardsApiId: cardsApiId,
+    })
+  }, [id, routeCardId, cardMeta, cardsApiId])
 
   const balancePayload = useMemo(() => (balance.data as any)?.data ?? balance.data ?? {}, [balance.data])
 
@@ -310,7 +379,7 @@ const CardDetail = () => {
       }
     }
 
-    if (nextAction === 'reveal' && !cardId) {
+    if (nextAction === 'reveal' && !cardsApiId) {
       setNotice('Card not available yet. Try again in a moment.')
       return
     }
@@ -362,7 +431,7 @@ const CardDetail = () => {
       setPinError(null)
       try {
         // IMPORTANT: do not log reveal payload (PCI)
-        const response = await revealCard(cardId, transactionPin)
+        const response = await revealCard(cardsApiId, transactionPin)
         const payload = (response as any)?.data ?? response
         const revealPayload = payload?.data ?? payload
 
@@ -393,14 +462,14 @@ const CardDetail = () => {
       const frozenNow = isFrozen
 
       if (DEBUG_CARDS) {
-        console.log('[CARD] freeze toggle', { cardId, frozenNow })
+        console.log('[CARD] freeze toggle', { cardsApiId, frozenNow })
       }
 
       if (frozenNow) {
-        await unfreezeCard(cardId)
+        await unfreezeCard(cardsApiId)
         setNotice('Card unfrozen.')
       } else {
-        await freezeCard(cardId)
+        await freezeCard(cardsApiId)
         setNotice('Card frozen.')
       }
 
@@ -522,12 +591,34 @@ const CardDetail = () => {
     return formatMaybeDateTime(v)
   }, [detailPayload, cardReveal])
 
+  const hasUsableDetailPayload = useMemo(() => {
+    const payload = detailPayload as any
+    return Boolean(
+      payload &&
+        (payload.card_id ||
+          payload.id ||
+          payload.card_brand ||
+          payload.brand ||
+          payload.last4 ||
+          payload.last_4 ||
+          payload.card_last4)
+    )
+  }, [detailPayload])
+
+  const hasUsableCard = hasUsableDetailPayload || Boolean(cardMeta)
+  const invalidCardBanner = shouldShowInvalidCardBanner({
+    routeCardId: cardsApiId,
+    hasUsableCard,
+    error: details.error,
+  })
+  const showFetchErrorBanner = Boolean(details.error) && !invalidCardBanner && !hasUsableCard
+
   // ----------------------------
   // PCI-safe receipt routing
   // ----------------------------
   const openCardReceipt = useCallback(
     (item: any, index: number) => {
-      const reference = item?.transaction_reference || item?.reference || item?.id || `${cardId}-${index}`
+      const reference = item?.transaction_reference || item?.reference || item?.id || `${cardsApiId}-${index}`
       const createdAt = item?.created_at || item?.createdAt || ''
       const amountValue = Number(item?.amount ?? 0)
       const description = formatHistoryLabel(item)
@@ -537,7 +628,7 @@ const CardDetail = () => {
       // SAFE log only
       if (DEBUG_CARDS) {
         console.log('[CARD] open receipt', {
-          cardId,
+          cardsApiId,
           reference: String(reference),
           amount: amountValue,
           status,
@@ -548,7 +639,7 @@ const CardDetail = () => {
       router.push({
         pathname: '/transaction/card-receipt',
         params: {
-          cardId: String(cardId),
+          cardId: String(cardsApiId),
           reference: String(reference),
           amount: String(amountValue),
           currency: 'USD',
@@ -559,8 +650,42 @@ const CardDetail = () => {
         },
       } as any)
     },
-    [router, cardId]
+    [router, cardsApiId]
   )
+
+  useEffect(() => {
+    if (!DEBUG_CARD_DETAILS || !details.error) return
+    const err: any = details.error
+    const statusCode = Number((err?.status ?? err?.response?.status) || 0) || null
+    const endpoint = err?.endpoint || `/cards/${cardsApiId || ':id'}/details`
+    const requestUrl = err?.url || err?.config?.url || null
+
+    console.log('[CARD_DETAILS][error]', {
+      routeParam: id,
+      routeCardId,
+      chosenIdentifier: cardsApiId,
+      endpoint,
+      url: requestUrl,
+      statusCode,
+      notFound: isCardNotFoundError(err),
+      hasUsableCard,
+      invalidCardBanner,
+      message: err?.message,
+      responseBody: err?.response?.data ?? null,
+    })
+  }, [details.error, id, routeCardId, cardsApiId, hasUsableCard, invalidCardBanner])
+
+  useEffect(() => {
+    if (!DEBUG_CARD_DETAILS || !details.data) return
+    console.log('[CARD_DETAILS][response]', {
+      routeParam: id,
+      routeCardId,
+      chosenIdentifier: cardsApiId,
+      endpoint: `/cards/${cardsApiId}/details`,
+      status: (details.data as any)?.status ?? 'ok',
+      payloadKeys: Object.keys(((details.data as any)?.data ?? details.data ?? {}) as any),
+    })
+  }, [details.data, id, routeCardId, cardsApiId])
 
   // ----------------------------
   // Render
@@ -571,10 +696,18 @@ const CardDetail = () => {
         contentContainerStyle={{ paddingBottom: 40 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        {!cardId ? (
+        {invalidCardBanner ? (
           <View className="bg-red-500/20 border border-red-500/30 rounded-xl p-3 mt-4">
-            <Text className="text-white font-semibold">Invalid card link</Text>
-            <Text className="text-white/80 mt-1">Card ID is missing. Go back to cards and open again.</Text>
+            <Text className="text-white font-semibold">Invalid card ID</Text>
+            <Text className="text-white/80 mt-1">
+              There is no card with this ID. Go back to Cards and open it again.
+            </Text>
+            <TouchableOpacity
+              onPress={() => router.replace('/cards')}
+              className="mt-3 bg-red-600 py-2 rounded-lg"
+            >
+              <Text className="text-white text-center font-medium">Back to Cards</Text>
+            </TouchableOpacity>
           </View>
         ) : null}
 
@@ -590,10 +723,32 @@ const CardDetail = () => {
           </View>
         ) : null}
 
-        {details.error ? (
+        {showFetchErrorBanner ? (
           <View className="bg-red-500/20 border border-red-500/30 rounded-xl p-3 mt-4">
             <Text className="text-white font-semibold">Error</Text>
             <Text className="text-white/80">{(details.error as any)?.message || 'Failed to load card'}</Text>
+          </View>
+        ) : null}
+
+        {DEBUG_CARDS ? (
+          <View className="bg-gray-950 border border-yellow-700/40 rounded-xl p-3 mt-4">
+            <Text className="text-yellow-200 font-semibold text-xs uppercase tracking-widest">
+              Details Debug
+            </Text>
+            <Text className="text-gray-300 text-xs mt-2">
+              Request path: {`/cards/${cardsApiId || '--'}/details`}
+            </Text>
+            <Text className="text-gray-300 text-xs mt-1">ID passed: {cardsApiId || '--'}</Text>
+            <Text className="text-gray-300 text-xs mt-1">
+              Status: {String((details.data as any)?.status ?? (details.error as any)?.status ?? (details.error as any)?.response?.status ?? (details.loading ? 'loading' : 'unknown'))}
+            </Text>
+            <Text className="text-gray-300 text-xs mt-1">
+              Error message: {String((details.error as any)?.message ?? '--')}
+            </Text>
+            <Text className="text-gray-300 text-xs mt-2">Error body preview:</Text>
+            <Text className="text-gray-500 text-[10px] mt-1">
+              {stringifyPreview((details.error as any)?.response?.data ?? null).slice(0, 500)}
+            </Text>
           </View>
         ) : null}
 

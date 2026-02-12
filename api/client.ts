@@ -492,4 +492,14 @@ client.interceptors.response.use(
   }
 )
 
+export const getApiClientDebugSnapshot = () => {
+  return {
+    baseURL: client.defaults.baseURL || API_BASE_URL,
+    apiBaseURL: API_BASE_URL,
+    rootURL: ROOT_URL,
+    env: APP_CONFIG.env,
+    debugApi: DEBUG_API,
+  }
+}
+
 export default client

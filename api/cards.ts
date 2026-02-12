@@ -2,6 +2,12 @@
 import client from '@/api/client'
 
 type Id = string | number
+type ApiError = Error & {
+  status?: number
+  url?: string
+  endpoint?: string
+  response?: any
+}
 
 const pickMsg = (data: any) => {
   if (!data) return null
@@ -20,6 +26,15 @@ const errMsg = (err: any, fallback = 'Something went wrong') => {
   return pickMsg(data) || err?.message || fallback
 }
 
+const buildApiError = (err: any, fallback: string, endpoint: string): ApiError => {
+  const error = new Error(errMsg(err, fallback)) as ApiError
+  error.status = err?.response?.status
+  error.url = err?.config?.url
+  error.endpoint = endpoint
+  error.response = err?.response
+  return error
+}
+
 /**
  * Cards list (your existing route)
  */
@@ -36,29 +51,32 @@ export const getUserCards = async () => {
  * Card detail / balance / history (your existing routes)
  */
 export const getCardDetails = async (id: Id) => {
+  const endpoint = `/cards/${id}/details`
   try {
-    const res = await client.get(`/cards/${id}/details`)
+    const res = await client.get(endpoint)
     return res.data
   } catch (err: any) {
-    throw new Error(errMsg(err, 'Failed to fetch card details'))
+    throw buildApiError(err, 'Failed to fetch card details', endpoint)
   }
 }
 
 export const getCardBalance = async (id: Id) => {
+  const endpoint = `/cards/${id}/balance`
   try {
-    const res = await client.get(`/cards/${id}/balance`)
+    const res = await client.get(endpoint)
     return res.data
   } catch (err: any) {
-    throw new Error(errMsg(err, 'Failed to fetch card balance'))
+    throw buildApiError(err, 'Failed to fetch card balance', endpoint)
   }
 }
 
 export const getCardHistory = async (id: Id) => {
+  const endpoint = `/cards/${id}/history`
   try {
-    const res = await client.get(`/cards/${id}/history`)
+    const res = await client.get(endpoint)
     return res.data
   } catch (err: any) {
-    throw new Error(errMsg(err, 'Failed to fetch card history'))
+    throw buildApiError(err, 'Failed to fetch card history', endpoint)
   }
 }
 

@@ -208,6 +208,7 @@ export default function RootLayout() {
         <Stack.Screen name="cards/index" options={{ headerTitle: 'Cards' }} />
         <Stack.Screen name="cards/[id]" options={{ headerTitle: 'Card Details' }} />
         <Stack.Screen name="cards/create" options={{ headerTitle: 'Create Card' }} />
+        <Stack.Screen name="cards/debug" options={{ headerTitle: 'Cards Debug' }} />
         <Stack.Screen name="circles/[id]/fund" options={{ headerTitle: 'Fund Circle' }} />
         <Stack.Screen name="circles/[id]/withdraw" options={{ headerTitle: 'Withdraw' }} />
         <Stack.Screen name="circles/[id]/activities" options={{ headerTitle: 'Activities' }} />
