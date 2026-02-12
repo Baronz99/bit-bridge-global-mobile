@@ -1,6 +1,6 @@
 import React from 'react'
 import { ActivityIndicator, View } from 'react-native'
-import { Redirect, Slot, usePathname } from 'expo-router'
+import { Redirect, Stack, usePathname } from 'expo-router'
 import { useAuth } from '@/services/useAuth'
 import { getTierFromProfile, isTierEligibleForBankTransfer } from '@/utils/bankTransfer'
 
@@ -27,7 +27,20 @@ const BankTransferLayout = () => {
     return <Redirect href="/bank-transfer" />
   }
 
-  return <Slot />
+  return (
+    <Stack
+      screenOptions={{
+        headerTitleStyle: { color: 'orange' },
+        headerStyle: { backgroundColor: '#030014' },
+        headerTintColor: 'white',
+      }}
+    >
+      <Stack.Screen name="index" options={{ headerTitle: 'Bank Transfer' }} />
+      <Stack.Screen name="locked" options={{ headerTitle: 'Bank Transfer Access' }} />
+      <Stack.Screen name="review" options={{ headerTitle: 'Review Transfer' }} />
+      <Stack.Screen name="success" options={{ headerTitle: 'Transfer Success' }} />
+    </Stack>
+  )
 }
 
 export default BankTransferLayout

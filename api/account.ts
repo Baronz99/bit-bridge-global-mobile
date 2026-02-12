@@ -269,6 +269,27 @@ export const initiateFundTransfer = async (payload: {
   }
 }
 
+export const getTransferQuote = async (amount: number) => {
+  try {
+    const res = await client.get('/accounts/transfer_quote', {
+      params: { amount },
+      headers: {
+        Accept: 'application/json',
+      },
+    })
+    return res.data
+  } catch (err: any) {
+    const msg = errMsg(err, 'Unable to compute transfer quote')
+    warn('[getTransferQuote error]', {
+      message: msg,
+      status: err?.response?.status,
+      data: err?.response?.data,
+      url: err?.config?.url,
+    })
+    throw err
+  }
+}
+
 export const resolveAccountName = async (payload: {
   account: {
     bank_code: string

@@ -132,10 +132,7 @@ export default function RootLayout() {
         <Stack.Screen name="beneficiaries/index" options={{ headerTitle: 'Beneficiaries' }} />
         <Stack.Screen name="add-beneficiary/index" options={{ headerTitle: 'Add Beneficiary' }} />
         <Stack.Screen name="send-money/index" options={{ headerTitle: 'Send Money' }} />
-        <Stack.Screen name="bank-transfer/index" options={{ headerTitle: 'Bank Transfer' }} />
-        <Stack.Screen name="bank-transfer/locked" options={{ headerTitle: 'Bank Transfer Access' }} />
-        <Stack.Screen name="bank-transfer/review" options={{ headerTitle: 'Review Transfer' }} />
-        <Stack.Screen name="bank-transfer/success" options={{ headerTitle: 'Transfer Success' }} />
+        <Stack.Screen name="bank-transfer" options={{ headerTitle: 'Bank Transfer' }} />
         <Stack.Screen name="transfer-status/index" options={{ headerTitle: 'Transfer Status' }} />
         <Stack.Screen name="anchor-account/index" options={{ headerTitle: 'Anchor Account' }} />
 

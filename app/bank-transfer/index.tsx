@@ -8,10 +8,11 @@ import RecipientVerificationState from '@/components/bankTransfer/RecipientVerif
 import TierGateCard from '@/components/bankTransfer/TierGateCard'
 import { getBanks, getBeneficiaries, resolveAccountName } from '@/api/account'
 import { getUserWallet } from '@/api/wallet'
-import { estimateTransferFee, getTodayTransferSpent } from '@/services/bankTransfer'
+import { getTodayTransferSpent, getTransferQuoteSnapshot } from '@/services/bankTransfer'
 import { useAuth } from '@/services/useAuth'
 import {
   BANK_TRANSFER_TIER_REQUIREMENT_COPY,
+  buildTransferReference,
   computeDailyRemainingAfterTransfer,
   formatAmountInput,
   formatNaira,
@@ -41,9 +42,11 @@ type TransferDraft = {
   daily_limit: number
   today_spent: number
   daily_remaining_before: number
+  transfer_reference: string
 }
 
 const QUICK_AMOUNTS = [5000, 10000, 20000, 50000]
+const MIN_TRANSFER_AMOUNT = 150
 
 const sanitizeDigits = (value: string) => String(value || '').replace(/\D/g, '')
 
@@ -68,7 +71,9 @@ const BankTransferScreen = () => {
   const accountNumberRef = useRef<TextInput | null>(null)
   const amountRef = useRef<TextInput | null>(null)
   const resolveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const quoteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastLookupKeyRef = useRef('')
+  const lastQuoteAmountRef = useRef<number | null>(null)
 
   const [loading, setLoading] = useState(false)
   const [notice, setNotice] = useState<NoticeState>({ message: null, error: false, data: null })
@@ -90,11 +95,17 @@ const BankTransferScreen = () => {
   })
   const [accountLookupStatus, setAccountLookupStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [accountLookupError, setAccountLookupError] = useState<string | null>(null)
+  const [quoteLoading, setQuoteLoading] = useState(false)
+  const [quotedFee, setQuotedFee] = useState(0)
+  const [quotedDailyLimit, setQuotedDailyLimit] = useState(0)
+  const [quotedDailySpent, setQuotedDailySpent] = useState(0)
+  const [feeEstimated, setFeeEstimated] = useState(true)
 
   const tier = useMemo(() => getTierFromProfile(userProfileData), [userProfileData])
   const tierEligible = isTierEligibleForBankTransfer(tier)
-  const dailyLimit = getTierDailyLimit(tier)
-  const dailyLimitRemaining = Math.max(0, dailyLimit - todaySpent)
+  const dailyLimit = quotedDailyLimit > 0 ? quotedDailyLimit : getTierDailyLimit(tier)
+  const effectiveTodaySpent = quotedDailySpent > 0 ? quotedDailySpent : todaySpent
+  const dailyLimitRemaining = Math.max(0, dailyLimit - effectiveTodaySpent)
   const beneficiaryLocked = Boolean(selectedBeneficiary)
 
   const bankOptions = useMemo(
@@ -123,12 +134,13 @@ const BankTransferScreen = () => {
   }, [bankOptions, formData.bank_code])
 
   const amountValue = parseAmountInput(formData.amount)
-  const fee = estimateTransferFee(amountValue)
+  const fee = quotedFee
   const amountValidation = validateTransferAmount({
     amount: amountValue,
     fee,
     availableBalance,
     dailyLimitRemaining,
+    minAmount: MIN_TRANSFER_AMOUNT,
   })
 
   const narrationValue = formData.description.trim()
@@ -174,7 +186,15 @@ const BankTransferScreen = () => {
           userProfileData?.wallet?.balance ??
           0
         setAvailableBalance(Number(walletBalance || 0))
-        setTodaySpent(Number(todaySpentResult || 0))
+        const initialSpent = Number(todaySpentResult || 0)
+        setTodaySpent(initialSpent)
+        const quote = await getTransferQuoteSnapshot(MIN_TRANSFER_AMOUNT).catch(() => null)
+        if (quote) {
+          setQuotedFee(Number(quote.fee || 0))
+          setFeeEstimated(quote.feeIsEstimate === true)
+          setQuotedDailyLimit(Number(quote.dailyLimit || 0))
+          setQuotedDailySpent(Number(quote.dailySpent || initialSpent))
+        }
       } catch (error: any) {
         const status = error?.response?.status
         if (status === 401) {
@@ -196,6 +216,30 @@ const BankTransferScreen = () => {
     }
     loadData()
   }, [onLogout, userProfileData?.wallet?.balance])
+
+  useEffect(() => {
+    const quoteAmount = amountValue > 0 ? amountValue : MIN_TRANSFER_AMOUNT
+    if (lastQuoteAmountRef.current === quoteAmount) return
+
+    if (quoteTimerRef.current) clearTimeout(quoteTimerRef.current)
+    quoteTimerRef.current = setTimeout(async () => {
+      setQuoteLoading(true)
+      try {
+        const quote = await getTransferQuoteSnapshot(quoteAmount)
+        setQuotedFee(Number(quote.fee || 0))
+        setFeeEstimated(quote.feeIsEstimate === true)
+        setQuotedDailyLimit(Number(quote.dailyLimit || 0))
+        setQuotedDailySpent(Number(quote.dailySpent || 0))
+        lastQuoteAmountRef.current = quoteAmount
+      } finally {
+        setQuoteLoading(false)
+      }
+    }, 400)
+
+    return () => {
+      if (quoteTimerRef.current) clearTimeout(quoteTimerRef.current)
+    }
+  }, [amountValue])
 
   const runResolveAccount = async (force = false) => {
     if (!canResolve) return
@@ -265,8 +309,9 @@ const BankTransferScreen = () => {
       save_beneficiary: saveBeneficiary,
       description: narrationValue,
       daily_limit: dailyLimit,
-      today_spent: todaySpent,
+      today_spent: effectiveTodaySpent,
       daily_remaining_before: dailyLimitRemaining,
+      transfer_reference: buildTransferReference(),
     }
     router.push({
       pathname: '/bank-transfer/review',
@@ -301,6 +346,9 @@ const BankTransferScreen = () => {
               Daily limit remaining: {formatNaira(dailyLimitRemaining)}
             </Text>
             <Text className="text-gray-500 text-xs mt-1">Daily limit: {dailyLimit.toLocaleString('en-NG')}</Text>
+            <Text className="text-gray-600 text-[10px] mt-1">
+              Today's spent: {formatNaira(effectiveTodaySpent)}
+            </Text>
           </View>
 
           <View className="bg-gray-900 border border-gray-800 rounded-2xl p-4 mb-4">
@@ -447,10 +495,14 @@ const BankTransferScreen = () => {
 
             <View className="mt-4 bg-gray-950 border border-gray-800 rounded-xl p-3">
               <View className="flex-row items-center justify-between">
-                <Text className="text-gray-400 text-xs">Fee (Estimated)</Text>
+                <Text className="text-gray-400 text-xs">
+                  Fee ({feeEstimated ? 'Estimated' : 'Confirmed'})
+                </Text>
                 <Text className="text-white text-xs">{formatNaira(fee)}</Text>
               </View>
-              <Text className="text-gray-500 text-[10px] mt-1">Final fee is confirmed on review.</Text>
+              <Text className="text-gray-500 text-[10px] mt-1">
+                {feeEstimated ? 'Final fee is confirmed on review.' : 'Fee sourced from transfer quote.'}
+              </Text>
               <View className="flex-row items-center justify-between mt-2">
                 <Text className="text-gray-400 text-xs">Total debit</Text>
                 <Text className="text-white text-sm font-semibold">{formatNaira(amountValidation.totalDebit)}</Text>
@@ -459,6 +511,7 @@ const BankTransferScreen = () => {
                 <Text className="text-gray-400 text-xs">Daily remaining after transfer</Text>
                 <Text className="text-white text-sm">{formatNaira(dailyRemainingAfterTransfer)}</Text>
               </View>
+              {quoteLoading ? <Text className="text-gray-600 text-[10px] mt-2">Refreshing quote...</Text> : null}
             </View>
           </View>
 

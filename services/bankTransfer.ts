@@ -1,7 +1,9 @@
+import { getTransferQuote } from '@/api/account'
 import { listTimeline, type TimelineQuery } from '@/api/timeline'
 
 const TODAY_LIMIT = 50
 const MAX_PAGES = 5
+const MIN_TRANSFER_AMOUNT = 150
 
 const toNumber = (value: unknown) => {
   if (typeof value === 'number') return Number.isFinite(value) ? value : 0
@@ -13,6 +15,29 @@ const toNumber = (value: unknown) => {
 }
 
 const toLower = (value: unknown) => String(value ?? '').trim().toLowerCase()
+
+export const estimateTransferFeeBreakdown = (amount: number) => {
+  const safeAmount = toNumber(amount)
+  if (safeAmount <= 0) {
+    return { platformFee: 0, stampDutyFee: 0, totalFee: 0 }
+  }
+
+  let totalFee = 0
+  if (safeAmount <= 1999) totalFee = 55
+  else if (safeAmount <= 9999) totalFee = 76.8
+  else if (safeAmount <= 49999) totalFee = 126.8
+  else totalFee = 150
+
+  const stampDutyFee = safeAmount >= 10000 ? 50 : 0
+  const platformFee = Math.max(0, totalFee - stampDutyFee)
+
+  return { platformFee, stampDutyFee, totalFee }
+}
+
+export const estimateTransferFee = (amount: number): number => {
+  const fee = estimateTransferFeeBreakdown(amount).totalFee
+  return Number(fee.toFixed(2))
+}
 
 export const isSameLocalDay = (value: unknown, day: Date = new Date()) => {
   const parsed = new Date(String(value || ''))
@@ -42,36 +67,26 @@ export const isBankTransferDebitRecord = (record: Record<string, any>) => {
   const meta = record?.meta || {}
   const kind = toLower(record?.kind || record?.type || meta?.kind || meta?.source)
   const txType = toLower(meta?.transaction_type || record?.transaction_type || record?.type)
+  const subtype = toLower(meta?.subtype)
+  const provider = toLower(meta?.provider)
+
+  const isAnchorTransferComponent =
+    provider === 'anchor' && (subtype === 'principal' || subtype === 'fee')
+
+  const description = toLower(meta?.description || meta?.address || record?.description || record?.display_message)
   const label = toLower(record?.label || record?.title || record?.text || record?.message)
-  const description = toLower(
-    meta?.description ||
-      meta?.address ||
-      record?.description ||
-      record?.display_message
-  )
-  const transferRef = toLower(
-    meta?.transfer_reference ||
-      record?.transfer_reference ||
-      meta?.reference ||
-      record?.reference
-  )
 
   const hasBankMarkers =
     Boolean(meta?.bank_code || meta?.account_number || meta?.counter_party_id) ||
     description.includes('bank transfer') ||
-    description.includes('inter bank') ||
-    description.includes('inter-bank') ||
-    description.includes('nip transfer') ||
-    label.includes('bank transfer') ||
-    label.includes('inter bank') ||
-    transferRef.startsWith('trf-')
+    label.includes('bank transfer')
 
   const isTransferLike =
+    isAnchorTransferComponent ||
     kind.includes('transfer') ||
     txType.includes('transfer') ||
     label.includes('transfer') ||
-    description.includes('transfer') ||
-    (hasBankMarkers && (txType === 'withdraw' || txType === 'withdrawal' || txType === 'debit'))
+    description.includes('transfer')
 
   const isDebitLike =
     txType === 'withdraw' ||
@@ -81,16 +96,12 @@ export const isBankTransferDebitRecord = (record: Record<string, any>) => {
     toLower(record?.direction) === 'debit' ||
     toLower(meta?.direction) === 'debit'
 
-  return hasBankMarkers && isTransferLike && isDebitLike
+  return (isAnchorTransferComponent || hasBankMarkers) && isTransferLike && isDebitLike
 }
 
-export const sumTodayTransferSpentFromTimeline = (
-  records: Record<string, any>[],
-  day: Date = new Date()
-) => {
+export const sumTodayTransferSpentFromTimeline = (records: Record<string, any>[], day: Date = new Date()) => {
   return records.reduce((sum, record) => {
-    const occurredAt =
-      record?.occurred_at || record?.created_at || record?.createdAt || record?.timestamp
+    const occurredAt = record?.occurred_at || record?.created_at || record?.createdAt || record?.timestamp
     if (!isSameLocalDay(occurredAt, day)) return sum
     if (!isBankTransferDebitRecord(record)) return sum
 
@@ -112,7 +123,7 @@ const extractNextCursor = (payload: any): string | null => {
   return cursor ? String(cursor) : null
 }
 
-export const getTodayTransferSpent = async (): Promise<number> => {
+const getTodayTransferSpentFromTimelineFallback = async (): Promise<number> => {
   const now = new Date()
   const dateOnly = now.toISOString().slice(0, 10)
   const queryBase: TimelineQuery = {
@@ -138,9 +149,47 @@ export const getTodayTransferSpent = async (): Promise<number> => {
   return Number(total.toFixed(2))
 }
 
-export const estimateTransferFee = (amount: number): number => {
-  const safeAmount = toNumber(amount)
-  if (safeAmount <= 0) return 0
-  // Backend fee rule is not exposed on mobile today; keep estimate conservative.
-  return 0
+export const getTransferQuoteSnapshot = async (amount: number) => {
+  const safeAmount = Math.max(0, toNumber(amount))
+  const quoteAmount = safeAmount > 0 ? safeAmount : MIN_TRANSFER_AMOUNT
+
+  try {
+    const raw = await getTransferQuote(quoteAmount)
+    const payload = raw?.data ?? raw ?? {}
+    return {
+      source: 'quote' as const,
+      amount: quoteAmount,
+      fee: toNumber(payload?.fee),
+      totalDebit: toNumber(payload?.total_debit),
+      dailyLimit: toNumber(payload?.daily_limit),
+      dailySpent: toNumber(payload?.daily_spent),
+      dailyRemaining: toNumber(payload?.daily_remaining),
+      feeIsEstimate: payload?.fee_is_estimate === true,
+      feeBreakdown: payload?.fee_breakdown || null,
+      businessTimezone: String(payload?.business_timezone || ''),
+      minAmount: MIN_TRANSFER_AMOUNT,
+    }
+  } catch {
+    const fallbackFee = estimateTransferFee(quoteAmount)
+    const todaySpent = await getTodayTransferSpentFromTimelineFallback().catch(() => 0)
+    return {
+      source: 'fallback' as const,
+      amount: quoteAmount,
+      fee: fallbackFee,
+      totalDebit: quoteAmount + fallbackFee,
+      dailyLimit: 0,
+      dailySpent: todaySpent,
+      dailyRemaining: 0,
+      feeIsEstimate: true,
+      feeBreakdown: null,
+      businessTimezone: '',
+      minAmount: MIN_TRANSFER_AMOUNT,
+    }
+  }
 }
+
+export const getTodayTransferSpent = async (): Promise<number> => {
+  const snapshot = await getTransferQuoteSnapshot(MIN_TRANSFER_AMOUNT)
+  return Number(snapshot.dailySpent || 0)
+}
+

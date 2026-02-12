@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useRef, useState } from 'react'
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import NotificationAlert from '@/components/notification'
@@ -33,6 +33,7 @@ type TransferDraft = {
   save_beneficiary?: boolean
   description?: string
   daily_remaining_before: number
+  transfer_reference?: string
 }
 
 const parseDraft = (raw: any): TransferDraft | null => {
@@ -75,6 +76,10 @@ const ReviewTransferScreen = () => {
   const [notice, setNotice] = useState<NoticeState>({ message: null, error: false, data: null })
 
   const draft = useMemo(() => parseDraft(draftParam), [draftParam])
+  const transferReferenceRef = useRef<string>('')
+  if (!transferReferenceRef.current) {
+    transferReferenceRef.current = String(draft?.transfer_reference || buildTransferReference())
+  }
   const tierEligible = useMemo(
     () => isTierEligibleForBankTransfer(getTierFromProfile(userProfileData)),
     [userProfileData]
@@ -128,7 +133,7 @@ const ReviewTransferScreen = () => {
     setShowUpgradeCta(false)
     setLastEnteredPin(transactionPin)
 
-    const transferReference = buildTransferReference()
+    const transferReference = transferReferenceRef.current
     try {
       const counterPartyId = draft.inter_bank
         ? await resolveInterBankCounterPartyId(draft)

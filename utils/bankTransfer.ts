@@ -55,16 +55,19 @@ export const validateTransferAmount = ({
   fee,
   availableBalance,
   dailyLimitRemaining,
+  minAmount = 0,
 }: {
   amount: number
   fee: number
   availableBalance: number
   dailyLimitRemaining: number
+  minAmount?: number
 }) => {
   const safeAmount = clampMoney(amount)
   const safeFee = clampMoney(fee)
   const safeBalance = clampMoney(availableBalance)
   const safeDailyRemaining = clampMoney(dailyLimitRemaining)
+  const safeMinAmount = clampMoney(minAmount)
   const totalDebit = safeAmount + safeFee
 
   if (safeAmount <= 0) {
@@ -72,6 +75,13 @@ export const validateTransferAmount = ({
       valid: false,
       totalDebit,
       message: 'Enter an amount greater than 0.',
+    }
+  }
+  if (safeMinAmount > 0 && safeAmount < safeMinAmount) {
+    return {
+      valid: false,
+      totalDebit,
+      message: `Minimum transfer amount is ${safeMinAmount.toLocaleString('en-NG')}.`,
     }
   }
   if (totalDebit > safeBalance) {
