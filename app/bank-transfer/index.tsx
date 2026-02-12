@@ -323,6 +323,7 @@ const BankTransferScreen = () => {
     return (
       <View className="flex-1 bg-primary px-4">
         <View className="pt-10">
+          <Text className="text-amber-300 text-xs mb-2">BANK TRANSFER OTA MARKER v2</Text>
           <Text className="text-white text-2xl mb-2">Bank Transfer</Text>
           <TierGateCard onUpgrade={() => router.replace('/kyc')} />
         </View>
@@ -334,6 +335,7 @@ const BankTransferScreen = () => {
     <View className="flex-1 bg-primary px-4">
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
         <View className="pt-10">
+          <Text className="text-amber-300 text-xs mb-2">BANK TRANSFER OTA MARKER v2</Text>
           <Text className="text-white text-2xl mb-2">Bank Transfer</Text>
           <Text className="text-gray-300 mb-4">Step 1 of 3: Recipient and amount</Text>
 

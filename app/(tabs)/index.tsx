@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
   RefreshControl,
@@ -9,6 +10,7 @@ import {
   View,
 } from 'react-native'
 import Constants from 'expo-constants'
+import * as Updates from 'expo-updates'
 import { Link, useRouter } from 'expo-router'
 import { AntDesign, Feather } from '@expo/vector-icons'
 
@@ -33,6 +35,7 @@ import NotificationAlert from '@/components/notification'
 import useNotification from '@/hooks/useNotification'
 import ScreenContainer from '@/components/ScreenContainer'
 import ViewBox from '@/components/view-box/ViewBoxIcon'
+import OtaDebug from '@/src/components/OtaDebug'
 import { FEATURE_LEGACY_HOME } from '@/constants/featureFlags'
 import { getTierFromProfile, isTierEligibleForBankTransfer } from '@/utils/bankTransfer'
 
@@ -236,9 +239,16 @@ export default function Index() {
   const [getstarted, setOpenStarted] = useState(false)
   const [sendOpen, setSendOpen] = useState(false)
   const [loader, setLoader] = useState(false)
+  const [otaChecking, setOtaChecking] = useState(false)
+  const [otaStatus, setOtaStatus] = useState<string | null>(null)
 
   // ✅ Recent Activity toggle (money vs all)
   const [activityMode, setActivityMode] = useState<'money' | 'all'>('money')
+  const buildProfile =
+    (Constants.expoConfig as any)?.extra?.eas?.buildProfile ||
+    (Constants as any)?.easConfig?.buildProfile ||
+    ''
+  const showOtaDebug = __DEV__ || buildProfile === 'preview'
 
   useEffect(() => {
     console.log('Runtime Versions:', Constants.manifest2?.runtimeVersion)
@@ -529,6 +539,39 @@ export default function Index() {
     [router, goToTimeline]
   )
 
+  const handleForceOtaCheck = useCallback(async () => {
+    if (otaChecking) return
+    setOtaChecking(true)
+    setOtaStatus('Checking for update...')
+    try {
+      const result = await Updates.checkForUpdateAsync()
+      if (!result.isAvailable) {
+        setOtaStatus('No update available for this build/runtime.')
+        return
+      }
+
+      setOtaStatus('Update found. Downloading...')
+      await Updates.fetchUpdateAsync()
+      setOtaStatus('Update downloaded. Reload to apply.')
+
+      Alert.alert('Update downloaded', 'A new update is ready. Reload now?', [
+        { text: 'Later', style: 'cancel' },
+        {
+          text: 'Reload now',
+          onPress: () => {
+            Updates.reloadAsync().catch(() => {})
+          },
+        },
+      ])
+    } catch (error: any) {
+      const message = String(error?.message || 'Failed to check for updates.')
+      setOtaStatus(`Update check failed: ${message}`)
+      Alert.alert('OTA check failed', message)
+    } finally {
+      setOtaChecking(false)
+    }
+  }, [otaChecking])
+
   return (
     <>
       <ScreenContainer
@@ -631,6 +674,10 @@ export default function Index() {
               <Text className="text-white font-semibold">Network/Error</Text>
               <Text className="text-white/80">{String(showTopError)}</Text>
             </View>
+          ) : null}
+
+          {showOtaDebug ? (
+            <OtaDebug onForceCheck={handleForceOtaCheck} busy={otaChecking} status={otaStatus} />
           ) : null}
 
           {/* Account chip */}
