@@ -83,7 +83,9 @@
     "owner": "bz99",
     "updates": {
       "enabled": true,
-      "url": "https://u.expo.dev/138ede9a-6452-46f2-8fe4-0e7c5c30b172"
+      "url": "https://u.expo.dev/138ede9a-6452-46f2-8fe4-0e7c5c30b172",
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
     },
     "runtimeVersion": {
       "policy": "sdkVersion"
