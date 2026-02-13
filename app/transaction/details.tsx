@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import useNotification from '@/hooks/useNotification'
 import useFetch from '@/services/useFetch'
 import { useAuth } from '@/services/useAuth'
-import { createBillPaymentIntent, executeBillPaymentIntent, getPurchaseOrder } from '@/api/billOrder'
+import { createBillPaymentIntent, executeBillPaymentIntent, getBillPaymentIntent, getPurchaseOrder } from '@/api/billOrder'
 import Summary from '@/components/cards/Summary'
 import Loader from '@/components/Loader'
 import AppModal from '@/components/modal/Modal'
@@ -18,9 +18,10 @@ const ConfirmDetails = () => {
   const routeOrderId = String(orderId || '').trim()
   const [loader, setLoader] = useState(false)
   const [pendingRetry, setPendingRetry] = useState(false)
-  const [retryCount, setRetryCount] = useState(0)
-  const [lastPaymentMethod, setLastPaymentMethod] = useState<string | null>(null)
-  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [pollingIntent, setPollingIntent] = useState(false)
+  const [pollTimedOut, setPollTimedOut] = useState(false)
+  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const pollStartedAtRef = useRef<number | null>(null)
   const [applyCommission, setApplyCommission] = useState(false)
   const [resolvedBillOrderId, setResolvedBillOrderId] = useState<string | null>(null)
   const [resolveError, setResolveError] = useState<string | null>(null)
@@ -102,25 +103,63 @@ const ConfirmDetails = () => {
     }
   }, [resolvedBillOrderId, routeIntentId, setNotification])
 
-  const clearRetryTimer = () => {
-    if (retryTimerRef.current) {
-      clearTimeout(retryTimerRef.current)
-      retryTimerRef.current = null
+  const clearPolling = () => {
+    if (pollTimerRef.current) {
+      clearInterval(pollTimerRef.current)
+      pollTimerRef.current = null
     }
+    pollStartedAtRef.current = null
+    setPollingIntent(false)
   }
 
   const resetPending = useCallback(() => {
-    clearRetryTimer()
+    clearPolling()
     setPendingRetry(false)
-    setRetryCount(0)
+    setPollTimedOut(false)
   }, [])
+
+  const startIntentPolling = useCallback((intent: string, fallbackOrderId: string) => {
+    clearPolling()
+    setPollingIntent(true)
+    setPollTimedOut(false)
+    pollStartedAtRef.current = Date.now()
+    pollTimerRef.current = setInterval(async () => {
+      try {
+        const latest = await getBillPaymentIntent(intent)
+        const status = String(latest?.status || '').toLowerCase()
+        if (status === 'completed') {
+          clearPolling()
+          router.push({
+            pathname: '/transaction/confirm',
+            params: { orderId: String(latest?.bill_order_id || fallbackOrderId) },
+          })
+          loadProfile({ force: true })
+          return
+        }
+        if (status === 'failed' || status === 'refunded' || status === 'expired') {
+          clearPolling()
+          setNotification({
+            error: true,
+            message: `Bill payment ${status}.`,
+            data: null,
+          })
+          return
+        }
+        if (pollStartedAtRef.current && Date.now() - pollStartedAtRef.current >= 45_000) {
+          clearPolling()
+          setPendingRetry(true)
+          setPollTimedOut(true)
+        }
+      } catch {
+        // keep polling until timeout
+      }
+    }, 2000)
+  }, [loadProfile, router, setNotification])
 
   const handleConfirmation = useCallback(
     async (payment_method: string) => {
       const billTotal = Number(data?.total_amount ?? data?.amount ?? 0)
       const shortfall = Math.max(0, billTotal - walletBalanceValue)
-      setLastPaymentMethod('wallet')
-
       if (payment_method !== 'wallet') {
         setNotification({
           error: true,
@@ -165,9 +204,10 @@ const ConfirmDetails = () => {
 
         if (response?.pending || response?.status === 'pending' || response?.http_status === 202) {
           setPendingRetry(true)
+          startIntentPolling(String(intentId), String(resolvedBillOrderId))
           setNotification({
             error: true,
-            message: response?.message || 'Payment pending. Please try again in a moment.',
+            message: response?.message || 'Payment pending. We are checking status...',
             data: null,
           })
           return
@@ -214,25 +254,13 @@ const ConfirmDetails = () => {
   )
 
   useEffect(() => {
-    if (!pendingRetry || !lastPaymentMethod) return
-    if (retryCount >= 3) return
-    clearRetryTimer()
-    retryTimerRef.current = setTimeout(() => {
-      setRetryCount((count) => count + 1)
-      handleConfirmation(lastPaymentMethod)
-    }, 5000)
-    return () => {
-      clearRetryTimer()
-    }
-  }, [handleConfirmation, lastPaymentMethod, pendingRetry, retryCount])
-
-  useEffect(() => {
     if (String(resume || '') !== '1') return
     if (!intentReady || !intentId) return
+    startIntentPolling(String(intentId), String(resolvedBillOrderId || routeOrderId))
     setResumePolling(true)
     setResumeTimedOut(false)
     resumePollCountRef.current = 0
-  }, [resume, intentReady, intentId])
+  }, [intentId, intentReady, resolvedBillOrderId, resume, routeOrderId, startIntentPolling])
 
   useEffect(() => {
     if (!resumePolling) return
@@ -255,6 +283,8 @@ const ConfirmDetails = () => {
 
     return () => clearInterval(timer)
   }, [resumePolling, walletBalanceValue, data?.total_amount, data?.amount, loadProfile, handleConfirmation])
+
+  useEffect(() => () => clearPolling(), [])
 
   return (
     <View className="flex-1 p-4 bg-primary">
@@ -302,16 +332,23 @@ const ConfirmDetails = () => {
 
       {pendingRetry ? (
         <View className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 mb-3">
-          <Text className="text-yellow-200 text-center">Payment pending. Please try again in a moment.</Text>
-          {lastPaymentMethod ? (
+          <Text className="text-yellow-200 text-center">Payment pending. We are checking status.</Text>
+          {pollingIntent ? (
+            <Text className="text-yellow-100 text-center mt-2">Checking every 2s (up to 45s)...</Text>
+          ) : null}
+          {pollTimedOut ? (
             <TouchableOpacity
               onPress={() => {
-                setRetryCount(0)
-                handleConfirmation(lastPaymentMethod)
+                startIntentPolling(String(intentId), String(resolvedBillOrderId || routeOrderId))
               }}
               className="border rounded-md mt-3 border-alt py-3"
             >
-              <Text className="text-alt text-center">Retry Confirmation</Text>
+              <Text className="text-alt text-center">Check status</Text>
+            </TouchableOpacity>
+          ) : null}
+          {pollTimedOut ? (
+            <TouchableOpacity onPress={() => router.push('/utility/power')} className="border rounded-md mt-3 border-gray-600 py-3">
+              <Text className="text-gray-300 text-center">Back to bills</Text>
             </TouchableOpacity>
           ) : null}
         </View>
@@ -392,4 +429,3 @@ const ConfirmDetails = () => {
 }
 
 export default ConfirmDetails
-
