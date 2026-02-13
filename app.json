@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "bitbridge-app",
+    "name": "BitBridge",
     "slug": "bit-bridge-global-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/logos/logo.png",
+    "icon": "./assets/icons/app-icon-1024.png",
     "scheme": "bitbridgeglobal",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -16,7 +16,8 @@
         "applinks:www.bitbridgeglobal.com"
       ],
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "CFBundleDisplayName": "BitBridge"
       }
     },
     "android": {
@@ -43,8 +44,8 @@
         }
       ],
       "adaptiveIcon": {
-        "foregroundImage": "./assets/logos/logo.png",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/icons/adaptive-foreground.png",
+        "backgroundColor": "#FFFFFF"
       },
       "package": "com.vortech.bitbridgeapp"
     },
