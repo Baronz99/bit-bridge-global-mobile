@@ -26,6 +26,7 @@ type TransferDraft = {
   account_name: string
   amount: number
   fee: number
+  fee_estimated?: boolean
   total_debit: number
   inter_bank: boolean
   counter_party_id?: string
@@ -90,6 +91,18 @@ const ReviewTransferScreen = () => {
       dailyLimitRemaining: Number(draft.daily_remaining_before || 0),
       totalDebit: Number(draft.total_debit || 0),
     })
+  }, [draft])
+  const isReviewComplete = useMemo(() => {
+    if (!draft) return false
+    return Boolean(
+      String(draft.bank_code || '').trim() &&
+      String(draft.bank_name || '').trim() &&
+      String(draft.account_number || '').trim().length === 10 &&
+      String(draft.account_name || '').trim() &&
+      Number(draft.amount || 0) > 0 &&
+      Number(draft.total_debit || 0) >= Number(draft.amount || 0) &&
+      String(draft.description || '').trim()
+    )
   }, [draft])
 
   const resolveInterBankCounterPartyId = async (payload: TransferDraft): Promise<string> => {
@@ -255,7 +268,6 @@ const ReviewTransferScreen = () => {
     return (
       <View className="flex-1 bg-primary px-4">
         <View className="pt-10">
-          <Text className="text-white text-2xl mb-2">Review Transfer</Text>
           <Text className="text-red-300">Transfer details are missing. Please restart the flow.</Text>
           <TouchableOpacity
             onPress={() => router.replace('/bank-transfer')}
@@ -272,7 +284,6 @@ const ReviewTransferScreen = () => {
     return (
       <View className="flex-1 bg-primary px-4">
         <View className="pt-10">
-          <Text className="text-white text-2xl mb-2">Review Transfer</Text>
           <Text className="text-gray-300">Bank transfer is available from Tier 2.</Text>
           <TouchableOpacity
             onPress={() => router.replace('/kyc')}
@@ -289,7 +300,6 @@ const ReviewTransferScreen = () => {
     <View className="flex-1 bg-primary px-4">
       <ScrollView contentContainerStyle={{ paddingBottom: 30 }}>
         <View className="pt-10">
-          <Text className="text-white text-2xl mb-2">Review Transfer</Text>
           <Text className="text-gray-300 mb-4">Step 2 of 3: Confirm details</Text>
           <Text className="text-gray-500 text-xs mb-3">
             If charged, transfer completion will be reflected in timeline automatically.
@@ -308,7 +318,9 @@ const ReviewTransferScreen = () => {
             dailyRemainingAfter={dailyRemainingAfter}
           />
           <Text className="text-gray-500 text-xs mt-2">
-            Fee shown is estimated. Final fee is confirmed by backend at submission.
+            {draft.fee_estimated
+              ? 'Estimated fee shown. Final fee is confirmed by backend at submission.'
+              : 'Fee confirmed from transfer quote.'}
           </Text>
 
           {showUpgradeCta ? (
@@ -323,8 +335,8 @@ const ReviewTransferScreen = () => {
 
           <TouchableOpacity
             onPress={() => setPinModalOpen(true)}
-            disabled={loading}
-            className={`${loading ? 'bg-gray-700' : 'bg-theme-primary'} py-5 rounded-xl mt-6`}
+            disabled={loading || !isReviewComplete}
+            className={`${loading || !isReviewComplete ? 'bg-gray-700' : 'bg-theme-primary'} py-5 rounded-xl mt-6`}
           >
             <Text className="text-alt font-semibold text-center">
               {loading ? 'Processing...' : 'Confirm & enter PIN'}

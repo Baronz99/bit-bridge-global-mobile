@@ -240,6 +240,7 @@ export default function Index() {
 
   // ✅ Recent Activity toggle (money vs all)
   const [activityMode, setActivityMode] = useState<'money' | 'all'>('money')
+  const showOtaDebug = __DEV__ || String(process.env.EXPO_PUBLIC_SHOW_OTA_DEBUG || '') === '1'
 
   useEffect(() => {
     console.log('Runtime Versions:', Constants.manifest2?.runtimeVersion)
@@ -634,7 +635,7 @@ export default function Index() {
             </View>
           ) : null}
 
-          <OtaDebug />
+          {showOtaDebug ? <OtaDebug /> : null}
 
           {/* Account chip */}
           {showLegacyAccountChip ? (

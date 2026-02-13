@@ -32,6 +32,7 @@ type TransferDraft = {
   account_name: string
   amount: number
   fee: number
+  fee_estimated?: boolean
   total_debit: number
   inter_bank: boolean
   counter_party_id?: string
@@ -310,6 +311,7 @@ const BankTransferScreen = () => {
       account_name: formData.account_name,
       amount: amountValue,
       fee,
+      fee_estimated: feeEstimated,
       total_debit: amountValidation.totalDebit,
       inter_bank: formData.inter_bank,
       counter_party_id: formData.counter_party_id || undefined,
@@ -341,7 +343,6 @@ const BankTransferScreen = () => {
     <View className="flex-1 bg-primary px-4">
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
         <View className="pt-10">
-          <Text className="text-white text-2xl mb-2">Bank Transfer</Text>
           <Text className="text-gray-300 mb-4">Step 1 of 3: Recipient and amount</Text>
 
           <NotificationAlert message={notice.message} error={notice.error} data={notice.data} />
@@ -460,11 +461,19 @@ const BankTransferScreen = () => {
               placeholderTextColor="gray"
               className={`${beneficiaryLocked ? 'bg-gray-900' : 'bg-gray-950'} border border-gray-800 rounded-xl px-4 py-4 text-white`}
             />
-            <Text className="text-gray-500 text-xs mt-2">
-              {sanitizeDigits(formData.account_number).length < 10
-                ? 'Account number must be exactly 10 digits.'
-                : 'Recipient account looks valid. Verifying...'}
-            </Text>
+            {accountLookupStatus === 'loading' ? (
+              <Text className="text-gray-400 text-xs mt-2">Verifying recipient...</Text>
+            ) : null}
+            {accountLookupStatus === 'error' ? (
+              <View className="flex-row items-center justify-between mt-2">
+                <Text className="text-red-300 text-xs flex-1 pr-3">
+                  Verification failed. Confirm bank and account, then retry.
+                </Text>
+                <TouchableOpacity onPress={() => runResolveAccount(true)}>
+                  <Text className="text-app-primary text-xs">Retry</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
 
             <RecipientVerificationState
               status={accountLookupStatus}
