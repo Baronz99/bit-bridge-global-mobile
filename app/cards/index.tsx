@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useMemo } from 'react'
 import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native'
 import { Link } from 'expo-router'
 import useFetch from '@/services/useFetch'
@@ -8,13 +8,6 @@ import { resolveUserProfile } from '@/services/auth/resolveUserProfile'
 import ScreenContainer from '@/components/ScreenContainer'
 import moneyFormat from '@/utils/moneyFormat'
 import { getCardsApiId } from '@/utils/cardIdentifier'
-import { getApiClientDebugSnapshot } from '@/api/client'
-import { INTERNAL_DIAGNOSTICS_ENABLED } from '@/constants/appEnv'
-
-const DEBUG_CARDS =
-  INTERNAL_DIAGNOSTICS_ENABLED &&
-  String(process.env.EXPO_PUBLIC_DEBUG_CARDS || '').toLowerCase() === 'true'
-const DEBUG_CARDS_LOG = DEBUG_CARDS
 
 const normalizeLast4 = (value: any) => {
   const digits = String(value ?? '').replace(/\D/g, '')
@@ -24,7 +17,6 @@ const normalizeLast4 = (value: any) => {
 
 const CardsScreen = () => {
   const { data, loading, error, refetch } = useFetch(() => getUserCards())
-  const [selectedDebugCard, setSelectedDebugCard] = useState<any | null>(null)
   const {
     userProfileData,
     authHydrated,
@@ -74,34 +66,6 @@ const CardsScreen = () => {
   }, [profileResolution.profileRoot])
 
   const cardsCount = cards.length
-  const debugClient = getApiClientDebugSnapshot()
-
-  useEffect(() => {
-    if (!DEBUG_CARDS) return
-    console.log('[CARDS][list_endpoint]', {
-      endpoint: '/cards/user_card',
-      resolvedBaseURL: debugClient.baseURL,
-      fullUrl: `${String(debugClient.baseURL || '').replace(/\/+$/, '')}/cards/user_card`,
-      cardsCount: cards.length,
-    })
-  }, [cards, debugClient.baseURL])
-
-  useEffect(() => {
-    if (!DEBUG_CARDS_LOG) return
-    const preview = cards.slice(0, 5).map((card: any) => {
-      const meta = card?.meta_data ?? card?.metaData ?? {}
-      return {
-        id: card?.id ?? null,
-        card_id: card?.card_id ?? null,
-        bridge_card_id: card?.bridge_card_id ?? null,
-        bridgecard_id: card?.bridgecard_id ?? null,
-        provider_id: card?.provider_id ?? null,
-        meta_keys: Object.keys(meta || {}),
-        chosen_cards_api_id: getCardsApiId(card),
-      }
-    })
-    console.log('[CARDS][api_id_selection]', { count: cards.length, preview })
-  }, [cards])
 
   if (!authHydrated) {
     return (
@@ -216,34 +180,6 @@ const CardsScreen = () => {
       </View>
 
       <View className="mt-4 gap-3">
-        {DEBUG_CARDS ? (
-          <View className="bg-gray-950 border border-yellow-700/40 rounded-2xl p-4">
-            <Text className="text-yellow-200 font-semibold text-xs uppercase tracking-widest">
-              Cards Debug
-            </Text>
-            <Text className="text-gray-300 text-xs mt-2">List endpoint: `/cards/user_card`</Text>
-            <Text className="text-gray-300 text-xs mt-1">API base: {debugClient.baseURL || '--'}</Text>
-            <Text className="text-gray-300 text-xs mt-1">Cards loaded: {cardsCount}</Text>
-            {selectedDebugCard ? (
-              <View className="mt-3">
-                <Text className="text-gray-200 text-xs">Selected card keys:</Text>
-                <Text className="text-gray-400 text-xs mt-1">{Object.keys(selectedDebugCard).join(', ') || '--'}</Text>
-                <Text className="text-gray-300 text-xs mt-2">id: {String(selectedDebugCard?.id ?? '--')}</Text>
-                <Text className="text-gray-300 text-xs mt-1">card_id: {String(selectedDebugCard?.card_id ?? '--')}</Text>
-                <Text className="text-gray-300 text-xs mt-1">provider_id: {String(selectedDebugCard?.provider_id ?? '--')}</Text>
-                <Text className="text-gray-300 text-xs mt-1">bridgecard_id: {String(selectedDebugCard?.bridgecard_id ?? '--')}</Text>
-                <Text className="text-gray-300 text-xs mt-1">last4: {String(selectedDebugCard?.last4 ?? selectedDebugCard?.last_4 ?? '--')}</Text>
-                <Text className="text-gray-300 text-xs mt-1">reference: {String(selectedDebugCard?.reference ?? '--')}</Text>
-              </View>
-            ) : null}
-            <Link href="/cards/debug" asChild>
-              <TouchableOpacity className="mt-3 border border-yellow-500/60 rounded-lg py-2">
-                <Text className="text-yellow-200 text-center text-xs font-semibold">Open Full Cards Debug Panel</Text>
-              </TouchableOpacity>
-            </Link>
-          </View>
-        ) : null}
-
         {cards.length === 0 && !loading ? (
           <View className="bg-gray-900 border border-gray-800 rounded-2xl p-4">
             <Text className="text-gray-300 text-center">
@@ -309,24 +245,6 @@ const CardsScreen = () => {
             >
               <TouchableOpacity
                 className="bg-gray-900 rounded-2xl p-4 border border-gray-800"
-                onPress={() => {
-                  if (!DEBUG_CARDS_LOG) return
-                  const meta = card?.meta_data ?? card?.metaData ?? {}
-                  setSelectedDebugCard(card)
-                  console.log('[CARDS][selected_card]', {
-                    keys: Object.keys(card || {}),
-                    id: card?.id,
-                    card_id: card?.card_id,
-                    bridge_card_id: card?.bridge_card_id,
-                    bridgecard_id: card?.bridgecard_id,
-                    provider_id: card?.provider_id,
-                    meta_data_keys: Object.keys(meta || {}),
-                    chosen_cards_api_id: routeId,
-                    last4: card?.last4 ?? card?.last_4,
-                    reference: card?.reference,
-                    routeId,
-                  })
-                }}
               >
                 <View className="flex-row justify-between items-start">
                   <View>
