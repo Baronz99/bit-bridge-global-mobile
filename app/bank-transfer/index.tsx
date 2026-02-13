@@ -53,15 +53,11 @@ const sanitizeDigits = (value: string) => String(value || '').replace(/\D/g, '')
 const extractCounterPartyId = (payload: any): string => {
   const direct =
     payload?.counter_party_id ||
-    payload?.counterPartyId ||
-    payload?.id ||
-    payload?.beneficiary_id
+    payload?.counterPartyId
   if (direct) return String(direct)
   const nested =
     payload?.data?.counter_party_id ||
-    payload?.data?.counterPartyId ||
-    payload?.data?.id ||
-    payload?.data?.beneficiary_id
+    payload?.data?.counterPartyId
   return nested ? String(nested) : ''
 }
 
@@ -401,9 +397,7 @@ const BankTransferScreen = () => {
                   account_number: accountNumber || prev.account_number,
                   account_name: beneficiaryName || '',
                   beneficiary_name: beneficiaryName || '',
-                  counter_party_id: String(
-                    data?.counter_party_id || data?.beneficiary_id || selectedValue || prev.counter_party_id || ''
-                  ),
+                  counter_party_id: extractCounterPartyId(data),
                 }))
                 if (bankCode) {
                   setRecentBankCodes((prev) => [bankCode, ...prev.filter((item) => item !== bankCode)].slice(0, 6))

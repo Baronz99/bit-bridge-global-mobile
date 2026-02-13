@@ -52,15 +52,11 @@ const parseDraft = (raw: any): TransferDraft | null => {
 const extractCounterPartyId = (payload: any): string => {
   const direct =
     payload?.counter_party_id ||
-    payload?.counterPartyId ||
-    payload?.id ||
-    payload?.beneficiary_id
+    payload?.counterPartyId
   if (direct) return String(direct)
   const nested =
     payload?.data?.counter_party_id ||
-    payload?.data?.counterPartyId ||
-    payload?.data?.id ||
-    payload?.data?.beneficiary_id
+    payload?.data?.counterPartyId
   return nested ? String(nested) : ''
 }
 
@@ -106,7 +102,7 @@ const ReviewTransferScreen = () => {
   }, [draft])
 
   const resolveInterBankCounterPartyId = async (payload: TransferDraft): Promise<string> => {
-    const existing = String(payload?.counter_party_id || payload?.beneficiary_id || '').trim()
+    const existing = String(payload?.counter_party_id || '').trim()
     if (existing) return existing
 
     const resolved = await resolveAccountName({
@@ -150,7 +146,7 @@ const ReviewTransferScreen = () => {
     try {
       const counterPartyId = draft.inter_bank
         ? await resolveInterBankCounterPartyId(draft)
-        : String(draft.counter_party_id || draft.beneficiary_id || '').trim()
+        : String(draft.counter_party_id || '').trim()
       if (draft.inter_bank && !counterPartyId) {
         throw new Error('Inter-bank transfer requires a resolved beneficiary.')
       }
