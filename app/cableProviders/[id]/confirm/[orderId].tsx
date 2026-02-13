@@ -25,7 +25,6 @@ const CableConfirmScreen = () => {
 
   const { data } = useFetch<any>(useCallback(() => getPurchaseOrder(routeOrderId), [routeOrderId]))
   const billTotal = useMemo(() => Number(data?.total_amount ?? data?.amount ?? 0), [data?.amount, data?.total_amount])
-  const canViewReceipt = flow.uiState === 'completed' || String(data?.status || '').toLowerCase() === 'completed'
 
   const flow = useBillPaymentIntentFlow({
     billOrderId: routeOrderId,
@@ -39,6 +38,7 @@ const CableConfirmScreen = () => {
       loadProfile({ force: true })
     },
   })
+  const canViewReceipt = flow.uiState === 'completed'
 
   const handleConfirmation = useCallback(async (paymentMethod: string) => {
     if (paymentMethod !== 'wallet') {

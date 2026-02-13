@@ -31,7 +31,6 @@ const CableTvConfirmScreen = () => {
     return getPurchaseOrder(routeOrderId)
   }, [routeOrderId]))
   const billTotal = useMemo(() => Number(data?.total_amount ?? data?.amount ?? 0), [data?.amount, data?.total_amount])
-  const canViewReceipt = flow.uiState === 'completed' || String(data?.status || '').toLowerCase() === 'completed'
 
   useEffect(() => {
     let cancelled = false
@@ -65,6 +64,7 @@ const CableTvConfirmScreen = () => {
       loadProfile({ force: true })
     },
   })
+  const canViewReceipt = flow.uiState === 'completed'
 
   const handleConfirmation = useCallback(async (paymentMethod: string) => {
     if (paymentMethod !== 'wallet') {

@@ -174,9 +174,38 @@ const ReceiptScreen = () => {
     const isSuccess = ['success', 'completed'].includes(statusRaw)
     const rewardAmount = Number(raw.reward_applied ?? raw.commission_used ?? 0)
     const baseAmount = Number(raw.amount ?? 0)
+    const explicitValueAmount = Number(raw.value_amount)
+    const explicitTotalDisplay = Number(raw.total_display)
+    const explicitTotalAmount = Number(raw.total_amount)
+    const explicitWalletCharged = Number(raw.wallet_amount_charged)
+    const hasExplicitValue = Number.isFinite(explicitValueAmount)
+    const hasExplicitTotalDisplay = Number.isFinite(explicitTotalDisplay)
+    const hasExplicitTotalAmount = Number.isFinite(explicitTotalAmount)
+    const hasExplicitWalletCharged = Number.isFinite(explicitWalletCharged)
+
     const computedValue =
-      raw.value_amount ?? (rewardAmount > 0 ? baseAmount + rewardAmount : baseAmount)
-    const walletAmount = raw.wallet_amount_charged ?? (isSuccess ? baseAmount : 0)
+      hasExplicitValue
+        ? explicitValueAmount
+        : hasExplicitTotalDisplay
+          ? explicitTotalDisplay
+          : hasExplicitTotalAmount
+            ? explicitTotalAmount
+            : hasExplicitWalletCharged
+              ? explicitWalletCharged + Math.max(0, rewardAmount)
+              : rewardAmount > 0
+                ? baseAmount + rewardAmount
+                : baseAmount
+
+    const walletAmount =
+      hasExplicitWalletCharged
+        ? explicitWalletCharged
+        : hasExplicitTotalAmount
+          ? Math.max(0, explicitTotalAmount - Math.max(0, rewardAmount))
+          : hasExplicitValue
+            ? Math.max(0, explicitValueAmount - Math.max(0, rewardAmount))
+            : isSuccess
+              ? baseAmount
+              : 0
     const failReason =
       cleanText((raw.meta && (raw.meta['reason'] || raw.meta['message'])) as string) ||
       cleanText(raw.reason as string) ||
@@ -330,13 +359,13 @@ const ReceiptScreen = () => {
                 event={receipt.event}
                 kind={receipt.kind}
                 subtitle={receipt.subtitle}
-                valueAmount={
-                  receipt.value_amount ??
-                  (typeof receipt.total_amount === 'number'
-                    ? receipt.total_amount + Number(receipt.reward_applied ?? 0)
-                    : undefined)
-                }
-                walletAmount={receipt.wallet_amount_charged ?? receipt.total_amount ?? receipt.amount}
+              valueAmount={
+                receipt.value_amount ??
+                (typeof receipt.total_amount === 'number'
+                  ? receipt.total_amount + Number(receipt.reward_applied ?? 0)
+                  : undefined)
+              }
+                walletAmount={receipt.wallet_amount_charged}
                 rewardAmount={receipt.reward_applied}
                 reason={receipt.reason}
                 timeline={receipt.timeline}

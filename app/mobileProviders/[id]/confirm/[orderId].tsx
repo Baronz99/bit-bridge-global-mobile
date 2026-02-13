@@ -107,7 +107,7 @@ const ConfirmScreen = () => {
     : flow.uiState === 'processing'
       ? flow.message || 'Payment pending. We are checking status.'
       : ''
-  const canViewReceipt = flow.uiState === 'completed' || String(data?.status || '').toLowerCase() === 'completed'
+  const canViewReceipt = flow.uiState === 'completed'
 
   return (
     <View className="flex-1 p-4 bg-primary">

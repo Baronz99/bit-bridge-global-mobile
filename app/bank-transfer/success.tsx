@@ -12,7 +12,6 @@ type TransferSummary = {
   total_debit: number
   description?: string
   transfer_reference: string
-  daily_remaining_after: number
 }
 
 const parseSummary = (raw: any): TransferSummary | null => {
@@ -84,11 +83,6 @@ const SuccessScreen = () => {
                 <Text className="text-white text-sm mb-2">{payload.description}</Text>
               </>
             ) : null}
-
-            <Text className="text-gray-400 text-xs">Daily Remaining</Text>
-            <Text className="text-white text-sm mb-2">
-              {formatNaira(Number(payload.daily_remaining_after || 0))}
-            </Text>
 
             <Text className="text-gray-400 text-xs">Transfer Reference</Text>
             <Text className="text-white text-xs">{payload.transfer_reference}</Text>

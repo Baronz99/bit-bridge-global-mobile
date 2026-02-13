@@ -100,7 +100,7 @@ const ConfirmDetails = () => {
       setNotification({ error: true, message: result.message || 'Bill payment failed.', data: null })
     }
   }, [applyCommission, billTotal, flow, isElectricityVerificationPending, resolveError, resolvedBillOrderId, setNotification, walletBalanceValue])
-  const canViewReceipt = flow.uiState === 'completed' || String(data?.status || '').toLowerCase() === 'completed'
+  const canViewReceipt = flow.uiState === 'completed'
 
   return (
     <View className="flex-1 p-4 bg-primary">
