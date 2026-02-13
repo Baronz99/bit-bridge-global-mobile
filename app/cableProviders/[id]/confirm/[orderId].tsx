@@ -1,29 +1,31 @@
-import { Linking, Text, TouchableOpacity, View } from 'react-native'
+import { Text, TouchableOpacity, View } from 'react-native'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import useFetch from '@/services/useFetch'
-import { getProvision } from '@/api/products'
-import { confirmBillPayment, confirmPayment, getPurchaseOrder } from '@/api/billOrder'
+import { createBillPaymentIntent, executeBillPaymentIntent, getPurchaseOrder } from '@/api/billOrder'
 import { useAuth } from '@/services/useAuth'
-import { images } from '@/constants/images'
-import { AntDesign } from '@expo/vector-icons'
-import { gifs } from '@/constants/gifs'
 import Loader from '@/components/Loader'
 import NotificationAlert from '@/components/notification'
 import useNotification from '@/hooks/useNotification'
 import Summary from '@/components/cards/Summary'
 import TransactionButtons from '@/components/transactionButtons/TransactionButtons'
+import AppModal from '@/components/modal/Modal'
+import moneyFormat from '@/utils/moneyFormat'
 
 const CableetailConfirm = () => {
-  const { orderId } = useLocalSearchParams()
+  const { orderId, id, resume, intentId: routeIntentId } = useLocalSearchParams()
   const [loader, setLoader] = useState(false)
   const [pendingRetry, setPendingRetry] = useState(false)
   const [retryCount, setRetryCount] = useState(0)
   const [lastPaymentMethod, setLastPaymentMethod] = useState<string | null>(null)
+  const [intentId, setIntentId] = useState('')
+  const [intentReady, setIntentReady] = useState(false)
+  const [fundPrompt, setFundPrompt] = useState<{ open: boolean; shortfall: number }>({ open: false, shortfall: 0 })
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const { loadProfile } = useAuth()
+  const { loadProfile, userProfileData } = useAuth()
   const { notification, setNotification } = useNotification()
   const router = useRouter()
+  const walletBalanceValue = Number(userProfileData?.wallet?.balance ?? 0)
 
   const fetchOrder = useCallback(() => getPurchaseOrder(orderId as string), [orderId])
   const { data } = useFetch(fetchOrder)
@@ -41,12 +43,66 @@ const CableetailConfirm = () => {
     setRetryCount(0)
   }, [])
 
+  useEffect(() => {
+    let cancelled = false
+    const bootstrapIntent = async () => {
+      const routeIntent = String(routeIntentId || '').trim()
+      if (routeIntent) {
+        setIntentId(routeIntent)
+        setIntentReady(true)
+        return
+      }
+      try {
+        const created = await createBillPaymentIntent(String(orderId || ''))
+        const createdId = String(created?.id || '').trim()
+        if (!cancelled && createdId) {
+          setIntentId(createdId)
+          setIntentReady(true)
+        }
+      } catch (e: any) {
+        if (!cancelled) {
+          setNotification({
+            error: true,
+            message: e?.message || 'Unable to initialize bill payment.',
+            data: null,
+          })
+        }
+      }
+    }
+    void bootstrapIntent()
+    return () => {
+      cancelled = true
+    }
+  }, [orderId, routeIntentId, setNotification])
+
   const handleCardConfirmation = useCallback(async (payment_method: string) => {
-    setLastPaymentMethod(payment_method)
+    setLastPaymentMethod('wallet')
+    if (payment_method !== 'wallet') {
+      setNotification({
+        error: true,
+        message: 'Bills can only be paid from wallet.',
+        data: null,
+      })
+      return
+    }
+    if (!intentReady || !intentId) {
+      setNotification({
+        error: true,
+        message: 'Bill payment is not ready yet. Please wait.',
+        data: null,
+      })
+      return
+    }
+    const billTotal = Number(data?.total_amount ?? data?.amount ?? 0)
+    const shortfall = Math.max(0, billTotal - walletBalanceValue)
+    if (shortfall > 0) {
+      setFundPrompt({ open: true, shortfall })
+      return
+    }
     setLoader(true)
 
     try {
-      const response = await confirmBillPayment({ queryId: orderId as string, payment_method })
+      const response = await executeBillPaymentIntent(intentId)
       setLoader(false)
 
       if (response?.pending || response?.status === 'pending') {
@@ -58,10 +114,6 @@ const CableetailConfirm = () => {
           data: null,
         })
         return
-      }
-
-      if (payment_method === 'card') {
-        Linking.openURL(response.responseBody.checkoutUrl)
       }
 
       if (response?.data?.id || orderId) {
@@ -88,7 +140,7 @@ const CableetailConfirm = () => {
         data: null,
       })
     }
-  }, [loadProfile, orderId, resetPending, setNotification])
+  }, [data?.amount, data?.total_amount, intentId, intentReady, loadProfile, orderId, resetPending, setNotification, walletBalanceValue])
 
   useEffect(() => {
     if (!pendingRetry || !lastPaymentMethod) return
@@ -102,6 +154,15 @@ const CableetailConfirm = () => {
       clearRetryTimer()
     }
   }, [handleCardConfirmation, lastPaymentMethod, pendingRetry, retryCount])
+
+  useEffect(() => {
+    if (String(resume || '') !== '1') return
+    if (!intentReady || !intentId) return
+    const billTotal = Number(data?.total_amount ?? data?.amount ?? 0)
+    if (billTotal > 0 && walletBalanceValue >= billTotal) {
+      handleCardConfirmation('wallet')
+    }
+  }, [resume, intentReady, intentId, walletBalanceValue, data?.total_amount, data?.amount, handleCardConfirmation])
 
   return (
     <View className="flex-1 px-4 bg-primary w-full">
@@ -135,7 +196,7 @@ const CableetailConfirm = () => {
           ) : null}
         </View>
       ) : null}
-      <TransactionButtons handleConfirmation={handleCardConfirmation} />
+      <TransactionButtons handleConfirmation={handleCardConfirmation} walletOnly />
       <TouchableOpacity
         onPress={() =>
           router.push({
@@ -148,6 +209,31 @@ const CableetailConfirm = () => {
         <Text className="text-gray-300 text-center">View Receipt</Text>
       </TouchableOpacity>
       {loader && <Loader open={loader} />}
+      <AppModal open={fundPrompt.open} onclose={() => setFundPrompt({ open: false, shortfall: 0 })}>
+        <View className="bg-primary rounded-xl p-4">
+          <Text className="text-white text-lg font-semibold mb-2">Insufficient Wallet Balance</Text>
+          <Text className="text-gray-300 mb-4">
+            You need {moneyFormat(fundPrompt.shortfall)} more to complete this bill payment.
+          </Text>
+          <TouchableOpacity
+            onPress={() => {
+              setFundPrompt({ open: false, shortfall: 0 })
+              router.push({
+                pathname: '/fundWallet',
+                params: {
+                  returnTo: '/cableProviders/[id]/confirm/[orderId]',
+                  id: String(id || ''),
+                  orderId: String(orderId || ''),
+                  intentId: String(intentId || '')
+                }
+              })
+            }}
+            className="bg-theme-primary rounded-lg py-3"
+          >
+            <Text className="text-alt text-center font-semibold">Fund Wallet</Text>
+          </TouchableOpacity>
+        </View>
+      </AppModal>
       <NotificationAlert
         message={notification.message}
         error={notification.error}

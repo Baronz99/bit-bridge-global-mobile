@@ -1,10 +1,10 @@
-import { View, Text, Linking, TouchableOpacity, Animated, Alert } from 'react-native'
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { View, Text, TouchableOpacity, Animated, Alert } from 'react-native'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import useNotification from '@/hooks/useNotification'
 import useFetch from '@/services/useFetch'
 import { useAuth } from '@/services/useAuth'
-import { confirmBillPayment, getPurchaseOrder, initializeBillOrderPayment } from '@/api/billOrder'
+import { createBillPaymentIntent, executeBillPaymentIntent, getPurchaseOrder } from '@/api/billOrder'
 import Summary from '@/components/cards/Summary'
 import Loader from '@/components/Loader'
 import AppModal from '@/components/modal/Modal'
@@ -15,7 +15,7 @@ import resolveBillOrderId from '@/utils/resolveBillOrderId'
 import { log } from '@/utils/log'
 
 const ConfirmScreen = () => {
-  const { orderId } = useLocalSearchParams()
+  const { orderId, id, resume, intentId: routeIntentId } = useLocalSearchParams()
   const routeOrderId = String(orderId || '').trim()
 
   if (__DEV__) {
@@ -30,14 +30,17 @@ const ConfirmScreen = () => {
   const confirmingRef = useRef(false)
   const [resolvedBillOrderId, setResolvedBillOrderId] = useState<string | null>(null)
   const [resolveError, setResolveError] = useState<string | null>(null)
+  const [intentId, setIntentId] = useState('')
+  const [intentReady, setIntentReady] = useState(false)
+  const [fundPrompt, setFundPrompt] = useState<{ open: boolean; shortfall: number }>({ open: false, shortfall: 0 })
   const [applyCommission, setApplyCommission] = useState(false)
   const translateX = useRef(new Animated.Value(0)).current
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const idempotencyKeyRef = useRef<string | null>(null)
   const router = useRouter()
 
   const { userProfileData, loadProfile } = useAuth()
   const [textInfo] = useState('')
+  const walletBalanceValue = Number(userProfileData?.wallet?.balance ?? 0)
 
   const fetchOrder = useCallback(() => {
     if (!routeOrderId) return Promise.resolve(null)
@@ -73,22 +76,6 @@ const ConfirmScreen = () => {
     setRetryCount(0)
   }, [])
 
-  const generateIdempotencyKey = () => {
-    try {
-      if (typeof crypto?.randomUUID === 'function') return crypto.randomUUID()
-    } catch {
-      // ignored
-    }
-    return `${Date.now()}-${Math.random()}`
-  }
-
-  const getStableIdempotencyKey = useCallback(() => {
-    if (!idempotencyKeyRef.current) {
-      idempotencyKeyRef.current = generateIdempotencyKey()
-    }
-    return idempotencyKeyRef.current
-  }, [])
-
   useEffect(() => {
     let cancelled = false
     const run = async () => {
@@ -113,8 +100,38 @@ const ConfirmScreen = () => {
   }, [data, routeOrderId])
 
   useEffect(() => {
-    idempotencyKeyRef.current = null
-  }, [resolvedBillOrderId])
+    let cancelled = false
+    const bootstrapIntent = async () => {
+      if (!resolvedBillOrderId) return
+      try {
+        const routeIntent = String(routeIntentId || '').trim()
+        if (routeIntent) {
+          setIntentId(routeIntent)
+          setIntentReady(true)
+          return
+        }
+        const created = await createBillPaymentIntent(String(resolvedBillOrderId))
+        const createdId = String(created?.id || '').trim()
+        if (!cancelled && createdId) {
+          setIntentId(createdId)
+          setIntentReady(true)
+        }
+      } catch (e: any) {
+        if (!cancelled) {
+          setIntentReady(false)
+          setNotification({
+            error: true,
+            message: e?.message || 'Unable to initialize bill payment.',
+            data: null,
+          })
+        }
+      }
+    }
+    void bootstrapIntent()
+    return () => {
+      cancelled = true
+    }
+  }, [resolvedBillOrderId, routeIntentId, setNotification])
 
   const handleConfirmation = useCallback(
     async (payment_method: string) => {
@@ -127,49 +144,44 @@ const ConfirmScreen = () => {
         })
         return
       }
+      if (!intentReady || !intentId) {
+        setNotification({
+          error: true,
+          message: 'Bill payment is not ready yet. Please wait.',
+          data: null,
+        })
+        return
+      }
+      if (payment_method !== 'wallet') {
+        setNotification({
+          error: true,
+          message: 'Bills can only be paid from wallet.',
+          data: null,
+        })
+        return
+      }
+      const billTotal = Number(data?.total_amount ?? data?.amount ?? 0)
+      const shortfall = Math.max(0, billTotal - walletBalanceValue)
+      if (shortfall > 0) {
+        setFundPrompt({ open: true, shortfall })
+        return
+      }
       confirmingRef.current = true
-      const idempotencyKey = getStableIdempotencyKey()
-      setLastPaymentMethod(payment_method)
+      setLastPaymentMethod('wallet')
       setLoader(true)
 
       try {
-        if (payment_method === 'card') {
-          const initResponse = await initializeBillOrderPayment({
-            queryId: String(resolvedBillOrderId),
-            payment_method: 'card',
-            redirect_url: `bitbridge://transaction/confirm?orderId=${resolvedBillOrderId}`,
-            use_commission: applyCommission,
-          })
-          const checkoutUrl = initResponse?.responseBody?.checkoutUrl
-          if (!checkoutUrl) {
-            throw new Error(initResponse?.message || 'Unable to initialize card payment')
-          }
-          await Linking.openURL(checkoutUrl)
-          setNotification({
-            error: false,
-            message: 'Card payment initialized. Complete payment in checkout.',
-            data: null,
-          })
-          resetPending()
-          return
-        }
-
         if (__DEV__) {
-          log('[UI] idempotencyKey', idempotencyKey)
+          log('[UI] intentId', intentId)
           log('[UI] applyCommission', applyCommission)
-          log('[BONUS] mobile confirm', { payment_method, use_commission: applyCommission })
-          log('[UI] confirm endpoint', {
+          log('[BONUS] mobile confirm', { payment_method: 'wallet', use_commission: applyCommission })
+          log('[UI] execute intent endpoint', {
             routeOrderId,
             billOrderId: resolvedBillOrderId,
-            endpoint: `/bill_orders/${resolvedBillOrderId}/confirm_bill_payment`,
+            endpoint: `/bill_payment_intents/${intentId}/execute`,
           })
         }
-        const response = await confirmBillPayment({
-          queryId: String(resolvedBillOrderId),
-          payment_method,
-          use_commission: applyCommission,
-          idempotencyKey,
-        })
+        const response = await executeBillPaymentIntent(String(intentId))
 
         if (response?.pending || response?.status === 'pending' || response?.http_status === 202) {
           const nextOrderId = response?.ui?.order_id ?? response?.data?.id ?? response?.id ?? resolvedBillOrderId
@@ -189,10 +201,6 @@ const ConfirmScreen = () => {
             data: null,
           })
           return
-        }
-
-        if (payment_method === 'card' && response?.responseBody?.checkoutUrl) {
-          Linking.openURL(response.responseBody.checkoutUrl)
         }
 
         const nextOrderId = response?.ui?.order_id ?? response?.data?.id ?? response?.id ?? resolvedBillOrderId
@@ -229,7 +237,20 @@ const ConfirmScreen = () => {
         confirmingRef.current = false
       }
     },
-    [loadProfile, resetPending, setNotification, applyCommission, resolvedBillOrderId, resolveError, routeOrderId, getStableIdempotencyKey]
+    [
+      applyCommission,
+      data?.amount,
+      data?.total_amount,
+      intentId,
+      intentReady,
+      loadProfile,
+      resetPending,
+      resolveError,
+      resolvedBillOrderId,
+      routeOrderId,
+      setNotification,
+      walletBalanceValue
+    ]
   )
 
   useEffect(() => {
@@ -245,10 +266,14 @@ const ConfirmScreen = () => {
     }
   }, [handleConfirmation, lastPaymentMethod, pendingRetry, retryCount])
 
-  const commissionValue = useMemo(
-    () => Number((data?.amount * data?.commissionRate).toFixed(2)),
-    [data]
-  )
+  useEffect(() => {
+    if (String(resume || '') !== '1') return
+    if (!intentReady || !intentId) return
+    const billTotal = Number(data?.total_amount ?? data?.amount ?? 0)
+    if (billTotal > 0 && walletBalanceValue >= billTotal) {
+      handleConfirmation('wallet')
+    }
+  }, [resume, intentReady, intentId, walletBalanceValue, data?.total_amount, data?.amount, handleConfirmation])
 
   return (
     <View className="flex-1 p-4 bg-primary">
@@ -331,7 +356,7 @@ const ConfirmScreen = () => {
         </View>
       ) : null}
 
-      <TransactionButtons handleConfirmation={handleConfirmation} />
+      <TransactionButtons handleConfirmation={handleConfirmation} walletOnly />
 
       <TouchableOpacity
         onPress={() =>
@@ -346,6 +371,32 @@ const ConfirmScreen = () => {
       </TouchableOpacity>
 
       <Loader open={loader} />
+
+      <AppModal open={fundPrompt.open} onclose={() => setFundPrompt({ open: false, shortfall: 0 })}>
+        <View className="bg-primary rounded-xl p-4">
+          <Text className="text-white text-lg font-semibold mb-2">Insufficient Wallet Balance</Text>
+          <Text className="text-gray-300 mb-4">
+            You need {moneyFormat(fundPrompt.shortfall)} more to complete this bill payment.
+          </Text>
+          <TouchableOpacity
+            onPress={() => {
+              setFundPrompt({ open: false, shortfall: 0 })
+              router.push({
+                pathname: '/fundWallet',
+                params: {
+                  returnTo: '/mobileProviders/[id]/confirm/[orderId]',
+                  id: String(id || ''),
+                  orderId: String(orderId || ''),
+                  intentId: String(intentId || '')
+                }
+              })
+            }}
+            className="bg-theme-primary rounded-lg py-3"
+          >
+            <Text className="text-alt text-center font-semibold">Fund Wallet</Text>
+          </TouchableOpacity>
+        </View>
+      </AppModal>
 
       <AppModal
         open={!!notification?.message}

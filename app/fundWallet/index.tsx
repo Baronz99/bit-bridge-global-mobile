@@ -1,14 +1,17 @@
-import { Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { Linking, Text, TouchableOpacity, View } from 'react-native'
 import React, { useState } from 'react'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import FormInput from '@/components/FormInput'
 import { useAuth } from '@/services/useAuth'
-import { createTransaction, initiateMonnifyTransaction } from '@/api/transactions'
+import { initiateMonnifyTransaction } from '@/api/transactions'
 import Loader from '@/components/Loader'
 import NotificationAlert from '@/components/notification'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
 import { log } from '@/utils/log'
 
 const index = () => {
+  const router = useRouter()
+  const { returnTo, orderId, id, intentId } = useLocalSearchParams()
   const {
     userProfileData,
     loadProfile,
@@ -88,6 +91,25 @@ const index = () => {
           >
             <Text className="text-alt font-medium text-center"> Pay With Bank?</Text>
           </TouchableOpacity>
+
+          {String(returnTo || '').trim() ? (
+            <TouchableOpacity
+              onPress={() =>
+                router.replace({
+                  pathname: String(returnTo) as any,
+                  params: {
+                    id: String(id || ''),
+                    orderId: String(orderId || ''),
+                    intentId: String(intentId || ''),
+                    resume: '1'
+                  }
+                })
+              }
+              className="border border-gray-700 py-4 rounded-xl"
+            >
+              <Text className="text-gray-300 font-medium text-center">I have funded wallet, continue</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
       </KeyboardAvoidWrapper>
       <Loader open={loading} />

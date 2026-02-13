@@ -179,6 +179,43 @@ export const initializeBillOrderPayment = async ({
   }
 }
 
+export const createBillPaymentIntent = async (bill_order_id: string) => {
+  try {
+    const res = await client.post('/bill_payment_intents', { bill_order_id })
+    return res.data?.data ?? res.data
+  } catch (err: any) {
+    throw new Error(errMsg(err, 'Unable to create bill payment intent'))
+  }
+}
+
+export const getBillPaymentIntent = async (intentId: string) => {
+  try {
+    const res = await client.get(`/bill_payment_intents/${intentId}`)
+    return res.data?.data ?? res.data
+  } catch (err: any) {
+    throw new Error(errMsg(err, 'Unable to fetch bill payment intent'))
+  }
+}
+
+export const executeBillPaymentIntent = async (intentId: string) => {
+  try {
+    const res = await client.post(`/bill_payment_intents/${intentId}/execute`)
+    return { ...(res.data || {}), http_status: res.status }
+  } catch (err: any) {
+    const status = err?.response?.status
+    const respData = err?.response?.data
+    if (status === 503 || isTimeoutError(err) || isPendingResponse(respData)) {
+      return {
+        pending: true,
+        status: 'pending',
+        message: respData?.message || 'Payment pending. Please try again in a moment.',
+      }
+    }
+
+    throw new Error(respData?.message || errMsg(err, 'Unable to execute bill payment intent'))
+  }
+}
+
 /**
  * BillOrders confirm endpoint (kept as-is with your "pending" tolerant behavior)
  */
@@ -374,6 +411,9 @@ export default {
   cancelPayment,
   getPurchaseOrder,
   getBillOrder,
+  createBillPaymentIntent,
+  getBillPaymentIntent,
+  executeBillPaymentIntent,
   confirmPayment,
   initializeBillOrderPayment,
   confirmBillPayment,
