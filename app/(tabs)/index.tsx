@@ -33,7 +33,6 @@ import NotificationAlert from '@/components/notification'
 import useNotification from '@/hooks/useNotification'
 import ScreenContainer from '@/components/ScreenContainer'
 import ViewBox from '@/components/view-box/ViewBoxIcon'
-import OtaDebug from '@/src/components/OtaDebug'
 import { FEATURE_LEGACY_HOME } from '@/constants/featureFlags'
 import { getTierFromProfile, isTierEligibleForBankTransfer } from '@/utils/bankTransfer'
 
@@ -240,7 +239,6 @@ export default function Index() {
 
   // ✅ Recent Activity toggle (money vs all)
   const [activityMode, setActivityMode] = useState<'money' | 'all'>('money')
-  const showOtaDebug = __DEV__ || String(process.env.EXPO_PUBLIC_SHOW_OTA_DEBUG || '') === '1'
 
   useEffect(() => {
     console.log('Runtime Versions:', Constants.manifest2?.runtimeVersion)
@@ -634,8 +632,6 @@ export default function Index() {
               <Text className="text-white/80">{String(showTopError)}</Text>
             </View>
           ) : null}
-
-          {showOtaDebug ? <OtaDebug /> : null}
 
           {/* Account chip */}
           {showLegacyAccountChip ? (

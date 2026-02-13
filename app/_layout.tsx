@@ -7,6 +7,7 @@ import { AuthProvider } from '@/services/useAuth'
 import { AppLockProvider } from '../services/useAppLock'
 import { setLastFatalError } from '@/services/fatalError'
 import { FEATURE_TIMELINE } from '@/constants/featureFlags'
+import { INTERNAL_DIAGNOSTICS_ENABLED } from '@/constants/appEnv'
 
 type ErrorBoundaryState = { hasError: boolean; message: string | null }
 
@@ -208,7 +209,9 @@ export default function RootLayout() {
         <Stack.Screen name="cards/index" options={{ headerTitle: 'Cards' }} />
         <Stack.Screen name="cards/[id]" options={{ headerTitle: 'Card Details' }} />
         <Stack.Screen name="cards/create" options={{ headerTitle: 'Create Card' }} />
-        <Stack.Screen name="cards/debug" options={{ headerTitle: 'Cards Debug' }} />
+        {INTERNAL_DIAGNOSTICS_ENABLED ? (
+          <Stack.Screen name="cards/debug" options={{ headerTitle: 'Cards Debug' }} />
+        ) : null}
         <Stack.Screen name="circles/[id]/fund" options={{ headerTitle: 'Fund Circle' }} />
         <Stack.Screen name="circles/[id]/withdraw" options={{ headerTitle: 'Withdraw' }} />
         <Stack.Screen name="circles/[id]/activities" options={{ headerTitle: 'Activities' }} />

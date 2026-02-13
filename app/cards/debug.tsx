@@ -11,9 +11,11 @@ import {
   FEATURE_NEW_DASHBOARD,
   FEATURE_TIMELINE,
 } from '@/constants/featureFlags'
+import { INTERNAL_DIAGNOSTICS_ENABLED } from '@/constants/appEnv'
 
 const DEBUG_CARDS =
-  String(process.env.EXPO_PUBLIC_DEBUG_CARDS || '').toLowerCase() === 'true' || __DEV__ === true
+  INTERNAL_DIAGNOSTICS_ENABLED &&
+  String(process.env.EXPO_PUBLIC_DEBUG_CARDS || '').toLowerCase() === 'true'
 
 const tokenFingerprint = (token?: string | null) => {
   const raw = String(token || '').trim()

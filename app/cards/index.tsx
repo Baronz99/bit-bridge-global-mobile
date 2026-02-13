@@ -9,10 +9,12 @@ import ScreenContainer from '@/components/ScreenContainer'
 import moneyFormat from '@/utils/moneyFormat'
 import { getCardsApiId } from '@/utils/cardIdentifier'
 import { getApiClientDebugSnapshot } from '@/api/client'
+import { INTERNAL_DIAGNOSTICS_ENABLED } from '@/constants/appEnv'
 
 const DEBUG_CARDS =
-  String(process.env.EXPO_PUBLIC_DEBUG_CARDS || '').toLowerCase() === 'true' || __DEV__ === true
-const DEBUG_CARDS_LOG = String(process.env.EXPO_PUBLIC_DEBUG_CARDS || '').toLowerCase() === 'true'
+  INTERNAL_DIAGNOSTICS_ENABLED &&
+  String(process.env.EXPO_PUBLIC_DEBUG_CARDS || '').toLowerCase() === 'true'
+const DEBUG_CARDS_LOG = DEBUG_CARDS
 
 const normalizeLast4 = (value: any) => {
   const digits = String(value ?? '').replace(/\D/g, '')

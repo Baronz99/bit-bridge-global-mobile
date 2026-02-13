@@ -1,8 +1,8 @@
 import { Text, TouchableOpacity, View } from 'react-native'
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useMemo, useState } from 'react'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import useFetch from '@/services/useFetch'
-import { createBillPaymentIntent, executeBillPaymentIntent, getBillPaymentIntent, getPurchaseOrder } from '@/api/billOrder'
+import { getPurchaseOrder } from '@/api/billOrder'
 import { useAuth } from '@/services/useAuth'
 import Loader from '@/components/Loader'
 import NotificationAlert from '@/components/notification'
@@ -11,268 +11,91 @@ import Summary from '@/components/cards/Summary'
 import TransactionButtons from '@/components/transactionButtons/TransactionButtons'
 import AppModal from '@/components/modal/Modal'
 import moneyFormat from '@/utils/moneyFormat'
+import useBillPaymentIntentFlow from '@/hooks/useBillPaymentIntentFlow'
 
-const CableetailConfirm = () => {
+const CableConfirmScreen = () => {
   const { orderId, id, resume, intentId: routeIntentId } = useLocalSearchParams()
-  const [loader, setLoader] = useState(false)
-  const [pendingRetry, setPendingRetry] = useState(false)
-  const [pollingIntent, setPollingIntent] = useState(false)
-  const [pollTimedOut, setPollTimedOut] = useState(false)
-  const [intentId, setIntentId] = useState('')
-  const [intentReady, setIntentReady] = useState(false)
-  const [resumePolling, setResumePolling] = useState(false)
-  const [resumeTimedOut, setResumeTimedOut] = useState(false)
+  const routeOrderId = String(orderId || '').trim()
+  const resumeFlag = String(resume || '') === '1'
   const [fundPrompt, setFundPrompt] = useState<{ open: boolean; shortfall: number }>({ open: false, shortfall: 0 })
-  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const pollStartedAtRef = useRef<number | null>(null)
-  const resumePollCountRef = useRef(0)
   const { loadProfile, userProfileData } = useAuth()
+  const walletBalanceValue = Number(userProfileData?.wallet?.balance ?? 0)
   const { notification, setNotification } = useNotification()
   const router = useRouter()
-  const walletBalanceValue = Number(userProfileData?.wallet?.balance ?? 0)
 
-  const fetchOrder = useCallback(() => getPurchaseOrder(orderId as string), [orderId])
-  const { data } = useFetch(fetchOrder)
+  const { data } = useFetch<any>(useCallback(() => getPurchaseOrder(routeOrderId), [routeOrderId]))
+  const billTotal = useMemo(() => Number(data?.total_amount ?? data?.amount ?? 0), [data?.amount, data?.total_amount])
 
-  const clearPolling = () => {
-    if (pollTimerRef.current) {
-      clearInterval(pollTimerRef.current)
-      pollTimerRef.current = null
-    }
-    pollStartedAtRef.current = null
-    setPollingIntent(false)
-  }
-
-  const resetPending = useCallback(() => {
-    clearPolling()
-    setPendingRetry(false)
-    setPollTimedOut(false)
-  }, [])
-
-  const startIntentPolling = useCallback((intent: string, fallbackOrderId: string) => {
-    clearPolling()
-    setPollingIntent(true)
-    setPollTimedOut(false)
-    pollStartedAtRef.current = Date.now()
-    pollTimerRef.current = setInterval(async () => {
-      try {
-        const latest = await getBillPaymentIntent(intent)
-        const status = String(latest?.status || '').toLowerCase()
-        if (status === 'completed') {
-          clearPolling()
-          router.push({
-            pathname: '/transaction/confirm',
-            params: { orderId: String(latest?.bill_order_id || fallbackOrderId) },
-          })
-          loadProfile({ force: true })
-          return
-        }
-        if (status === 'failed' || status === 'refunded' || status === 'expired') {
-          clearPolling()
-          setNotification({
-            error: true,
-            message: `Bill payment ${status}.`,
-            data: null,
-          })
-          return
-        }
-        if (pollStartedAtRef.current && Date.now() - pollStartedAtRef.current >= 45_000) {
-          clearPolling()
-          setPendingRetry(true)
-          setPollTimedOut(true)
-        }
-      } catch {
-        // keep polling until timeout
-      }
-    }, 2000)
-  }, [loadProfile, router, setNotification])
-
-  useEffect(() => {
-    let cancelled = false
-    const bootstrapIntent = async () => {
-      const routeIntent = String(routeIntentId || '').trim()
-      if (routeIntent) {
-        setIntentId(routeIntent)
-        setIntentReady(true)
-        return
-      }
-      try {
-        const created = await createBillPaymentIntent(String(orderId || ''))
-        const createdId = String(created?.id || '').trim()
-        if (!cancelled && createdId) {
-          setIntentId(createdId)
-          setIntentReady(true)
-        }
-      } catch (e: any) {
-        if (!cancelled) {
-          setNotification({
-            error: true,
-            message: e?.message || 'Unable to initialize bill payment.',
-            data: null,
-          })
-        }
-      }
-    }
-    void bootstrapIntent()
-    return () => {
-      cancelled = true
-    }
-  }, [orderId, routeIntentId, setNotification])
-
-  const handleCardConfirmation = useCallback(async (payment_method: string) => {
-    if (payment_method !== 'wallet') {
-      setNotification({
-        error: true,
-        message: 'Bills can only be paid from wallet.',
-        data: null,
+  const flow = useBillPaymentIntentFlow({
+    billOrderId: routeOrderId,
+    initialIntentId: String(routeIntentId || '').trim(),
+    resumeFlag,
+    onCompleted: (completedOrderId) => {
+      router.push({
+        pathname: '/transaction/confirm',
+        params: { orderId: String(completedOrderId || routeOrderId) },
       })
-      return
-    }
-    if (!intentReady || !intentId) {
-      setNotification({
-        error: true,
-        message: 'Bill payment is not ready yet. Please wait.',
-        data: null,
-      })
-      return
-    }
-    const billTotal = Number(data?.total_amount ?? data?.amount ?? 0)
-    const shortfall = Math.max(0, billTotal - walletBalanceValue)
-    if (shortfall > 0) {
-      setFundPrompt({ open: true, shortfall })
-      return
-    }
-    setLoader(true)
-
-    try {
-      const response = await executeBillPaymentIntent(intentId)
-      setLoader(false)
-
-      if (response?.pending || response?.status === 'pending') {
-        setPendingRetry(true)
-        startIntentPolling(String(intentId), String(orderId || ''))
-        setNotification({
-          error: true,
-          message: response?.message || 'Payment pending. We are checking status...',
-          data: null,
-        })
-        return
-      }
-
-      if (response?.data?.id || orderId) {
-        router.push({
-          pathname: '/transaction/confirm',
-          params: { orderId: String(response?.data?.id || orderId) },
-        })
-      }
-
-      setNotification({
-        error: false,
-        message: response?.message || 'Recharge Successful',
-        data: null,
-      })
-
-      setResumePolling(false)
-      setResumeTimedOut(false)
-      resetPending()
       loadProfile({ force: true })
-    } catch (error: any) {
-      setLoader(false)
-      resetPending()
-      setNotification({
-        error: true,
-        message: error.message || 'something went wrong',
-        data: null,
-      })
-    }
-  }, [data?.amount, data?.total_amount, intentId, intentReady, loadProfile, orderId, resetPending, setNotification, walletBalanceValue])
+    },
+  })
 
-  useEffect(() => {
-    if (String(resume || '') !== '1') return
-    if (!intentReady || !intentId) return
-    startIntentPolling(String(intentId), String(orderId || ''))
-    setResumePolling(true)
-    setResumeTimedOut(false)
-    resumePollCountRef.current = 0
-  }, [intentId, intentReady, orderId, resume, startIntentPolling])
-
-  useEffect(() => {
-    if (!resumePolling) return
-    const billTotal = Number(data?.total_amount ?? data?.amount ?? 0)
-    if (billTotal > 0 && walletBalanceValue >= billTotal) {
-      setResumePolling(false)
-      handleCardConfirmation('wallet')
+  const handleConfirmation = useCallback(async (paymentMethod: string) => {
+    if (paymentMethod !== 'wallet') {
+      setNotification({ error: true, message: 'Bills can only be paid from wallet.', data: null })
       return
     }
 
-    const timer = setInterval(() => {
-      resumePollCountRef.current += 1
-      loadProfile({ force: true })
-      if (resumePollCountRef.current >= 10) {
-        clearInterval(timer)
-        setResumePolling(false)
-        setResumeTimedOut(true)
-      }
-    }, 2000)
-
-    return () => clearInterval(timer)
-  }, [resumePolling, walletBalanceValue, data?.total_amount, data?.amount, loadProfile, handleCardConfirmation])
-
-  useEffect(() => () => clearPolling(), [])
+    const result = await flow.execute({ billTotal, walletBalance: walletBalanceValue })
+    if (result.kind === 'awaiting_funds') {
+      setFundPrompt({ open: true, shortfall: result.shortfall })
+      return
+    }
+    if (result.kind === 'failed') {
+      setNotification({ error: true, message: result.message || 'Bill payment failed.', data: null })
+    }
+  }, [billTotal, flow, setNotification, walletBalanceValue])
 
   return (
     <View className="flex-1 px-4 bg-primary w-full">
       <View className="mb-6">
         <Text className="text-2xl font-bold text-white text-center">Confirm Payment</Text>
-        <Text className="text-sm text-white text-center mt-1">
-          Review the details before you pay.
-        </Text>
+        <Text className="text-sm text-white text-center mt-1">Review the details before you pay.</Text>
       </View>
 
       <View className="bg-gray-800 rounded-2xl p-6 shadow-lg mb-8">
         <Text className="text-lg font-semibold text-center text-gray-200 mb-4">Payment Summary</Text>
-
         <Summary data={data} applyCommission={false} />
       </View>
-      {pendingRetry ? (
+
+      {flow.uiState === 'processing' || flow.uiState === 'timed_out' ? (
         <View className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 mb-3">
-          <Text className="text-yellow-200 text-center">Payment pending. We are checking status.</Text>
-          {pollingIntent ? (
-            <Text className="text-yellow-100 text-center mt-2">Checking every 2s (up to 45s)...</Text>
-          ) : null}
-          {pollTimedOut ? (
-            <TouchableOpacity
-              onPress={() => {
-                startIntentPolling(String(intentId), String(orderId || ''))
-              }}
-              className="border rounded-md mt-3 border-alt py-3"
-            >
-              <Text className="text-alt text-center">Check status</Text>
-            </TouchableOpacity>
-          ) : null}
-          {pollTimedOut ? (
-            <TouchableOpacity onPress={() => router.push('/utility/cable')} className="border rounded-md mt-3 border-gray-600 py-3">
-              <Text className="text-gray-300 text-center">Back to bills</Text>
-            </TouchableOpacity>
-          ) : null}
-        </View>
-      ) : null}
-      {resumePolling ? (
-        <View className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 mb-3">
-          <Text className="text-blue-200 text-center">
-            Checking wallet funding status. We will resume payment automatically.
+          <Text className="text-yellow-200 text-center">
+            {flow.uiState === 'timed_out' ? 'Payment is still processing. Check status to continue.' : flow.message || 'Payment pending. We are checking status.'}
           </Text>
+          {flow.uiState === 'timed_out' ? (
+            <>
+              <TouchableOpacity onPress={() => flow.pollStatus()} className="border rounded-md mt-3 border-alt py-3">
+                <Text className="text-alt text-center">Check status</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => router.push('/utility/cable')} className="border rounded-md mt-3 border-gray-600 py-3">
+                <Text className="text-gray-300 text-center">Back to bills</Text>
+              </TouchableOpacity>
+            </>
+          ) : null}
         </View>
       ) : null}
 
-      {resumeTimedOut ? (
-        <View className="bg-gray-800 border border-gray-700 rounded-lg p-3 mb-3">
-          <Text className="text-gray-200 text-center">
-            Wallet balance is still insufficient. Your intent remains awaiting funds.
-          </Text>
+      {flow.uiState === 'failed' ? (
+        <View className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 mb-3">
+          <Text className="text-red-200 text-center">{flow.message || 'Bill payment failed.'}</Text>
+          <TouchableOpacity onPress={() => handleConfirmation('wallet')} className="border rounded-md mt-3 border-red-400 py-3">
+            <Text className="text-red-200 text-center">Retry payment</Text>
+          </TouchableOpacity>
         </View>
       ) : null}
-      <TransactionButtons handleConfirmation={handleCardConfirmation} walletOnly />
+
+      <TransactionButtons handleConfirmation={handleConfirmation} walletOnly disabled={flow.isActionDisabled} />
+
       <TouchableOpacity
         onPress={() =>
           router.push({
@@ -284,7 +107,9 @@ const CableetailConfirm = () => {
       >
         <Text className="text-gray-300 text-center">View Receipt</Text>
       </TouchableOpacity>
-      {loader && <Loader open={loader} />}
+
+      {flow.isBusy && <Loader open={flow.isBusy} />}
+
       <AppModal open={fundPrompt.open} onclose={() => setFundPrompt({ open: false, shortfall: 0 })}>
         <View className="bg-primary rounded-xl p-4">
           <Text className="text-white text-lg font-semibold mb-2">Insufficient Wallet Balance</Text>
@@ -300,8 +125,9 @@ const CableetailConfirm = () => {
                   returnTo: '/cableProviders/[id]/confirm/[orderId]',
                   id: String(id || ''),
                   orderId: String(orderId || ''),
-                  intentId: String(intentId || '')
-                }
+                  intentId: String(flow.intentId || ''),
+                  resume: '1',
+                },
               })
             }}
             className="bg-theme-primary rounded-lg py-3"
@@ -310,13 +136,11 @@ const CableetailConfirm = () => {
           </TouchableOpacity>
         </View>
       </AppModal>
-      <NotificationAlert
-        message={notification.message}
-        error={notification.error}
-        data={notification.data}
-      />
+
+      <NotificationAlert message={notification.message} error={notification.error} data={notification.data} />
     </View>
   )
 }
 
-export default CableetailConfirm
+export default CableConfirmScreen
+
