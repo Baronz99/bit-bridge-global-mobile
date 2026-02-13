@@ -94,6 +94,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const userRef = useRef<any | null>(null)
   const profileLoadedRef = useRef(false)
   const profileFetchInFlightRef = useRef(false)
+  const lastProfileFetchAtRef = useRef(0)
   const bootstrapProfileAttemptedForTokenRef = useRef<string | null>(null)
 
   const authenticated = !!token
@@ -118,13 +119,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshProfile = useCallback(async (options?: { force?: boolean; tokenOverride?: string | null }) => {
     const force = options?.force === true
     const tokenOverride = options?.tokenOverride ?? null
+    const now = Date.now()
 
     if (!token && !tokenOverride) return userRef.current
 
-    if (!force) {
-      if (profileFetchInFlightRef.current) return userRef.current
-      if (profileLoadedRef.current) return userRef.current
-    }
+    // Never allow concurrent profile fetches; this prevents request storms.
+    if (profileFetchInFlightRef.current) return userRef.current
+
+    if (!force && profileLoadedRef.current) return userRef.current
+
+    // Collapse rapid repeated calls from multiple mounted screens/effects.
+    if (!force && now - lastProfileFetchAtRef.current < 5000) return userRef.current
+    if (force && now - lastProfileFetchAtRef.current < 1500) return userRef.current
 
     profileFetchInFlightRef.current = true
     setProfileLoading(true)
@@ -162,6 +168,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       userRef.current = data
       setUser(data)
       profileLoadedRef.current = true
+      lastProfileFetchAtRef.current = Date.now()
       bootTrace('profile_fetch_success')
       return data
     } catch (error: any) {
@@ -290,6 +297,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (token) return
     profileLoadedRef.current = false
     profileFetchInFlightRef.current = false
+    lastProfileFetchAtRef.current = 0
     userRef.current = null
     setProfileError(null)
     setProfileErrorStatus(null)
@@ -312,7 +320,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
-      if (nextState === 'active') {
+      // Mark stale on resume only if profile is old enough to need refresh.
+      if (nextState === 'active' && Date.now() - lastProfileFetchAtRef.current > 60_000) {
         profileLoadedRef.current = false
       }
     })

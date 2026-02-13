@@ -202,7 +202,16 @@ export const executeBillPaymentIntent = async (
   { use_commission = false }: { use_commission?: boolean } = {}
 ) => {
   try {
-    const res = await client.post(`/bill_payment_intents/${intentId}/execute`, { use_commission })
+    const normalizedUseCommission = use_commission === true
+    const res = await client.post(
+      `/bill_payment_intents/${intentId}/execute`,
+      { use_commission: normalizedUseCommission },
+      {
+        params: {
+          use_commission: normalizedUseCommission,
+        },
+      }
+    )
     return { ...(res.data || {}), http_status: res.status }
   } catch (err: any) {
     const status = err?.response?.status

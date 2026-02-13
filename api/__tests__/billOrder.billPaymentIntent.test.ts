@@ -29,7 +29,11 @@ describe('bill payment intent API contract', () => {
 
     const response = await executeBillPaymentIntent('intent_123', { use_commission: true })
 
-    expect(mockedPost).toHaveBeenCalledWith('/bill_payment_intents/intent_123/execute', { use_commission: true })
+    expect(mockedPost).toHaveBeenCalledWith(
+      '/bill_payment_intents/intent_123/execute',
+      { use_commission: true },
+      { params: { use_commission: true } }
+    )
     expect(response).toEqual(expect.objectContaining({ success: true, http_status: 200 }))
   })
 })
