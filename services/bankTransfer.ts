@@ -22,14 +22,9 @@ export const estimateTransferFeeBreakdown = (amount: number) => {
     return { platformFee: 0, stampDutyFee: 0, totalFee: 0 }
   }
 
-  let totalFee = 0
-  if (safeAmount <= 1999) totalFee = 55
-  else if (safeAmount <= 9999) totalFee = 76.8
-  else if (safeAmount <= 49999) totalFee = 126.8
-  else totalFee = 150
-
+  const platformFee = safeAmount >= 50000 ? 50 : 35
   const stampDutyFee = safeAmount >= 10000 ? 50 : 0
-  const platformFee = Math.max(0, totalFee - stampDutyFee)
+  const totalFee = platformFee + stampDutyFee
 
   return { platformFee, stampDutyFee, totalFee }
 }
@@ -192,4 +187,3 @@ export const getTodayTransferSpent = async (): Promise<number> => {
   const snapshot = await getTransferQuoteSnapshot(MIN_TRANSFER_AMOUNT)
   return Number(snapshot.dailySpent || 0)
 }
-

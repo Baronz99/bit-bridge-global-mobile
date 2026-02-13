@@ -32,6 +32,11 @@ type TransferDraft = {
   account_name: string
   amount: number
   fee: number
+  fee_breakdown?: {
+    platform_fee?: number
+    stamp_duty_fee?: number
+    total_fee?: number
+  }
   fee_estimated?: boolean
   total_debit: number
   inter_bank: boolean
@@ -97,6 +102,7 @@ const BankTransferScreen = () => {
   const [accountLookupError, setAccountLookupError] = useState<string | null>(null)
   const [quoteLoading, setQuoteLoading] = useState(false)
   const [quotedFee, setQuotedFee] = useState(0)
+  const [quotedFeeBreakdown, setQuotedFeeBreakdown] = useState<{ platform_fee: number; stamp_duty_fee: number; total_fee: number } | null>(null)
   const [quotedDailyLimit, setQuotedDailyLimit] = useState(0)
   const [quotedDailySpent, setQuotedDailySpent] = useState(0)
   const [quotedAmount, setQuotedAmount] = useState(0)
@@ -196,6 +202,11 @@ const BankTransferScreen = () => {
         const quote = await getTransferQuoteSnapshot(MIN_TRANSFER_AMOUNT).catch(() => null)
         if (quote) {
           setQuotedFee(Number(quote.fee || 0))
+          setQuotedFeeBreakdown({
+            platform_fee: Number(quote?.feeBreakdown?.platform_fee ?? quote?.feeBreakdown?.platformFee ?? 0),
+            stamp_duty_fee: Number(quote?.feeBreakdown?.stamp_duty_fee ?? quote?.feeBreakdown?.stampDutyFee ?? 0),
+            total_fee: Number(quote?.feeBreakdown?.total_fee ?? quote?.fee ?? 0),
+          })
           setFeeEstimated(quote.feeIsEstimate === true)
           setQuotedDailyLimit(Number(quote.dailyLimit || 0))
           setQuotedDailySpent(Number(quote.dailySpent || initialSpent))
@@ -233,6 +244,11 @@ const BankTransferScreen = () => {
       try {
         const quote = await getTransferQuoteSnapshot(quoteAmount)
         setQuotedFee(Number(quote.fee || 0))
+        setQuotedFeeBreakdown({
+          platform_fee: Number(quote?.feeBreakdown?.platform_fee ?? quote?.feeBreakdown?.platformFee ?? 0),
+          stamp_duty_fee: Number(quote?.feeBreakdown?.stamp_duty_fee ?? quote?.feeBreakdown?.stampDutyFee ?? 0),
+          total_fee: Number(quote?.feeBreakdown?.total_fee ?? quote?.fee ?? 0),
+        })
         setFeeEstimated(quote.feeIsEstimate === true)
         setQuotedDailyLimit(Number(quote.dailyLimit || 0))
         setQuotedDailySpent(Number(quote.dailySpent || 0))
@@ -309,6 +325,7 @@ const BankTransferScreen = () => {
       account_name: formData.account_name,
       amount: amountValue,
       fee,
+      fee_breakdown: quotedFeeBreakdown || undefined,
       fee_estimated: feeEstimated,
       total_debit: amountValidation.totalDebit,
       inter_bank: formData.inter_bank,

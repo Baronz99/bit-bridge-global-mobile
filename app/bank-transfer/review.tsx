@@ -26,6 +26,11 @@ type TransferDraft = {
   account_name: string
   amount: number
   fee: number
+  fee_breakdown?: {
+    platform_fee?: number
+    stamp_duty_fee?: number
+    total_fee?: number
+  }
   fee_estimated?: boolean
   total_debit: number
   inter_bank: boolean
@@ -175,9 +180,11 @@ const ReviewTransferScreen = () => {
           responseData?.fees ??
           responseData?.transfer_fee ??
           responseData?.charges ??
+          responseData?.fee_breakdown?.total_fee ??
           draft.fee ??
           0
       )
+      const backendFeeBreakdown = responseData?.fee_breakdown || draft.fee_breakdown || {}
       const backendTotalDebit = Number(
         responseData?.total_debit ??
           responseData?.amount_debited ??
@@ -197,6 +204,7 @@ const ReviewTransferScreen = () => {
           summary: JSON.stringify({
             ...draft,
             fee: backendFee,
+            fee_breakdown: backendFeeBreakdown,
             total_debit: backendTotalDebit,
             transfer_reference: transferReference,
             transfer_id:
@@ -311,6 +319,7 @@ const ReviewTransferScreen = () => {
             accountNumber={draft.account_number}
             amount={Number(draft.amount || 0)}
             fee={Number(draft.fee || 0)}
+            feeBreakdown={draft.fee_breakdown}
             totalDebit={Number(draft.total_debit || 0)}
             description={draft.description}
             dailyRemainingAfter={dailyRemainingAfter}

@@ -9,6 +9,11 @@ type TransferSummary = {
   account_name: string
   amount: number
   fee: number
+  fee_breakdown?: {
+    platform_fee?: number
+    stamp_duty_fee?: number
+    total_fee?: number
+  }
   total_debit: number
   description?: string
   transfer_reference: string
@@ -31,6 +36,8 @@ const SuccessScreen = () => {
   const { summary } = useLocalSearchParams<{ summary?: string }>()
 
   const payload = useMemo(() => parseSummary(summary), [summary])
+  const transferFee = Number(payload?.fee_breakdown?.platform_fee ?? 0)
+  const stampDutyFee = Number(payload?.fee_breakdown?.stamp_duty_fee ?? 0)
 
   if (!payload) {
     return (
@@ -73,6 +80,20 @@ const SuccessScreen = () => {
 
             <Text className="text-gray-400 text-xs">Fee</Text>
             <Text className="text-white text-sm mb-2">{formatNaira(Number(payload.fee || 0))}</Text>
+
+            {transferFee > 0 ? (
+              <>
+                <Text className="text-gray-400 text-xs">Transfer Fee</Text>
+                <Text className="text-white text-sm mb-2">{formatNaira(transferFee)}</Text>
+              </>
+            ) : null}
+
+            {stampDutyFee > 0 ? (
+              <>
+                <Text className="text-gray-400 text-xs">Stamp Duty</Text>
+                <Text className="text-white text-sm mb-2">{formatNaira(stampDutyFee)}</Text>
+              </>
+            ) : null}
 
             <Text className="text-gray-400 text-xs">Total Debit</Text>
             <Text className="text-white text-sm mb-2">{formatNaira(Number(payload.total_debit || 0))}</Text>
