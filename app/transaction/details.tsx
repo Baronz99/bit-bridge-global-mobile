@@ -86,7 +86,11 @@ const ConfirmDetails = () => {
       return
     }
 
-    const result = await flow.execute({ billTotal, walletBalance: walletBalanceValue })
+    const result = await flow.execute({
+      billTotal,
+      walletBalance: walletBalanceValue,
+      useCommission: applyCommission,
+    })
     if (result.kind === 'awaiting_funds') {
       setFundPrompt({ open: true, shortfall: result.shortfall })
       return
@@ -95,7 +99,7 @@ const ConfirmDetails = () => {
       Alert.alert('Payment failed', result.message || 'Bill payment failed')
       setNotification({ error: true, message: result.message || 'Bill payment failed.', data: null })
     }
-  }, [billTotal, flow, isElectricityVerificationPending, resolveError, resolvedBillOrderId, setNotification, walletBalanceValue])
+  }, [applyCommission, billTotal, flow, isElectricityVerificationPending, resolveError, resolvedBillOrderId, setNotification, walletBalanceValue])
 
   return (
     <View className="flex-1 p-4 bg-primary">
@@ -223,4 +227,3 @@ const ConfirmDetails = () => {
 }
 
 export default ConfirmDetails
-

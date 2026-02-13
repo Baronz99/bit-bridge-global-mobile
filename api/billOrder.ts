@@ -197,9 +197,12 @@ export const getBillPaymentIntent = async (intentId: string) => {
   }
 }
 
-export const executeBillPaymentIntent = async (intentId: string) => {
+export const executeBillPaymentIntent = async (
+  intentId: string,
+  { use_commission = false }: { use_commission?: boolean } = {}
+) => {
   try {
-    const res = await client.post(`/bill_payment_intents/${intentId}/execute`)
+    const res = await client.post(`/bill_payment_intents/${intentId}/execute`, { use_commission })
     return { ...(res.data || {}), http_status: res.status }
   } catch (err: any) {
     const status = err?.response?.status

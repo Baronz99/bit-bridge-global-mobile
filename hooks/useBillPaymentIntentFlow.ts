@@ -14,6 +14,7 @@ export type BillIntentUiState =
 type ExecuteArgs = {
   billTotal: number
   walletBalance: number
+  useCommission?: boolean
 }
 
 type ExecuteResult =
@@ -156,7 +157,7 @@ export const useBillPaymentIntentFlow = ({
     }
   }, [billOrderId, intentId])
 
-  const execute = useCallback(async ({ billTotal, walletBalance }: ExecuteArgs): Promise<ExecuteResult> => {
+  const execute = useCallback(async ({ billTotal, walletBalance, useCommission = false }: ExecuteArgs): Promise<ExecuteResult> => {
     const total = toSafeNumber(billTotal)
     const balance = toSafeNumber(walletBalance)
     const requiredShortfall = Math.max(0, total - balance)
@@ -171,7 +172,7 @@ export const useBillPaymentIntentFlow = ({
     const resolvedIntentId = await ensureIntent()
     setIsBusy(true)
     try {
-      const response = await executeBillPaymentIntent(resolvedIntentId)
+      const response = await executeBillPaymentIntent(resolvedIntentId, { use_commission: useCommission })
       if (response?.pending || String(response?.status || '').toLowerCase() === 'pending' || response?.http_status === 202) {
         setUiState('processing')
         setMessage(response?.message || 'Bill payment processing. Checking status...')
@@ -253,4 +254,3 @@ export const useBillPaymentIntentFlow = ({
 }
 
 export default useBillPaymentIntentFlow
-

@@ -87,7 +87,11 @@ const ConfirmScreen = () => {
       return
     }
 
-    const result = await flow.execute({ billTotal, walletBalance: walletBalanceValue })
+    const result = await flow.execute({
+      billTotal,
+      walletBalance: walletBalanceValue,
+      useCommission: applyCommission,
+    })
     if (result.kind === 'awaiting_funds') {
       setFundPrompt({ open: true, shortfall: result.shortfall })
       return
@@ -96,7 +100,7 @@ const ConfirmScreen = () => {
       Alert.alert('Payment failed', result.message || 'Bill payment failed')
       setNotification({ error: true, message: result.message || 'Bill payment failed', data: null })
     }
-  }, [billTotal, flow, resolveError, resolvedBillOrderId, setNotification, walletBalanceValue])
+  }, [applyCommission, billTotal, flow, resolveError, resolvedBillOrderId, setNotification, walletBalanceValue])
 
   const pendingMessage = flow.uiState === 'timed_out'
     ? 'Payment is still processing. Check status or return to bills.'
@@ -222,4 +226,3 @@ const ConfirmScreen = () => {
 }
 
 export default ConfirmScreen
-

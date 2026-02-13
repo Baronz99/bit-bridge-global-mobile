@@ -27,9 +27,9 @@ describe('bill payment intent API contract', () => {
   it('executes a bill payment intent via execute endpoint', async () => {
     mockedPost.mockResolvedValueOnce({ status: 200, data: { success: true } })
 
-    const response = await executeBillPaymentIntent('intent_123')
+    const response = await executeBillPaymentIntent('intent_123', { use_commission: true })
 
-    expect(mockedPost).toHaveBeenCalledWith('/bill_payment_intents/intent_123/execute')
+    expect(mockedPost).toHaveBeenCalledWith('/bill_payment_intents/intent_123/execute', { use_commission: true })
     expect(response).toEqual(expect.objectContaining({ success: true, http_status: 200 }))
   })
 })
