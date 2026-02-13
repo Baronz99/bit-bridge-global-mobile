@@ -14,7 +14,6 @@ import {
   BANK_TRANSFER_TIER_REQUIREMENT_COPY,
   buildTransferReference,
   computeDailyRemainingAfterTransfer,
-  formatAmountInput,
   formatNaira,
   getTierDailyLimit,
   getTierFromProfile,
@@ -86,8 +85,10 @@ const BankTransferScreen = () => {
   const [recentBankCodes, setRecentBankCodes] = useState<string[]>([])
   const [formData, setFormData] = useState({
     bank_code: '',
+    bank_name: '',
     account_number: '',
     account_name: '',
+    beneficiary_name: '',
     amount: '',
     inter_bank: true,
     description: '',
@@ -99,6 +100,7 @@ const BankTransferScreen = () => {
   const [quotedFee, setQuotedFee] = useState(0)
   const [quotedDailyLimit, setQuotedDailyLimit] = useState(0)
   const [quotedDailySpent, setQuotedDailySpent] = useState(0)
+  const [quotedAmount, setQuotedAmount] = useState(0)
   const [feeEstimated, setFeeEstimated] = useState(true)
 
   const tier = useMemo(() => getTierFromProfile(userProfileData), [userProfileData])
@@ -130,8 +132,8 @@ const BankTransferScreen = () => {
 
   const selectedBankLabel = useMemo(() => {
     const selected = bankOptions.find((item) => String(item.value) === String(formData.bank_code))
-    return selected?.label || ''
-  }, [bankOptions, formData.bank_code])
+    return selected?.label || formData.bank_name || ''
+  }, [bankOptions, formData.bank_code, formData.bank_name])
 
   const amountValue = parseAmountInput(formData.amount)
   const fee = quotedFee
@@ -152,6 +154,10 @@ const BankTransferScreen = () => {
   const canResolve =
     sanitizeDigits(formData.account_number).length === 10 &&
     !!formData.bank_code
+  const quoteVisible =
+    amountValue > 0 &&
+    canResolve &&
+    quotedAmount === amountValue
 
   const canContinue =
     tierEligible &&
@@ -194,6 +200,7 @@ const BankTransferScreen = () => {
           setFeeEstimated(quote.feeIsEstimate === true)
           setQuotedDailyLimit(Number(quote.dailyLimit || 0))
           setQuotedDailySpent(Number(quote.dailySpent || initialSpent))
+          setQuotedAmount(MIN_TRANSFER_AMOUNT)
         }
       } catch (error: any) {
         const status = error?.response?.status
@@ -230,6 +237,7 @@ const BankTransferScreen = () => {
         setFeeEstimated(quote.feeIsEstimate === true)
         setQuotedDailyLimit(Number(quote.dailyLimit || 0))
         setQuotedDailySpent(Number(quote.dailySpent || 0))
+        setQuotedAmount(quoteAmount)
         lastQuoteAmountRef.current = quoteAmount
       } finally {
         setQuoteLoading(false)
@@ -297,7 +305,7 @@ const BankTransferScreen = () => {
     if (!canContinue) return
     const draft: TransferDraft = {
       bank_code: formData.bank_code,
-      bank_name: selectedBankLabel,
+      bank_name: selectedBankLabel || formData.bank_name,
       account_number: sanitizeDigits(formData.account_number),
       account_name: formData.account_name,
       amount: amountValue,
@@ -323,8 +331,6 @@ const BankTransferScreen = () => {
     return (
       <View className="flex-1 bg-primary px-4">
         <View className="pt-10">
-          <Text className="text-amber-300 text-xs mb-2">BANK TRANSFER OTA MARKER v2</Text>
-          <Text className="text-white text-2xl mb-2">Bank Transfer</Text>
           <TierGateCard onUpgrade={() => router.replace('/kyc')} />
         </View>
       </View>
@@ -335,7 +341,6 @@ const BankTransferScreen = () => {
     <View className="flex-1 bg-primary px-4">
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
         <View className="pt-10">
-          <Text className="text-amber-300 text-xs mb-2">BANK TRANSFER OTA MARKER v2</Text>
           <Text className="text-white text-2xl mb-2">Bank Transfer</Text>
           <Text className="text-gray-300 mb-4">Step 1 of 3: Recipient and amount</Text>
 
@@ -360,7 +365,7 @@ const BankTransferScreen = () => {
                 <TouchableOpacity
                   onPress={() => {
                     setSelectedBeneficiary('')
-                    setFormData((prev) => ({ ...prev, counter_party_id: '' }))
+                    setFormData((prev) => ({ ...prev, counter_party_id: '', beneficiary_name: '' }))
                     setAccountLookupStatus('idle')
                   }}
                 >
@@ -375,17 +380,28 @@ const BankTransferScreen = () => {
               options={beneficiaryOptions}
               placeholder="Select beneficiary"
               onSelect={(option) => {
-                setSelectedBeneficiary(option.value)
                 const data = option.data || {}
-                const bankCode = String(data?.bank_code || '')
-                const accountNumber = sanitizeDigits(String(data?.account_number || '')).slice(0, 10)
+                const bankCode = String(data?.bank_code || data?.bankCode || '').trim()
+                const bankName = String(data?.bank_name || data?.bankName || data?.bank || '').trim()
+                const accountNumber = sanitizeDigits(String(data?.account_number || data?.accountNumber || '')).slice(0, 10)
+                const beneficiaryName = String(data?.account_name || data?.beneficiary_name || data?.name || '').trim()
+                const selectedValue = String(
+                  option.value ||
+                    data?.id ||
+                    data?.beneficiary_id ||
+                    data?.counter_party_id ||
+                    `${bankCode}:${accountNumber}`
+                )
+                setSelectedBeneficiary(selectedValue)
                 setFormData((prev) => ({
                   ...prev,
                   bank_code: bankCode || prev.bank_code,
+                  bank_name: bankName || prev.bank_name,
                   account_number: accountNumber || prev.account_number,
-                  account_name: '',
+                  account_name: beneficiaryName || '',
+                  beneficiary_name: beneficiaryName || '',
                   counter_party_id: String(
-                    data?.counter_party_id || data?.beneficiary_id || option.value || prev.counter_party_id || ''
+                    data?.counter_party_id || data?.beneficiary_id || selectedValue || prev.counter_party_id || ''
                   ),
                 }))
                 if (bankCode) {
@@ -407,6 +423,7 @@ const BankTransferScreen = () => {
                   setFormData((prev) => ({
                     ...prev,
                     bank_code: option.value,
+                    bank_name: option.label,
                     account_name: '',
                     counter_party_id: '',
                   }))
@@ -428,6 +445,7 @@ const BankTransferScreen = () => {
                 setFormData((prev) => ({
                   ...prev,
                   account_number: next,
+                  beneficiary_name: '',
                   account_name: '',
                   counter_party_id: '',
                 }))
@@ -477,7 +495,6 @@ const BankTransferScreen = () => {
                 className="flex-1 py-4 text-white"
               />
             </View>
-            <Text className="text-gray-400 text-xs mt-2">Formatted: {formatAmountInput(formData.amount) || '0'}</Text>
 
             <View className="flex-row flex-wrap mt-3 gap-2">
               {QUICK_AMOUNTS.map((quick) => (
@@ -495,26 +512,28 @@ const BankTransferScreen = () => {
               <Text className="text-red-300 text-xs mt-3">{amountValidation.message}</Text>
             ) : null}
 
-            <View className="mt-4 bg-gray-950 border border-gray-800 rounded-xl p-3">
-              <View className="flex-row items-center justify-between">
-                <Text className="text-gray-400 text-xs">
-                  Fee ({feeEstimated ? 'Estimated' : 'Confirmed'})
+            {quoteVisible ? (
+              <View className="mt-4 bg-gray-950 border border-gray-800 rounded-xl p-3">
+                <View className="flex-row items-center justify-between">
+                  <Text className="text-gray-400 text-xs">
+                    Fee ({feeEstimated ? 'Estimated' : 'Confirmed'})
+                  </Text>
+                  <Text className="text-white text-xs">{formatNaira(fee)}</Text>
+                </View>
+                <Text className="text-gray-500 text-[10px] mt-1">
+                  {feeEstimated ? 'Final fee is confirmed on review.' : 'Fee sourced from transfer quote.'}
                 </Text>
-                <Text className="text-white text-xs">{formatNaira(fee)}</Text>
+                <View className="flex-row items-center justify-between mt-2">
+                  <Text className="text-gray-400 text-xs">Total debit</Text>
+                  <Text className="text-white text-sm font-semibold">{formatNaira(amountValidation.totalDebit)}</Text>
+                </View>
+                <View className="flex-row items-center justify-between mt-2">
+                  <Text className="text-gray-400 text-xs">Daily remaining after transfer</Text>
+                  <Text className="text-white text-sm">{formatNaira(dailyRemainingAfterTransfer)}</Text>
+                </View>
+                {quoteLoading ? <Text className="text-gray-600 text-[10px] mt-2">Refreshing quote...</Text> : null}
               </View>
-              <Text className="text-gray-500 text-[10px] mt-1">
-                {feeEstimated ? 'Final fee is confirmed on review.' : 'Fee sourced from transfer quote.'}
-              </Text>
-              <View className="flex-row items-center justify-between mt-2">
-                <Text className="text-gray-400 text-xs">Total debit</Text>
-                <Text className="text-white text-sm font-semibold">{formatNaira(amountValidation.totalDebit)}</Text>
-              </View>
-              <View className="flex-row items-center justify-between mt-2">
-                <Text className="text-gray-400 text-xs">Daily remaining after transfer</Text>
-                <Text className="text-white text-sm">{formatNaira(dailyRemainingAfterTransfer)}</Text>
-              </View>
-              {quoteLoading ? <Text className="text-gray-600 text-[10px] mt-2">Refreshing quote...</Text> : null}
-            </View>
+            ) : null}
           </View>
 
           <View className="bg-gray-900 border border-gray-800 rounded-2xl p-4 mb-4">
@@ -536,7 +555,7 @@ const BankTransferScreen = () => {
           <Text className="text-gray-500 text-xs mb-3">{BANK_TRANSFER_TIER_REQUIREMENT_COPY}</Text>
           <TouchableOpacity
             onPress={handleContinue}
-            disabled={!canContinue || accountLookupStatus === 'loading' || loading}
+            disabled={!canContinue || loading}
             className={`${canContinue ? 'bg-theme-primary' : 'bg-gray-700'} py-5 rounded-xl`}
           >
             <Text className="text-alt font-semibold text-center">Continue to review</Text>
