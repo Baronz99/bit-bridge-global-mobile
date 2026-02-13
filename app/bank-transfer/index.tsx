@@ -53,11 +53,13 @@ const sanitizeDigits = (value: string) => String(value || '').replace(/\D/g, '')
 const extractCounterPartyId = (payload: any): string => {
   const direct =
     payload?.counter_party_id ||
-    payload?.counterPartyId
+    payload?.counterPartyId ||
+    payload?.id
   if (direct) return String(direct)
   const nested =
     payload?.data?.counter_party_id ||
-    payload?.data?.counterPartyId
+    payload?.data?.counterPartyId ||
+    payload?.data?.id
   return nested ? String(nested) : ''
 }
 
