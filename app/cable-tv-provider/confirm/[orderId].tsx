@@ -1,10 +1,9 @@
-import { Alert, Linking, Text, TouchableOpacity, View } from 'react-native'
+import { Text, TouchableOpacity, View } from 'react-native'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import useFetch from '@/services/useFetch'
-import { confirmBillPayment, getPurchaseOrder, initializeBillOrderPayment } from '@/api/billOrder'
+import { createBillPaymentIntent, executeBillPaymentIntent, getPurchaseOrder } from '@/api/billOrder'
 import { useAuth } from '@/services/useAuth'
-
 import Loader from '@/components/Loader'
 import NotificationAlert from '@/components/notification'
 import useNotification from '@/hooks/useNotification'
@@ -12,57 +11,34 @@ import Summary from '@/components/cards/Summary'
 import AppModal from '@/components/modal/Modal'
 import TransactionButtons from '@/components/transactionButtons/TransactionButtons'
 import resolveBillOrderId from '@/utils/resolveBillOrderId'
-import { log } from '@/utils/log'
+import moneyFormat from '@/utils/moneyFormat'
 
 const CableDetailConfirm = () => {
-  const { orderId } = useLocalSearchParams()
+  const { orderId, id, resume, intentId: routeIntentId } = useLocalSearchParams()
   const routeOrderId = String(orderId || '').trim()
-
-  if (__DEV__) {
-    log('[CONFIRM_SCREEN] params', { orderId })
-  }
-
   const [loader, setLoader] = useState(false)
   const [pendingRetry, setPendingRetry] = useState(false)
   const [retryCount, setRetryCount] = useState(0)
   const [lastPaymentMethod, setLastPaymentMethod] = useState<string | null>(null)
-  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const confirmingRef = useRef(false)
-  const idempotencyKeyRef = useRef<string | null>(null)
   const [resolvedBillOrderId, setResolvedBillOrderId] = useState<string | null>(null)
   const [resolveError, setResolveError] = useState<string | null>(null)
-  const { loadProfile } = useAuth()
+  const [intentId, setIntentId] = useState('')
+  const [intentReady, setIntentReady] = useState(false)
+  const [resumePolling, setResumePolling] = useState(false)
+  const [resumeTimedOut, setResumeTimedOut] = useState(false)
+  const [fundPrompt, setFundPrompt] = useState<{ open: boolean; shortfall: number }>({ open: false, shortfall: 0 })
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const resumePollCountRef = useRef(0)
+  const { loadProfile, userProfileData } = useAuth()
   const { notification, setNotification } = useNotification()
   const router = useRouter()
+  const walletBalanceValue = Number(userProfileData?.wallet?.balance ?? 0)
 
   const fetchOrder = useCallback(() => {
     if (!routeOrderId) return Promise.resolve(null)
     return getPurchaseOrder(routeOrderId)
   }, [routeOrderId])
   const { data } = useFetch<any>(fetchOrder)
-
-  useEffect(() => {
-    let cancelled = false
-    const run = async () => {
-      setResolveError(null)
-      try {
-        const id = await resolveBillOrderId({ routeOrderId, data })
-        if (__DEV__) {
-          log('[CONFIRM] resolve bill_order_id', { routeOrderId, billOrderId: id })
-        }
-        if (!cancelled) setResolvedBillOrderId(id)
-      } catch (e: any) {
-        if (!cancelled) {
-          setResolvedBillOrderId(null)
-          setResolveError(e?.message || 'Missing bill_order_id for confirm')
-        }
-      }
-    }
-    void run()
-    return () => {
-      cancelled = true
-    }
-  }, [data, routeOrderId])
 
   const clearRetryTimer = () => {
     if (retryTimerRef.current) {
@@ -77,29 +53,71 @@ const CableDetailConfirm = () => {
     setRetryCount(0)
   }, [])
 
-  const generateIdempotencyKey = () => {
-    try {
-      if (typeof crypto?.randomUUID === 'function') return crypto.randomUUID()
-    } catch {
-      // ignore
+  useEffect(() => {
+    let cancelled = false
+    const run = async () => {
+      setResolveError(null)
+      try {
+        const resolvedId = await resolveBillOrderId({ routeOrderId, data })
+        if (!cancelled) setResolvedBillOrderId(resolvedId)
+      } catch (e: any) {
+        if (!cancelled) {
+          setResolvedBillOrderId(null)
+          setResolveError(e?.message || 'Missing bill_order_id for confirm')
+        }
+      }
     }
-    return `${Date.now()}-${Math.random()}`
-  }
-
-  const getStableIdempotencyKey = useCallback(() => {
-    if (!idempotencyKeyRef.current) {
-      idempotencyKeyRef.current = generateIdempotencyKey()
+    void run()
+    return () => {
+      cancelled = true
     }
-    return idempotencyKeyRef.current
-  }, [])
+  }, [data, routeOrderId])
 
   useEffect(() => {
-    idempotencyKeyRef.current = null
-  }, [resolvedBillOrderId])
+    let cancelled = false
+    const bootstrapIntent = async () => {
+      if (!resolvedBillOrderId) return
+      try {
+        const routeIntent = String(routeIntentId || '').trim()
+        if (routeIntent) {
+          setIntentId(routeIntent)
+          setIntentReady(true)
+          return
+        }
+        const created = await createBillPaymentIntent(String(resolvedBillOrderId))
+        const createdId = String(created?.id || '').trim()
+        if (!cancelled && createdId) {
+          setIntentId(createdId)
+          setIntentReady(true)
+        }
+      } catch (e: any) {
+        if (!cancelled) {
+          setIntentReady(false)
+          setNotification({
+            error: true,
+            message: e?.message || 'Unable to initialize bill payment.',
+            data: null,
+          })
+        }
+      }
+    }
+    void bootstrapIntent()
+    return () => {
+      cancelled = true
+    }
+  }, [resolvedBillOrderId, routeIntentId, setNotification])
 
-  const handleCardConfirmation = useCallback(
+  const handleConfirmation = useCallback(
     async (payment_method: string) => {
-      if (confirmingRef.current) return
+      setLastPaymentMethod('wallet')
+      if (payment_method !== 'wallet') {
+        setNotification({
+          error: true,
+          message: 'Bills can only be paid from wallet.',
+          data: null,
+        })
+        return
+      }
       if (!resolvedBillOrderId) {
         setNotification({
           error: true,
@@ -108,61 +126,28 @@ const CableDetailConfirm = () => {
         })
         return
       }
+      if (!intentReady || !intentId) {
+        setNotification({
+          error: true,
+          message: 'Bill payment is not ready yet. Please wait.',
+          data: null,
+        })
+        return
+      }
 
-      confirmingRef.current = true
-      setLastPaymentMethod(payment_method)
+      const billTotal = Number(data?.total_amount ?? data?.amount ?? 0)
+      const shortfall = Math.max(0, billTotal - walletBalanceValue)
+      if (shortfall > 0) {
+        setFundPrompt({ open: true, shortfall })
+        return
+      }
       setLoader(true)
 
       try {
-        if (payment_method === 'card') {
-          const initResponse = await initializeBillOrderPayment({
-            queryId: String(resolvedBillOrderId),
-            payment_method: 'card',
-            redirect_url: `bitbridge://transaction/confirm?orderId=${resolvedBillOrderId}`,
-            use_commission: false,
-          })
-          const checkoutUrl = initResponse?.responseBody?.checkoutUrl
-          if (!checkoutUrl) {
-            throw new Error(initResponse?.message || 'Unable to initialize card payment')
-          }
-          await Linking.openURL(checkoutUrl)
-          setNotification({
-            error: false,
-            message: 'Card payment initialized. Complete payment in checkout.',
-            data: null,
-          })
-          setLoader(false)
-          resetPending()
-          return
-        }
-
-        if (__DEV__) {
-          log('[UI] applyCommission', false)
-          log('[UI] confirm endpoint', {
-            routeOrderId,
-            billOrderId: resolvedBillOrderId,
-            endpoint: `/bill_orders/${resolvedBillOrderId}/confirm_bill_payment`,
-          })
-        }
-        const response = await confirmBillPayment({
-          queryId: String(resolvedBillOrderId),
-          payment_method,
-          use_commission: false,
-          idempotencyKey: getStableIdempotencyKey(),
-        })
+        const response = await executeBillPaymentIntent(intentId)
         setLoader(false)
 
-        if (response?.pending || response?.status === 'pending' || response?.http_status === 202) {
-          const nextOrderId = response?.ui?.order_id ?? response?.data?.id ?? response?.id ?? resolvedBillOrderId
-          if (nextOrderId) {
-            router.replace({
-              pathname: '/transaction/confirm',
-              params: { orderId: String(nextOrderId) },
-            })
-            resetPending()
-            return
-          }
-
+        if (response?.pending || response?.status === 'pending') {
           setPendingRetry(true)
           setNotification({
             error: true,
@@ -172,15 +157,10 @@ const CableDetailConfirm = () => {
           return
         }
 
-        if (payment_method === 'card' && response?.responseBody?.checkoutUrl) {
-          Linking.openURL(response.responseBody.checkoutUrl)
-        }
-
-        const nextOrderId = response?.ui?.order_id ?? response?.data?.id ?? response?.id ?? resolvedBillOrderId
-        if (nextOrderId) {
-          router.replace({
+        if (response?.data?.id || resolvedBillOrderId) {
+          router.push({
             pathname: '/transaction/confirm',
-            params: { orderId: String(nextOrderId) },
+            params: { orderId: String(response?.data?.id || resolvedBillOrderId) },
           })
         }
 
@@ -190,27 +170,21 @@ const CableDetailConfirm = () => {
           data: null,
         })
 
+        setResumePolling(false)
+        setResumeTimedOut(false)
         resetPending()
         loadProfile({ force: true })
       } catch (error: any) {
-        const message =
-          error?.response?.data?.message || error?.response?.data?.error || error?.message || 'something went wrong'
-        if (__DEV__) {
-          log('[UI] confirm bill error', error?.response?.data || error?.message)
-        }
-        Alert.alert('Payment failed', message)
         setLoader(false)
         resetPending()
         setNotification({
           error: true,
-          message,
+          message: error.message || 'something went wrong',
           data: null,
         })
-      } finally {
-        confirmingRef.current = false
       }
     },
-    [loadProfile, resetPending, setNotification, resolvedBillOrderId, resolveError, routeOrderId, getStableIdempotencyKey]
+    [data?.amount, data?.total_amount, intentId, intentReady, loadProfile, resetPending, resolveError, resolvedBillOrderId, setNotification, walletBalanceValue]
   )
 
   useEffect(() => {
@@ -219,34 +193,63 @@ const CableDetailConfirm = () => {
     clearRetryTimer()
     retryTimerRef.current = setTimeout(() => {
       setRetryCount((count) => count + 1)
-      handleCardConfirmation(lastPaymentMethod)
+      handleConfirmation(lastPaymentMethod)
     }, 5000)
     return () => {
       clearRetryTimer()
     }
-  }, [handleCardConfirmation, lastPaymentMethod, pendingRetry, retryCount])
+  }, [handleConfirmation, lastPaymentMethod, pendingRetry, retryCount])
+
+  useEffect(() => {
+    if (String(resume || '') !== '1') return
+    if (!intentReady || !intentId) return
+    setResumePolling(true)
+    setResumeTimedOut(false)
+    resumePollCountRef.current = 0
+  }, [resume, intentReady, intentId])
+
+  useEffect(() => {
+    if (!resumePolling) return
+    const billTotal = Number(data?.total_amount ?? data?.amount ?? 0)
+    if (billTotal > 0 && walletBalanceValue >= billTotal) {
+      setResumePolling(false)
+      handleConfirmation('wallet')
+      return
+    }
+
+    const timer = setInterval(() => {
+      resumePollCountRef.current += 1
+      loadProfile({ force: true })
+      if (resumePollCountRef.current >= 10) {
+        clearInterval(timer)
+        setResumePolling(false)
+        setResumeTimedOut(true)
+      }
+    }, 2000)
+
+    return () => clearInterval(timer)
+  }, [resumePolling, walletBalanceValue, data?.total_amount, data?.amount, loadProfile, handleConfirmation])
 
   return (
     <View className="flex-1 px-4 bg-primary w-full">
-      <View className="mt-6 rounded-3xl border border-gray-800 bg-gray-900/80 p-5">
-        <Text className="text-white/70 text-xs tracking-widest uppercase">Utilities</Text>
-        <Text className="text-white text-2xl font-semibold mt-2">Confirm Payment</Text>
-        <Text className="text-gray-400 text-sm mt-2">Review the details before you pay.</Text>
+      <View className="mb-6">
+        <Text className="text-2xl font-bold text-white text-center">Confirm Payment</Text>
+        <Text className="text-sm text-white text-center mt-1">Review the details before you pay.</Text>
       </View>
 
-      <View className="bg-gray-900 border border-gray-800 rounded-2xl p-6 mt-6">
+      <View className="bg-gray-800 rounded-2xl p-6 shadow-lg mb-8">
         <Text className="text-lg font-semibold text-center text-gray-200 mb-4">Payment Summary</Text>
         <Summary data={data} applyCommission={false} />
       </View>
 
       {pendingRetry ? (
-        <View className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 mt-4">
+        <View className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 mb-3">
           <Text className="text-yellow-200 text-center">Payment pending. Please try again in a moment.</Text>
           {lastPaymentMethod ? (
             <TouchableOpacity
               onPress={() => {
                 setRetryCount(0)
-                handleCardConfirmation(lastPaymentMethod)
+                handleConfirmation(lastPaymentMethod)
               }}
               className="border rounded-md mt-3 border-alt py-3"
             >
@@ -256,40 +259,67 @@ const CableDetailConfirm = () => {
         </View>
       ) : null}
 
-      <TransactionButtons handleConfirmation={handleCardConfirmation} />
+      {resumePolling ? (
+        <View className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 mb-3">
+          <Text className="text-blue-200 text-center">
+            Checking wallet funding status. We will resume payment automatically.
+          </Text>
+        </View>
+      ) : null}
+
+      {resumeTimedOut ? (
+        <View className="bg-gray-800 border border-gray-700 rounded-lg p-3 mb-3">
+          <Text className="text-gray-200 text-center">
+            Wallet balance is still insufficient. Your intent remains awaiting funds.
+          </Text>
+        </View>
+      ) : null}
+
+      <TransactionButtons handleConfirmation={handleConfirmation} walletOnly />
 
       <TouchableOpacity
         onPress={() =>
           router.push({
             pathname: '/transaction/confirm',
-            params: { orderId: String(routeOrderId) },
+            params: { orderId: String(orderId) },
           })
         }
         className="border rounded-md mt-4 border-gray-700 py-4"
       >
         <Text className="text-gray-300 text-center">View Receipt</Text>
       </TouchableOpacity>
-      <Loader open={loader} />
+      {loader && <Loader open={loader} />}
 
-      <AppModal
-        open={!!notification.message}
-        onclose={() => {
-          resetPending()
-          setNotification({ message: null, error: false, data: null })
-        }}
-      >
-        <NotificationAlert
-          onPress={() => {
-            resetPending()
-            setNotification({ message: null, error: false, data: null })
-          }}
-          message={notification.message}
-          error={notification.error}
-          data={notification.data}
-        />
+      <AppModal open={fundPrompt.open} onclose={() => setFundPrompt({ open: false, shortfall: 0 })}>
+        <View className="bg-primary rounded-xl p-4">
+          <Text className="text-white text-lg font-semibold mb-2">Insufficient Wallet Balance</Text>
+          <Text className="text-gray-300 mb-4">
+            You need {moneyFormat(fundPrompt.shortfall)} more to complete this bill payment.
+          </Text>
+          <TouchableOpacity
+            onPress={() => {
+              setFundPrompt({ open: false, shortfall: 0 })
+              router.push({
+                pathname: '/fundWallet',
+                params: {
+                  returnTo: '/cable-tv-provider/confirm/[orderId]',
+                  id: String(id || ''),
+                  orderId: String(orderId || ''),
+                  intentId: String(intentId || '')
+                }
+              })
+            }}
+            className="bg-theme-primary rounded-lg py-3"
+          >
+            <Text className="text-alt text-center font-semibold">Fund Wallet</Text>
+          </TouchableOpacity>
+        </View>
       </AppModal>
+
+      <NotificationAlert message={notification.message} error={notification.error} data={notification.data} />
     </View>
   )
 }
 
 export default CableDetailConfirm
+

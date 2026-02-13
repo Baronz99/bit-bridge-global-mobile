@@ -32,10 +32,13 @@ const ConfirmScreen = () => {
   const [resolveError, setResolveError] = useState<string | null>(null)
   const [intentId, setIntentId] = useState('')
   const [intentReady, setIntentReady] = useState(false)
+  const [resumePolling, setResumePolling] = useState(false)
+  const [resumeTimedOut, setResumeTimedOut] = useState(false)
   const [fundPrompt, setFundPrompt] = useState<{ open: boolean; shortfall: number }>({ open: false, shortfall: 0 })
   const [applyCommission, setApplyCommission] = useState(false)
   const translateX = useRef(new Animated.Value(0)).current
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const resumePollCountRef = useRef(0)
   const router = useRouter()
 
   const { userProfileData, loadProfile } = useAuth()
@@ -217,6 +220,8 @@ const ConfirmScreen = () => {
           data: null,
         })
 
+        setResumePolling(false)
+        setResumeTimedOut(false)
         resetPending()
         loadProfile({ force: true })
       } catch (error: any) {
@@ -269,11 +274,32 @@ const ConfirmScreen = () => {
   useEffect(() => {
     if (String(resume || '') !== '1') return
     if (!intentReady || !intentId) return
+    setResumePolling(true)
+    setResumeTimedOut(false)
+    resumePollCountRef.current = 0
+  }, [resume, intentReady, intentId])
+
+  useEffect(() => {
+    if (!resumePolling) return
     const billTotal = Number(data?.total_amount ?? data?.amount ?? 0)
     if (billTotal > 0 && walletBalanceValue >= billTotal) {
+      setResumePolling(false)
       handleConfirmation('wallet')
+      return
     }
-  }, [resume, intentReady, intentId, walletBalanceValue, data?.total_amount, data?.amount, handleConfirmation])
+
+    const timer = setInterval(() => {
+      resumePollCountRef.current += 1
+      loadProfile({ force: true })
+      if (resumePollCountRef.current >= 10) {
+        clearInterval(timer)
+        setResumePolling(false)
+        setResumeTimedOut(true)
+      }
+    }, 2000)
+
+    return () => clearInterval(timer)
+  }, [resumePolling, walletBalanceValue, data?.total_amount, data?.amount, loadProfile, handleConfirmation])
 
   return (
     <View className="flex-1 p-4 bg-primary">
@@ -353,6 +379,22 @@ const ConfirmScreen = () => {
               <Text className="text-alt text-center">Retry Confirmation</Text>
             </TouchableOpacity>
           ) : null}
+        </View>
+      ) : null}
+
+      {resumePolling ? (
+        <View className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 mb-3">
+          <Text className="text-blue-200 text-center">
+            Checking wallet funding status. We will resume payment automatically.
+          </Text>
+        </View>
+      ) : null}
+
+      {resumeTimedOut ? (
+        <View className="bg-gray-800 border border-gray-700 rounded-lg p-3 mb-3">
+          <Text className="text-gray-200 text-center">
+            Wallet balance is still insufficient. Your intent remains awaiting funds.
+          </Text>
         </View>
       ) : null}
 

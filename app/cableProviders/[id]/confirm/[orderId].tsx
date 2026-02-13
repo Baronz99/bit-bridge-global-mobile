@@ -20,8 +20,11 @@ const CableetailConfirm = () => {
   const [lastPaymentMethod, setLastPaymentMethod] = useState<string | null>(null)
   const [intentId, setIntentId] = useState('')
   const [intentReady, setIntentReady] = useState(false)
+  const [resumePolling, setResumePolling] = useState(false)
+  const [resumeTimedOut, setResumeTimedOut] = useState(false)
   const [fundPrompt, setFundPrompt] = useState<{ open: boolean; shortfall: number }>({ open: false, shortfall: 0 })
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const resumePollCountRef = useRef(0)
   const { loadProfile, userProfileData } = useAuth()
   const { notification, setNotification } = useNotification()
   const router = useRouter()
@@ -129,6 +132,8 @@ const CableetailConfirm = () => {
         data: null,
       })
 
+      setResumePolling(false)
+      setResumeTimedOut(false)
       resetPending()
       loadProfile({ force: true })
     } catch (error: any) {
@@ -158,11 +163,32 @@ const CableetailConfirm = () => {
   useEffect(() => {
     if (String(resume || '') !== '1') return
     if (!intentReady || !intentId) return
+    setResumePolling(true)
+    setResumeTimedOut(false)
+    resumePollCountRef.current = 0
+  }, [resume, intentReady, intentId])
+
+  useEffect(() => {
+    if (!resumePolling) return
     const billTotal = Number(data?.total_amount ?? data?.amount ?? 0)
     if (billTotal > 0 && walletBalanceValue >= billTotal) {
+      setResumePolling(false)
       handleCardConfirmation('wallet')
+      return
     }
-  }, [resume, intentReady, intentId, walletBalanceValue, data?.total_amount, data?.amount, handleCardConfirmation])
+
+    const timer = setInterval(() => {
+      resumePollCountRef.current += 1
+      loadProfile({ force: true })
+      if (resumePollCountRef.current >= 10) {
+        clearInterval(timer)
+        setResumePolling(false)
+        setResumeTimedOut(true)
+      }
+    }, 2000)
+
+    return () => clearInterval(timer)
+  }, [resumePolling, walletBalanceValue, data?.total_amount, data?.amount, loadProfile, handleCardConfirmation])
 
   return (
     <View className="flex-1 px-4 bg-primary w-full">
@@ -194,6 +220,21 @@ const CableetailConfirm = () => {
               <Text className="text-alt text-center">Retry Confirmation</Text>
             </TouchableOpacity>
           ) : null}
+        </View>
+      ) : null}
+      {resumePolling ? (
+        <View className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 mb-3">
+          <Text className="text-blue-200 text-center">
+            Checking wallet funding status. We will resume payment automatically.
+          </Text>
+        </View>
+      ) : null}
+
+      {resumeTimedOut ? (
+        <View className="bg-gray-800 border border-gray-700 rounded-lg p-3 mb-3">
+          <Text className="text-gray-200 text-center">
+            Wallet balance is still insufficient. Your intent remains awaiting funds.
+          </Text>
         </View>
       ) : null}
       <TransactionButtons handleConfirmation={handleCardConfirmation} walletOnly />
