@@ -25,6 +25,7 @@ const CableConfirmScreen = () => {
 
   const { data } = useFetch<any>(useCallback(() => getPurchaseOrder(routeOrderId), [routeOrderId]))
   const billTotal = useMemo(() => Number(data?.total_amount ?? data?.amount ?? 0), [data?.amount, data?.total_amount])
+  const canViewReceipt = flow.uiState === 'completed' || String(data?.status || '').toLowerCase() === 'completed'
 
   const flow = useBillPaymentIntentFlow({
     billOrderId: routeOrderId,
@@ -96,17 +97,19 @@ const CableConfirmScreen = () => {
 
       <TransactionButtons handleConfirmation={handleConfirmation} walletOnly disabled={flow.isActionDisabled} />
 
-      <TouchableOpacity
-        onPress={() =>
-          router.push({
-            pathname: '/transaction/confirm',
-            params: { orderId: String(orderId) },
-          })
-        }
-        className="border rounded-md mt-4 border-gray-700 py-4"
-      >
-        <Text className="text-gray-300 text-center">View Receipt</Text>
-      </TouchableOpacity>
+      {canViewReceipt ? (
+        <TouchableOpacity
+          onPress={() =>
+            router.push({
+              pathname: '/transaction/confirm',
+              params: { orderId: String(orderId) },
+            })
+          }
+          className="border rounded-md mt-4 border-gray-700 py-4"
+        >
+          <Text className="text-gray-300 text-center">View Receipt</Text>
+        </TouchableOpacity>
+      ) : null}
 
       {flow.isBusy && <Loader open={flow.isBusy} />}
 
@@ -143,4 +146,3 @@ const CableConfirmScreen = () => {
 }
 
 export default CableConfirmScreen
-

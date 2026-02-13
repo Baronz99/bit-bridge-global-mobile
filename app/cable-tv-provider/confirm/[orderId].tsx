@@ -31,6 +31,7 @@ const CableTvConfirmScreen = () => {
     return getPurchaseOrder(routeOrderId)
   }, [routeOrderId]))
   const billTotal = useMemo(() => Number(data?.total_amount ?? data?.amount ?? 0), [data?.amount, data?.total_amount])
+  const canViewReceipt = flow.uiState === 'completed' || String(data?.status || '').toLowerCase() === 'completed'
 
   useEffect(() => {
     let cancelled = false
@@ -126,12 +127,14 @@ const CableTvConfirmScreen = () => {
 
       <TransactionButtons handleConfirmation={handleConfirmation} walletOnly disabled={flow.isActionDisabled} />
 
-      <TouchableOpacity
-        onPress={() => router.push({ pathname: '/transaction/confirm', params: { orderId: String(orderId) } })}
-        className="border rounded-md mt-4 border-gray-700 py-4"
-      >
-        <Text className="text-gray-300 text-center">View Receipt</Text>
-      </TouchableOpacity>
+      {canViewReceipt ? (
+        <TouchableOpacity
+          onPress={() => router.push({ pathname: '/transaction/confirm', params: { orderId: String(orderId) } })}
+          className="border rounded-md mt-4 border-gray-700 py-4"
+        >
+          <Text className="text-gray-300 text-center">View Receipt</Text>
+        </TouchableOpacity>
+      ) : null}
       {flow.isBusy && <Loader open={flow.isBusy} />}
 
       <AppModal open={fundPrompt.open} onclose={() => setFundPrompt({ open: false, shortfall: 0 })}>
@@ -167,4 +170,3 @@ const CableTvConfirmScreen = () => {
 }
 
 export default CableTvConfirmScreen
-

@@ -107,6 +107,7 @@ const ConfirmScreen = () => {
     : flow.uiState === 'processing'
       ? flow.message || 'Payment pending. We are checking status.'
       : ''
+  const canViewReceipt = flow.uiState === 'completed' || String(data?.status || '').toLowerCase() === 'completed'
 
   return (
     <View className="flex-1 p-4 bg-primary">
@@ -142,7 +143,6 @@ const ConfirmScreen = () => {
             activeOpacity={0.8}
             accessibilityLabel="Trigger commission"
             accessibilityRole="button"
-            disabled={loading}
             onPress={toggleSwitch}
             className="relative border border-gray-800 bg-gray-900"
             style={{ height: 30, width: 100, borderRadius: 25, justifyContent: 'center', padding: 5 }}
@@ -179,12 +179,14 @@ const ConfirmScreen = () => {
 
       <TransactionButtons handleConfirmation={handleConfirmation} walletOnly disabled={flow.isActionDisabled} />
 
-      <TouchableOpacity
-        onPress={() => router.push({ pathname: '/transaction/confirm', params: { orderId: String(routeOrderId) } })}
-        className="border rounded-md mt-4 border-gray-700 py-4"
-      >
-        <Text className="text-gray-300 text-center">View Receipt</Text>
-      </TouchableOpacity>
+      {canViewReceipt ? (
+        <TouchableOpacity
+          onPress={() => router.push({ pathname: '/transaction/confirm', params: { orderId: String(routeOrderId) } })}
+          className="border rounded-md mt-4 border-gray-700 py-4"
+        >
+          <Text className="text-gray-300 text-center">View Receipt</Text>
+        </TouchableOpacity>
+      ) : null}
 
       <Loader open={flow.isBusy} />
 

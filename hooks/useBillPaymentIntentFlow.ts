@@ -213,17 +213,8 @@ export const useBillPaymentIntentFlow = ({
     const seededIntentId = String(initialIntentId || '').trim()
     setIntentId(seededIntentId)
     setLatestBillOrderId(String(billOrderId || '').trim() || null)
-    setUiState(billOrderId ? (seededIntentId ? 'ready' : 'initializing') : 'idle')
+    setUiState(billOrderId ? 'ready' : 'idle')
   }, [billOrderId, initialIntentId, stopPolling])
-
-  useEffect(() => {
-    if (!billOrderId) return
-    if (intentId) return
-    ensureIntent().catch((error: any) => {
-      setUiState('failed')
-      setMessage(error?.message || 'Unable to initialize bill payment.')
-    })
-  }, [billOrderId, ensureIntent, intentId])
 
   useEffect(() => {
     if (!resumeFlag) return
@@ -234,7 +225,7 @@ export const useBillPaymentIntentFlow = ({
   useEffect(() => () => stopPolling(), [stopPolling])
 
   const isActionDisabled = useMemo(() => {
-    return isBusy || uiState === 'initializing' || uiState === 'processing' || uiState === 'completed'
+    return isBusy || uiState === 'processing' || uiState === 'completed'
   }, [isBusy, uiState])
 
   return {

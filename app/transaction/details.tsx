@@ -100,6 +100,7 @@ const ConfirmDetails = () => {
       setNotification({ error: true, message: result.message || 'Bill payment failed.', data: null })
     }
   }, [applyCommission, billTotal, flow, isElectricityVerificationPending, resolveError, resolvedBillOrderId, setNotification, walletBalanceValue])
+  const canViewReceipt = flow.uiState === 'completed' || String(data?.status || '').toLowerCase() === 'completed'
 
   return (
     <View className="flex-1 p-4 bg-primary">
@@ -178,12 +179,14 @@ const ConfirmDetails = () => {
         disabled={flow.isActionDisabled || isElectricityVerificationPending}
       />
 
-      <TouchableOpacity
-        onPress={() => router.push({ pathname: '/transaction/confirm', params: { orderId: String(orderId) } })}
-        className="border rounded-md mt-4 border-gray-700 py-4"
-      >
-        <Text className="text-gray-300 text-center">View Receipt</Text>
-      </TouchableOpacity>
+      {canViewReceipt ? (
+        <TouchableOpacity
+          onPress={() => router.push({ pathname: '/transaction/confirm', params: { orderId: String(orderId) } })}
+          className="border rounded-md mt-4 border-gray-700 py-4"
+        >
+          <Text className="text-gray-300 text-center">View Receipt</Text>
+        </TouchableOpacity>
+      ) : null}
 
       <Loader open={flow.isBusy} />
 
