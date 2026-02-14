@@ -184,6 +184,16 @@ const BankReceiptCard = ({
   const safeValueAmount = Number.isFinite(Number(valueAmount)) ? Number(valueAmount) : undefined
   const safeWalletAmount = typeof walletAmount === 'number' ? walletAmount : safeAmount
   const safeRewardAmount = typeof rewardAmount === 'number' ? rewardAmount : 0
+  const transactionType = clean(meta?.transaction_type || meta?.tx_type).toLowerCase()
+  const purposeHint = clean(meta?.purpose).toLowerCase()
+  const receiptText = `${clean(event)} ${clean(kind)} ${clean(title)} ${clean(subtitle)}`.toLowerCase()
+  const isCreditReceipt =
+    transactionType === 'deposit' ||
+    purposeHint.includes('wallet_fund') ||
+    receiptText.includes('wallet funding') ||
+    receiptText.includes('deposit')
+  const totalAmountLabel = isCreditReceipt ? 'Total credited' : 'Total debited'
+
 
   const feeDetails = Array.isArray(fees) ? fees : undefined
   const totalFees =
@@ -347,7 +357,7 @@ const BankReceiptCard = ({
       <View className="border-t border-[rgba(255,255,255,0.05)] mt-4 pt-4">
         <Text className="text-white text-3xl font-semibold">{moneyFormat(displayAmount, safeCurrency)}</Text>
         {isSuccess && hasFeeBreakdown ? (
-          <Text className="text-gray-400 text-[11px] mt-1">Total debited</Text>
+          <Text className="text-gray-400 text-[11px] mt-1">{totalAmountLabel}</Text>
         ) : null}
 
         {shouldShowBreakdown ? (
@@ -359,7 +369,7 @@ const BankReceiptCard = ({
               <Row label="Fees" value={moneyFormat(totalFees || 0, safeCurrency)} mono />
             ) : null}
             {isSuccess ? (
-              <Row label="Total debited" value={moneyFormat(safeAmount, safeCurrency)} mono />
+              <Row label={totalAmountLabel} value={moneyFormat(safeAmount, safeCurrency)} mono />
             ) : null}
             {safeWalletAmount > 0 ? (
               <Row label="Paid from wallet" value={moneyFormat(safeWalletAmount, safeCurrency)} mono />
