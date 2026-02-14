@@ -13,6 +13,8 @@ import TransactionButtons from '@/components/transactionButtons/TransactionButto
 import moneyFormat from '@/utils/moneyFormat'
 import resolveBillOrderId from '@/utils/resolveBillOrderId'
 import useBillPaymentIntentFlow from '@/hooks/useBillPaymentIntentFlow'
+import useServiceAvailability from '@/hooks/useServiceAvailability'
+import ServiceStatusPill from '@/components/service-availability/ServiceStatusPill'
 
 const ConfirmScreen = () => {
   const { orderId, id, resume, intentId: routeIntentId } = useLocalSearchParams()
@@ -27,11 +29,14 @@ const ConfirmScreen = () => {
   const [fundPrompt, setFundPrompt] = useState<{ open: boolean; shortfall: number }>({ open: false, shortfall: 0 })
   const [applyCommission, setApplyCommission] = useState(false)
   const translateX = useRef(new Animated.Value(0)).current
+  const { getStatus } = useServiceAvailability()
 
-  const { data, loading } = useFetch<any>(useCallback(() => {
-    if (!routeOrderId) return Promise.resolve(null)
-    return getPurchaseOrder(routeOrderId)
-  }, [routeOrderId]))
+  const { data, loading } = useFetch<any>(
+    useCallback(() => {
+      if (!routeOrderId) return Promise.resolve(null)
+      return getPurchaseOrder(routeOrderId)
+    }, [routeOrderId])
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -77,36 +82,45 @@ const ConfirmScreen = () => {
     setApplyCommission((prev) => !prev)
   }
 
-  const handleConfirmation = useCallback(async (paymentMethod: string) => {
-    if (paymentMethod !== 'wallet') {
-      setNotification({ error: true, message: 'Bills can only be paid from wallet.', data: null })
-      return
-    }
-    if (!resolvedBillOrderId) {
-      setNotification({ error: true, message: resolveError || 'Missing bill order id. Please try again.', data: null })
-      return
-    }
+  const handleConfirmation = useCallback(
+    async (paymentMethod: string) => {
+      if (paymentMethod !== 'wallet') {
+        setNotification({ error: true, message: 'Bills can only be paid from wallet.', data: null })
+        return
+      }
+      if (!resolvedBillOrderId) {
+        setNotification({ error: true, message: resolveError || 'Missing bill order id. Please try again.', data: null })
+        return
+      }
 
-    const result = await flow.execute({
-      billTotal,
-      walletBalance: walletBalanceValue,
-      useCommission: applyCommission,
-    })
-    if (result.kind === 'awaiting_funds') {
-      setFundPrompt({ open: true, shortfall: result.shortfall })
-      return
-    }
-    if (result.kind === 'failed') {
-      Alert.alert('Payment failed', result.message || 'Bill payment failed')
-      setNotification({ error: true, message: result.message || 'Bill payment failed', data: null })
-    }
-  }, [applyCommission, billTotal, flow, resolveError, resolvedBillOrderId, setNotification, walletBalanceValue])
+      const result = await flow.execute({
+        billTotal,
+        walletBalance: walletBalanceValue,
+        useCommission: applyCommission,
+      })
+      if (result.kind === 'awaiting_funds') {
+        setFundPrompt({ open: true, shortfall: result.shortfall })
+        return
+      }
+      if (result.kind === 'failed') {
+        Alert.alert('Payment failed', result.message || 'Bill payment failed')
+        setNotification({ error: true, message: result.message || 'Bill payment failed', data: null })
+      }
+    },
+    [applyCommission, billTotal, flow, resolveError, resolvedBillOrderId, setNotification, walletBalanceValue]
+  )
 
-  const pendingMessage = flow.uiState === 'timed_out'
-    ? 'Payment is still processing. Check status or return to bills.'
-    : flow.uiState === 'processing'
-      ? flow.message || 'Payment pending. We are checking status.'
-      : ''
+  const selectedServiceStatus = useMemo(
+    () => getStatus({ provider: data?.biller, serviceType: data?.service_type }),
+    [data?.biller, data?.service_type, getStatus]
+  )
+
+  const pendingMessage =
+    flow.uiState === 'timed_out'
+      ? 'Payment is still processing. Check status or return to bills.'
+      : flow.uiState === 'processing'
+        ? flow.message || 'Payment pending. We are checking status.'
+        : ''
   const canViewReceipt = flow.uiState === 'completed'
 
   return (
@@ -117,7 +131,12 @@ const ConfirmScreen = () => {
         <Text className="text-gray-400 text-sm mt-2">Review the details before you pay.</Text>
       </View>
 
-      <View className="bg-gray-900 border border-gray-800 rounded-2xl p-6 mt-6">
+      <View className="mt-3 mb-2 flex-row items-center justify-between rounded-xl border border-gray-800 bg-gray-900/70 px-3 py-2">
+        <Text className="text-gray-300 text-xs">Service availability</Text>
+        <ServiceStatusPill state={selectedServiceStatus.state} />
+      </View>
+
+      <View className="bg-gray-900 border border-gray-800 rounded-2xl p-6 mt-2">
         <Text className="text-lg font-semibold text-center text-gray-200 mb-4">Payment Summary</Text>
         <Summary data={data} applyCommission={applyCommission} />
       </View>

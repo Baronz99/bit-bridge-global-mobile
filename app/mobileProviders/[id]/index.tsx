@@ -12,17 +12,21 @@ import { createPurchaseOrder, getPriceList } from '@/api/billOrder'
 import { createOrderFromPurchase } from '@/api/orders'
 import FormSelect from '@/components/FormSelect'
 import Loader from '@/components/Loader'
+import useServiceAvailability from '@/hooks/useServiceAvailability'
+import ServiceStatusPill from '@/components/service-availability/ServiceStatusPill'
 
 const getImageByKey = (key: string) => {
   const dict = images as Record<string, any>
   return dict[key] ?? images.fail ?? images.bg
 }
+
 const ProvideDertails = () => {
   const { id } = useLocalSearchParams()
   const [loader, setLoader] = useState(false)
 
   const router = useRouter()
   const { userProfileData } = useAuth()
+  const { getStatus } = useServiceAvailability()
   const fetchProvision = useCallback(() => getProvision(id as string), [id])
   const { data } = useFetch(fetchProvision)
 
@@ -30,12 +34,18 @@ const ProvideDertails = () => {
     const raw = String(data?.product?.provider ?? '').trim()
     return raw ? String(splitString(raw)) : ''
   }, [data])
+
   const serviceType = useMemo(() => {
     const raw = String(data?.service_type ?? '').toLowerCase()
     if (raw.includes('data')) return 'DATA'
     if (raw.includes('vtu')) return 'VTU'
     return data?.service_type ?? ''
   }, [data])
+
+  const selectedServiceStatus = useMemo(
+    () => getStatus({ provider: data?.product?.provider, serviceType, label: providerName }),
+    [data?.product?.provider, getStatus, providerName, serviceType]
+  )
 
   const fetchPriceList = useCallback(() => {
     if (!providerName || serviceType !== 'DATA') return Promise.resolve([])
@@ -125,6 +135,10 @@ const ProvideDertails = () => {
             source={getImageByKey(String(splitString(data?.name)))}
             className="w-full h-40 rounded-2xl mt-4"
           />
+          <View className="mt-3 flex-row items-center justify-between rounded-xl border border-gray-800 bg-gray-950/40 px-3 py-2">
+            <Text className="text-gray-300 text-xs">Current service signal</Text>
+            <ServiceStatusPill state={selectedServiceStatus.state} />
+          </View>
         </View>
 
         <View className="mt-6 rounded-2xl border border-gray-800 bg-gray-900/70 p-4">

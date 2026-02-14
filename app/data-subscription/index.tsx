@@ -11,8 +11,9 @@ import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoi
 import FormInput from '@/components/FormInput'
 import SelectBoxIcon from '@/components/select-box/SelectBoxIcon'
 import FormSelect from '@/components/FormSelect'
-import { splitString } from '@/utils'
 import { images } from '@/constants/images'
+import useServiceAvailability from '@/hooks/useServiceAvailability'
+import ServiceStatusPill from '@/components/service-availability/ServiceStatusPill'
 
 type PriceOption = {
   label: string
@@ -23,7 +24,6 @@ type PriceOption = {
 const normalizeProviderKey = (raw: any) => {
   const s = String(raw ?? '').trim().toLowerCase()
   if (!s) return ''
-  // normalize common aliases to match your images keys + backend normalization
   if (['9mobile', '9-mobile', '9_mobil', '9mobil', 'etisalat', 'emts'].includes(s)) return '9mobile'
   return s
 }
@@ -50,6 +50,7 @@ const DataSubscriptionScreen = () => {
 
   const [loader, setLoader] = useState(false)
   const [selectProvider, setSelectedProvider] = useState<any | null>(null)
+  const { getStatus } = useServiceAvailability()
 
   const [formValue, setFormValue] = useState({
     billersCode: '',
@@ -60,11 +61,9 @@ const DataSubscriptionScreen = () => {
 
   const serviceType = 'DATA'
 
-  // ---- products ----
   const fetchProducts = useCallback(() => getProducts({ category: 'mobile provider' }), [])
   const { data: products, error: productsError } = useFetch(fetchProducts)
 
-  // ✅ Only show providers that your upstream actually supports
   const providers = useMemo(() => {
     const list = (products ?? []).filter((item: any) => item?.category === 'mobile provider')
 
@@ -72,28 +71,20 @@ const DataSubscriptionScreen = () => {
     for (const item of list) {
       const key = normalizeProviderKey(item?.provider ?? item?.name)
       if (!key) continue
-
-      // Hide ntel (upstream rejects: "invalid disco NTEL for vertical DATA")
       if (key === 'ntel') continue
-
       if (!unique.has(key)) unique.set(key, { ...item, _normalizedProvider: key })
     }
     return Array.from(unique.values())
   }, [products])
 
-  // Default provider (MTN first, else first)
   useEffect(() => {
     if (!providers?.length) return
     const mtn = providers.find((p: any) => normalizeProviderKey(p?.provider) === 'mtn')
     setSelectedProvider(mtn ?? providers[0] ?? null)
   }, [providers])
 
-  const selectedProviderName = useMemo(() => {
-    // backend expects provider like mtn/glo/airtel/9mobile (it also accepts 9-mobile, but we normalize anyway)
-    return normalizeProviderKey(selectProvider?.provider)
-  }, [selectProvider])
+  const selectedProviderName = useMemo(() => normalizeProviderKey(selectProvider?.provider), [selectProvider])
 
-  // ---- price list (for ALL providers) ----
   const fetchPriceList = useCallback(() => {
     if (!selectedProviderName) return Promise.resolve([])
     return getPriceList({ provider: selectedProviderName, service_type: serviceType })
@@ -106,20 +97,22 @@ const DataSubscriptionScreen = () => {
     return priceList as any
   }, [priceList])
 
-  const planOptions: PriceOption[] = useMemo(() => {
-    return rawPriceList.filter(isRealPlanOption)
-  }, [rawPriceList])
+  const planOptions: PriceOption[] = useMemo(() => rawPriceList.filter(isRealPlanOption), [rawPriceList])
 
-  // When provider changes, refetch plans + reset fields
+  const statusForProvider = useCallback(
+    (provider: any) => getStatus({ provider: provider?._normalizedProvider || provider?.provider, serviceType }),
+    [getStatus, serviceType]
+  )
+
+  const selectedServiceStatus = useMemo(() => statusForProvider(selectProvider), [selectProvider, statusForProvider])
+
   useEffect(() => {
     if (!selectedProviderName) return
     setFormValue((prev) => ({ ...prev, tariff_class: '', amount: '', description: null }))
     refetchPriceList()
   }, [selectedProviderName, refetchPriceList])
 
-  const handleProviderSelect = (item: any) => {
-    setSelectedProvider(item)
-  }
+  const handleProviderSelect = (item: any) => setSelectedProvider(item)
 
   const handleProceed = async () => {
     setLoader(true)
@@ -184,6 +177,7 @@ const DataSubscriptionScreen = () => {
                     onSelect={() => handleProviderSelect(item)}
                     icon={getImageByKey(item?._normalizedProvider ?? item?.provider)}
                     label={item?.provider}
+                    statusState={statusForProvider(item)?.state}
                   />
                 ) : null
               )}
@@ -192,6 +186,12 @@ const DataSubscriptionScreen = () => {
 
           <View className="mt-6 rounded-2xl border border-gray-800 bg-gray-900/70 p-4">
             <Text className="text-white text-sm font-semibold">Subscription Details</Text>
+            {selectedProviderName ? (
+              <View className="mt-3 flex-row items-center justify-between rounded-xl border border-gray-800 bg-gray-950/40 px-3 py-2">
+                <Text className="text-gray-300 text-xs">Current service signal</Text>
+                <ServiceStatusPill state={selectedServiceStatus.state} />
+              </View>
+            ) : null}
 
             <KeyboardAvoidWrapper>
               <View className="mt-3">
@@ -199,9 +199,7 @@ const DataSubscriptionScreen = () => {
                   name="billerCode"
                   label="Phone Number"
                   placeHolder="Enter 11 digits Number"
-                  onChangeText={(text: string) =>
-                    setFormValue((prev) => ({ ...prev, billersCode: text }))
-                  }
+                  onChangeText={(text: string) => setFormValue((prev) => ({ ...prev, billersCode: text }))}
                   value={formValue.billersCode}
                 />
 
@@ -213,9 +211,7 @@ const DataSubscriptionScreen = () => {
                     label="Data Plan"
                     placeHolder={planPlaceholder}
                     onValueChange={(value: string) => {
-                      const picked = planOptions.find(
-                        (p: any) => String(p?.value) === String(value)
-                      )
+                      const picked = planOptions.find((p: any) => String(p?.value) === String(value))
                       setFormValue((prev) => ({
                         ...prev,
                         tariff_class: value,
@@ -227,17 +223,12 @@ const DataSubscriptionScreen = () => {
                 ) : (
                   <View className="mt-3 rounded-xl border border-gray-800 bg-gray-950/40 p-3">
                     <Text className="text-gray-300 text-xs">
-                      {selectedProviderName
-                        ? 'Loading data plans…'
-                        : 'Select a network to load data plans.'}
+                      {selectedProviderName ? 'Loading data plans...' : 'Select a network to load data plans.'}
                     </Text>
                   </View>
                 )}
 
-                <TouchableOpacity
-                  onPress={handleProceed}
-                  className="bg-app-primary rounded-xl mt-4 py-4"
-                >
+                <TouchableOpacity onPress={handleProceed} className="bg-app-primary rounded-xl mt-4 py-4">
                   <Text className="text-white text-center font-semibold">Proceed</Text>
                 </TouchableOpacity>
               </View>

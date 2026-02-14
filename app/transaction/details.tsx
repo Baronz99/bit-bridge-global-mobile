@@ -13,6 +13,8 @@ import TransactionButtons from '@/components/transactionButtons/TransactionButto
 import moneyFormat from '@/utils/moneyFormat'
 import resolveBillOrderId from '@/utils/resolveBillOrderId'
 import useBillPaymentIntentFlow from '@/hooks/useBillPaymentIntentFlow'
+import useServiceAvailability from '@/hooks/useServiceAvailability'
+import ServiceStatusPill from '@/components/service-availability/ServiceStatusPill'
 
 const ConfirmDetails = () => {
   const { orderId, id, resume, intentId: routeIntentId } = useLocalSearchParams()
@@ -26,11 +28,14 @@ const ConfirmDetails = () => {
   const router = useRouter()
   const { userProfileData, loadProfile } = useAuth()
   const walletBalanceValue = Number(userProfileData?.wallet?.balance ?? 0)
+  const { getStatus } = useServiceAvailability()
 
-  const { data } = useFetch<any>(useCallback(() => {
-    if (!routeOrderId) return Promise.resolve(null)
-    return getPurchaseOrder(routeOrderId)
-  }, [routeOrderId]))
+  const { data } = useFetch<any>(
+    useCallback(() => {
+      if (!routeOrderId) return Promise.resolve(null)
+      return getPurchaseOrder(routeOrderId)
+    }, [routeOrderId])
+  )
   const billTotal = useMemo(() => Number(data?.total_amount ?? data?.amount ?? 0), [data?.amount, data?.total_amount])
 
   const statusRaw = String(data?.status || '').toLowerCase()
@@ -72,34 +77,51 @@ const ConfirmDetails = () => {
     },
   })
 
-  const handleConfirmation = useCallback(async (paymentMethod: string) => {
-    if (paymentMethod !== 'wallet') {
-      setNotification({ error: true, message: 'Bills can only be paid from wallet.', data: null })
-      return
-    }
-    if (!resolvedBillOrderId) {
-      setNotification({ error: true, message: resolveError || 'Missing bill order id.', data: null })
-      return
-    }
-    if (isElectricityVerificationPending) {
-      setNotification({ error: true, message: 'Meter verification is still in progress. Please wait.', data: null })
-      return
-    }
+  const handleConfirmation = useCallback(
+    async (paymentMethod: string) => {
+      if (paymentMethod !== 'wallet') {
+        setNotification({ error: true, message: 'Bills can only be paid from wallet.', data: null })
+        return
+      }
+      if (!resolvedBillOrderId) {
+        setNotification({ error: true, message: resolveError || 'Missing bill order id.', data: null })
+        return
+      }
+      if (isElectricityVerificationPending) {
+        setNotification({ error: true, message: 'Meter verification is still in progress. Please wait.', data: null })
+        return
+      }
 
-    const result = await flow.execute({
+      const result = await flow.execute({
+        billTotal,
+        walletBalance: walletBalanceValue,
+        useCommission: applyCommission,
+      })
+      if (result.kind === 'awaiting_funds') {
+        setFundPrompt({ open: true, shortfall: result.shortfall })
+        return
+      }
+      if (result.kind === 'failed') {
+        Alert.alert('Payment failed', result.message || 'Bill payment failed')
+        setNotification({ error: true, message: result.message || 'Bill payment failed.', data: null })
+      }
+    },
+    [
+      applyCommission,
       billTotal,
-      walletBalance: walletBalanceValue,
-      useCommission: applyCommission,
-    })
-    if (result.kind === 'awaiting_funds') {
-      setFundPrompt({ open: true, shortfall: result.shortfall })
-      return
-    }
-    if (result.kind === 'failed') {
-      Alert.alert('Payment failed', result.message || 'Bill payment failed')
-      setNotification({ error: true, message: result.message || 'Bill payment failed.', data: null })
-    }
-  }, [applyCommission, billTotal, flow, isElectricityVerificationPending, resolveError, resolvedBillOrderId, setNotification, walletBalanceValue])
+      flow,
+      isElectricityVerificationPending,
+      resolveError,
+      resolvedBillOrderId,
+      setNotification,
+      walletBalanceValue,
+    ]
+  )
+
+  const selectedServiceStatus = useMemo(
+    () => getStatus({ provider: data?.biller, serviceType: data?.service_type }),
+    [data?.biller, data?.service_type, getStatus]
+  )
   const canViewReceipt = flow.uiState === 'completed'
 
   return (
@@ -107,6 +129,11 @@ const ConfirmDetails = () => {
       <View className="mb-6">
         <Text className="text-2xl font-bold text-white text-center">Confirm Payment</Text>
         <Text className="text-sm text-white text-center mt-1">Review the details before you pay.</Text>
+      </View>
+
+      <View className="mt-1 mb-3 flex-row items-center justify-between rounded-xl border border-gray-800 bg-gray-900/70 px-3 py-2">
+        <Text className="text-gray-300 text-xs">Service availability</Text>
+        <ServiceStatusPill state={selectedServiceStatus.state} />
       </View>
 
       <View className="bg-gray-800 rounded-2xl p-6 shadow-lg mb-8">
@@ -149,7 +176,9 @@ const ConfirmDetails = () => {
       {flow.uiState === 'processing' || flow.uiState === 'timed_out' ? (
         <View className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 mb-3 mt-2">
           <Text className="text-yellow-200 text-center">
-            {flow.uiState === 'timed_out' ? 'Payment is still processing. Check status to continue.' : flow.message || 'Payment pending. We are checking status.'}
+            {flow.uiState === 'timed_out'
+              ? 'Payment is still processing. Check status to continue.'
+              : flow.message || 'Payment pending. We are checking status.'}
           </Text>
           {flow.uiState === 'timed_out' ? (
             <>

@@ -1,4 +1,4 @@
-import { Image, ScrollView, Text, TouchableOpacity, View } from 'react-native'
+import { ScrollView, Text, TouchableOpacity, View } from 'react-native'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import useFetch from '@/services/useFetch'
 import { getProducts } from '@/api/products'
@@ -16,10 +16,14 @@ import Loader from '@/components/Loader'
 import AppModal from '@/components/modal/Modal'
 import NotificationAlert from '@/components/notification'
 import useNotification from '@/hooks/useNotification'
+import useServiceAvailability from '@/hooks/useServiceAvailability'
+import ServiceStatusPill from '@/components/service-availability/ServiceStatusPill'
 
+const normalizeProviderKey = (raw: any) => String(raw ?? '').trim().toLowerCase().replace(/\s+/g, '_')
 const getImageByKey = (key: string) => {
   const dict = images as Record<string, any>
-  return dict[key] ?? images.fail ?? images.bg
+  const k = normalizeProviderKey(key)
+  return dict[k] ?? dict.fail ?? dict.bg
 }
 
 const index = () => {
@@ -30,6 +34,7 @@ const index = () => {
   const { notification, setNotification } = useNotification()
   const [selectProvider, setSelectedProvider] = useState<any | null>(null)
   const [selectProvision, setSelectedProvision] = useState<any | null>(null)
+  const { getStatus } = useServiceAvailability()
   const [formValue, setFormValue] = useState({
     billersCode: '',
     amount: '',
@@ -37,11 +42,7 @@ const index = () => {
     description: null,
   })
 
-  const fetchProducts = useCallback(() => {
-    return getProducts({
-      category: 'utility',
-    })
-  }, [])
+  const fetchProducts = useCallback(() => getProducts({ category: 'utility' }), [])
   const { data } = useFetch(fetchProducts)
 
   const { data: priceList, refetch } = useFetch(
@@ -54,13 +55,26 @@ const index = () => {
   )
   const safePriceList = priceList ?? []
 
+  const cableProviders = useMemo(() => {
+    const list = (data ?? []).filter((item: any) => item?.category === 'utility')
+    const unique = new Map<string, any>()
+    for (const item of list) {
+      const key = normalizeProviderKey(item?.provider ?? item?.name)
+      if (!key) continue
+      if (!unique.has(key)) unique.set(key, item)
+    }
+    return Array.from(unique.values())
+  }, [data])
+
+  const statusForProvider = useCallback(
+    (provider: any) => getStatus({ provider: provider?.provider, serviceType: 'TV' }),
+    [getStatus]
+  )
+  const selectedServiceStatus = useMemo(() => statusForProvider(selectProvider), [selectProvider, statusForProvider])
+
   const handleFormSubmit = async () => {
     if (!formValue.billersCode || !formValue.amount || !formValue.tariff_class) {
-      setNotification({
-        message: 'Please fill all required fields',
-        error: true,
-        data: null,
-      })
+      setNotification({ message: 'Please fill all required fields', error: true, data: null })
       return
     }
     setLoader(true)
@@ -92,11 +106,7 @@ const index = () => {
         params: { orderId: String(response?.data?.id) },
       })
     } catch (error: any) {
-      setNotification({
-        message: error.message || 'Something went wrong',
-        error: true,
-        data: null,
-      })
+      setNotification({ message: error.message || 'Something went wrong', error: true, data: null })
       setLoader(false)
     }
   }
@@ -109,30 +119,15 @@ const index = () => {
   }, [data])
 
   useEffect(() => {
-    if (selectProvision) {
-      refetch()
-    }
-  }, [selectProvision])
+    if (selectProvision) refetch()
+  }, [selectProvision, refetch])
 
   useEffect(() => {
     if (selectProvider) {
-      const provision = selectProvider?.provisions?.find(
-        (item: any) => item.service_type.toLowerCase() === 'tv'
-      )
+      const provision = selectProvider?.provisions?.find((item: any) => item.service_type.toLowerCase() === 'tv')
       setSelectedProvision(provision)
     }
   }, [selectProvider])
-
-  const cableProviders = useMemo(() => {
-    const list = (data ?? []).filter((item: any) => item?.category === 'utility')
-    const unique = new Map<string, any>()
-    for (const item of list) {
-      const key = String(item?.provider ?? item?.name ?? '').trim().toLowerCase()
-      if (!key) continue
-      if (!unique.has(key)) unique.set(key, item)
-    }
-    return Array.from(unique.values())
-  }, [data])
 
   const priceListData = safePriceList.length
     ? safePriceList
@@ -147,33 +142,35 @@ const index = () => {
         <View className="mt-6 rounded-3xl border border-gray-800 bg-gray-900/80 p-5">
           <Text className="text-white/70 text-xs tracking-widest uppercase">Utilities</Text>
           <Text className="text-white text-2xl font-semibold mt-2">Cable TV Subscription</Text>
-          <Text className="text-gray-400 mt-2 text-sm">
-            Renew your favorite TV packages in seconds.
-          </Text>
+          <Text className="text-gray-400 mt-2 text-sm">Renew your favorite TV packages in seconds.</Text>
         </View>
 
         <View className="mt-6 rounded-2xl border border-gray-800 bg-gray-900/70 p-4">
           <Text className="text-white text-sm font-semibold">Choose Provider</Text>
           <View className="mt-4 flex-row flex-wrap gap-y-4">
-            {cableProviders &&
-              cableProviders?.map((item: any, index: number) =>
-                item ? (
-                  <SelectBoxIcon
-                    key={String(
-                      item?.id ?? item?.uuid ?? item?.code ?? item?.provider ?? item?.name ?? index
-                    )}
-                    onSelect={() => setSelectedProvider(item)}
-                    selectedLabel={selectProvider?.provider?.toLowerCase()}
-                    icon={getImageByKey(String(splitString(item?.provider)))}
-                    label={splitString(item?.provider)}
-                  />
-                ) : null
-              )}
+            {cableProviders?.map((item: any, index: number) =>
+              item ? (
+                <SelectBoxIcon
+                  key={String(item?.id ?? item?.uuid ?? item?.code ?? item?.provider ?? item?.name ?? index)}
+                  onSelect={() => setSelectedProvider(item)}
+                  selectedLabel={selectProvider?.provider?.toLowerCase()}
+                  icon={getImageByKey(String(splitString(item?.provider)))}
+                  label={splitString(item?.provider)}
+                  statusState={statusForProvider(item)?.state}
+                />
+              ) : null
+            )}
           </View>
         </View>
 
         <View className="mt-6 rounded-2xl border border-gray-800 bg-gray-900/70 p-4">
           <Text className="text-white text-sm font-semibold">Subscription Details</Text>
+          {selectProvider ? (
+            <View className="mt-3 flex-row items-center justify-between rounded-xl border border-gray-800 bg-gray-950/40 px-3 py-2">
+              <Text className="text-gray-300 text-xs">Current service signal</Text>
+              <ServiceStatusPill state={selectedServiceStatus.state} />
+            </View>
+          ) : null}
           <KeyboardAvoidWrapper>
             <View className="mt-3">
               <FormInput
@@ -183,15 +180,6 @@ const index = () => {
                 onChangeText={(text: string) => setFormValue({ ...formValue, billersCode: text })}
                 value={formValue.billersCode}
               />
-              {data?.service_type === 'VTU' && (
-                <FormInput
-                  name="amount"
-                  label="amount"
-                  placeHolder="Enter Amount"
-                  onChangeText={(text: string) => setFormValue({ ...formValue, amount: text })}
-                  value={formValue.amount}
-                />
-              )}
 
               <FormSelect
                 options={priceListData}
@@ -201,7 +189,6 @@ const index = () => {
                 placeHolder="Data Plan"
                 onValueChange={(value: string) => {
                   const newAmountdata = priceListData.find((price: any) => price.value === value)
-
                   setFormValue({
                     ...formValue,
                     amount: newAmountdata.amount,
@@ -211,10 +198,7 @@ const index = () => {
                 }}
               />
 
-              <TouchableOpacity
-                onPress={handleFormSubmit}
-                className="bg-app-primary rounded-xl mt-4 py-4"
-              >
+              <TouchableOpacity onPress={handleFormSubmit} className="bg-app-primary rounded-xl mt-4 py-4">
                 <Text className="text-white text-center font-semibold">Proceed</Text>
               </TouchableOpacity>
             </View>
@@ -223,10 +207,7 @@ const index = () => {
       </ScrollView>
 
       <Loader open={loader} />
-      <AppModal
-        open={!!notification.message}
-        onclose={() => setNotification({ message: null, error: false, data: null })}
-      >
+      <AppModal open={!!notification.message} onclose={() => setNotification({ message: null, error: false, data: null })}>
         <NotificationAlert
           onPress={() => setNotification({ message: null, error: false, data: null })}
           message={notification.message}
