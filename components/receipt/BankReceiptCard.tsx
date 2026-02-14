@@ -303,9 +303,10 @@ const BankReceiptCard = ({
 
   const normalizedStatus = normalizeStatus(String(status))
   const isSuccess = normalizedStatus === 'successful'
+  const hasFeeBreakdown = typeof totalFees === 'number' && totalFees > 0
   const shouldShowBreakdown =
-    isSuccess && safeValueAmount !== undefined && (safeWalletAmount > 0 || safeRewardAmount > 0)
-  const displayAmount = safeValueAmount ?? safeAmount
+    isSuccess && (safeValueAmount !== undefined || hasFeeBreakdown || safeRewardAmount > 0 || safeWalletAmount > 0)
+  const displayAmount = isSuccess && hasFeeBreakdown ? safeAmount : (safeValueAmount ?? safeAmount)
 
   return (
     <View className="bg-gray-950 border border-[rgba(255,255,255,0.08)] rounded-2xl px-5 py-5 md:px-6 md:py-6 shadow-lg">
@@ -344,12 +345,25 @@ const BankReceiptCard = ({
 
       {/* Amount */}
       <View className="border-t border-[rgba(255,255,255,0.05)] mt-4 pt-4">
-        <Text className="text-white text-3xl font-semibold">{moneyFormat(safeValueAmount ?? safeAmount, safeCurrency)}</Text>
+        <Text className="text-white text-3xl font-semibold">{moneyFormat(displayAmount, safeCurrency)}</Text>
+        {isSuccess && hasFeeBreakdown ? (
+          <Text className="text-gray-400 text-[11px] mt-1">Total debited</Text>
+        ) : null}
 
         {shouldShowBreakdown ? (
           <View className="mt-3 space-y-1">
-            <Row label="Value" value={moneyFormat(safeValueAmount ?? safeAmount, safeCurrency)} mono />
-            <Row label="Paid from wallet" value={moneyFormat(safeWalletAmount, safeCurrency)} mono />
+            {safeValueAmount !== undefined ? (
+              <Row label="Value" value={moneyFormat(safeValueAmount, safeCurrency)} mono />
+            ) : null}
+            {hasFeeBreakdown ? (
+              <Row label="Fees" value={moneyFormat(totalFees || 0, safeCurrency)} mono />
+            ) : null}
+            {isSuccess ? (
+              <Row label="Total debited" value={moneyFormat(safeAmount, safeCurrency)} mono />
+            ) : null}
+            {safeWalletAmount > 0 ? (
+              <Row label="Paid from wallet" value={moneyFormat(safeWalletAmount, safeCurrency)} mono />
+            ) : null}
             {safeRewardAmount > 0 ? (
               <Row label="Paid from rewards" value={moneyFormat(safeRewardAmount, safeCurrency)} mono />
             ) : null}
@@ -363,14 +377,14 @@ const BankReceiptCard = ({
           )
         )}
 
-        {feesLabel ? (
+        {!shouldShowBreakdown && feesLabel ? (
           <Text className="text-gray-400 text-[12px] mt-1">
             Fees: {feesLabel}
-            {typeof computedNet === 'number' ? `  •  Net: ${moneyFormat(computedNet, safeCurrency)}` : ''}
+            {typeof computedNet === 'number' ? `  | Net: ${moneyFormat(computedNet, safeCurrency)}` : ''}
           </Text>
-        ) : (
+        ) : !shouldShowBreakdown ? (
           <Text className="text-gray-500 text-[12px] mt-1">Fees may apply depending on channel.</Text>
-        )}
+        ) : null}
       </View>
 
       <Divider />
