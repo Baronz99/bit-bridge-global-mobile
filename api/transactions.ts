@@ -56,14 +56,12 @@ export const createTransaction = async ({ data }: { data: any }) => {
   }
 }
 
-export const initiateMonnifyTransaction = async ({ data }: { data: any }) => {
+export const initializeTransaction = async ({ data }: { data: any }) => {
   const formdata = {
     transaction: {
       ...data,
     },
   }
-
-  console.log(formdata)
 
   try {
     const response = await client.post('/transactions/initialize_transaction', formdata)
@@ -77,6 +75,10 @@ export const initiateMonnifyTransaction = async ({ data }: { data: any }) => {
     }
     throw new Error('Something went wrong')
   }
+}
+
+export const initiateMonnifyTransaction = async ({ data }: { data: any }) => {
+  return initializeTransaction({ data })
 }
 
 export const getTransactionRecord = async (id: string) => {
