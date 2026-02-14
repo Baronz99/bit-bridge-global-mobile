@@ -101,8 +101,12 @@ const ConfirmDetails = () => {
         setFundPrompt({ open: true, shortfall: result.shortfall })
         return
       }
+      if (result.warningCode === 'SERVICE_UNSTABLE') {
+        setNotification({ error: false, message: result.warningMessage || 'Service is unstable. Transaction may be delayed.', data: null })
+      }
       if (result.kind === 'failed') {
-        Alert.alert('Payment failed', result.message || 'Bill payment failed')
+        const alertTitle = result.errorCode === 'SERVICE_UNAVAILABLE' ? 'Service unavailable' : 'Payment failed'
+        Alert.alert(alertTitle, result.message || 'Bill payment failed')
         setNotification({ error: true, message: result.message || 'Bill payment failed.', data: null })
       }
     },
