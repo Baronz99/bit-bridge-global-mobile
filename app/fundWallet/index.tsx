@@ -3,20 +3,24 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import FormInput from '@/components/FormInput'
 import { useAuth } from '@/services/useAuth'
-import { initializeTransaction, initiateMonnifyTransaction } from '@/api/transactions'
+import { initiateMonnifyTransaction } from '@/api/transactions'
+import { createFundingIntent, getFundingIntent, type FundingIntentResponse } from '@/api/funding'
 import Loader from '@/components/Loader'
 import NotificationAlert from '@/components/notification'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
 
 type FundMethod = 'monnify' | 'anchor'
 
-type AnchorInitState = {
+type AnchorIntentState = {
+  id?: string
   paymentReference?: string
-  providerReference?: string
   bankName?: string
   accountNumber?: string
   accountName?: string
+  instructions?: string
   expiryTime?: string | number
+  status?: FundingIntentResponse['status']
+  creditedTransactionId?: string | null
 }
 
 const resolveExpiryDate = (raw: string | number | undefined): Date | null => {
@@ -56,7 +60,7 @@ const FundWalletScreen = () => {
 
   const [loading, setLoading] = useState(false)
   const [method, setMethod] = useState<FundMethod>('monnify')
-  const [anchorInit, setAnchorInit] = useState<AnchorInitState | null>(null)
+  const [anchorIntent, setAnchorIntent] = useState<AnchorIntentState | null>(null)
   const [now, setNow] = useState(Date.now())
   const [formData, setFormData] = useState({
     amount: '',
@@ -68,7 +72,7 @@ const FundWalletScreen = () => {
     data: null,
   })
 
-  const expiryDate = useMemo(() => resolveExpiryDate(anchorInit?.expiryTime), [anchorInit?.expiryTime])
+  const expiryDate = useMemo(() => resolveExpiryDate(anchorIntent?.expiryTime), [anchorIntent?.expiryTime])
   const countdown = useMemo(() => {
     if (!expiryDate) return null
     return formatCountdown(expiryDate.getTime() - now)
@@ -79,6 +83,39 @@ const FundWalletScreen = () => {
     const timer = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(timer)
   }, [expiryDate])
+
+  useEffect(() => {
+    const intentId = String(anchorIntent?.id || '').trim()
+    const status = anchorIntent?.status
+    if (!intentId || !status || !['pending', 'detected'].includes(status)) return
+
+    const poller = setInterval(async () => {
+      try {
+        const latest = await getFundingIntent(intentId)
+        setAnchorIntent((prev) => ({
+          ...(prev || {}),
+          id: latest.id,
+          paymentReference: latest.reference,
+          bankName: latest.account?.bank_name,
+          accountName: latest.account?.account_name,
+          accountNumber: latest.account?.account_number,
+          instructions: latest.account?.instructions,
+          expiryTime: latest.expires_at,
+          status: latest.status,
+          creditedTransactionId: latest.credited_transaction_id || null,
+        }))
+
+        if (latest.status === 'credited') {
+          await loadProfile({ force: true })
+          setNotice({ message: 'Wallet credited successfully.', error: false, data: null })
+        }
+      } catch {
+        // silent poll retry
+      }
+    }, 10000)
+
+    return () => clearInterval(poller)
+  }, [anchorIntent?.id, anchorIntent?.status, loadProfile])
 
   const parseAmount = () => {
     const normalized = Number(String(formData.amount || '').replace(/,/g, '').trim())
@@ -123,26 +160,25 @@ const FundWalletScreen = () => {
         return
       }
 
-      const response = await initializeTransaction({
-        data: {
-          ...payload,
-          provider: 'anchor',
-          expiry_time: 3600,
-        },
+      const amountCents = Math.round(amount * 100)
+      const response = await createFundingIntent({
+        provider: 'anchor',
+        amount_cents: amountCents,
       })
 
-      const details = response?.responseBody || {}
-      setAnchorInit({
-        paymentReference: details.paymentReference,
-        providerReference: details.providerReference,
-        bankName: details.bankName,
-        accountNumber: details.accountNumber,
-        accountName: details.accountName,
-        expiryTime: details.expiryTime,
+      setAnchorIntent({
+        id: response.id,
+        paymentReference: response.reference,
+        bankName: response.account?.bank_name,
+        accountNumber: response.account?.account_number,
+        accountName: response.account?.account_name,
+        instructions: response.account?.instructions,
+        expiryTime: response.expires_at,
+        status: response.status,
+        creditedTransactionId: response.credited_transaction_id || null,
       })
 
-      loadProfile({ force: true })
-      setNotice({ message: 'Transfer account generated. Complete transfer and refresh.', error: false, data: null })
+      setNotice({ message: 'Transfer details generated. Complete transfer with the reference.', error: false, data: null })
     } catch (error: any) {
       setNotice({ message: error?.message || 'Something went wrong', error: true, data: null })
     } finally {
@@ -151,7 +187,7 @@ const FundWalletScreen = () => {
   }
 
   const handleCopyAccountNumber = async () => {
-    const accountNumber = String(anchorInit?.accountNumber || '').trim()
+    const accountNumber = String(anchorIntent?.accountNumber || '').trim()
     if (!accountNumber) return
 
     try {
@@ -163,11 +199,46 @@ const FundWalletScreen = () => {
     }
   }
 
+  const handleCopyReference = async () => {
+    const reference = String(anchorIntent?.paymentReference || '').trim()
+    if (!reference) return
+
+    try {
+      const Clipboard = await import('expo-clipboard')
+      await Clipboard.setStringAsync(reference)
+      Alert.alert('Copied', 'Reference copied')
+    } catch {
+      Alert.alert('Copy failed', 'Unable to copy reference')
+    }
+  }
+
   const handleIHaveSentTransfer = async () => {
+    const intentId = String(anchorIntent?.id || '').trim()
+    if (!intentId) return
+
     setLoading(true)
     try {
+      const latest = await getFundingIntent(intentId)
+      setAnchorIntent((prev) => ({
+        ...(prev || {}),
+        id: latest.id,
+        paymentReference: latest.reference,
+        bankName: latest.account?.bank_name,
+        accountName: latest.account?.account_name,
+        accountNumber: latest.account?.account_number,
+        instructions: latest.account?.instructions,
+        expiryTime: latest.expires_at,
+        status: latest.status,
+        creditedTransactionId: latest.credited_transaction_id || null,
+      }))
+
       await loadProfile({ force: true })
-      setNotice({ message: 'Wallet refreshed. Check timeline/wallet for settlement.', error: false, data: null })
+
+      if (latest.status === 'credited') {
+        setNotice({ message: 'Payment received and wallet credited.', error: false, data: null })
+      } else {
+        setNotice({ message: `Current status: ${latest.status}. We will keep checking automatically.`, error: false, data: null })
+      }
     } catch (error: any) {
       setNotice({ message: error?.message || 'Unable to refresh status', error: true, data: null })
     } finally {
@@ -195,7 +266,7 @@ const FundWalletScreen = () => {
               className={`flex-1 rounded-xl border p-3 ${method === 'anchor' ? 'border-theme-primary bg-[#0e1a33]' : 'border-gray-700'}`}
             >
               <Text className="text-white font-semibold">Bank Transfer (Anchor)</Text>
-              <Text className="text-gray-300 text-xs mt-1">Get dedicated transfer account</Text>
+              <Text className="text-gray-300 text-xs mt-1">Use pooled transfer account</Text>
             </TouchableOpacity>
           </View>
 
@@ -218,24 +289,34 @@ const FundWalletScreen = () => {
 
           <TouchableOpacity onPress={handleSubmit} className="bg-theme-primary py-4 mt-6 rounded-xl">
             <Text className="text-alt font-medium text-center">
-              {method === 'monnify' ? 'Continue to Checkout' : 'Generate Transfer Account'}
+              {method === 'monnify' ? 'Continue to Checkout' : 'Generate Transfer Details'}
             </Text>
           </TouchableOpacity>
 
-          {method === 'anchor' && anchorInit?.accountNumber ? (
+          {method === 'anchor' && anchorIntent?.accountNumber ? (
             <View className="border border-gray-700 rounded-xl p-4 mt-5">
               <Text className="text-white font-semibold mb-3">Anchor Transfer Details</Text>
-              <Text className="text-gray-300">Bank: <Text className="text-white">{anchorInit.bankName || '--'}</Text></Text>
-              <Text className="text-gray-300 mt-1">Account Name: <Text className="text-white">{anchorInit.accountName || '--'}</Text></Text>
-              <Text className="text-gray-300 mt-1">Account Number: <Text className="text-white">{anchorInit.accountNumber}</Text></Text>
-              <Text className="text-gray-300 mt-1">Reference: <Text className="text-white">{anchorInit.paymentReference || '--'}</Text></Text>
+              <Text className="text-gray-300">Bank: <Text className="text-white">{anchorIntent.bankName || '--'}</Text></Text>
+              <Text className="text-gray-300 mt-1">Account Name: <Text className="text-white">{anchorIntent.accountName || '--'}</Text></Text>
+              <Text className="text-gray-300 mt-1">Account Number: <Text className="text-white">{anchorIntent.accountNumber}</Text></Text>
+              <Text className="text-gray-300 mt-1">Reference: <Text className="text-white">{anchorIntent.paymentReference || '--'}</Text></Text>
+              <Text className="text-gray-300 mt-1">Status: <Text className="text-white">{anchorIntent.status || 'pending'}</Text></Text>
               {countdown ? (
                 <Text className="text-gray-300 mt-1">Expires In: <Text className="text-white">{countdown}</Text></Text>
               ) : null}
+              {anchorIntent.instructions ? (
+                <Text className="text-gray-400 mt-2 text-xs">{anchorIntent.instructions}</Text>
+              ) : null}
 
-              <TouchableOpacity onPress={handleCopyAccountNumber} className="border border-theme-primary py-3 rounded-xl mt-4">
-                <Text className="text-theme-primary text-center font-medium">Copy Account Number</Text>
-              </TouchableOpacity>
+              <View className="flex-row gap-2 mt-4">
+                <TouchableOpacity onPress={handleCopyAccountNumber} className="border border-theme-primary py-3 rounded-xl flex-1">
+                  <Text className="text-theme-primary text-center font-medium">Copy Account</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity onPress={handleCopyReference} className="border border-theme-primary py-3 rounded-xl flex-1">
+                  <Text className="text-theme-primary text-center font-medium">Copy Reference</Text>
+                </TouchableOpacity>
+              </View>
 
               <TouchableOpacity onPress={handleIHaveSentTransfer} className="bg-theme-primary py-3 rounded-xl mt-3">
                 <Text className="text-alt text-center font-medium">I've sent the transfer</Text>
