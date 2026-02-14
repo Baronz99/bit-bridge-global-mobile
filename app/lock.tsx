@@ -11,10 +11,43 @@ import {
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
-import * as LocalAuthentication from 'expo-local-authentication'
 import { verifyTransactionPin } from '@/api/transactionPin'
 import { useAppLock } from '../services/useAppLock'
 import { useAuth } from '@/services/useAuth'
+
+type LocalAuthResult = {
+  success: boolean
+  error?: string
+}
+
+type LocalAuthModule = {
+  hasHardwareAsync: () => Promise<boolean>
+  isEnrolledAsync: () => Promise<boolean>
+  authenticateAsync: (options: {
+    promptMessage: string
+    cancelLabel?: string
+    fallbackLabel?: string
+    disableDeviceFallback?: boolean
+  }) => Promise<LocalAuthResult>
+}
+
+const loadLocalAuthentication = async (): Promise<LocalAuthModule | null> => {
+  try {
+    const mod = await import('expo-local-authentication')
+    const api = (mod?.default ?? mod) as LocalAuthModule
+    if (
+      api &&
+      typeof api.hasHardwareAsync === 'function' &&
+      typeof api.isEnrolledAsync === 'function' &&
+      typeof api.authenticateAsync === 'function'
+    ) {
+      return api
+    }
+    return null
+  } catch {
+    return null
+  }
+}
 
 export default function LockScreen() {
   const router = useRouter()
@@ -41,9 +74,15 @@ export default function LockScreen() {
   useEffect(() => {
     let mounted = true
     const checkBiometric = async () => {
+      const localAuth = await loadLocalAuthentication()
+      if (!localAuth) {
+        if (mounted) setBiometricAvailable(false)
+        return
+      }
+
       try {
-        const hasHardware = await LocalAuthentication.hasHardwareAsync()
-        const isEnrolled = await LocalAuthentication.isEnrolledAsync()
+        const hasHardware = await localAuth.hasHardwareAsync()
+        const isEnrolled = await localAuth.isEnrolledAsync()
         if (mounted) setBiometricAvailable(Boolean(hasHardware && isEnrolled))
       } catch {
         if (mounted) setBiometricAvailable(false)
@@ -125,7 +164,13 @@ export default function LockScreen() {
     setBiometricLoading(true)
     setError(null)
     try {
-      const result = await LocalAuthentication.authenticateAsync({
+      const localAuth = await loadLocalAuthentication()
+      if (!localAuth) {
+        setError('Biometric unlock unavailable. Use your transaction PIN.')
+        return
+      }
+
+      const result = await localAuth.authenticateAsync({
         promptMessage: 'Unlock BitBridge',
         cancelLabel: 'Cancel',
         fallbackLabel: 'Use transaction PIN',
@@ -250,4 +295,3 @@ export default function LockScreen() {
     </SafeAreaView>
   )
 }
-
