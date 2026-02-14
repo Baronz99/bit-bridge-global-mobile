@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import {
   Image,
   KeyboardAvoidingView,
@@ -250,3 +250,4 @@ export default function LockScreen() {
     </SafeAreaView>
   )
 }
+
