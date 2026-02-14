@@ -1,14 +1,21 @@
-import React, { useCallback, useEffect, useState } from 'react'
-import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { ActivityIndicator, Switch, Text, TouchableOpacity, View } from 'react-native'
 import { Link } from 'expo-router'
 import { FEATURE_TRANSACTION_PIN } from '@/constants/featureFlags'
-import { getTransactionPinStatus } from '@/api/transactionPin'
+import {
+  disableTransactionPinAppLock,
+  enableTransactionPinAppLock,
+  getTransactionPinStatus,
+} from '@/api/transactionPin'
 import { buildApiErrorMessage } from '@/utils/apiErrorMessage'
+import { useAppLock } from '@/services/useAppLock'
 
 const PinSettings = () => {
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState<any | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [toggleBusy, setToggleBusy] = useState(false)
+  const { refreshStatus } = useAppLock()
 
   const fetchStatus = useCallback(async () => {
     setLoading(true)
@@ -33,6 +40,40 @@ const PinSettings = () => {
     void fetchStatus()
   }, [fetchStatus])
 
+  const hasPin = useMemo(
+    () => status?.has_pin === true || status?.status === 'set' || status?.pin_set === true,
+    [status]
+  )
+
+  const appLockEnabled = useMemo(
+    () => status?.app_lock_enabled === true || status?.appLockEnabled === true,
+    [status]
+  )
+
+  const handleToggleAppLock = useCallback(async () => {
+    if (!hasPin || toggleBusy) return
+    setToggleBusy(true)
+    setError(null)
+    try {
+      if (appLockEnabled) {
+        await disableTransactionPinAppLock()
+      } else {
+        await enableTransactionPinAppLock()
+      }
+      await fetchStatus()
+      await refreshStatus()
+    } catch (err: any) {
+      const message = buildApiErrorMessage({
+        status: err?.response?.status,
+        data: err?.response?.data,
+        fallback: err?.message || 'Unable to update app lock setting',
+      })
+      setError(message)
+    } finally {
+      setToggleBusy(false)
+    }
+  }, [appLockEnabled, fetchStatus, hasPin, refreshStatus, toggleBusy])
+
   if (!FEATURE_TRANSACTION_PIN) {
     return (
       <View className="flex-1 bg-primary px-5 py-8">
@@ -41,11 +82,6 @@ const PinSettings = () => {
       </View>
     )
   }
-
-  const hasPin =
-    status?.has_pin === true ||
-    status?.status === 'set' ||
-    status?.pin_set === true
 
   return (
     <View className="flex-1 bg-primary px-5 py-8">
@@ -72,10 +108,27 @@ const PinSettings = () => {
 
       <View className="bg-gray-900 rounded-2xl p-4 mt-6">
         <Text className="text-white font-semibold">PIN status</Text>
-        <Text className="text-gray-400 mt-2">
-          {hasPin ? 'PIN is set.' : 'No PIN set yet.'}
-        </Text>
+        <Text className="text-gray-400 mt-2">{hasPin ? 'PIN is set.' : 'No PIN set yet.'}</Text>
       </View>
+
+      <View className="bg-gray-900 rounded-2xl p-4 mt-4 flex-row items-center justify-between">
+        <View className="flex-1 pr-4">
+          <Text className="text-white font-semibold">App lock</Text>
+          <Text className="text-gray-400 mt-1 text-xs">
+            Require transaction PIN/biometric when reopening the app.
+          </Text>
+        </View>
+        <Switch
+          value={appLockEnabled}
+          onValueChange={handleToggleAppLock}
+          disabled={!hasPin || toggleBusy}
+          trackColor={{ false: '#334155', true: '#1d4ed8' }}
+          thumbColor="#ffffff"
+        />
+      </View>
+      {!hasPin ? (
+        <Text className="text-gray-500 text-xs mt-2">Set a PIN before enabling app lock.</Text>
+      ) : null}
 
       <View className="mt-6 gap-4">
         <Link href="/settings/pin/set" asChild>

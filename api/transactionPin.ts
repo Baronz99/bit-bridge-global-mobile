@@ -10,6 +10,16 @@ export const setTransactionPin = async (pin: string) => {
   return res.data
 }
 
+export const enableTransactionPinAppLock = async () => {
+  const res = await client.post('/transaction_pin/app_lock/enable')
+  return res.data
+}
+
+export const disableTransactionPinAppLock = async () => {
+  const res = await client.post('/transaction_pin/app_lock/disable')
+  return res.data
+}
+
 export const verifyTransactionPin = async (pin: string) => {
   const endpoint = '/transaction_pin/verify'
   try {

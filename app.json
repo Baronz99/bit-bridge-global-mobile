@@ -17,7 +17,8 @@
       ],
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "CFBundleDisplayName": "BitBridge"
+        "CFBundleDisplayName": "BitBridge",
+        "NSFaceIDUsageDescription": "Use Face ID to securely unlock BitBridge."
       }
     },
     "android": {
@@ -68,6 +69,7 @@
       "expo-secure-store",
       "expo-font",
       "expo-web-browser",
+      "expo-local-authentication",
       "@react-native-community/datetimepicker"
     ],
     "experiments": {

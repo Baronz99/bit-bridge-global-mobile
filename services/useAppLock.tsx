@@ -1,4 +1,4 @@
-﻿import React, {
+import React, {
   createContext,
   useCallback,
   useContext,
@@ -30,14 +30,36 @@ type AppLockContextValue = {
 
 const AppLockContext = createContext<AppLockContextValue | null>(null)
 
+const parsePinStatus = (raw: any) => {
+  const data = raw?.data ?? raw
+  const hasPin =
+    data?.has_pin === true ||
+    data?.hasPin === true ||
+    data?.pin_set === true ||
+    data?.pinSet === true ||
+    data?.status === 'set' ||
+    data?.status === 'SET'
+
+  const appLockEnabled =
+    data?.app_lock_enabled === true ||
+    data?.appLockEnabled === true
+
+  return {
+    hasPin,
+    appLockEnabled,
+    shouldLock: hasPin && appLockEnabled,
+  }
+}
+
 export const AppLockProvider = ({ children }: { children: React.ReactNode }) => {
-  const { authenticated, authHydrated, token } = useAuth()
+  const { authenticated, authHydrated } = useAuth()
 
   const [locked, setLockedState] = useState(false)
   const [backgroundAt, setBackgroundAt] = useState<number | null>(null)
   const bgRef = useRef<number | null>(null)
   const unlockedSessionRef = useRef(false)
   const statusCheckInFlightRef = useRef(false)
+  const appLockEnabledRef = useRef(false)
 
   const persistBackground = useCallback(async (value: number) => {
     bgRef.current = value
@@ -87,6 +109,11 @@ export const AppLockProvider = ({ children }: { children: React.ReactNode }) => 
           return
         }
 
+        if (!appLockEnabledRef.current) {
+          void clearBackground()
+          return
+        }
+
         const lastBg = bgRef.current ?? backgroundAt
         const elapsed = lastBg ? Date.now() - lastBg : null
         if (__DEV__) console.log('[APP_LOCK] resume', { lastBg, elapsed })
@@ -111,22 +138,11 @@ export const AppLockProvider = ({ children }: { children: React.ReactNode }) => 
     statusCheckInFlightRef.current = true
     try {
       const res = await getTransactionPinStatus()
-      if (__DEV__) console.log('[APP_LOCK] status raw', res)
-      const hasPin =
-        res?.has_pin === true ||
-        res?.hasPin === true ||
-        res?.pin_set === true ||
-        res?.pinSet === true ||
-        res?.status === 'set' ||
-        res?.status === 'SET' ||
-        res?.data?.has_pin === true ||
-        res?.data?.hasPin === true ||
-        res?.data?.pin_set === true ||
-        res?.data?.pinSet === true ||
-        res?.data?.status === 'set' ||
-        res?.data?.status === 'SET'
-      if (__DEV__) console.log('[APP_LOCK] status', { hasPin })
-      if (hasPin) {
+      const parsed = parsePinStatus(res)
+      appLockEnabledRef.current = parsed.shouldLock
+      if (__DEV__) console.log('[APP_LOCK] status', parsed)
+
+      if (parsed.shouldLock) {
         if (!unlockedSessionRef.current) {
           setLockedState(true)
         }
@@ -140,10 +156,10 @@ export const AppLockProvider = ({ children }: { children: React.ReactNode }) => 
     }
   }, [authenticated, authHydrated])
 
-  // cold-start lock when authenticated & hydrated
   useEffect(() => {
     if (!authenticated || !authHydrated) {
       setLockedState(false)
+      appLockEnabledRef.current = false
       unlockedSessionRef.current = false
       void clearBackground()
       return
@@ -154,6 +170,7 @@ export const AppLockProvider = ({ children }: { children: React.ReactNode }) => 
   useEffect(() => {
     if (!authenticated) {
       setLockedState(false)
+      appLockEnabledRef.current = false
       unlockedSessionRef.current = false
       void clearBackground()
     }
