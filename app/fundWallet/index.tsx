@@ -1,12 +1,11 @@
 import { Alert, Linking, Text, TouchableOpacity, View } from 'react-native'
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import FormInput from '@/components/FormInput'
 import { useAuth } from '@/services/useAuth'
 import { initiateMonnifyTransaction } from '@/api/transactions'
 import { createFundingIntent, getFundingIntent, type FundingIntentResponse } from '@/api/funding'
 import Loader from '@/components/Loader'
-import NotificationAlert from '@/components/notification'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
 
 type FundMethod = 'monnify' | 'anchor'
@@ -66,7 +65,8 @@ const FundWalletScreen = () => {
     amount: '',
     coupon_code: '',
   })
-  const [notice, setNotice] = useState<{ message: string | null; error: boolean; data: any }>({
+  const creditedNavigatedRef = useRef(false)
+  const [notice, setNotice] = useState<{ message: string | null; error: boolean; data: unknown }>({
     message: null,
     error: false,
     data: null,
@@ -78,6 +78,13 @@ const FundWalletScreen = () => {
     return formatCountdown(expiryDate.getTime() - now)
   }, [expiryDate, now])
 
+  const anchorStatus = String(anchorIntent?.status || '').toLowerCase() as FundingIntentResponse['status'] | ''
+  const hasActiveAnchorIntent = method === 'anchor' && !!anchorIntent?.id && !!anchorIntent?.accountNumber
+  const isAnchorWaiting = hasActiveAnchorIntent && ['pending', 'detected'].includes(anchorStatus)
+  const isAnchorCredited = hasActiveAnchorIntent && anchorStatus === 'credited'
+  const isAnchorExpired = hasActiveAnchorIntent && ['expired', 'cancelled'].includes(anchorStatus)
+  const lockAnchorForm = hasActiveAnchorIntent && !isAnchorExpired
+
   useEffect(() => {
     if (!expiryDate) return
     const timer = setInterval(() => setNow(Date.now()), 1000)
@@ -85,13 +92,13 @@ const FundWalletScreen = () => {
   }, [expiryDate])
 
   useEffect(() => {
-    const intentId = String(anchorIntent?.id || '').trim()
+    const currentIntentId = String(anchorIntent?.id || '').trim()
     const status = anchorIntent?.status
-    if (!intentId || !status || !['pending', 'detected'].includes(status)) return
+    if (!currentIntentId || !status || !['pending', 'detected'].includes(status)) return
 
     const poller = setInterval(async () => {
       try {
-        const latest = await getFundingIntent(intentId)
+        const latest = await getFundingIntent(currentIntentId)
         setAnchorIntent((prev) => ({
           ...(prev || {}),
           id: latest.id,
@@ -116,6 +123,15 @@ const FundWalletScreen = () => {
 
     return () => clearInterval(poller)
   }, [anchorIntent?.id, anchorIntent?.status, loadProfile])
+
+  useEffect(() => {
+    if (!isAnchorCredited || creditedNavigatedRef.current) return
+    const reference = String(anchorIntent?.paymentReference || '').trim()
+    if (!reference) return
+
+    creditedNavigatedRef.current = true
+    router.push({ pathname: '/transaction/receipt', params: { reference } } as never)
+  }, [anchorIntent?.paymentReference, isAnchorCredited, router])
 
   const parseAmount = () => {
     const normalized = Number(String(formData.amount || '').replace(/,/g, '').trim())
@@ -178,9 +194,10 @@ const FundWalletScreen = () => {
         creditedTransactionId: response.credited_transaction_id || null,
       })
 
+      creditedNavigatedRef.current = false
       setNotice({ message: 'Transfer details generated. Complete transfer with the reference.', error: false, data: null })
-    } catch (error: any) {
-      setNotice({ message: error?.message || 'Something went wrong', error: true, data: null })
+    } catch (error: unknown) {
+      setNotice({ message: (error instanceof Error && error.message) || 'Something went wrong', error: true, data: null })
     } finally {
       setLoading(false)
     }
@@ -213,12 +230,12 @@ const FundWalletScreen = () => {
   }
 
   const handleIHaveSentTransfer = async () => {
-    const intentId = String(anchorIntent?.id || '').trim()
-    if (!intentId) return
+    const currentIntentId = String(anchorIntent?.id || '').trim()
+    if (!currentIntentId) return
 
     setLoading(true)
     try {
-      const latest = await getFundingIntent(intentId)
+      const latest = await getFundingIntent(currentIntentId)
       setAnchorIntent((prev) => ({
         ...(prev || {}),
         id: latest.id,
@@ -239,12 +256,14 @@ const FundWalletScreen = () => {
       } else {
         setNotice({ message: `Current status: ${latest.status}. We will keep checking automatically.`, error: false, data: null })
       }
-    } catch (error: any) {
-      setNotice({ message: error?.message || 'Unable to refresh status', error: true, data: null })
+    } catch (error: unknown) {
+      setNotice({ message: (error instanceof Error && error.message) || 'Unable to refresh status', error: true, data: null })
     } finally {
       setLoading(false)
     }
   }
+
+  const statusToneClass = notice.error ? 'border-red-500 bg-red-950' : 'border-green-500 bg-green-950'
 
   return (
     <View className="flex-1 bg-primary px-4">
@@ -254,16 +273,18 @@ const FundWalletScreen = () => {
 
           <View className="flex-row gap-3 mb-4">
             <TouchableOpacity
+              disabled={lockAnchorForm}
               onPress={() => setMethod('monnify')}
-              className={`flex-1 rounded-xl border p-3 ${method === 'monnify' ? 'border-theme-primary bg-[#0e1a33]' : 'border-gray-700'}`}
+              className={`flex-1 rounded-xl border p-3 ${method === 'monnify' ? 'border-theme-primary bg-[#0e1a33]' : 'border-gray-700'} ${lockAnchorForm ? 'opacity-60' : ''}`}
             >
               <Text className="text-white font-semibold">Card/Checkout (Monnify)</Text>
               <Text className="text-gray-300 text-xs mt-1">Redirect to secure checkout</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
+              disabled={lockAnchorForm}
               onPress={() => setMethod('anchor')}
-              className={`flex-1 rounded-xl border p-3 ${method === 'anchor' ? 'border-theme-primary bg-[#0e1a33]' : 'border-gray-700'}`}
+              className={`flex-1 rounded-xl border p-3 ${method === 'anchor' ? 'border-theme-primary bg-[#0e1a33]' : 'border-gray-700'} ${lockAnchorForm ? 'opacity-60' : ''}`}
             >
               <Text className="text-white font-semibold">Bank Transfer (Anchor)</Text>
               <Text className="text-gray-300 text-xs mt-1">Use pooled transfer account</Text>
@@ -275,6 +296,7 @@ const FundWalletScreen = () => {
             value={formData.amount}
             name="amount"
             keyboardType="numeric"
+            editable={!lockAnchorForm}
             onChangeText={(text: string) => setFormData({ ...formData, amount: text })}
           />
 
@@ -282,16 +304,27 @@ const FundWalletScreen = () => {
             label="Coupon (optional)"
             name="coupon_code"
             value={formData.coupon_code}
+            editable={!lockAnchorForm}
             onChangeText={(text: string) => setFormData({ ...formData, coupon_code: text })}
           />
 
-          <NotificationAlert message={notice.message} data={notice.data} error={notice.error} />
+          {notice.message ? (
+            <View className={`mt-4 rounded-xl border p-3 ${statusToneClass}`}>
+              <Text className={`${notice.error ? 'text-red-200' : 'text-green-100'} text-center`}>{notice.message}</Text>
+            </View>
+          ) : null}
 
-          <TouchableOpacity onPress={handleSubmit} className="bg-theme-primary py-4 mt-6 rounded-xl">
-            <Text className="text-alt font-medium text-center">
-              {method === 'monnify' ? 'Continue to Checkout' : 'Generate Transfer Details'}
-            </Text>
-          </TouchableOpacity>
+          {method === 'monnify' ? (
+            <TouchableOpacity onPress={handleSubmit} className="bg-theme-primary py-4 mt-6 rounded-xl">
+              <Text className="text-alt font-medium text-center">Continue to Checkout</Text>
+            </TouchableOpacity>
+          ) : null}
+
+          {method === 'anchor' && !hasActiveAnchorIntent ? (
+            <TouchableOpacity onPress={handleSubmit} className="bg-theme-primary py-4 mt-6 rounded-xl">
+              <Text className="text-alt font-medium text-center">Generate Transfer Details</Text>
+            </TouchableOpacity>
+          ) : null}
 
           {method === 'anchor' && anchorIntent?.accountNumber ? (
             <View className="border border-gray-700 rounded-xl p-4 mt-5">
@@ -318,9 +351,38 @@ const FundWalletScreen = () => {
                 </TouchableOpacity>
               </View>
 
-              <TouchableOpacity onPress={handleIHaveSentTransfer} className="bg-theme-primary py-3 rounded-xl mt-3">
-                <Text className="text-alt text-center font-medium">I've sent the transfer</Text>
-              </TouchableOpacity>
+              {isAnchorWaiting ? (
+                <TouchableOpacity onPress={handleIHaveSentTransfer} className="bg-theme-primary py-3 rounded-xl mt-3">
+                  <Text className="text-alt text-center font-medium">I&apos;ve sent the transfer</Text>
+                </TouchableOpacity>
+              ) : null}
+
+              {isAnchorCredited ? (
+                <TouchableOpacity
+                  onPress={() =>
+                    router.push({
+                      pathname: '/transaction/receipt',
+                      params: { reference: String(anchorIntent.paymentReference || '') },
+                    } as never)
+                  }
+                  className="bg-green-600 py-3 rounded-xl mt-3"
+                >
+                  <Text className="text-white text-center font-medium">View Receipt</Text>
+                </TouchableOpacity>
+              ) : null}
+
+              {isAnchorExpired ? (
+                <TouchableOpacity
+                  onPress={() => {
+                    setAnchorIntent(null)
+                    creditedNavigatedRef.current = false
+                    setNotice({ message: 'Reference expired. Generate a new transfer reference.', error: true, data: null })
+                  }}
+                  className="border border-theme-primary py-3 rounded-xl mt-3"
+                >
+                  <Text className="text-theme-primary text-center font-medium">Generate New Reference</Text>
+                </TouchableOpacity>
+              ) : null}
             </View>
           ) : null}
 
@@ -328,7 +390,7 @@ const FundWalletScreen = () => {
             <TouchableOpacity
               onPress={() =>
                 router.replace({
-                  pathname: String(returnTo) as any,
+                  pathname: String(returnTo) as never,
                   params: {
                     id: String(id || ''),
                     orderId: String(orderId || ''),
@@ -350,3 +412,5 @@ const FundWalletScreen = () => {
 }
 
 export default FundWalletScreen
+
+
