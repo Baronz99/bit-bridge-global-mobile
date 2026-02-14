@@ -62,7 +62,7 @@ describe('useBillPaymentIntentFlow', () => {
       await hookState.execute({ billTotal: 500, walletBalance: 5000 })
     })
     expect(hookState.uiState).toBe('processing')
-    expect(mockedExecuteIntent).toHaveBeenCalledWith('intent_1')
+    expect(mockedExecuteIntent).toHaveBeenCalledWith('intent_1', { use_commission: false })
 
     await act(async () => {
       jest.advanceTimersByTime(4500)
@@ -78,3 +78,4 @@ describe('useBillPaymentIntentFlow', () => {
     })
   })
 })
+

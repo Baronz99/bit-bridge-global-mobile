@@ -18,8 +18,8 @@ type ExecuteArgs = {
 }
 
 type ExecuteResult =
-  | { kind: 'awaiting_funds'; shortfall: number }
-  | { kind: 'processing' | 'completed' | 'failed' | 'timed_out'; billOrderId?: string | null; message?: string }
+  | { kind: 'awaiting_funds'; shortfall: number; warningCode?: string; warningMessage?: string }
+  | { kind: 'processing' | 'completed' | 'failed' | 'timed_out'; billOrderId?: string | null; message?: string; errorCode?: string; warningCode?: string; warningMessage?: string }
 
 type UseBillPaymentIntentFlowParams = {
   billOrderId?: string | null
@@ -50,6 +50,7 @@ export const useBillPaymentIntentFlow = ({
   const [message, setMessage] = useState<string>('')
   const [shortfall, setShortfall] = useState<number>(0)
   const [isBusy, setIsBusy] = useState<boolean>(false)
+  const [warning, setWarning] = useState<{ code?: string; message?: string } | null>(null)
   const [latestBillOrderId, setLatestBillOrderId] = useState<string | null>(null)
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const pollStartedAtRef = useRef<number | null>(null)
@@ -173,11 +174,18 @@ export const useBillPaymentIntentFlow = ({
     setIsBusy(true)
     try {
       const response = await executeBillPaymentIntent(resolvedIntentId, { use_commission: useCommission })
+      const responseWarning = response?.warning
+      setWarning(responseWarning?.code ? { code: responseWarning.code, message: responseWarning.message } : null)
       if (response?.pending || String(response?.status || '').toLowerCase() === 'pending' || response?.http_status === 202) {
         setUiState('processing')
         setMessage(response?.message || 'Bill payment processing. Checking status...')
         startPolling(resolvedIntentId)
-        return { kind: 'processing', message: response?.message }
+        return {
+          kind: 'processing',
+          message: response?.message,
+          warningCode: responseWarning?.code,
+          warningMessage: responseWarning?.message,
+        }
       }
 
       const status = String(response?.intent?.status || response?.status || '').toLowerCase()
@@ -190,16 +198,38 @@ export const useBillPaymentIntentFlow = ({
         setUiState('completed')
         setMessage(response?.message || 'Bill payment completed.')
         notifyCompleted(responseBillOrderId)
-        return { kind: 'completed', billOrderId: responseBillOrderId, message: response?.message }
+        return {
+          kind: 'completed',
+          billOrderId: responseBillOrderId,
+          message: response?.message,
+          warningCode: responseWarning?.code,
+          warningMessage: responseWarning?.message,
+        }
       }
 
       setUiState('failed')
       setMessage(response?.message || 'Bill payment failed.')
-      return { kind: 'failed', billOrderId: responseBillOrderId, message: response?.message }
+      return {
+        kind: 'failed',
+        billOrderId: responseBillOrderId,
+        message: response?.message,
+        errorCode: response?.error_code,
+        warningCode: responseWarning?.code,
+        warningMessage: responseWarning?.message,
+      }
     } catch (error: any) {
       setUiState('failed')
       setMessage(error?.message || 'Bill payment failed.')
-      return { kind: 'failed', billOrderId: latestBillOrderId, message: error?.message }
+      const warningPayload = error?.warning
+      setWarning(warningPayload?.code ? { code: warningPayload.code, message: warningPayload.message } : null)
+      return {
+        kind: 'failed',
+        billOrderId: latestBillOrderId,
+        message: error?.message,
+        errorCode: error?.code,
+        warningCode: warningPayload?.code,
+        warningMessage: warningPayload?.message,
+      }
     } finally {
       setIsBusy(false)
     }
@@ -210,6 +240,7 @@ export const useBillPaymentIntentFlow = ({
     stopPolling()
     setShortfall(0)
     setMessage('')
+    setWarning(null)
     const seededIntentId = String(initialIntentId || '').trim()
     setIntentId(seededIntentId)
     setLatestBillOrderId(String(billOrderId || '').trim() || null)
@@ -232,6 +263,7 @@ export const useBillPaymentIntentFlow = ({
     intentId,
     uiState,
     message,
+    warning,
     shortfall,
     latestBillOrderId,
     isBusy,

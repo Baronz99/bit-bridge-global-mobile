@@ -224,7 +224,11 @@ export const executeBillPaymentIntent = async (
       }
     }
 
-    throw new Error(respData?.message || errMsg(err, 'Unable to execute bill payment intent'))
+    const enrichedError: any = new Error(respData?.message || errMsg(err, 'Unable to execute bill payment intent'))
+    enrichedError.code = respData?.error_code
+    enrichedError.details = respData?.details
+    enrichedError.warning = respData?.warning
+    throw enrichedError
   }
 }
 
