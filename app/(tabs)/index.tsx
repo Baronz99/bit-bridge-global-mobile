@@ -74,10 +74,12 @@ const formatRelative = (iso: any) => {
 
 const normalizeStatus = (raw: any) => s(raw, 'pending').toLowerCase()
 
-const toBankStatus = (raw: any): 'successful' | 'pending' | 'failed' => {
+const toBankStatus = (raw: any): 'successful' | 'pending' | 'failed' | 'timed_out' => {
   const v = normalizeStatus(raw)
   if (v.includes('success') || v.includes('complete') || v.includes('approved') || v.includes('paid'))
     return 'successful'
+  if (v.includes('timedout') || v.includes('timed_out') || v.includes('timeout'))
+    return 'timed_out'
   if (v.includes('fail') || v.includes('declin') || v.includes('revers') || v.includes('error'))
     return 'failed'
   return 'pending'
@@ -150,16 +152,18 @@ const isMoneyLikeTimelineItem = (t: TimelineItem) => {
 // ---------------------------
 // Bank-grade Home row (compact, unique)
 // ---------------------------
-const StatusPill = ({ status }: { status: 'successful' | 'pending' | 'failed' }) => {
+const StatusPill = ({ status }: { status: 'successful' | 'pending' | 'failed' | 'timed_out' }) => {
   const text =
-    status === 'successful' ? 'Success' : status === 'failed' ? 'Failed' : 'Pending'
+    status === 'successful' ? 'Success' : status === 'failed' ? 'Failed' : status === 'timed_out' ? 'Timed out' : 'Pending'
 
   const klass =
     status === 'successful'
       ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
       : status === 'failed'
         ? 'bg-red-500/15 border-red-500/30 text-red-300'
-        : 'bg-amber-500/15 border-amber-500/30 text-amber-300'
+        : status === 'timed_out'
+          ? 'bg-orange-500/15 border-orange-500/30 text-orange-300'
+          : 'bg-amber-500/15 border-amber-500/30 text-amber-300'
 
   return (
     <View className={`px-2 py-1 rounded-full border ${klass}`}>
@@ -1012,3 +1016,4 @@ const LabelText = ({ label, value }: any) => (
     <Text className="text-white text-center">{value}</Text>
   </View>
 )
+

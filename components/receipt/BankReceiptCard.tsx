@@ -4,7 +4,7 @@ import moneyFormat from '@/utils/moneyFormat'
 import { icons } from '@/constants/icons'
 import { BRAND_NAME } from '@/constants/brand'
 
-type ReceiptStatus = 'successful' | 'pending' | 'failed'
+type ReceiptStatus = 'successful' | 'pending' | 'failed' | 'timed_out'
 
 type ReceiptMeta = {
   channel?: string
@@ -58,6 +58,8 @@ const normalizeStatus = (statusRaw: string) => {
   const s = String(statusRaw || 'pending').toLowerCase()
   if (s.includes('success') || s.includes('complete') || s.includes('approved') || s.includes('paid'))
     return 'successful'
+  if (s.includes('timedout') || s.includes('timed_out') || s.includes('timeout'))
+    return 'timed_out'
   if (s.includes('fail') || s.includes('declin') || s.includes('revers') || s.includes('error'))
     return 'failed'
   return 'pending'
@@ -70,6 +72,9 @@ const statusPill = (statusRaw: string) => {
   }
   if (status === 'failed') {
     return { label: 'Failed', bg: 'bg-red-500/15', border: 'border-red-500/30', text: 'text-red-300' }
+  }
+  if (status === 'timed_out') {
+    return { label: 'Timed out', bg: 'bg-orange-500/15', border: 'border-orange-500/30', text: 'text-orange-300' }
   }
   return { label: 'Pending', bg: 'bg-amber-500/15', border: 'border-amber-500/30', text: 'text-amber-300' }
 }
@@ -517,3 +522,4 @@ const BankReceiptCard = ({
 }
 
 export default BankReceiptCard
+

@@ -33,9 +33,10 @@ const safeNum = (v: unknown, fallback = 0) => {
 
 const normalizeStatus = (value: unknown) => safeStr(value, 'pending').toLowerCase()
 
-const toReceiptStatus = (raw: string): 'successful' | 'pending' | 'failed' => {
+const toReceiptStatus = (raw: string): 'successful' | 'pending' | 'failed' | 'timed_out' => {
   const s = normalizeStatus(raw)
   if (s.includes('success') || s.includes('complete') || s.includes('approved')) return 'successful'
+  if (s.includes('timedout') || s.includes('timed_out') || s.includes('timeout')) return 'timed_out'
   if (s.includes('fail') || s.includes('declin') || s.includes('revers')) return 'failed'
   return 'pending'
 }
@@ -233,3 +234,4 @@ const WalletReceiptScreen = () => {
 }
 
 export default WalletReceiptScreen
+
