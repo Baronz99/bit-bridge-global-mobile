@@ -212,10 +212,11 @@ export const createCard = async (payload: {
   card_limit?: string
   card_pin?: string
 }) => {
+  const endpoint = '/cards/create_card'
   try {
-    const res = await client.post('/cards/create_card', { card: payload })
+    const res = await client.post(endpoint, { card: payload })
     return res.data
   } catch (err: any) {
-    throw new Error(errMsg(err, 'Failed to create card'))
+    throw buildApiError(err, 'Failed to create card', endpoint)
   }
 }

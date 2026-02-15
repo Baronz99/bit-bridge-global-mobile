@@ -23,6 +23,17 @@ const resolveCardRouteId = (payload: any): string | null => {
   return pickCardRouteId(root) || null
 }
 
+const isLikelyNetworkCreateError = (error: any) => {
+  const message = String(error?.message || '').toLowerCase()
+  const code = String(error?.code || '').toLowerCase()
+  return (
+    !error?.response ||
+    code === 'ecconnaborted' ||
+    message.includes('network error') ||
+    message.includes('timeout')
+  )
+}
+
 const CreateCard = () => {
   const router = useRouter()
   const { userProfileData } = useAuth()
@@ -338,6 +349,24 @@ const CreateCard = () => {
       setSuccess(cardRes?.message || 'Card created successfully.')
       if (cardId) setCreatedCardId(String(cardId))
     } catch (error: any) {
+      if (isLikelyNetworkCreateError(error)) {
+        for (let attempt = 0; attempt < 6; attempt += 1) {
+          try {
+            const existing = await getUserCards()
+            const existingCardId = resolveCardRouteId(existing as any)
+            if (existingCardId) {
+              setCreatedCardId(String(existingCardId))
+              setSuccess('Card request completed. Your active card was detected after a network timeout.')
+              setNotice(null)
+              return
+            }
+          } catch {
+            // keep retrying briefly before surfacing fallback error
+          }
+          await new Promise((resolve) => setTimeout(resolve, 1500))
+        }
+      }
+
       const message = buildApiErrorMessage({
         status: error?.response?.status,
         data: error?.response?.data,
@@ -510,6 +539,11 @@ const CreateCard = () => {
               </Text>
             )}
           </TouchableOpacity>
+          {loading ? (
+            <Text className="text-sky-300 text-xs mt-2">
+              Finalizing card request. Please wait...
+            </Text>
+          ) : null}
         </View>
       </KeyboardAvoidWrapper>
 
