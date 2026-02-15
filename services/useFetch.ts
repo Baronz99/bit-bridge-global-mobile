@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { log } from '@/utils/logger'
 
 type AnyFn<T> = () => Promise<T>
 
@@ -61,7 +62,7 @@ const useFetch = <T>(fetchFunction: AnyFn<T>, autoFetch = true) => {
       const url = err?.config?.url
       const respData = err?.response?.data
 
-      console.log('[FETCH ERROR]', {
+      log('[FETCH ERROR]', {
         message,
         status,
         url,

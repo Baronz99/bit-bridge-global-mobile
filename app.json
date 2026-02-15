@@ -2,7 +2,7 @@
   "expo": {
     "name": "BitBridge",
     "slug": "bit-bridge-global-mobile",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/icons/app-icon-1024.png",
     "scheme": "bitbridgeglobal",

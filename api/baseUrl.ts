@@ -1,4 +1,5 @@
 // src/api/baseUrl.ts
+import { log } from '@/utils/logger'
 
 type EnvName = 'staging' | 'production'
 
@@ -71,7 +72,7 @@ const APP_CONFIG = {
 
 export default APP_CONFIG
 
-console.log('[APP_CONFIG]', {
+log('[APP_CONFIG]', {
   env: APP_CONFIG.env,
   root_url: APP_CONFIG.root_url,
   api_base_url: APP_CONFIG.api_base_url,
@@ -81,7 +82,7 @@ if (!isPublicHttpsRoot(envRoot)) {
   const source = isPublicHttpsRoot(rootFromApiBase)
     ? 'EXPO_PUBLIC_API_BASE_URL'
     : 'hardcoded_production_fallback'
-  console.log('[APP_CONFIG_FALLBACK]', {
+  log('[APP_CONFIG_FALLBACK]', {
     reason: 'invalid_or_missing_env_root_url',
     envRoot,
     explicitApiBase,

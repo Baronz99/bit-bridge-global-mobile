@@ -19,6 +19,7 @@ import APP_CONFIG from '@/api/baseUrl'
 import { signup as signupApi } from '@/api/auth'
 import { setEmailForVerification } from '@/auth/tokenstore'
 import { clearAppLockPersisted } from '@/services/appLockStorage'
+import { log } from '@/utils/logger'
 
 type LoginPayload = { email: string; password: string }
 
@@ -102,7 +103,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const bootTrace = useCallback(
     (event: string, extra: Record<string, unknown> = {}) => {
-      console.log('[BOOT_TRACE][AUTH]', {
+      log('[BOOT_TRACE][AUTH]', {
         event,
         hydrated: authHydrated,
         authed: authenticated,
@@ -183,7 +184,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return String(error?.response?.data ?? '').slice(0, 200)
         }
       })()
-      console.log('[AUTH][PROFILE_FETCH_DEBUG]', {
+      log('[AUTH][PROFILE_FETCH_DEBUG]', {
         baseURL: requestBaseURL,
         requestUrl: fullRequestUrl,
         headers: requestHeaders,
@@ -360,7 +361,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error(msg)
       }
 
-      console.log('[AUTH] login', { url: loginUrl, status: res.status })
+      log('[AUTH] login', { url: loginUrl, status: res.status })
 
       const json = res.data || {}
 

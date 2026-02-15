@@ -28,7 +28,6 @@ const ConfirmEmail = () => {
   useEffect(() => {
     ;(async () => {
       const emailadd = await SecureStore.getItemAsync('email')
-      console.log(emailadd)
       setEmail(emailadd)
     })()
   }, [])

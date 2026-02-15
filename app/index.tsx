@@ -6,6 +6,7 @@ import { useAuth } from '../services/useAuth'
 import { useAppLock } from '../services/useAppLock'
 import APP_CONFIG from '@/api/baseUrl'
 import { getLastFatalError, subscribeLastFatalError } from '@/services/fatalError'
+import { DEBUG_ENABLED, log } from '@/utils/logger'
 
 export default function Index() {
   const router = useRouter()
@@ -39,7 +40,7 @@ export default function Index() {
 
   const bootTrace = useCallback(
     (event: string, redirect: string | null = null, extra: Record<string, unknown> = {}) => {
-      console.log('[BOOT_TRACE][INDEX]', {
+      log('[BOOT_TRACE][INDEX]', {
         event,
         hydrated: authHydrated,
         authed: authenticated,
@@ -124,12 +125,16 @@ export default function Index() {
       <ActivityIndicator size="large" color="#FFCC00" />
       <View style={{ height: 12 }} />
       <Text style={{ color: 'white' }}>Booting</Text>
-      <Text style={{ color: '#aaa', marginTop: 6, fontSize: 12 }}>
-        env: {String(process.env.EXPO_PUBLIC_ENV || '')} | navReady: {String(navigationReady)}
-      </Text>
-      <Text style={{ color: '#aaa', marginTop: 6, fontSize: 12 }}>
-        apiBaseUrl: {String(APP_CONFIG.root_url || process.env.EXPO_PUBLIC_API_BASE_URL || '')}
-      </Text>
+      {DEBUG_ENABLED ? (
+        <Text style={{ color: '#aaa', marginTop: 6, fontSize: 12 }}>
+          env: {String(process.env.EXPO_PUBLIC_ENV || '')} | navReady: {String(navigationReady)}
+        </Text>
+      ) : null}
+      {DEBUG_ENABLED ? (
+        <Text style={{ color: '#aaa', marginTop: 6, fontSize: 12 }}>
+          apiBaseUrl: {String(APP_CONFIG.root_url || process.env.EXPO_PUBLIC_API_BASE_URL || '')}
+        </Text>
+      ) : null}
       <Text style={{ color: '#aaa', marginTop: 6, fontSize: 12 }}>
         hydrated: {String(authHydrated)} | loading: {String(loading)} | authed: {String(authenticated)}
       </Text>

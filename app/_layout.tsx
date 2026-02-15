@@ -7,6 +7,7 @@ import { AuthProvider } from '@/services/useAuth'
 import { AppLockProvider } from '../services/useAppLock'
 import { setLastFatalError } from '@/services/fatalError'
 import { FEATURE_TIMELINE } from '@/constants/featureFlags'
+import { log } from '@/utils/logger'
 
 type ErrorBoundaryState = { hasError: boolean; message: string | null }
 
@@ -29,7 +30,7 @@ class RootErrorBoundary extends React.Component<{ children: React.ReactNode }, E
       .join('\n')
       .slice(0, 4000)
     setLastFatalError(payload)
-    console.log('[FATAL][RENDER]', payload)
+    log('[FATAL][RENDER]', payload)
   }
 
   render() {
@@ -49,9 +50,9 @@ class RootErrorBoundary extends React.Component<{ children: React.ReactNode }, E
 
 export default function RootLayout() {
   useEffect(() => {
-    console.log('[BOOT_TRACE][ROOT_LAYOUT]', { event: 'providers_mounted' })
+    log('[BOOT_TRACE][ROOT_LAYOUT]', { event: 'providers_mounted' })
     if (__DEV__) {
-      console.log('[FEATURE_FLAG][TIMELINE]', {
+      log('[FEATURE_FLAG][TIMELINE]', {
         EXPO_PUBLIC_FEATURE_TIMELINE: String(process.env.EXPO_PUBLIC_FEATURE_TIMELINE ?? ''),
         resolved: FEATURE_TIMELINE,
       })
@@ -70,7 +71,7 @@ export default function RootLayout() {
           .join('\n')
           .slice(0, 4000)
         setLastFatalError(payload)
-        console.log('[FATAL][GLOBAL]', payload)
+        log('[FATAL][GLOBAL]', payload)
         if (typeof previousHandler === 'function') {
           previousHandler(error, isFatal)
         }

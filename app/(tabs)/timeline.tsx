@@ -10,6 +10,7 @@ import SkeletonTimeline from '@/components/timeline/SkeletonTimeline'
 import FilterBottomSheet, { TimelineFilterState } from '@/components/timeline/FilterBottomSheet'
 import AppModal from '@/components/modal/Modal'
 import { extractReceiptReference, getTimelineId, isWalletTimelineId } from '@/utils/timelineRefs'
+import { log } from '@/utils/logger'
 
 const PRIMARY_TABS = [
   { key: 'all', label: 'All' },
@@ -134,7 +135,7 @@ const logTimelineSource = (
   list: Record<string, unknown>[],
   extra?: Record<string, unknown>
 ) => {
-  console.log('[TimelineData]', {
+  log('[TimelineData]', {
     SOURCE: source,
     count: list.length,
     first2: list.slice(0, 2),
@@ -305,7 +306,7 @@ const TimelineScreen = () => {
         const kinds = Array.from(
           new Set((list as any[]).map((x) => String(x?.kind || x?.type || '').toLowerCase()))
         ).slice(0, 25)
-        console.log('[Timeline] loaded', { count: (list as any[])?.length, kinds })
+        log('[Timeline] loaded', { count: (list as any[])?.length, kinds })
       }
     } catch {
       setError('Unable to load timeline right now.')
@@ -416,7 +417,7 @@ const TimelineScreen = () => {
       const receiptRef = extractReceiptReference(item as any, { allowWalletTx: true })
       const metaKeys = Object.keys((((item as any)?.meta ?? {}) as any) || {})
 
-      console.log('[Timeline] pressed item', { id, kind, cardId, receiptRef, metaKeys })
+      log('[Timeline] pressed item', { id, kind, cardId, receiptRef, metaKeys })
 
       // 1) CardReceipt only when truly card-linked
       if (cardId && isCardLinkedWalletTxn(item)) {
