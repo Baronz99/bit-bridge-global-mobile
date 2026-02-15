@@ -1,0 +1,58 @@
+[
+  {
+    "id": "01",
+    "headline": "Everyday Payments, Simplified",
+    "sub": "Airtime, data, utility bills, and transfers in one secure app",
+    "proof": "Fast checkout. Real-time status. Reliable delivery.",
+    "chips": ["Airtime", "Data", "Bills", "Transfers"]
+  },
+  {
+    "id": "02",
+    "headline": "Buy Airtime Instantly",
+    "sub": "Top up all major networks in seconds with clear confirmation",
+    "proof": "Built for daily recharge speed and accuracy.",
+    "chips": ["MTN", "Airtel", "Glo", "9mobile"]
+  },
+  {
+    "id": "03",
+    "headline": "Pay Utilities in Seconds",
+    "sub": "Electricity and TV subscriptions with simple, guided flow",
+    "proof": "Provider-ready payment rails with dependable receipts.",
+    "chips": ["Electricity", "Cable TV", "Validation", "Receipts"]
+  },
+  {
+    "id": "04",
+    "headline": "Fund Your Wallet Easily",
+    "sub": "Card checkout and secure bank transfer funding options",
+    "proof": "Purpose-built funding flow with reference tracking.",
+    "chips": ["Monnify", "Anchor", "Bank Transfer", "Card"]
+  },
+  {
+    "id": "05",
+    "headline": "Track Every Transaction",
+    "sub": "A clean activity timeline for wallet, bills, and transfers",
+    "proof": "Know status, amount, and reference at a glance.",
+    "chips": ["Timeline", "Filters", "Status", "History"]
+  },
+  {
+    "id": "06",
+    "headline": "Bank-Grade Security",
+    "sub": "Transaction PIN, biometric unlock, and secure access controls",
+    "proof": "Defensive layers designed to protect every session.",
+    "chips": ["PIN", "Biometrics", "Access Control", "Trust"]
+  },
+  {
+    "id": "07",
+    "headline": "Instant Receipts & Records",
+    "sub": "Structured receipts and proof of payment for every transaction",
+    "proof": "Everything documented for support and reconciliation.",
+    "chips": ["Receipts", "Timeline", "Reference", "Proof"]
+  },
+  {
+    "id": "08",
+    "headline": "Built for Everyday Payments in Africa",
+    "sub": "Modern fintech for fast, secure, and reliable transactions",
+    "proof": "Bit Bridge Global: trusted infrastructure for daily payments.",
+    "chips": ["Fast", "Secure", "Reliable", "Scalable"]
+  }
+]

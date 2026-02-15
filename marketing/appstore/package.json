@@ -1,0 +1,12 @@
+{
+  "name": "bitbridge-appstore-generator",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "export": "node export.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.54.2"
+  }
+}

@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=1242, height=2688, initial-scale=1" />
+    <title>BitBridge App Store Slide 08</title>
+    <link rel="stylesheet" href="../styles/shared.css" />
+  </head>
+  <body>
+    <div class="canvas" data-slide="08">
+      <img class="mesh-a" src="../assets/mesh-a.svg" alt="" />
+      <img class="mesh-b" src="../assets/mesh-b.svg" alt="" />
+
+      <header class="top">
+        <div class="brand">
+          <img id="brandLogo" class="brand-logo" src="../brand/logo.png" alt="BitBridge" />
+          <div class="brand-name">Bit Bridge Global</div>
+        </div>
+        <div class="slide-tag" id="slideTag">Slide 08/08</div>
+      </header>
+
+      <main class="content">
+        <section class="copy-block">
+          <h1 class="headline" id="headline">Everyday Payments, Simplified</h1>
+          <div class="gold-underline"></div>
+          <p class="subhead" id="subhead">Airtime, data, and bills-fast and secure</p>
+          <p class="proof" id="proof">Trusted by thousands of users daily</p>
+          <div class="chips" id="chips">
+            <span class="chip">Airtime</span>
+            <span class="chip">Data</span>
+            <span class="chip">Bills</span>
+          </div>
+        </section>
+
+        <section class="device-wrap">
+          <div class="device">
+            <div class="notch"></div>
+            <div class="screen">
+              <img id="screenShot" src="../inputs/screens/08.png" alt="App screenshot" />
+              <div class="privacy-mask" id="privacyMask"></div>
+              <div class="placeholder" id="placeholder">
+                <div>
+                  <strong>Screenshot Missing</strong>
+                  Add ../inputs/screens/08.png to render this slide with your real app capture.
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer class="footer">
+        <span>bitbridgeglobal.com</span>
+        <span>Secure payments, trusted by design</span>
+      </footer>
+    </div>
+
+    <script>
+      (function () {
+        const canvas = document.querySelector('.canvas');
+        const slideId = String(canvas?.dataset?.slide || '01').padStart(2, '0');
+        const logoEl = document.getElementById('brandLogo');
+        const slideTag = document.getElementById('slideTag');
+        const headlineEl = document.getElementById('headline');
+        const subheadEl = document.getElementById('subhead');
+        const proofEl = document.getElementById('proof');
+        const chipsEl = document.getElementById('chips');
+        const shotEl = document.getElementById('screenShot');
+        const placeholderEl = document.getElementById('placeholder');
+        const privacyMaskEl = document.getElementById('privacyMask');
+
+        const setLogo = () => {
+          const logoCandidates = ['../brand/logo.png', '../brand/logo.svg', '../brand/logo-placeholder.svg'];
+          let idx = 0;
+          const tryNext = () => {
+            if (!logoEl || idx >= logoCandidates.length) return;
+            const src = logoCandidates[idx++];
+            logoEl.src = src;
+            logoEl.onerror = tryNext;
+          };
+          tryNext();
+        };
+
+        const setCopy = async () => {
+          try {
+            const response = await fetch('../inputs/copy.json', { cache: 'no-store' });
+            const slides = await response.json();
+            const row = Array.isArray(slides) ? slides.find((x) => String(x.id).padStart(2, '0') === slideId) : null;
+            if (row) {
+              if (headlineEl && row.headline) headlineEl.textContent = row.headline;
+              if (subheadEl && row.sub) subheadEl.textContent = row.sub;
+              if (proofEl && row.proof) proofEl.textContent = row.proof;
+              if (chipsEl && Array.isArray(row.chips)) {
+                chipsEl.innerHTML = row.chips
+                  .slice(0, 4)
+                  .map((chip) => `<span class=\"chip\">${String(chip)}</span>`)
+                  .join('');
+              }
+            }
+          } catch (_) {
+            // keep defaults when copy file is missing/corrupt
+          }
+        };
+
+        const setScreenshotFallback = () => {
+          if (!shotEl || !placeholderEl) return;
+          shotEl.onerror = function () {
+            shotEl.style.display = 'none';
+            placeholderEl.style.display = 'flex';
+          };
+        };
+
+        if (slideTag) slideTag.textContent = `Slide ${slideId}/08`;
+        setLogo();
+        setCopy();
+        if (privacyMaskEl) { privacyMaskEl.style.display = (slideId === '04') ? 'block' : 'none'; }
+        setScreenshotFallback();
+      })();
+    </script>
+  </body>
+</html>
+
+
+
