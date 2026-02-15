@@ -6,6 +6,7 @@ type ApiError = Error & {
   status?: number
   url?: string
   endpoint?: string
+  code?: string
   response?: any
 }
 
@@ -31,6 +32,7 @@ const buildApiError = (err: any, fallback: string, endpoint: string): ApiError =
   error.status = err?.response?.status
   error.url = err?.config?.url
   error.endpoint = endpoint
+  error.code = err?.response?.data?.code
   error.response = err?.response
   return error
 }

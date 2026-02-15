@@ -58,7 +58,9 @@ export const matchCardByIdentifier = (cards: any[], routeCardId: string) => {
 
 export const isCardNotFoundError = (error: any): boolean => {
   const status = Number(error?.status ?? error?.response?.status)
+  const code = String(error?.code ?? error?.response?.data?.code ?? '').toUpperCase()
   const message = String(error?.message ?? '').toLowerCase()
+  if (code === 'CARD_PROVIDER_MISSING') return true
   if (status === 404) return true
   return (
     message.includes('card not found') ||

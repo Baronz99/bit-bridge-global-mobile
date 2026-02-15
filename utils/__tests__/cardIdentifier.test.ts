@@ -72,6 +72,9 @@ describe('cardIdentifier helpers', () => {
   it('treats 404 and card-not-found messages as invalid-card errors', () => {
     expect(isCardNotFoundError({ response: { status: 404 }, message: 'Not Found' })).toBe(true)
     expect(isCardNotFoundError({ message: 'No card with this ID' })).toBe(true)
+    expect(isCardNotFoundError({ code: 'CARD_PROVIDER_MISSING', message: 'Card is no longer available' })).toBe(
+      true
+    )
     expect(isCardNotFoundError({ message: 'network timeout' })).toBe(false)
   })
 

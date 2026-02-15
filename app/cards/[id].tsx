@@ -30,6 +30,7 @@ import { useAuth } from '@/services/useAuth'
 import { DEBUG_ENABLED } from '@/utils/logger'
 import {
   extractRouteCardId,
+  isCardNotFoundError,
   matchCardByIdentifier,
   shouldShowInvalidCardBanner,
 } from '@/utils/cardIdentifier'
@@ -100,6 +101,18 @@ const formatHistoryLabel = (item: any) => {
   if (lower.includes('refund')) return 'Card refund'
   if (lower.includes('conversion')) return 'Card conversion'
   return raw
+}
+
+const parseUserCardsList = (input: any) => {
+  const payload = input?.data ?? input
+  if (Array.isArray(payload)) return payload.filter(Boolean)
+  if (Array.isArray(payload?.cards)) return payload.cards.filter(Boolean)
+  if (Array.isArray(payload?.data)) return payload.data.filter(Boolean)
+  if (Array.isArray(payload?.data?.cards)) return payload.data.cards.filter(Boolean)
+  if (Array.isArray(payload?.results)) return payload.results.filter(Boolean)
+  if (payload?.card) return [payload.card]
+  if (payload?.card_id) return [payload]
+  return []
 }
 
 const CardDetail = () => {
@@ -277,6 +290,7 @@ const CardDetail = () => {
   const [pinError, setPinError] = useState<string | null>(null)
   const [action, setAction] = useState<CardAction>('fund')
   const [actionLoading, setActionLoading] = useState(false)
+  const [recoveringMissingCard, setRecoveringMissingCard] = useState(false)
 
   // PCI reveal state (must not persist)
   const [cardReveal, setCardReveal] = useState<any | null>(null)
@@ -295,6 +309,23 @@ const CardDetail = () => {
     setNotice(null)
     setPinError(null)
   }
+
+  const recoverFromInvalidCard = useCallback(async () => {
+    setRecoveringMissingCard(true)
+    try {
+      const raw = await getUserCards()
+      const cards = parseUserCardsList(raw)
+      if (cards.length === 0) {
+        router.replace('/cards/create')
+        return
+      }
+      router.replace('/cards')
+    } catch {
+      router.replace('/cards')
+    } finally {
+      setRecoveringMissingCard(false)
+    }
+  }, [router])
 
   const formatStatusTime = (value?: string | null) => {
     if (!value) return '--'
@@ -559,6 +590,8 @@ const CardDetail = () => {
     hasUsableCard,
     error: details.error,
   })
+  const providerMissingFromBalance = isCardNotFoundError(balance.error)
+  const shouldShowProviderMissingRecovery = invalidCardBanner || providerMissingFromBalance
   const showFetchErrorBanner = Boolean(details.error) && !invalidCardBanner && !hasUsableCard
 
   // ----------------------------
@@ -599,15 +632,24 @@ const CardDetail = () => {
         contentContainerStyle={{ paddingBottom: 40 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        {invalidCardBanner ? (
+        {shouldShowProviderMissingRecovery ? (
           <View className="bg-red-500/20 border border-red-500/30 rounded-xl p-3 mt-4">
-            <Text className="text-white font-semibold">Invalid card ID</Text>
+            <Text className="text-white font-semibold">Card no longer available</Text>
             <Text className="text-white/80 mt-1">
-              There is no card with this ID. Go back to Cards and open it again.
+              This card is no longer active. We can refresh and take you to your current card flow.
             </Text>
             <TouchableOpacity
-              onPress={() => router.replace('/cards')}
+              onPress={recoverFromInvalidCard}
+              disabled={recoveringMissingCard}
               className="mt-3 bg-red-600 py-2 rounded-lg"
+            >
+              <Text className="text-white text-center font-medium">
+                {recoveringMissingCard ? 'Checking cards...' : 'Find Active Card'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => router.replace('/cards')}
+              className="mt-2 border border-red-300/40 py-2 rounded-lg"
             >
               <Text className="text-white text-center font-medium">Back to Cards</Text>
             </TouchableOpacity>
