@@ -27,14 +27,14 @@ import FormInput from '@/components/FormInput'
 import TransactionPinModal from '@/components/TransactionPinModal'
 import { getTransactionPinStatus } from '@/api/transactionPin'
 import { useAuth } from '@/services/useAuth'
+import { DEBUG_ENABLED } from '@/utils/logger'
 import {
   extractRouteCardId,
   matchCardByIdentifier,
   shouldShowInvalidCardBanner,
 } from '@/utils/cardIdentifier'
 
-const DEBUG_CARDS =
-  String(process.env.EXPO_PUBLIC_DEBUG_CARDS || '').toLowerCase() === 'true' || __DEV__ === true
+const DEBUG_CARDS = DEBUG_ENABLED
 
 type CardAction = 'fund' | 'unload' | 'reveal'
 type Id = string | number

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ActivityIndicator, TouchableOpacity, View, Text } from 'react-native'
 import { useRootNavigationState, useRouter } from 'expo-router'
-import Constants from 'expo-constants'
 import { useAuth } from '../services/useAuth'
 import { useAppLock } from '../services/useAppLock'
 import APP_CONFIG from '@/api/baseUrl'
@@ -28,11 +27,7 @@ export default function Index() {
   const failsafeTriggeredRef = useRef(false)
   const hasProfile = !!userProfileData
   const [lastFatalError, setLastFatalErrorState] = useState<string | null>(getLastFatalError())
-  const buildProfile =
-    (Constants.expoConfig as any)?.extra?.eas?.buildProfile ||
-    (Constants as any)?.easConfig?.buildProfile ||
-    ''
-  const showFatalDiagnostics = useMemo(() => __DEV__ || buildProfile === 'preview', [buildProfile])
+  const showFatalDiagnostics = useMemo(() => DEBUG_ENABLED, [])
 
   useEffect(() => {
     return subscribeLastFatalError(setLastFatalErrorState)
