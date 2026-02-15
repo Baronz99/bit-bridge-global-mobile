@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ActivityIndicator, TouchableOpacity, View, Text } from 'react-native'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { ActivityIndicator, Image, TouchableOpacity, View, Text } from 'react-native'
 import { useRootNavigationState, useRouter } from 'expo-router'
 import { useAuth } from '../services/useAuth'
 import { useAppLock } from '../services/useAppLock'
-import APP_CONFIG from '@/api/baseUrl'
 import { getLastFatalError, subscribeLastFatalError } from '@/services/fatalError'
 import { DEBUG_ENABLED, log } from '@/utils/logger'
 
@@ -27,7 +26,7 @@ export default function Index() {
   const failsafeTriggeredRef = useRef(false)
   const hasProfile = !!userProfileData
   const [lastFatalError, setLastFatalErrorState] = useState<string | null>(getLastFatalError())
-  const showFatalDiagnostics = useMemo(() => DEBUG_ENABLED, [])
+  const showFatalDiagnostics = DEBUG_ENABLED
 
   useEffect(() => {
     return subscribeLastFatalError(setLastFatalErrorState)
@@ -117,32 +116,31 @@ export default function Index() {
 
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#111' }}>
+      <Image
+        source={require('../assets/logos/bitbridge-logo-clear.png')}
+        style={{ width: 150, height: 150 }}
+        resizeMode="contain"
+      />
+      <View style={{ height: 10 }} />
       <ActivityIndicator size="large" color="#FFCC00" />
-      <View style={{ height: 12 }} />
-      <Text style={{ color: 'white' }}>Booting</Text>
-      {DEBUG_ENABLED ? (
-        <Text style={{ color: '#aaa', marginTop: 6, fontSize: 12 }}>
-          env: {String(process.env.EXPO_PUBLIC_ENV || '')} | navReady: {String(navigationReady)}
-        </Text>
-      ) : null}
-      {DEBUG_ENABLED ? (
-        <Text style={{ color: '#aaa', marginTop: 6, fontSize: 12 }}>
-          apiBaseUrl: {String(APP_CONFIG.root_url || process.env.EXPO_PUBLIC_API_BASE_URL || '')}
-        </Text>
-      ) : null}
-      <Text style={{ color: '#aaa', marginTop: 6, fontSize: 12 }}>
-        hydrated: {String(authHydrated)} | loading: {String(loading)} | authed: {String(authenticated)}
-      </Text>
-      <Text style={{ color: '#aaa', marginTop: 6, fontSize: 12 }}>
-        tokenPresent: {String(!!token)} | profileLoading: {String(profileLoading)} | hasProfile: {String(hasProfile)}
-      </Text>
-      <Text style={{ color: '#aaa', marginTop: 6, fontSize: 12 }}>
-        lastProfileError: {profileError ? String(profileError) : 'none'}
-      </Text>
+      <View style={{ height: 14 }} />
+      <Text style={{ color: 'white', fontSize: 16, fontWeight: '600' }}>Loading your account...</Text>
       {showFatalDiagnostics ? (
-        <Text style={{ color: '#f97316', marginTop: 6, fontSize: 11, paddingHorizontal: 12 }} numberOfLines={8}>
-          lastFatalError: {lastFatalError || 'none'}
-        </Text>
+        <View style={{ marginTop: 8, alignItems: 'center' }}>
+          <Text style={{ color: '#aaa', marginTop: 6, fontSize: 12 }}>
+            hydrated: {String(authHydrated)} | loading: {String(loading)} | authed: {String(authenticated)}
+          </Text>
+          <Text style={{ color: '#aaa', marginTop: 6, fontSize: 12 }}>
+            tokenPresent: {String(!!token)} | profileLoading: {String(profileLoading)} | hasProfile:{' '}
+            {String(hasProfile)}
+          </Text>
+          <Text style={{ color: '#aaa', marginTop: 6, fontSize: 12 }}>
+            lastProfileError: {profileError ? String(profileError) : 'none'}
+          </Text>
+          <Text style={{ color: '#f97316', marginTop: 6, fontSize: 11, paddingHorizontal: 12 }} numberOfLines={8}>
+            lastFatalError: {lastFatalError || 'none'}
+          </Text>
+        </View>
       ) : null}
       <TouchableOpacity
         onPress={() => {
@@ -159,7 +157,7 @@ export default function Index() {
           borderRadius: 8,
         }}
       >
-        <Text style={{ color: '#ddd' }}>{profileLoading ? 'Retrying...' : 'Retry profile fetch'}</Text>
+        <Text style={{ color: '#ddd' }}>{profileLoading ? 'Retrying...' : 'Try again'}</Text>
       </TouchableOpacity>
     </View>
   )
