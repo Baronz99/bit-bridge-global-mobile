@@ -10,6 +10,7 @@ import { useAuth } from '@/services/useAuth'
 import { useAppLock } from '../../services/useAppLock'
 import LoaderScreen from '../LoaderScreen'
 import AppModal from '@/components/modal/Modal'
+import { log } from '@/utils/logger'
 
 const TabIcon = ({ focused, icon }: any) => (
   <View className="items-center justify-center" style={{ height: 32 }}>
@@ -159,7 +160,7 @@ export default function TabsLayout() {
 
   const bootTrace = useCallback(
     (event: string, redirect: string | null = null) => {
-      console.log('[BOOT_TRACE][TABS_GUARD]', {
+      log('[BOOT_TRACE][TABS_GUARD]', {
         event,
         hydrated: authHydrated,
         authed: !!authState?.authenticated,

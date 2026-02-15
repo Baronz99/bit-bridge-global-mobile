@@ -1,11 +1,13 @@
+import { error as loggerError, log as loggerLog, warn as loggerWarn } from '@/utils/logger'
+
 export const log = (...args: unknown[]) => {
-  if (__DEV__) console.log(...args)
+  loggerLog(...args)
 }
 
 export const warn = (...args: unknown[]) => {
-  if (__DEV__) console.warn(...args)
+  loggerWarn(...args)
 }
 
 export const error = (...args: unknown[]) => {
-  if (__DEV__) console.error(...args)
+  loggerError(...args)
 }

@@ -238,74 +238,10 @@ const isPciRevealUrl = (url?: string) => {
 
 const logRequest = (config: InternalAxiosRequestConfig) => {
   if (!DEBUG_API) return
-
-  // ✅ PCI: never log reveal request body (even though it only contains PIN)
-  if (isPciRevealUrl(config.url)) {
-    console.log('[API] request', {
-      method: (config.method || 'get').toUpperCase(),
-      baseURL: config.baseURL,
-      url: config.url,
-      fullUrl: fullUrl(config.baseURL, config.url),
-      note: 'PCI reveal request (body suppressed)',
-      headers: scrubHeaders(config.headers),
-    })
-    return
-  }
-
-  const method = (config.method || 'get').toUpperCase()
-  console.log('[API] request', {
-    method,
-    baseURL: config.baseURL,
-    url: config.url,
-    fullUrl: fullUrl(config.baseURL, config.url),
-    params: scrubSensitiveData(safeJson((config as any).params)),
-    data: scrubSensitiveData(safeJson((config as any).data)),
-    headers: scrubHeaders(config.headers),
-    timeout: (config as any).timeout,
-    skipAuth: (config as any).__skipAuth === true,
-    skipAuthRefresh: (config as any).__skipAuthRefresh === true,
-  })
 }
 
 const logResponse = (config: InternalAxiosRequestConfig | undefined, status?: number, data?: any) => {
   if (!DEBUG_API) return
-
-  const method = (config?.method || 'get').toUpperCase()
-  const url = config?.url
-  const baseURL = config?.baseURL
-
-  // ✅ PCI: never log reveal response body/meta
-  if (isPciRevealUrl(url)) {
-    console.log('[API] response', {
-      method,
-      baseURL,
-      url,
-      fullUrl: fullUrl(baseURL, url),
-      status,
-      note: 'PCI reveal response (body suppressed)',
-    })
-    return
-  }
-
-  // You can expand this list, but keep it careful
-  const shouldMeta =
-    (url?.includes('/cards') && !url?.includes('/pci/cards/')) ||
-    url?.includes('/timeline') ||
-    url?.includes('/login') ||
-    url?.includes('/refresh') ||
-    url?.includes('/payment_processors/get_price_list') ||
-    url?.includes('/provisions') ||
-    url?.includes('/products') ||
-    url?.includes('/payment_processors/')
-
-  console.log('[API] response', {
-    method,
-    baseURL,
-    url,
-    fullUrl: fullUrl(baseURL, url),
-    status,
-    ...(shouldMeta ? { dataMeta: summarizeData(scrubSensitiveData(data)) } : {}),
-  })
 }
 
 // --------------------
@@ -349,8 +285,6 @@ const refreshAccessToken = async (): Promise<string | null> => {
         'Bit-Refresh-Token': refreshToken,
       },
     })
-
-    if (DEBUG_API) console.log('[AUTH] refresh', { url: `${ROOT_URL}/refresh`, status: res.status })
 
     const data = res.data ?? {}
 
@@ -437,24 +371,6 @@ client.interceptors.response.use(
       String(originalRequest?.url || '').includes('/refresh') ||
       !!originalRequest?.headers?.['Bit-Refresh-Token'] ||
       !!originalRequest?.headers?.['bit-refresh-token']
-
-    if (DEBUG_API) {
-      const url = cfg?.url
-      const pciReveal = isPciRevealUrl(url)
-
-      console.log('[API] error', {
-        method: (cfg?.method || 'get').toUpperCase(),
-        baseURL: cfg?.baseURL,
-        url: cfg?.url,
-        fullUrl: fullUrl(cfg?.baseURL, cfg?.url),
-        status,
-        params: scrubSensitiveData(safeJson((cfg as any)?.params)),
-        // ✅ PCI: never show reveal response meta/body
-        ...(pciReveal ? { note: 'PCI reveal error (body suppressed)' } : { responseDataMeta: summarizeData(scrubSensitiveData(error?.response?.data)) }),
-        responseHeaders: scrubHeaders(error?.response?.headers),
-      })
-    }
-
     if (status === 401 && originalRequest && !originalRequest._retry && !isRefreshRequest) {
       originalRequest._retry = true
 
@@ -503,3 +419,5 @@ export const getApiClientDebugSnapshot = () => {
 }
 
 export default client
+
+

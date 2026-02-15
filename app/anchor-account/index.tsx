@@ -14,6 +14,7 @@ import { buildApiErrorMessage } from '@/utils/apiErrorMessage'
 import { useAuth } from '@/services/useAuth'
 import { resolveUserProfile } from '@/services/auth/resolveUserProfile'
 import { isKycAlreadyCompleted } from '@/utils/anchorAccount'
+import { warn } from '@/utils/logger'
 
 const AnchorAccountScreen = () => {
   const params = useLocalSearchParams()
@@ -40,9 +41,7 @@ const AnchorAccountScreen = () => {
 
   const profile = useMemo(() => {
     if (typeof resolveUserProfile !== 'function') {
-      if (__DEV__) {
-        console.warn('[AnchorAccount] resolveUserProfile export missing; using empty profile fallback')
-      }
+      warn('[AnchorAccount] resolveUserProfile export missing; using empty profile fallback')
       return {}
     }
     return resolveUserProfile(userProfileData)

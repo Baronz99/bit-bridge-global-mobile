@@ -1,3 +1,5 @@
+import { log } from '@/utils/logger'
+
 const DEBUG_PERF_FLAG = String(process.env.EXPO_PUBLIC_DEBUG_PERF || '').toLowerCase() === 'true'
 const PERF_ENABLED = __DEV__ || DEBUG_PERF_FLAG
 
@@ -16,7 +18,7 @@ const start = (label: string, meta?: Record<string, unknown>) => {
   } catch {
     // no-op
   }
-  if (meta) console.log('[PERF] start', { label, ...meta })
+  if (meta) log('[PERF] start', { label, ...meta })
 }
 
 const end = (label: string, meta?: Record<string, unknown>) => {
@@ -28,7 +30,7 @@ const end = (label: string, meta?: Record<string, unknown>) => {
   } catch {
     // no-op
   }
-  console.log('[PERF] end', {
+  log('[PERF] end', {
     label,
     duration_ms: typeof durationMs === 'number' ? Number(durationMs.toFixed(1)) : undefined,
     ...meta,
@@ -38,7 +40,7 @@ const end = (label: string, meta?: Record<string, unknown>) => {
 
 const mark = (label: string, meta?: Record<string, unknown>) => {
   if (!PERF_ENABLED) return
-  console.log('[PERF] mark', { label, ...meta })
+  log('[PERF] mark', { label, ...meta })
 }
 
 const enabled = () => PERF_ENABLED

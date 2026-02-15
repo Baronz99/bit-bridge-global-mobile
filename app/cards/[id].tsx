@@ -29,17 +29,12 @@ import { getTransactionPinStatus } from '@/api/transactionPin'
 import { useAuth } from '@/services/useAuth'
 import {
   extractRouteCardId,
-  getCardsApiId,
-  isCardNotFoundError,
   matchCardByIdentifier,
   shouldShowInvalidCardBanner,
 } from '@/utils/cardIdentifier'
 
 const DEBUG_CARDS =
   String(process.env.EXPO_PUBLIC_DEBUG_CARDS || '').toLowerCase() === 'true' || __DEV__ === true
-const DEBUG_CARDS_LOG = String(process.env.EXPO_PUBLIC_DEBUG_CARDS || '').toLowerCase() === 'true'
-const DEBUG_CARD_DETAILS =
-  DEBUG_CARDS || String(process.env.EXPO_PUBLIC_DEBUG_PERF || '').toLowerCase() === '1'
 
 type CardAction = 'fund' | 'unload' | 'reveal'
 type Id = string | number
@@ -119,38 +114,14 @@ const CardDetail = () => {
   // ----------------------------
   const fetchDetails = useCallback(() => {
     if (!cardsApiId) return Promise.resolve({ data: {} } as any)
-    if (DEBUG_CARD_DETAILS) {
-      console.log('[CARD_DETAILS][request]', {
-        routeParam: id,
-        routeCardId,
-        chosenIdentifier: cardsApiId,
-        endpoint: `/cards/${cardsApiId}/details`,
-      })
-    }
     return getCardDetails(cardsApiId)
   }, [cardsApiId, id, routeCardId])
   const fetchBalance = useCallback(() => {
     if (!cardsApiId) return Promise.resolve({ data: {} } as any)
-    if (DEBUG_CARD_DETAILS) {
-      console.log('[CARD_DETAILS][request]', {
-        routeParam: id,
-        routeCardId,
-        chosenIdentifier: cardsApiId,
-        endpoint: `/cards/${cardsApiId}/balance`,
-      })
-    }
     return getCardBalance(cardsApiId)
   }, [cardsApiId, id, routeCardId])
   const fetchHistory = useCallback(() => {
     if (!cardsApiId) return Promise.resolve({ data: [] } as any)
-    if (DEBUG_CARD_DETAILS) {
-      console.log('[CARD_DETAILS][request]', {
-        routeParam: id,
-        routeCardId,
-        chosenIdentifier: cardsApiId,
-        endpoint: `/cards/${cardsApiId}/history`,
-      })
-    }
     return getCardHistory(cardsApiId)
   }, [cardsApiId, id, routeCardId])
   const fetchCardMeta = useCallback(() => getUserCards(), [])
@@ -203,25 +174,6 @@ const CardDetail = () => {
     }
     return null
   }, [cardMetaPayload, cardsApiId, detailPayload])
-
-  useEffect(() => {
-    if (!DEBUG_CARDS_LOG) return
-    const meta: any = (cardMeta as any)?.meta_data ?? (cardMeta as any)?.metaData ?? {}
-    console.log('[CARD_DETAILS][identifier_choice]', {
-      routeParam: id,
-      routeCardId,
-      routeCardsApiId: cardsApiId,
-      selectedCardId: (cardMeta as any)?.id ?? null,
-      selectedProviderCardId: (cardMeta as any)?.card_id ?? null,
-      selectedBridgeCardId:
-        (cardMeta as any)?.bridge_card_id ?? (cardMeta as any)?.bridgecard_id ?? null,
-      selectedProviderId: (cardMeta as any)?.provider_id ?? null,
-      selectedMetaKeys: Object.keys(meta || {}),
-      selectedMetaLocalCardId: meta?.local_card_id ?? meta?.localCardId ?? null,
-      computedCardMetaApiId: getCardsApiId(cardMeta),
-      chosenCardsApiId: cardsApiId,
-    })
-  }, [id, routeCardId, cardMeta, cardsApiId])
 
   const balancePayload = useMemo(() => (balance.data as any)?.data ?? balance.data ?? {}, [balance.data])
 
@@ -461,10 +413,6 @@ const CardDetail = () => {
       // IMPORTANT: use unified status, not detailPayload-only
       const frozenNow = isFrozen
 
-      if (DEBUG_CARDS) {
-        console.log('[CARD] freeze toggle', { cardsApiId, frozenNow })
-      }
-
       if (frozenNow) {
         await unfreezeCard(cardsApiId)
         setNotice('Card unfrozen.')
@@ -625,17 +573,6 @@ const CardDetail = () => {
       const status = String(item?.status || 'pending')
       const breakdown = item?.breakdown || {}
 
-      // SAFE log only
-      if (DEBUG_CARDS) {
-        console.log('[CARD] open receipt', {
-          cardsApiId,
-          reference: String(reference),
-          amount: amountValue,
-          status,
-          hasBreakdown: !!breakdown && Object.keys(breakdown).length > 0,
-        })
-      }
-
       router.push({
         pathname: '/transaction/card-receipt',
         params: {
@@ -652,40 +589,6 @@ const CardDetail = () => {
     },
     [router, cardsApiId]
   )
-
-  useEffect(() => {
-    if (!DEBUG_CARD_DETAILS || !details.error) return
-    const err: any = details.error
-    const statusCode = Number((err?.status ?? err?.response?.status) || 0) || null
-    const endpoint = err?.endpoint || `/cards/${cardsApiId || ':id'}/details`
-    const requestUrl = err?.url || err?.config?.url || null
-
-    console.log('[CARD_DETAILS][error]', {
-      routeParam: id,
-      routeCardId,
-      chosenIdentifier: cardsApiId,
-      endpoint,
-      url: requestUrl,
-      statusCode,
-      notFound: isCardNotFoundError(err),
-      hasUsableCard,
-      invalidCardBanner,
-      message: err?.message,
-      responseBody: err?.response?.data ?? null,
-    })
-  }, [details.error, id, routeCardId, cardsApiId, hasUsableCard, invalidCardBanner])
-
-  useEffect(() => {
-    if (!DEBUG_CARD_DETAILS || !details.data) return
-    console.log('[CARD_DETAILS][response]', {
-      routeParam: id,
-      routeCardId,
-      chosenIdentifier: cardsApiId,
-      endpoint: `/cards/${cardsApiId}/details`,
-      status: (details.data as any)?.status ?? 'ok',
-      payloadKeys: Object.keys(((details.data as any)?.data ?? details.data ?? {}) as any),
-    })
-  }, [details.data, id, routeCardId, cardsApiId])
 
   // ----------------------------
   // Render

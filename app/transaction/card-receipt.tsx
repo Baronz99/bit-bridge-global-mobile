@@ -1,5 +1,5 @@
 // app/transaction/card-receipt.tsx
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useMemo, useState } from 'react'
 import { ActivityIndicator, RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import useFetch from '@/services/useFetch'
@@ -66,10 +66,6 @@ const CardReceipt = () => {
   const currency = safeStr(params.currency, 'USD')
 
   // ✅ ADD LOGGING (top of component)
-  useEffect(() => {
-    console.log('[CardReceipt] mounted', { cardId, reference })
-  }, [cardId, reference])
-
   // Fetch card history for "refresh + confirm"
   const historyFetch = useFetch(
     useCallback(() => {

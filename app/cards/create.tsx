@@ -11,6 +11,7 @@ import { resolveUserProfile } from '@/services/auth/resolveUserProfile'
 import { buildApiErrorMessage } from '@/utils/apiErrorMessage'
 import { pickCardRouteId } from '@/utils/cardIdentifier'
 import AppModal from '@/components/modal/Modal'
+import { warn } from '@/utils/logger'
 
 const resolveCardRouteId = (payload: any): string | null => {
   const root = payload?.data ?? payload
@@ -54,9 +55,7 @@ const CreateCard = () => {
 
   const profileRoot = useMemo(() => {
     if (typeof resolveUserProfile !== 'function') {
-      if (__DEV__) {
-        console.warn('[CreateCard] resolveUserProfile export missing; using empty profile fallback')
-      }
+      warn('[CreateCard] resolveUserProfile export missing; using empty profile fallback')
       return {}
     }
     return resolveUserProfile(userProfileData) || {}

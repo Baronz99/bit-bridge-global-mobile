@@ -11,6 +11,7 @@ import { getTransactionPinStatus } from '@/api/transactionPin'
 import { useAuth } from '@/services/useAuth'
 import moneyFormat from '@/utils/moneyFormat'
 import { apiErrorMessage } from '@/utils/apiErrorMessage'
+import { log } from '@/utils/logger'
 
 const ConvertUsdToNgnScreen = () => {
   const router = useRouter()
@@ -66,15 +67,15 @@ const ConvertUsdToNgnScreen = () => {
       setQuoteLoading(true)
       setPinError(null)
       try {
-        console.log('[TunnelFX] quote USD->NGN start')
+        log('[TunnelFX] quote USD->NGN start')
         const response = await quoteTunnelUsdToNgn(value)
         if (!active) return
         setQuoteData(response)
-        console.log('[TunnelFX] quote USD->NGN success')
+        log('[TunnelFX] quote USD->NGN success')
         setNotice({ message: null, error: false, data: null })
       } catch (error: any) {
         if (!active) return
-        console.log('[TunnelFX] quote USD->NGN failed', {
+        log('[TunnelFX] quote USD->NGN failed', {
           status: error?.response?.status,
         })
         await handleError(error)
@@ -98,10 +99,10 @@ const ConvertUsdToNgnScreen = () => {
     setLoading(true)
     setPinError(null)
     try {
-      console.log('[TunnelFX] convert USD->NGN start')
+      log('[TunnelFX] convert USD->NGN start')
       const response = await convertTunnelUsdToNgn(amountValue, transactionPin, quote?.quote_token)
       setPinModalOpen(false)
-      console.log('[TunnelFX] convert USD->NGN success')
+      log('[TunnelFX] convert USD->NGN success')
       setNotice({
         message: response?.message || 'Conversion successful.',
         error: false,
@@ -110,7 +111,7 @@ const ConvertUsdToNgnScreen = () => {
       setQuoteData(null)
       loadProfile({ force: true })
     } catch (error: any) {
-      console.log('[TunnelFX] convert USD->NGN failed', {
+      log('[TunnelFX] convert USD->NGN failed', {
         status: error?.response?.status,
       })
       await handleError(error, { forPin: true })

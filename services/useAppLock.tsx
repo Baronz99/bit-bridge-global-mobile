@@ -15,6 +15,7 @@ import {
   getAppLockBackgroundAt,
   saveAppLockBackgroundAt,
 } from '@/services/appLockStorage'
+import { log } from '@/utils/logger'
 
 const LOCK_AFTER_MS = Number(process.env.EXPO_PUBLIC_LOCK_AFTER_MS || 180000)
 
@@ -99,7 +100,7 @@ export const AppLockProvider = ({ children }: { children: React.ReactNode }) => 
       if (nextState === 'background' || nextState === 'inactive') {
         const now = Date.now()
         void persistBackground(now)
-        if (__DEV__) console.log('[APP_LOCK] background', { at: now })
+        log('[APP_LOCK] background', { at: now })
         return
       }
 
@@ -116,10 +117,10 @@ export const AppLockProvider = ({ children }: { children: React.ReactNode }) => 
 
         const lastBg = bgRef.current ?? backgroundAt
         const elapsed = lastBg ? Date.now() - lastBg : null
-        if (__DEV__) console.log('[APP_LOCK] resume', { lastBg, elapsed })
+        log('[APP_LOCK] resume', { lastBg, elapsed })
         if (lastBg && elapsed !== null && elapsed >= LOCK_AFTER_MS) {
           setLockedState(true)
-          if (__DEV__) console.log('[APP_LOCK] locked due to idle')
+          log('[APP_LOCK] locked due to idle')
         }
         void clearBackground()
       }
@@ -140,7 +141,7 @@ export const AppLockProvider = ({ children }: { children: React.ReactNode }) => 
       const res = await getTransactionPinStatus()
       const parsed = parsePinStatus(res)
       appLockEnabledRef.current = parsed.shouldLock
-      if (__DEV__) console.log('[APP_LOCK] status', parsed)
+      log('[APP_LOCK] status', parsed)
 
       if (parsed.shouldLock) {
         if (!unlockedSessionRef.current) {
@@ -150,7 +151,7 @@ export const AppLockProvider = ({ children }: { children: React.ReactNode }) => 
         setLockedState(false)
       }
     } catch (e) {
-      if (__DEV__) console.log('[APP_LOCK] status check failed', (e as any)?.message || e)
+      log('[APP_LOCK] status check failed', (e as any)?.message || e)
     } finally {
       statusCheckInFlightRef.current = false
     }

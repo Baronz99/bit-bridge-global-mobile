@@ -8,6 +8,7 @@ import { resolveUserProfile } from '@/services/auth/resolveUserProfile'
 import ScreenContainer from '@/components/ScreenContainer'
 import moneyFormat from '@/utils/moneyFormat'
 import { getCardsApiId } from '@/utils/cardIdentifier'
+import { warn } from '@/utils/logger'
 
 const normalizeLast4 = (value: any) => {
   const digits = String(value ?? '').replace(/\D/g, '')
@@ -42,16 +43,12 @@ const CardsScreen = () => {
   const profileResolution = useMemo(() => {
     try {
       if (typeof resolveUserProfile !== 'function') {
-        if (__DEV__) {
-          console.warn('[Cards] resolveUserProfile export missing; falling back to empty profile')
-        }
+        warn('[Cards] resolveUserProfile export missing; falling back to empty profile')
         return { profileRoot: {}, failed: true }
       }
       return { profileRoot: resolveUserProfile(userProfileData), failed: false }
     } catch (err) {
-      if (__DEV__) {
-        console.warn('[Cards] resolveUserProfile failed', (err as any)?.message || err)
-      }
+      warn('[Cards] resolveUserProfile failed', (err as any)?.message || err)
       return { profileRoot: {}, failed: true }
     }
   }, [userProfileData])

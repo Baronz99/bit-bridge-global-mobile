@@ -35,6 +35,7 @@ import ScreenContainer from '@/components/ScreenContainer'
 import ViewBox from '@/components/view-box/ViewBoxIcon'
 import { FEATURE_LEGACY_HOME } from '@/constants/featureFlags'
 import { getTierFromProfile, isTierEligibleForBankTransfer } from '@/utils/bankTransfer'
+import { log } from '@/utils/logger'
 
 // ---------------------------
 // Types
@@ -245,7 +246,7 @@ export default function Index() {
   const [activityMode, setActivityMode] = useState<'money' | 'all'>('money')
 
   useEffect(() => {
-    console.log('Runtime Versions:', Constants.manifest2?.runtimeVersion)
+    log('Runtime Versions:', Constants.manifest2?.runtimeVersion)
   }, [])
 
   useEffect(() => {

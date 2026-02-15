@@ -22,6 +22,7 @@ import { normalizeAnchorOnboarding, useAnchorOnboarding } from '@/services/useAn
 import AppModal from '@/components/modal/Modal'
 import { isPrimaryTransaction as isPrimaryTransactionFromUtils } from '@/utils/timelineRefs'
 import { getTierFromProfile, isTierEligibleForBankTransfer } from '@/utils/bankTransfer'
+import { warn } from '@/utils/logger'
 
 const REFRESH_TIMEOUT_MS = 15000
 const TX_PAGE_LIMIT = 30
@@ -179,9 +180,7 @@ const WalletScreen = () => {
     if (typeof isPrimaryTransactionFromUtils === 'function') {
       return isPrimaryTransactionFromUtils(item)
     }
-    if (__DEV__) {
-      console.warn('[WalletScreen] isPrimaryTransaction missing/invalid; using fallback')
-    }
+    warn('[WalletScreen] isPrimaryTransaction missing/invalid; using fallback')
     return item?.show_in_primary_feed !== false
   }, [])
 
