@@ -114,11 +114,19 @@ const formatHistoryLabel = (item: any) => {
   const lower = raw.toLowerCase()
   if (lower.includes('virtual card funding')) return 'Funding from Tunnel wallet'
   if (lower.includes('virtual card withdrawal')) return 'Withdrawal to Tunnel wallet'
+  const merchantName = safeStr(item?.merchant?.name, '')
+  if (merchantName) return merchantName
   if (lower.includes('authorization')) return 'Card purchase'
   if (lower.includes('reversal')) return 'Card reversal'
   if (lower.includes('refund')) return 'Card refund'
   if (lower.includes('conversion')) return 'Card conversion'
   return raw
+}
+
+const historyMerchantSubtitle = (item: any) => {
+  const merchant = item?.merchant || {}
+  const parts = [safeStr(merchant?.category, ''), safeStr(merchant?.group, '')].filter(Boolean)
+  return parts.join(' • ')
 }
 
 const parseUserCardsList = (input: any) => {
@@ -948,6 +956,7 @@ const CardDetail = () => {
             const createdAt = item?.created_at || item?.createdAt || ''
             const amountValue = Number(item?.amount ?? 0)
             const description = formatHistoryLabel(item)
+            const merchantSubtitle = historyMerchantSubtitle(item)
             const breakdown = item?.breakdown || {}
 
             return (
@@ -957,6 +966,9 @@ const CardDetail = () => {
                     <Text className="text-gray-200 text-sm">{description}</Text>
                     <Text className="text-gray-300 text-sm">{moneyFormat(amountValue, 'USD')}</Text>
                   </View>
+                  {merchantSubtitle ? (
+                    <Text className="text-gray-500 text-[11px] mt-1">{merchantSubtitle}</Text>
+                  ) : null}
 
                   <Text className="text-gray-500 text-xs mt-1">{createdAt ? formatMaybeDateTime(createdAt) : '--'}</Text>
 
