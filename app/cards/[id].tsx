@@ -129,6 +129,24 @@ const historyMerchantSubtitle = (item: any) => {
   return parts.join(' • ')
 }
 
+const breakdownTransactionFee = (breakdown: any) => {
+  if (!breakdown || typeof breakdown !== 'object') return 0
+
+  const principal = Number(breakdown.principal_usd || 0)
+  const totalDebit = Number(breakdown.total_debit_usd || 0)
+  if (Number.isFinite(totalDebit) && Number.isFinite(principal) && totalDebit > 0 && principal >= 0) {
+    return Math.max(0, totalDebit - principal)
+  }
+
+  const feeSum =
+    Number(breakdown.provider_fee_usd || 0) +
+    Number(breakdown.bitbridge_fee_usd || 0) +
+    Number(breakdown.fx_markup_usd || 0) +
+    Number(breakdown.funding_fee_usd || 0) +
+    Number(breakdown.withdrawal_fee_usd || 0)
+  return Number.isFinite(feeSum) ? Math.max(0, feeSum) : 0
+}
+
 const parseUserCardsList = (input: any) => {
   const payload = input?.data ?? input
   if (Array.isArray(payload)) return payload.filter(Boolean)
@@ -985,9 +1003,9 @@ const CardDetail = () => {
                     breakdown.fx_markup_usd) ? (
                     <View className="mt-2">
                       <LineItem label="Principal" value={moneyFormat(Number(breakdown.principal_usd || 0), 'USD')} />
-                      <LineItem label="Provider fee" value={moneyFormat(Number(breakdown.provider_fee_usd || 0), 'USD')} />
-                      <LineItem label="BitBridge fee" value={moneyFormat(Number(breakdown.bitbridge_fee_usd || 0), 'USD')} />
-                      <LineItem label="FX markup" value={moneyFormat(Number(breakdown.fx_markup_usd || 0), 'USD')} />
+                      {breakdownTransactionFee(breakdown) > 0 ? (
+                        <LineItem label="Transaction fee" value={moneyFormat(breakdownTransactionFee(breakdown), 'USD')} />
+                      ) : null}
                       <LineItem
                         label="Total debit"
                         value={moneyFormat(Number(breakdown.total_debit_usd || 0), 'USD')}
