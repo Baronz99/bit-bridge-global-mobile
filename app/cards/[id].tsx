@@ -16,6 +16,7 @@ import {
   fundCard,
   getCardBalance,
   getCardDetails,
+  getCardFundingStatus,
   getCardHistory,
   getUserCards,
   revealCard,
@@ -53,6 +54,23 @@ const isEncryptedValue = (value?: string | number | null) => {
 const parseAmount = (v: any) => {
   const n = Number(v)
   return Number.isFinite(n) ? n : NaN
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+const normalizeFundingState = (value: any) => {
+  const state = String(value ?? '')
+    .trim()
+    .toLowerCase()
+  if (!state) return null
+  if (['successful', 'success', 'succeeded', 'approved', 'completed', 'complete'].includes(state)) {
+    return 'successful'
+  }
+  if (['failed', 'failure', 'declined', 'error', 'cancelled', 'canceled', 'reversed'].includes(state)) {
+    return 'failed'
+  }
+  if (['pending', 'processing', 'queued', 'initiated', 'in_progress'].includes(state)) return 'pending'
+  return null
 }
 
 const normalizeLast4 = (value: any) => {
@@ -327,6 +345,40 @@ const CardDetail = () => {
     }
   }, [router])
 
+  const pollFundingStatus = useCallback(
+    async ({
+      cardLookupId,
+      reference,
+      maxAttempts = 10,
+      delayMs = 1500,
+    }: {
+      cardLookupId: Id
+      reference: string
+      maxAttempts?: number
+      delayMs?: number
+    }) => {
+      for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+        try {
+          const response = await getCardFundingStatus(cardLookupId, reference)
+          const payload = (response as any)?.data ?? response ?? {}
+          const state = normalizeFundingState(payload?.state || payload?.status || payload?.provider_state)
+
+          if (state === 'successful') return 'successful'
+          if (state === 'failed') return 'failed'
+        } catch {
+          // Ignore transient polling errors and continue polling.
+        }
+
+        if (attempt < maxAttempts - 1) {
+          await sleep(delayMs)
+        }
+      }
+
+      return 'pending'
+    },
+    []
+  )
+
   const formatStatusTime = (value?: string | null) => {
     if (!value) return '--'
     const d = new Date(String(value))
@@ -372,8 +424,25 @@ const CardDetail = () => {
       setPinError(null)
       try {
         if (nextAction === 'fund') {
-          await fundCard({ card_id: bridgeCardId, amount: parseAmount(amount) })
-          setNotice('Card funded successfully.')
+          const response = await fundCard({ card_id: bridgeCardId, amount: parseAmount(amount) })
+          const payload = (response as any)?.data ?? response ?? {}
+          const reference = String(payload?.transaction_reference || '').trim()
+          const cardLookupId = (cardsApiId || bridgeCardId) as Id
+
+          if (reference && cardLookupId) {
+            setNotice('Card funding in progress. Confirming final status...')
+            const fundingState = await pollFundingStatus({ cardLookupId, reference })
+
+            if (fundingState === 'successful') {
+              setNotice('Card funded successfully.')
+            } else if (fundingState === 'failed') {
+              setNotice('Card funding failed. Provider rejected the transaction.')
+            } else {
+              setNotice('Card funding is still processing. Pull to refresh shortly.')
+            }
+          } else {
+            setNotice('Card funding submitted. Pull to refresh shortly.')
+          }
         } else {
           await unloadCard({ card_id: bridgeCardId, amount: parseAmount(amount) })
           setNotice('Card unloaded successfully.')

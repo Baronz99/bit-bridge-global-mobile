@@ -82,6 +82,18 @@ export const getCardHistory = async (id: Id) => {
   }
 }
 
+export const getCardFundingStatus = async (id: Id, reference?: string) => {
+  const endpoint = `/cards/${id}/funding_status`
+  try {
+    const res = await client.get(endpoint, {
+      params: reference ? { reference } : undefined,
+    })
+    return res.data
+  } catch (err: any) {
+    throw buildApiError(err, 'Failed to fetch card funding status', endpoint)
+  }
+}
+
 /**
  * ✅ PCI Reveal (NEW)
  * Backend controller: POST /api/v1/pci/cards/:id/reveal
