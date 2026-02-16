@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { ActivityIndicator, Image, TouchableOpacity, View, Text } from 'react-native'
+import { useCallback, useEffect, useRef } from 'react'
+import { View } from 'react-native'
 import { useRootNavigationState, useRouter } from 'expo-router'
 import { useAuth } from '../services/useAuth'
 import { useAppLock } from '../services/useAppLock'
-import { getLastFatalError, subscribeLastFatalError } from '@/services/fatalError'
-import { DEBUG_ENABLED, log } from '@/utils/logger'
+import { log } from '@/utils/logger'
 
 export default function Index() {
   const router = useRouter()
@@ -19,18 +18,11 @@ export default function Index() {
     token,
     userProfileData,
     onLogout,
-    loadProfile,
   } = useAuth()
   const { locked } = useAppLock()
   const lastRedirectRef = useRef<string | null>(null)
   const failsafeTriggeredRef = useRef(false)
   const hasProfile = !!userProfileData
-  const [lastFatalError, setLastFatalErrorState] = useState<string | null>(getLastFatalError())
-  const showFatalDiagnostics = DEBUG_ENABLED
-
-  useEffect(() => {
-    return subscribeLastFatalError(setLastFatalErrorState)
-  }, [])
 
   const bootTrace = useCallback(
     (event: string, redirect: string | null = null, extra: Record<string, unknown> = {}) => {
@@ -114,51 +106,5 @@ export default function Index() {
     return () => clearTimeout(timeout)
   }, [authHydrated, authenticated, hasProfile, onLogout, safeReplace, bootTrace])
 
-  return (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#111' }}>
-      <Image
-        source={require('../assets/logos/bitbridge-logo-clear.png')}
-        style={{ width: 150, height: 150 }}
-        resizeMode="contain"
-      />
-      <View style={{ height: 10 }} />
-      <ActivityIndicator size="large" color="#FFCC00" />
-      <View style={{ height: 14 }} />
-      <Text style={{ color: 'white', fontSize: 16, fontWeight: '600' }}>Loading your account...</Text>
-      {showFatalDiagnostics ? (
-        <View style={{ marginTop: 8, alignItems: 'center' }}>
-          <Text style={{ color: '#aaa', marginTop: 6, fontSize: 12 }}>
-            hydrated: {String(authHydrated)} | loading: {String(loading)} | authed: {String(authenticated)}
-          </Text>
-          <Text style={{ color: '#aaa', marginTop: 6, fontSize: 12 }}>
-            tokenPresent: {String(!!token)} | profileLoading: {String(profileLoading)} | hasProfile:{' '}
-            {String(hasProfile)}
-          </Text>
-          <Text style={{ color: '#aaa', marginTop: 6, fontSize: 12 }}>
-            lastProfileError: {profileError ? String(profileError) : 'none'}
-          </Text>
-          <Text style={{ color: '#f97316', marginTop: 6, fontSize: 11, paddingHorizontal: 12 }} numberOfLines={8}>
-            lastFatalError: {lastFatalError || 'none'}
-          </Text>
-        </View>
-      ) : null}
-      <TouchableOpacity
-        onPress={() => {
-          if (profileLoading) return
-          bootTrace('manual_retry_profile_fetch')
-          void loadProfile({ force: true })
-        }}
-        style={{
-          marginTop: 12,
-          borderWidth: 1,
-          borderColor: '#555',
-          paddingHorizontal: 14,
-          paddingVertical: 8,
-          borderRadius: 8,
-        }}
-      >
-        <Text style={{ color: '#ddd' }}>{profileLoading ? 'Retrying...' : 'Try again'}</Text>
-      </TouchableOpacity>
-    </View>
-  )
+  return <View style={{ flex: 1, backgroundColor: '#05070D' }} />
 }

@@ -1,13 +1,18 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { Stack } from 'expo-router'
 import { StatusBar, Text, View } from 'react-native'
+import * as SplashScreen from 'expo-splash-screen'
 import './globals.css'
 
 import { AuthProvider } from '@/services/useAuth'
 import { AppLockProvider } from '../services/useAppLock'
+import { useAuth } from '@/services/useAuth'
 import { setLastFatalError } from '@/services/fatalError'
 import { FEATURE_TIMELINE } from '@/constants/featureFlags'
 import { log } from '@/utils/logger'
+import BootScreen from '@/src/components/BootScreen'
+
+void SplashScreen.preventAutoHideAsync().catch(() => {})
 
 type ErrorBoundaryState = { hasError: boolean; message: string | null }
 
@@ -46,6 +51,62 @@ class RootErrorBoundary extends React.Component<{ children: React.ReactNode }, E
     }
     return this.props.children
   }
+}
+
+function StartupGate({ children }: { children: React.ReactNode }) {
+  const { loading, authHydrated, authenticated, userProfileData, profileLoading, loadProfile } = useAuth()
+  const [warmupDone, setWarmupDone] = useState(false)
+  const [hardTimeoutReached, setHardTimeoutReached] = useState(false)
+
+  useEffect(() => {
+    // Hide native splash as soon as JS is ready to render our in-app boot overlay.
+    SplashScreen.hideAsync().catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    if (!authHydrated || loading) {
+      setWarmupDone(false)
+      return () => {
+        cancelled = true
+      }
+    }
+
+    const runWarmup = async () => {
+      // Give warmup requests a strict upper bound so boot never stalls.
+      await Promise.race([
+        authenticated ? loadProfile({ force: false }).catch(() => null) : Promise.resolve(null),
+        new Promise((resolve) => setTimeout(resolve, 2500)),
+      ])
+      if (!cancelled) setWarmupDone(true)
+    }
+
+    void runWarmup()
+    return () => {
+      cancelled = true
+    }
+  }, [authHydrated, loading, authenticated, loadProfile])
+
+  useEffect(() => {
+    const timeout = setTimeout(() => setHardTimeoutReached(true), 8000)
+    return () => clearTimeout(timeout)
+  }, [])
+
+  const appReady = useMemo(() => {
+    if (hardTimeoutReached) return true
+    if (!authHydrated || loading) return false
+    if (!warmupDone) return false
+    if (!authenticated) return true
+    if (userProfileData) return true
+    return !profileLoading
+  }, [hardTimeoutReached, authHydrated, loading, warmupDone, authenticated, userProfileData, profileLoading])
+
+  return (
+    <>
+      {children}
+      <BootScreen visible={!appReady} />
+    </>
+  )
 }
 
 export default function RootLayout() {
@@ -89,15 +150,16 @@ export default function RootLayout() {
     <RootErrorBoundary>
       <AuthProvider>
         <AppLockProvider>
-          <StatusBar hidden={false} barStyle="light-content" backgroundColor="black" />
+          <StartupGate>
+            <StatusBar hidden={false} barStyle="light-content" backgroundColor="black" />
 
-          <Stack
-            screenOptions={{
-              headerTitleStyle: { color: 'orange' },
-              headerStyle: { backgroundColor: '#030014' },
-              headerTintColor: 'white',
-            }}
-          >
+            <Stack
+              screenOptions={{
+                headerTitleStyle: { color: 'orange' },
+                headerStyle: { backgroundColor: '#030014' },
+                headerTintColor: 'white',
+              }}
+            >
         {/* ✅ IMPORTANT:
             Let app/index.tsx decide whether we land in (tabs) or login.
             So we keep both screens, but we do NOT assume (tabs) is the start. */}
@@ -216,7 +278,8 @@ export default function RootLayout() {
         <Stack.Screen name="circles/[id]/invite" options={{ headerTitle: 'Invite Member' }} />
         <Stack.Screen name="confirmEmail" options={{ headerTitle: 'Email Confirmation' }} />
         <Stack.Screen name="confirmation" options={{ headerTitle: 'Confirm Email' }} />
-          </Stack>
+            </Stack>
+          </StartupGate>
         </AppLockProvider>
       </AuthProvider>
     </RootErrorBoundary>
