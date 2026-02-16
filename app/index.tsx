@@ -65,7 +65,7 @@ export default function Index() {
     if (loading) return
 
     if (!authenticated) {
-      safeReplace('/login', 'no_token_after_hydration')
+      safeReplace('/welcome', 'no_token_after_hydration')
       return
     }
 
@@ -99,9 +99,9 @@ export default function Index() {
     const timeout = setTimeout(async () => {
       if (failsafeTriggeredRef.current) return
       failsafeTriggeredRef.current = true
-      bootTrace('failsafe_session_clear', '/login', { reason: 'authed_no_profile_8s_timeout' })
+      bootTrace('failsafe_session_clear', '/welcome', { reason: 'authed_no_profile_8s_timeout' })
       await onLogout()
-      safeReplace('/login', 'failsafe_authed_no_profile_8s')
+      safeReplace('/welcome', 'failsafe_authed_no_profile_8s')
     }, 8000)
     return () => clearTimeout(timeout)
   }, [authHydrated, authenticated, hasProfile, onLogout, safeReplace, bootTrace])
