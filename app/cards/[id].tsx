@@ -970,7 +970,7 @@ const CardDetail = () => {
             <Text className="text-gray-400 text-xs mt-2">No activity yet.</Text>
           ) : null}
 
-          {historyPayload.slice(0, 5).map((item: any, index: number) => {
+          {historyPayload.map((item: any, index: number) => {
             const createdAt = item?.created_at || item?.createdAt || ''
             const amountValue = Number(item?.amount ?? 0)
             const description = formatHistoryLabel(item)
