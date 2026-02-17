@@ -1,0 +1,657 @@
+:root {
+  --navy-1: #050a18;
+  --navy-2: #0b1630;
+  --gold: #d6b15e;
+  --blue: #3d78ff;
+  --teal: #14b8a6;
+  --text: #f7f9ff;
+  --muted: #b8c6e2;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  font-family: "Segoe UI Variable", "Avenir Next", "Segoe UI", sans-serif;
+}
+
+.canvas {
+  position: relative;
+  overflow: hidden;
+  color: var(--text);
+  background: linear-gradient(160deg, var(--navy-1), var(--navy-2));
+}
+
+.bg-layer {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(16px);
+}
+
+.bg-a {
+  width: 500px;
+  height: 500px;
+  top: -220px;
+  right: -140px;
+  background: radial-gradient(circle, rgba(214, 177, 94, 0.35), rgba(214, 177, 94, 0));
+}
+
+.bg-b {
+  width: 650px;
+  height: 650px;
+  left: -280px;
+  bottom: -320px;
+  background: radial-gradient(circle, rgba(61, 120, 255, 0.36), rgba(61, 120, 255, 0));
+}
+
+.bg-noise {
+  position: absolute;
+  inset: 0;
+  opacity: 0.08;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.45) 0.8px, transparent 0.8px);
+  background-size: 3px 3px;
+}
+
+.top {
+  position: absolute;
+  z-index: 3;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logo {
+  object-fit: contain;
+}
+
+.name {
+  font-weight: 760;
+}
+
+.brand-sub {
+  color: var(--muted);
+}
+
+.label-pill {
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.content {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  align-items: center;
+}
+
+.headline {
+  margin: 0;
+}
+
+.copy p {
+  color: var(--muted);
+}
+
+.bullets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.bullet {
+  border-radius: 999px;
+}
+
+.visual {
+  display: flex;
+  justify-content: center;
+}
+
+.phone {
+  position: relative;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  background: #060d1f;
+  box-shadow: 0 25px 80px rgba(0, 0, 0, 0.5), inset 0 0 0 4px rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+
+.notch {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #02050d;
+  z-index: 2;
+}
+
+.screen {
+  position: absolute;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  display: grid;
+  align-content: start;
+}
+
+.screen-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.kicker {
+  color: #9db3df;
+  text-transform: uppercase;
+}
+
+.status {
+  color: #8eead6;
+  border: 1px solid rgba(20, 184, 166, 0.45);
+  background: rgba(20, 184, 166, 0.15);
+  border-radius: 999px;
+}
+
+.card-block,
+.panel,
+.actions {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  background: rgba(7, 18, 40, 0.76);
+}
+
+.card-number {
+  letter-spacing: 1px;
+}
+
+.card-meta {
+  display: flex;
+  justify-content: space-between;
+  color: #bed0f2;
+}
+
+.panel-label,
+.panel-hint {
+  color: #9fb5e1;
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.actions div {
+  text-align: center;
+  border: 1px solid rgba(61, 120, 255, 0.45);
+  background: rgba(61, 120, 255, 0.15);
+  border-radius: 10px;
+  color: #d8e7ff;
+}
+
+.size-square {
+  width: 1080px;
+  height: 1080px;
+}
+
+.size-square .top {
+  left: 52px;
+  right: 52px;
+  top: 48px;
+}
+
+.size-square .logo {
+  width: 46px;
+  height: 46px;
+}
+
+.size-square .name {
+  font-size: 26px;
+}
+
+.size-square .brand-sub {
+  font-size: 13px;
+}
+
+.size-square .label-pill {
+  font-size: 12px;
+  padding: 8px 13px;
+}
+
+.size-square .content {
+  left: 52px;
+  right: 52px;
+  top: 124px;
+  bottom: 48px;
+  grid-template-columns: 1.08fr 0.92fr;
+  gap: 20px;
+}
+
+.size-square .headline {
+  font-size: 74px;
+  line-height: 0.95;
+  letter-spacing: -1.5px;
+}
+
+.size-square .copy p {
+  margin-top: 18px;
+  font-size: 28px;
+}
+
+.size-square .bullet {
+  font-size: 14px;
+  padding: 8px 12px;
+}
+
+.size-square .phone {
+  width: 330px;
+  height: 635px;
+  border-radius: 52px;
+}
+
+.size-square .notch {
+  width: 150px;
+  height: 24px;
+  border-radius: 0 0 13px 13px;
+}
+
+.size-square .screen {
+  inset: 16px;
+  border-radius: 38px;
+  padding: 20px 15px 14px;
+  gap: 11px;
+}
+
+.size-square .screen-title {
+  font-size: 24px;
+  font-weight: 760;
+}
+
+.size-square .kicker {
+  font-size: 11px;
+  letter-spacing: 1px;
+}
+
+.size-square .status {
+  font-size: 10px;
+  padding: 6px 9px;
+}
+
+.size-square .card-block,
+.size-square .panel,
+.size-square .actions {
+  padding: 12px;
+}
+
+.size-square .card-type {
+  font-size: 10px;
+}
+
+.size-square .card-number {
+  margin-top: 7px;
+  font-size: 19px;
+}
+
+.size-square .card-meta {
+  margin-top: 9px;
+  font-size: 11px;
+}
+
+.size-square .panel-value {
+  margin-top: 6px;
+  font-size: 29px;
+  font-weight: 760;
+}
+
+.size-square .panel-label,
+.size-square .panel-hint {
+  font-size: 11px;
+}
+
+.size-square .actions div {
+  font-size: 11px;
+  padding: 8px 5px;
+}
+
+.size-story {
+  width: 1080px;
+  height: 1920px;
+}
+
+.size-story .top {
+  left: 64px;
+  right: 64px;
+  top: 62px;
+}
+
+.size-story .logo {
+  width: 56px;
+  height: 56px;
+}
+
+.size-story .name {
+  font-size: 32px;
+}
+
+.size-story .brand-sub {
+  font-size: 15px;
+}
+
+.size-story .label-pill {
+  font-size: 13px;
+  padding: 10px 15px;
+}
+
+.size-story .content {
+  left: 64px;
+  right: 64px;
+  top: 178px;
+  bottom: 86px;
+  grid-template-columns: 1fr;
+  grid-template-rows: auto 1fr;
+  gap: 38px;
+}
+
+.size-story .headline {
+  font-size: 98px;
+  line-height: 0.92;
+  letter-spacing: -2px;
+}
+
+.size-story .copy p {
+  margin-top: 20px;
+  font-size: 40px;
+}
+
+.size-story .bullet {
+  font-size: 18px;
+  padding: 10px 15px;
+}
+
+.size-story .phone {
+  width: 500px;
+  height: 960px;
+  border-radius: 70px;
+}
+
+.size-story .notch {
+  width: 208px;
+  height: 30px;
+  border-radius: 0 0 16px 16px;
+}
+
+.size-story .screen {
+  inset: 22px;
+  border-radius: 50px;
+  padding: 30px 22px 24px;
+  gap: 15px;
+}
+
+.size-story .screen-title {
+  font-size: 38px;
+  font-weight: 760;
+}
+
+.size-story .kicker {
+  font-size: 16px;
+  letter-spacing: 1px;
+}
+
+.size-story .status {
+  font-size: 14px;
+  padding: 8px 12px;
+}
+
+.size-story .card-block,
+.size-story .panel,
+.size-story .actions {
+  padding: 18px;
+}
+
+.size-story .card-type {
+  font-size: 13px;
+}
+
+.size-story .card-number {
+  margin-top: 8px;
+  font-size: 29px;
+}
+
+.size-story .card-meta {
+  margin-top: 12px;
+  font-size: 15px;
+}
+
+.size-story .panel-value {
+  margin-top: 8px;
+  font-size: 45px;
+  font-weight: 760;
+}
+
+.size-story .panel-label,
+.size-story .panel-hint {
+  font-size: 14px;
+}
+
+.size-story .actions div {
+  font-size: 15px;
+  padding: 12px 8px;
+}
+
+.size-landscape {
+  width: 1200px;
+  height: 628px;
+}
+
+.size-landscape .top {
+  left: 40px;
+  right: 40px;
+  top: 32px;
+}
+
+.size-landscape .logo {
+  width: 34px;
+  height: 34px;
+}
+
+.size-landscape .name {
+  font-size: 20px;
+}
+
+.size-landscape .brand-sub {
+  font-size: 11px;
+}
+
+.size-landscape .label-pill {
+  font-size: 10px;
+  padding: 6px 10px;
+}
+
+.size-landscape .content {
+  left: 40px;
+  right: 40px;
+  top: 82px;
+  bottom: 32px;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 14px;
+}
+
+.size-landscape .headline {
+  font-size: 56px;
+  line-height: 0.94;
+}
+
+.size-landscape .copy p {
+  margin-top: 14px;
+  font-size: 24px;
+}
+
+.size-landscape .bullet {
+  font-size: 12px;
+  padding: 6px 9px;
+}
+
+.size-landscape .phone {
+  width: 236px;
+  height: 460px;
+  border-radius: 42px;
+}
+
+.size-landscape .notch {
+  width: 106px;
+  height: 18px;
+  border-radius: 0 0 10px 10px;
+}
+
+.size-landscape .screen {
+  inset: 10px;
+  border-radius: 32px;
+  padding: 14px 10px 10px;
+  gap: 7px;
+}
+
+.size-landscape .screen-title {
+  font-size: 18px;
+  font-weight: 760;
+}
+
+.size-landscape .kicker {
+  font-size: 9px;
+}
+
+.size-landscape .status {
+  font-size: 8px;
+  padding: 4px 7px;
+}
+
+.size-landscape .card-block,
+.size-landscape .panel,
+.size-landscape .actions {
+  padding: 8px;
+  border-radius: 11px;
+}
+
+.size-landscape .card-type {
+  font-size: 8px;
+}
+
+.size-landscape .card-number {
+  margin-top: 4px;
+  font-size: 14px;
+}
+
+.size-landscape .card-meta {
+  margin-top: 6px;
+  font-size: 9px;
+}
+
+.size-landscape .panel-value {
+  margin-top: 4px;
+  font-size: 21px;
+  font-weight: 760;
+}
+
+.size-landscape .panel-label,
+.size-landscape .panel-hint {
+  font-size: 8px;
+}
+
+.size-landscape .actions {
+  gap: 5px;
+}
+
+.size-landscape .actions div {
+  font-size: 8px;
+  padding: 6px 3px;
+}
+
+.concept-editorial .headline {
+  max-width: 540px;
+}
+
+.concept-editorial .label-pill {
+  border: 1px solid rgba(214, 177, 94, 0.45);
+  background: rgba(214, 177, 94, 0.14);
+  color: #f1dba6;
+}
+
+.concept-editorial .bullet {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.concept-editorial .screen {
+  background: linear-gradient(180deg, #102148, #0a1938);
+}
+
+.concept-glass .canvas,
+.concept-glass {
+  background:
+    radial-gradient(700px 480px at 14% 10%, rgba(61, 120, 255, 0.28), transparent 70%),
+    radial-gradient(620px 420px at 88% 84%, rgba(214, 177, 94, 0.22), transparent 72%),
+    linear-gradient(150deg, #081128, #102951);
+}
+
+.concept-glass .label-pill {
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.12);
+  color: #e7efff;
+  backdrop-filter: blur(8px);
+}
+
+.concept-glass .bullet {
+  border: 1px solid rgba(61, 120, 255, 0.4);
+  background: rgba(61, 120, 255, 0.17);
+}
+
+.concept-glass .phone {
+  transform: rotate(-3deg);
+}
+
+.concept-glass .screen {
+  background:
+    linear-gradient(180deg, rgba(13, 29, 62, 0.8), rgba(11, 24, 52, 0.8)),
+    linear-gradient(130deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0));
+  backdrop-filter: blur(6px);
+}
+
+.concept-grid .bg-noise {
+  opacity: 0;
+}
+
+.concept-grid .canvas::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(to right, rgba(157, 179, 223, 0.12) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(157, 179, 223, 0.12) 1px, transparent 1px);
+  background-size: 38px 38px;
+  pointer-events: none;
+  opacity: 0.25;
+}
+
+.concept-grid .label-pill {
+  border: 1px solid rgba(20, 184, 166, 0.48);
+  background: rgba(20, 184, 166, 0.15);
+  color: #8bead4;
+}
+
+.concept-grid .bullet {
+  border: 1px solid rgba(20, 184, 166, 0.46);
+  background: rgba(20, 184, 166, 0.1);
+}
+
+.concept-grid .phone {
+  transform: rotate(2deg);
+}
+
+.concept-grid .screen {
+  background: linear-gradient(180deg, #0a1a3c, #07142d);
+}

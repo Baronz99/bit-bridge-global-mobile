@@ -22,6 +22,10 @@ export const updateKycDocuments = async (payload: KycDocumentsPayload) => {
     form.append('user[id_type]', payload.id_type)
   }
 
+  if (payload.nin) {
+    form.append('user[id_number]', payload.nin)
+  }
+
   if (payload.user_profile_id) {
     form.append('user[user_profile_attributes][id]', payload.user_profile_id)
   }

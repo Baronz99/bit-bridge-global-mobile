@@ -1,0 +1,654 @@
+:root {
+  --navy-0: #050a18;
+  --navy-1: #0b1630;
+  --gold: #d6b15e;
+  --blue: #3d78ff;
+  --teal: #14b8a6;
+  --mint: #6ef3df;
+  --text: #f8fbff;
+  --muted: #b8c9e8;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  font-family: "Segoe UI Variable", "SF Pro Display", "Avenir Next", sans-serif;
+}
+
+.canvas {
+  position: relative;
+  overflow: hidden;
+  color: var(--text);
+  background: linear-gradient(156deg, var(--navy-0), var(--navy-1));
+}
+
+.bg {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(18px);
+}
+
+.bg-a {
+  width: 600px;
+  height: 600px;
+  top: -280px;
+  right: -180px;
+  background: radial-gradient(circle, rgba(214, 177, 94, 0.32), rgba(214, 177, 94, 0));
+}
+
+.bg-b {
+  width: 760px;
+  height: 760px;
+  left: -360px;
+  bottom: -380px;
+  background: radial-gradient(circle, rgba(61, 120, 255, 0.34), rgba(61, 120, 255, 0));
+}
+
+.texture {
+  position: absolute;
+  inset: 0;
+  opacity: 0.08;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.4) 0.9px, transparent 0.9px);
+  background-size: 3px 3px;
+}
+
+.top {
+  position: absolute;
+  z-index: 3;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logo {
+  object-fit: contain;
+}
+
+.brand-name {
+  font-weight: 760;
+}
+
+.brand-sub {
+  color: var(--muted);
+}
+
+.tag {
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.content {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  align-items: center;
+}
+
+.headline {
+  margin: 0;
+  line-height: 0.95;
+  letter-spacing: -1.4px;
+}
+
+.subtext {
+  color: var(--muted);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.chip {
+  border-radius: 999px;
+}
+
+.visual {
+  display: flex;
+  justify-content: center;
+}
+
+.device {
+  position: relative;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  background: #070d1f;
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.56), inset 0 0 0 4px rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.island {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #02060e;
+  z-index: 2;
+}
+
+.screen {
+  position: absolute;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  display: grid;
+  align-content: start;
+}
+
+.hero-card,
+.card {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(5, 15, 33, 0.74);
+  border-radius: 16px;
+}
+
+.eyebrow,
+.card-title {
+  text-transform: uppercase;
+  color: #9fb5e1;
+}
+
+.subtitle {
+  color: #acc0e8;
+}
+
+.disco-grid {
+  margin-top: 9px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+
+.disco {
+  text-align: center;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.disco.active {
+  border-color: rgba(214, 177, 94, 0.52);
+  background: rgba(214, 177, 94, 0.2);
+  color: #f1dba7;
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  color: #b8caee;
+}
+
+.row strong {
+  color: #f2f7ff;
+}
+
+.row .ok {
+  color: var(--mint);
+}
+
+.cta {
+  text-align: center;
+  border-radius: 11px;
+  background: linear-gradient(90deg, #3d78ff, #2755d5);
+}
+
+.size-square {
+  width: 1080px;
+  height: 1080px;
+}
+
+.size-square .top {
+  left: 52px;
+  right: 52px;
+  top: 44px;
+}
+
+.size-square .logo {
+  width: 46px;
+  height: 46px;
+}
+
+.size-square .brand-name {
+  font-size: 26px;
+}
+
+.size-square .brand-sub {
+  font-size: 13px;
+}
+
+.size-square .tag {
+  font-size: 12px;
+  padding: 8px 13px;
+}
+
+.size-square .content {
+  left: 52px;
+  right: 52px;
+  top: 118px;
+  bottom: 44px;
+  grid-template-columns: 1.06fr 0.94fr;
+  gap: 24px;
+}
+
+.size-square .headline {
+  font-size: 71px;
+}
+
+.size-square .subtext {
+  margin-top: 16px;
+  font-size: 27px;
+}
+
+.size-square .chip {
+  font-size: 14px;
+  padding: 8px 12px;
+}
+
+.size-square .device {
+  width: 332px;
+  height: 676px;
+  border-radius: 56px;
+}
+
+.size-square .island {
+  width: 122px;
+  height: 28px;
+  top: 12px;
+  border-radius: 18px;
+}
+
+.size-square .screen {
+  inset: 10px;
+  border-radius: 44px;
+  padding: 30px 14px 14px;
+  gap: 10px;
+}
+
+.size-square .hero-card,
+.size-square .card {
+  padding: 11px;
+}
+
+.size-square .eyebrow,
+.size-square .card-title {
+  font-size: 10px;
+  letter-spacing: 0.8px;
+}
+
+.size-square .title {
+  margin-top: 4px;
+  font-size: 24px;
+  font-weight: 760;
+}
+
+.size-square .subtitle {
+  margin-top: 4px;
+  font-size: 11px;
+}
+
+.size-square .disco,
+.size-square .row,
+.size-square .cta {
+  font-size: 11px;
+  padding: 8px;
+}
+
+.size-square .row {
+  margin-top: 6px;
+  padding: 0;
+}
+
+.size-square .cta {
+  margin-top: 10px;
+  font-weight: 700;
+}
+
+.size-story {
+  width: 1080px;
+  height: 1920px;
+}
+
+.size-story .top {
+  left: 64px;
+  right: 64px;
+  top: 62px;
+}
+
+.size-story .logo {
+  width: 56px;
+  height: 56px;
+}
+
+.size-story .brand-name {
+  font-size: 32px;
+}
+
+.size-story .brand-sub {
+  font-size: 15px;
+}
+
+.size-story .tag {
+  font-size: 13px;
+  padding: 10px 15px;
+}
+
+.size-story .content {
+  left: 64px;
+  right: 64px;
+  top: 172px;
+  bottom: 86px;
+  grid-template-columns: 1fr;
+  grid-template-rows: auto 1fr;
+  gap: 36px;
+}
+
+.size-story .headline {
+  font-size: 95px;
+  letter-spacing: -2px;
+}
+
+.size-story .subtext {
+  margin-top: 18px;
+  font-size: 39px;
+}
+
+.size-story .chip {
+  font-size: 18px;
+  padding: 10px 15px;
+}
+
+.size-story .device {
+  width: 500px;
+  height: 1024px;
+  border-radius: 79px;
+}
+
+.size-story .island {
+  width: 174px;
+  height: 38px;
+  top: 16px;
+  border-radius: 26px;
+}
+
+.size-story .screen {
+  inset: 14px;
+  border-radius: 64px;
+  padding: 40px 22px 22px;
+  gap: 14px;
+}
+
+.size-story .hero-card,
+.size-story .card {
+  padding: 16px;
+  border-radius: 20px;
+}
+
+.size-story .eyebrow,
+.size-story .card-title {
+  font-size: 14px;
+}
+
+.size-story .title {
+  margin-top: 6px;
+  font-size: 34px;
+  font-weight: 760;
+}
+
+.size-story .subtitle {
+  margin-top: 6px;
+  font-size: 15px;
+}
+
+.size-story .disco,
+.size-story .row,
+.size-story .cta {
+  font-size: 15px;
+  padding: 12px;
+}
+
+.size-story .row {
+  margin-top: 9px;
+  padding: 0;
+}
+
+.size-story .cta {
+  margin-top: 13px;
+  font-weight: 700;
+}
+
+.size-landscape {
+  width: 1200px;
+  height: 628px;
+}
+
+.size-landscape .top {
+  left: 38px;
+  right: 38px;
+  top: 30px;
+}
+
+.size-landscape .logo {
+  width: 34px;
+  height: 34px;
+}
+
+.size-landscape .brand-name {
+  font-size: 20px;
+}
+
+.size-landscape .brand-sub {
+  font-size: 11px;
+}
+
+.size-landscape .tag {
+  font-size: 10px;
+  padding: 6px 10px;
+}
+
+.size-landscape .content {
+  left: 38px;
+  right: 38px;
+  top: 80px;
+  bottom: 30px;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 14px;
+}
+
+.size-landscape .headline {
+  font-size: 56px;
+}
+
+.size-landscape .subtext {
+  margin-top: 12px;
+  font-size: 24px;
+}
+
+.size-landscape .chip {
+  font-size: 12px;
+  padding: 6px 9px;
+}
+
+.size-landscape .device {
+  width: 246px;
+  height: 500px;
+  border-radius: 41px;
+}
+
+.size-landscape .island {
+  width: 82px;
+  height: 18px;
+  top: 8px;
+  border-radius: 12px;
+}
+
+.size-landscape .screen {
+  inset: 8px;
+  border-radius: 31px;
+  padding: 21px 10px 10px;
+  gap: 7px;
+}
+
+.size-landscape .hero-card,
+.size-landscape .card {
+  padding: 8px;
+  border-radius: 11px;
+}
+
+.size-landscape .eyebrow,
+.size-landscape .card-title {
+  font-size: 8px;
+}
+
+.size-landscape .title {
+  margin-top: 2px;
+  font-size: 17px;
+  font-weight: 760;
+}
+
+.size-landscape .subtitle {
+  margin-top: 2px;
+  font-size: 8px;
+}
+
+.size-landscape .disco,
+.size-landscape .row,
+.size-landscape .cta {
+  font-size: 8px;
+  padding: 6px;
+}
+
+.size-landscape .row {
+  margin-top: 4px;
+  padding: 0;
+}
+
+.size-landscape .cta {
+  margin-top: 6px;
+  font-weight: 700;
+}
+
+.concept-gridpulse .canvas,
+.concept-gridpulse {
+  background:
+    radial-gradient(840px 560px at 12% 10%, rgba(61, 120, 255, 0.26), transparent 68%),
+    radial-gradient(760px 520px at 86% 84%, rgba(214, 177, 94, 0.2), transparent 70%),
+    linear-gradient(156deg, #040d22, #0b1b3e);
+}
+
+.concept-gridpulse::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.23;
+  background-image:
+    linear-gradient(to right, rgba(157, 179, 223, 0.16) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(157, 179, 223, 0.16) 1px, transparent 1px);
+  background-size: 38px 38px;
+}
+
+.concept-gridpulse .tag {
+  border: 1px solid rgba(214, 177, 94, 0.5);
+  background: rgba(214, 177, 94, 0.14);
+  color: #f2dca8;
+}
+
+.concept-gridpulse .chip {
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.concept-gridpulse .screen {
+  background: linear-gradient(180deg, #122957, #0a1c3c);
+}
+
+.concept-lumen {
+  background:
+    linear-gradient(130deg, rgba(255, 219, 128, 0.24) 0%, rgba(255, 219, 128, 0) 30%),
+    radial-gradient(800px 540px at 20% 88%, rgba(61, 120, 255, 0.22), transparent 72%),
+    linear-gradient(160deg, #19120b, #352918);
+}
+
+.concept-lumen::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    110deg,
+    rgba(255, 219, 128, 0.07) 0px,
+    rgba(255, 219, 128, 0.07) 1px,
+    transparent 1px,
+    transparent 14px
+  );
+  opacity: 0.32;
+}
+
+.concept-lumen .tag {
+  border: 1px solid rgba(255, 228, 170, 0.4);
+  background: rgba(255, 228, 170, 0.16);
+  color: #ffe8b3;
+}
+
+.concept-lumen .chip {
+  border: 1px solid rgba(255, 228, 170, 0.34);
+  background: rgba(255, 228, 170, 0.12);
+  color: #ffefcb;
+}
+
+.concept-lumen .device {
+  transform: rotate(-2deg);
+}
+
+.concept-lumen .screen {
+  background: linear-gradient(180deg, #3d2e1b, #23190f);
+}
+
+.concept-current {
+  background:
+    radial-gradient(780px 540px at 16% 8%, rgba(20, 184, 166, 0.32), transparent 72%),
+    radial-gradient(700px 480px at 88% 86%, rgba(61, 120, 255, 0.2), transparent 70%),
+    linear-gradient(160deg, #031419, #0b2d36);
+}
+
+.concept-current::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.34;
+  background: linear-gradient(
+    160deg,
+    transparent 0%,
+    transparent 30%,
+    rgba(110, 243, 223, 0.18) 30.5%,
+    transparent 33%,
+    transparent 60%,
+    rgba(110, 243, 223, 0.16) 60.5%,
+    transparent 63%,
+    transparent 100%
+  );
+}
+
+.concept-current .tag {
+  border: 1px solid rgba(20, 184, 166, 0.55);
+  background: rgba(20, 184, 166, 0.18);
+  color: #9df3e5;
+}
+
+.concept-current .chip {
+  border: 1px solid rgba(20, 184, 166, 0.42);
+  background: rgba(20, 184, 166, 0.14);
+  color: #bcfaef;
+}
+
+.concept-current .screen {
+  background: linear-gradient(180deg, #0d343f, #0a232b);
+}

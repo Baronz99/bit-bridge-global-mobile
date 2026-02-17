@@ -1,6 +1,7 @@
 import { Text, View } from 'react-native'
 import React from 'react'
 import moneyFormat from '@/utils/moneyFormat'
+import { resolveElectricityIdentity } from '@/utils/electricityIdentity'
 
 const Summary = ({ data, applyCommission }: { data: any; applyCommission: boolean }) => {
   const serviceType = String(data?.service_type || '').toUpperCase()
@@ -15,6 +16,7 @@ const Summary = ({ data, applyCommission }: { data: any; applyCommission: boolea
   const hasDiscount =
     Number.isFinite(discountedAmount) && discountedAmount >= 0 && discountedAmount <= amount
   const payableAmount = applyCommission && hasDiscount ? discountedAmount : amount
+  const electricityIdentity = resolveElectricityIdentity(data)
 
   return (
     <View className="space-y-3 overflow-hidden">
@@ -45,8 +47,12 @@ const Summary = ({ data, applyCommission }: { data: any; applyCommission: boolea
       )}
 
       <SummaryRow label="Description" value={data?.description || 'No description'} />
-      {data?.name && <SummaryRow label="Name" value={data?.name || 'No description'} />}
-      {data?.address && <SummaryRow label="Address" value={data?.address || 'No description'} />}
+      {electricityIdentity.customerName && (
+        <SummaryRow label="Customer Name" value={electricityIdentity.customerName} />
+      )}
+      {electricityIdentity.serviceAddress && (
+        <SummaryRow label="Address" value={electricityIdentity.serviceAddress} />
+      )}
     </View>
   )
 }

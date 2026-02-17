@@ -3,6 +3,7 @@ import { Image, Text, TouchableOpacity, View } from 'react-native'
 import moneyFormat from '@/utils/moneyFormat'
 import { icons } from '@/constants/icons'
 import { BRAND_NAME } from '@/constants/brand'
+import { resolveElectricityIdentity } from '@/utils/electricityIdentity'
 
 type ReceiptStatus = 'successful' | 'pending' | 'failed' | 'timed_out'
 
@@ -239,8 +240,9 @@ const BankReceiptCard = ({
   const isElectricityReceipt = serviceType === 'ELECTRICITY'
   const electricityToken = clean(meta?.token)
   const electricityUnits = clean(meta?.units)
-  const electricityCustomerName = clean(meta?.customerName) || clean(meta?.customer_name) || clean(meta?.name)
-  const electricityAddress = clean(meta?.address)
+  const electricityIdentity = resolveElectricityIdentity({ meta, parties })
+  const electricityCustomerName = electricityIdentity.customerName
+  const electricityAddress = electricityIdentity.serviceAddress
   const electricityMeter = clean(meta?.meter_number) || clean(parties?.recipient)
   const electricityMeterType = clean(meta?.meter_type)
   const electricityBiller = clean(meta?.biller) || clean(parties?.biller) || clean(provider?.name)
@@ -305,7 +307,7 @@ const BankReceiptCard = ({
     { label: referenceLabel, value: providerReference, mono: true },
     { label: 'Session ID', value: sessionId, mono: true },
     { label: 'Payment channel', value: channelValue },
-    { label: 'Customer name', value: customerName },
+    { label: 'Customer name', value: electricityCustomerName || customerName },
     { label: 'Customer email', value: customerEmail },
     { label: 'Fees', value: feesLabel },
     { label: 'Net amount', value: typeof computedNet === 'number' ? moneyFormat(computedNet, safeCurrency) : undefined },

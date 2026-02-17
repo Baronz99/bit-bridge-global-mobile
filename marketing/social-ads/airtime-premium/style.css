@@ -1,0 +1,677 @@
+:root {
+  --bb-navy: #050a18;
+  --bb-midnight: #0b1630;
+  --bb-gold: #d6b15e;
+  --bb-blue: #3d78ff;
+  --bb-teal: #14b8a6;
+  --text: #f7faff;
+  --muted: #b8c8e8;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  font-family: "Segoe UI Variable", "SF Pro Display", "Avenir Next", sans-serif;
+}
+
+.canvas {
+  position: relative;
+  overflow: hidden;
+  color: var(--text);
+  background: linear-gradient(150deg, var(--bb-navy), var(--bb-midnight));
+}
+
+.wash {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(18px);
+}
+
+.wash-a {
+  width: 520px;
+  height: 520px;
+  top: -250px;
+  right: -160px;
+  background: radial-gradient(circle, rgba(214, 177, 94, 0.4), rgba(214, 177, 94, 0));
+}
+
+.wash-b {
+  width: 740px;
+  height: 740px;
+  left: -350px;
+  bottom: -360px;
+  background: radial-gradient(circle, rgba(61, 120, 255, 0.35), rgba(61, 120, 255, 0));
+}
+
+.noise {
+  position: absolute;
+  inset: 0;
+  opacity: 0.08;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.4) 0.9px, transparent 0.9px);
+  background-size: 3px 3px;
+}
+
+.top {
+  position: absolute;
+  z-index: 3;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logo {
+  object-fit: contain;
+}
+
+.name {
+  font-weight: 760;
+}
+
+.brand-sub {
+  color: var(--muted);
+}
+
+.tag {
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.content {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  align-items: center;
+}
+
+.headline {
+  margin: 0;
+  letter-spacing: -1.4px;
+}
+
+.subtext {
+  color: var(--muted);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.chip {
+  border-radius: 999px;
+}
+
+.visual {
+  display: flex;
+  justify-content: center;
+}
+
+.iphone16pm {
+  position: relative;
+  border-radius: 64px;
+  background: #070d1d;
+  border: 1.8px solid rgba(255, 255, 255, 0.22);
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.55), inset 0 0 0 3px rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.island {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  border-radius: 20px;
+  background: #02060e;
+  z-index: 2;
+}
+
+.screen {
+  position: absolute;
+  border-radius: 52px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(180deg, #10234c, #0a1936);
+  display: grid;
+  align-content: start;
+}
+
+.screen-header {
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(5, 15, 34, 0.65);
+}
+
+.screen-kicker {
+  color: #9ab1df;
+  text-transform: uppercase;
+}
+
+.screen-sub {
+  color: #afc0e4;
+}
+
+.network-card,
+.topup-card,
+.confirm-card {
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(6, 16, 35, 0.72);
+}
+
+.row-title {
+  color: #a2b7e3;
+  text-transform: uppercase;
+}
+
+.net-grid {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+
+.net {
+  text-align: center;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.net.active {
+  border-color: rgba(214, 177, 94, 0.55);
+  background: rgba(214, 177, 94, 0.2);
+  color: #f0dba4;
+}
+
+.field {
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  background: rgba(255, 255, 255, 0.04);
+  display: flex;
+  justify-content: space-between;
+}
+
+.field span {
+  color: #a8bbe6;
+}
+
+.cta {
+  text-align: center;
+  border-radius: 11px;
+  background: linear-gradient(90deg, #3d78ff, #2857d6);
+  color: white;
+}
+
+.confirm-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.signal {
+  border-radius: 999px;
+  border: 1px solid rgba(20, 184, 166, 0.5);
+  background: rgba(20, 184, 166, 0.16);
+  color: #8fe9d8;
+}
+
+.confirm-row {
+  display: flex;
+  justify-content: space-between;
+  color: #b6c8ee;
+}
+
+.confirm-row strong {
+  color: #eaf1ff;
+}
+
+.size-square {
+  width: 1080px;
+  height: 1080px;
+}
+
+.size-square .top {
+  left: 52px;
+  right: 52px;
+  top: 44px;
+}
+
+.size-square .logo {
+  width: 46px;
+  height: 46px;
+}
+
+.size-square .name {
+  font-size: 26px;
+}
+
+.size-square .brand-sub {
+  font-size: 13px;
+}
+
+.size-square .tag {
+  font-size: 12px;
+  padding: 8px 13px;
+}
+
+.size-square .content {
+  left: 52px;
+  right: 52px;
+  top: 118px;
+  bottom: 44px;
+  grid-template-columns: 1.08fr 0.92fr;
+  gap: 22px;
+}
+
+.size-square .headline {
+  font-size: 72px;
+  line-height: 0.95;
+}
+
+.size-square .subtext {
+  margin-top: 16px;
+  font-size: 27px;
+}
+
+.size-square .chip {
+  font-size: 14px;
+  padding: 8px 12px;
+}
+
+.size-square .iphone16pm {
+  width: 330px;
+  height: 676px;
+}
+
+.size-square .island {
+  width: 120px;
+  height: 28px;
+  top: 12px;
+}
+
+.size-square .screen {
+  inset: 10px;
+  padding: 22px 14px 14px;
+  gap: 10px;
+}
+
+.size-square .screen-header,
+.size-square .network-card,
+.size-square .topup-card,
+.size-square .confirm-card {
+  padding: 11px;
+}
+
+.size-square .screen-kicker,
+.size-square .row-title {
+  font-size: 10px;
+  letter-spacing: 0.8px;
+}
+
+.size-square .screen-title {
+  margin-top: 4px;
+  font-size: 23px;
+  font-weight: 760;
+}
+
+.size-square .screen-sub {
+  margin-top: 4px;
+  font-size: 11px;
+}
+
+.size-square .net,
+.size-square .field,
+.size-square .cta,
+.size-square .confirm-row {
+  font-size: 11px;
+  padding: 8px;
+}
+
+.size-square .confirm-head {
+  font-size: 11px;
+}
+
+.size-square .signal {
+  font-size: 10px;
+  padding: 5px 8px;
+}
+
+.size-story {
+  width: 1080px;
+  height: 1920px;
+}
+
+.size-story .top {
+  left: 64px;
+  right: 64px;
+  top: 62px;
+}
+
+.size-story .logo {
+  width: 56px;
+  height: 56px;
+}
+
+.size-story .name {
+  font-size: 32px;
+}
+
+.size-story .brand-sub {
+  font-size: 15px;
+}
+
+.size-story .tag {
+  font-size: 13px;
+  padding: 10px 15px;
+}
+
+.size-story .content {
+  left: 64px;
+  right: 64px;
+  top: 170px;
+  bottom: 86px;
+  grid-template-columns: 1fr;
+  grid-template-rows: auto 1fr;
+  gap: 34px;
+}
+
+.size-story .headline {
+  font-size: 96px;
+  line-height: 0.92;
+  letter-spacing: -2px;
+}
+
+.size-story .subtext {
+  margin-top: 18px;
+  font-size: 39px;
+}
+
+.size-story .chip {
+  font-size: 18px;
+  padding: 10px 15px;
+}
+
+.size-story .iphone16pm {
+  width: 500px;
+  height: 1024px;
+  border-radius: 80px;
+}
+
+.size-story .island {
+  width: 174px;
+  height: 38px;
+  top: 16px;
+  border-radius: 26px;
+}
+
+.size-story .screen {
+  inset: 14px;
+  border-radius: 66px;
+  padding: 32px 22px 22px;
+  gap: 14px;
+}
+
+.size-story .screen-header,
+.size-story .network-card,
+.size-story .topup-card,
+.size-story .confirm-card {
+  padding: 16px;
+  border-radius: 20px;
+}
+
+.size-story .screen-kicker,
+.size-story .row-title {
+  font-size: 14px;
+  letter-spacing: 1px;
+}
+
+.size-story .screen-title {
+  margin-top: 6px;
+  font-size: 34px;
+  font-weight: 760;
+}
+
+.size-story .screen-sub {
+  margin-top: 6px;
+  font-size: 15px;
+}
+
+.size-story .net,
+.size-story .field,
+.size-story .cta,
+.size-story .confirm-row {
+  font-size: 15px;
+  padding: 12px;
+}
+
+.size-story .confirm-head {
+  font-size: 15px;
+}
+
+.size-story .signal {
+  font-size: 12px;
+  padding: 6px 10px;
+}
+
+.size-landscape {
+  width: 1200px;
+  height: 628px;
+}
+
+.size-landscape .top {
+  left: 38px;
+  right: 38px;
+  top: 30px;
+}
+
+.size-landscape .logo {
+  width: 34px;
+  height: 34px;
+}
+
+.size-landscape .name {
+  font-size: 20px;
+}
+
+.size-landscape .brand-sub {
+  font-size: 11px;
+}
+
+.size-landscape .tag {
+  font-size: 10px;
+  padding: 6px 10px;
+}
+
+.size-landscape .content {
+  left: 38px;
+  right: 38px;
+  top: 80px;
+  bottom: 30px;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 14px;
+}
+
+.size-landscape .headline {
+  font-size: 56px;
+  line-height: 0.94;
+}
+
+.size-landscape .subtext {
+  margin-top: 12px;
+  font-size: 24px;
+}
+
+.size-landscape .chip {
+  font-size: 12px;
+  padding: 6px 9px;
+}
+
+.size-landscape .iphone16pm {
+  width: 245px;
+  height: 500px;
+  border-radius: 40px;
+}
+
+.size-landscape .island {
+  width: 82px;
+  height: 18px;
+  top: 8px;
+  border-radius: 12px;
+}
+
+.size-landscape .screen {
+  inset: 8px;
+  border-radius: 31px;
+  padding: 30px 10px 10px;
+  gap: 7px;
+}
+
+.size-landscape .screen-header,
+.size-landscape .network-card,
+.size-landscape .topup-card,
+.size-landscape .confirm-card {
+  padding: 8px;
+  border-radius: 11px;
+}
+
+.size-landscape .screen-kicker,
+.size-landscape .row-title {
+  font-size: 8px;
+}
+
+.size-landscape .screen-title {
+  margin-top: 2px;
+  font-size: 17px;
+  font-weight: 760;
+}
+
+.size-landscape .screen-sub {
+  margin-top: 2px;
+  font-size: 8px;
+}
+
+.size-landscape .net,
+.size-landscape .field,
+.size-landscape .cta,
+.size-landscape .confirm-row {
+  font-size: 8px;
+  padding: 6px;
+}
+
+.size-landscape .confirm-head {
+  font-size: 8px;
+}
+
+.size-landscape .signal {
+  font-size: 7px;
+  padding: 3px 6px;
+}
+
+.concept-atlas .tag {
+  border: 1px solid rgba(214, 177, 94, 0.5);
+  background: rgba(214, 177, 94, 0.14);
+  color: #f1dba6;
+}
+
+.concept-atlas .chip {
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.concept-atlas .screen {
+  background: linear-gradient(180deg, #10234c, #0a1936);
+}
+
+.concept-sand {
+  background:
+    radial-gradient(700px 460px at 16% 12%, rgba(214, 177, 94, 0.26), transparent 70%),
+    radial-gradient(700px 500px at 84% 88%, rgba(20, 184, 166, 0.24), transparent 72%),
+    linear-gradient(150deg, #171108, #302317);
+}
+
+.concept-sand .tag {
+  border: 1px solid rgba(255, 239, 199, 0.35);
+  background: rgba(255, 239, 199, 0.14);
+  color: #ffedc0;
+}
+
+.concept-sand .chip {
+  border: 1px solid rgba(255, 239, 199, 0.3);
+  background: rgba(255, 239, 199, 0.1);
+  color: #fff1cd;
+}
+
+.concept-sand .iphone16pm {
+  background: #12100d;
+}
+
+.concept-sand .screen {
+  background: linear-gradient(180deg, #3b2c1a, #21180f);
+}
+
+.concept-mint {
+  background:
+    radial-gradient(760px 520px at 14% 10%, rgba(20, 184, 166, 0.3), transparent 70%),
+    radial-gradient(740px 520px at 88% 84%, rgba(61, 120, 255, 0.24), transparent 70%),
+    linear-gradient(160deg, #041216, #0b2a33);
+}
+
+.concept-mint .tag {
+  border: 1px solid rgba(20, 184, 166, 0.55);
+  background: rgba(20, 184, 166, 0.18);
+  color: #95efe0;
+}
+
+.concept-mint .chip {
+  border: 1px solid rgba(20, 184, 166, 0.42);
+  background: rgba(20, 184, 166, 0.14);
+  color: #b6f6ec;
+}
+
+.concept-mint .iphone16pm {
+  transform: rotate(-2deg);
+}
+
+.concept-mint .screen {
+  background: linear-gradient(180deg, #0d2f39, #0a2027);
+}
+
+.size-square.concept-mint .screen {
+  padding-top: 52px;
+}
+
+.size-square.concept-mint .headline {
+  font-size: 64px;
+}
+
+.size-square.concept-mint .topup-card {
+  padding: 14px 12px 13px;
+}
+
+.size-square.concept-mint .topup-card .row-title {
+  margin-bottom: 8px;
+}
+
+.size-square.concept-mint .topup-card .field {
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+.size-square.concept-mint .topup-card .field + .field {
+  margin-top: 8px;
+}
+
+.size-square.concept-mint .topup-card .cta {
+  margin-top: 10px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}

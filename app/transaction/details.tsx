@@ -12,6 +12,7 @@ import NotificationAlert from '@/components/notification'
 import TransactionButtons from '@/components/transactionButtons/TransactionButtons'
 import moneyFormat from '@/utils/moneyFormat'
 import resolveBillOrderId from '@/utils/resolveBillOrderId'
+import { resolveElectricityIdentity } from '@/utils/electricityIdentity'
 import useBillPaymentIntentFlow from '@/hooks/useBillPaymentIntentFlow'
 import useServiceAvailability from '@/hooks/useServiceAvailability'
 import ServiceStatusPill from '@/components/service-availability/ServiceStatusPill'
@@ -37,12 +38,13 @@ const ConfirmDetails = () => {
     }, [routeOrderId])
   )
   const billTotal = useMemo(() => Number(data?.total_amount ?? data?.amount ?? 0), [data?.amount, data?.total_amount])
+  const electricityIdentity = useMemo(() => resolveElectricityIdentity(data), [data])
 
   const statusRaw = String(data?.status || '').toLowerCase()
   const isElectricityVerificationPending =
     String(data?.service_type || '').toUpperCase() === 'ELECTRICITY' &&
     statusRaw === 'pending' &&
-    !String(data?.name || '').trim()
+    !electricityIdentity.customerName
 
   useEffect(() => {
     let cancelled = false
@@ -113,6 +115,7 @@ const ConfirmDetails = () => {
     [
       applyCommission,
       billTotal,
+      electricityIdentity.customerName,
       flow,
       isElectricityVerificationPending,
       resolveError,

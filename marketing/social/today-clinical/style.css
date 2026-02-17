@@ -1,0 +1,218 @@
+@font-face {
+  font-family: "SpaceMono";
+  src: url("../../../assets/fonts/SpaceMono-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+}
+
+:root {
+  --bg-a: #f4f8ff;
+  --bg-b: #e7eefc;
+  --ink: #0d1b3f;
+  --ink-muted: #38508a;
+  --signal: #1f6fff;
+  --safe: #10b981;
+  --stroke: #d4def3;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  width: 1080px;
+  height: 1350px;
+  overflow: hidden;
+  font-family: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  color: var(--ink);
+}
+
+.canvas {
+  position: relative;
+  width: 1080px;
+  height: 1350px;
+  background:
+    radial-gradient(circle at 10% 10%, #ffffff 0, #ffffff80 18%, #ffffff00 38%),
+    linear-gradient(160deg, var(--bg-a) 0%, var(--bg-b) 100%);
+  padding: 62px 64px;
+}
+
+.grid-overlay {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(to right, rgba(56, 80, 138, 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(56, 80, 138, 0.06) 1px, transparent 1px);
+  background-size: 44px 44px;
+  pointer-events: none;
+}
+
+.top {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.logo {
+  width: 52px;
+  height: 52px;
+  object-fit: contain;
+}
+
+.brand-name {
+  font-family: "SpaceMono", monospace;
+  font-size: 22px;
+  letter-spacing: 0.4px;
+  font-weight: 700;
+}
+
+.stamp {
+  font-family: "SpaceMono", monospace;
+  font-size: 14px;
+  color: var(--ink-muted);
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--stroke);
+  background: #ffffffb8;
+}
+
+.hero {
+  position: relative;
+  z-index: 2;
+  margin-top: 72px;
+}
+
+.kicker {
+  display: inline-block;
+  font-family: "SpaceMono", monospace;
+  font-size: 14px;
+  letter-spacing: 0.9px;
+  text-transform: uppercase;
+  color: var(--signal);
+  border: 1px solid #b7ccfb;
+  background: #eef4ff;
+  border-radius: 999px;
+  padding: 8px 14px;
+}
+
+.title {
+  margin: 22px 0 0;
+  font-size: 74px;
+  line-height: 0.98;
+  letter-spacing: -1.8px;
+  font-weight: 780;
+  max-width: 900px;
+}
+
+.subtitle {
+  margin: 24px 0 0;
+  font-size: 29px;
+  line-height: 1.3;
+  color: var(--ink-muted);
+  max-width: 860px;
+}
+
+.protocol {
+  position: relative;
+  z-index: 2;
+  margin-top: 54px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+.step {
+  border: 1px solid var(--stroke);
+  border-radius: 20px;
+  background: #ffffffd9;
+  padding: 18px 16px 16px;
+}
+
+.step-id {
+  font-family: "SpaceMono", monospace;
+  font-size: 13px;
+  color: #5f76ac;
+}
+
+.step-title {
+  margin: 10px 0 6px;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.step-text {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.38;
+  color: #506290;
+}
+
+.panel {
+  position: relative;
+  z-index: 2;
+  margin-top: 36px;
+  border: 1px solid #bfd0f4;
+  border-radius: 24px;
+  background: #ffffffed;
+  padding: 24px 24px 20px;
+}
+
+.panel-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px dashed #d5dff4;
+}
+
+.panel-row:last-child {
+  border-bottom: 0;
+}
+
+.metric {
+  font-family: "SpaceMono", monospace;
+  font-size: 14px;
+  color: #4c6293;
+}
+
+.value {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.value.safe {
+  color: var(--safe);
+}
+
+.footer {
+  position: absolute;
+  left: 64px;
+  right: 64px;
+  bottom: 54px;
+  z-index: 2;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.cta {
+  font-size: 20px;
+  font-weight: 700;
+  color: #0f2458;
+}
+
+.site {
+  font-family: "SpaceMono", monospace;
+  font-size: 15px;
+  color: #4f6494;
+}

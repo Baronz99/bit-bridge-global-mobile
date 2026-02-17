@@ -78,7 +78,8 @@ const COUNTRY_OPTIONS = [
 const KycDocumentsScreen = () => {
   const router = useRouter()
   const { userProfileData, loadProfile } = useAuth()
-  const profile = userProfileData?.user_profile || {}
+  const userRoot = userProfileData?.data ?? userProfileData ?? {}
+  const profile = userRoot?.user_profile || {}
 
   const [saving, setSaving] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
@@ -109,7 +110,8 @@ const KycDocumentsScreen = () => {
   useEffect(() => {
     setForm((prev) => ({
       ...prev,
-      id_type: userProfileData?.id_type || '',
+      id_type: userRoot?.id_type || '',
+      nin: userRoot?.id_number || '',
       address_line1: profile?.address_line1 || '',
       address_line2: profile?.address_line2 || '',
       city: profile?.city || '',
@@ -118,7 +120,7 @@ const KycDocumentsScreen = () => {
       postal_code: profile?.postal_code || '',
       proof_of_address_type: profile?.proof_of_address_type || '',
     }))
-  }, [userProfileData, profile])
+  }, [userRoot, profile])
 
   const needsIdUpload = useMemo(() => form.id_type && form.id_type !== 'nin', [form.id_type])
   const hasIdDocOnFile = Boolean(profile?.id_document_url)
@@ -138,6 +140,9 @@ const KycDocumentsScreen = () => {
 
   const validate = () => {
     if (!form.id_type) return 'Select an ID type to continue.'
+    if (form.id_type === 'nin' && !/^\d{11}$/.test(String(form.nin || '').trim())) {
+      return 'Enter a valid 11-digit NIN.'
+    }
     if (!form.address_line1 || !form.city || !form.state || !form.postal_code) {
       return 'Address line 1, city, state, and postal code are required.'
     }
@@ -164,6 +169,7 @@ const KycDocumentsScreen = () => {
       await updateKycDocuments({
         user_profile_id: profile?.id,
         id_type: form.id_type,
+        nin: form.id_type === 'nin' ? String(form.nin || '').trim() : undefined,
         address_line1: form.address_line1,
         address_line2: form.address_line2,
         city: form.city,
@@ -197,9 +203,22 @@ const KycDocumentsScreen = () => {
         <FormSelect
           label="ID type"
           selectedValue={form.id_type}
-          onValueChange={(value: string) => setForm({ ...form, id_type: value })}
+          onValueChange={(value: string) =>
+            setForm({ ...form, id_type: value, nin: value === 'nin' ? form.nin : '' })
+          }
           options={ID_TYPE_OPTIONS}
         />
+
+        {form.id_type === 'nin' ? (
+          <View className="mt-4">
+            <FormInput
+              label="NIN"
+              value={form.nin}
+              keyboardType="numeric"
+              onChangeText={(value: string) => setForm({ ...form, nin: value })}
+            />
+          </View>
+        ) : null}
 
         {needsIdUpload ? (
           <View className="mt-4">

@@ -1,12 +1,14 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native'
 import FormInput from '@/components/FormInput'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
 import { updateBasicProfile, saveOnboardingStage } from '@/api/onboarding'
 import { FEATURE_ONBOARDING } from '@/constants/featureFlags'
 import { buildApiErrorMessage } from '@/utils/apiErrorMessage'
+import { useAuth } from '@/services/useAuth'
 
 const BasicProfile = () => {
+  const { userProfileData, loadProfile } = useAuth()
   const [loading, setLoading] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const [form, setForm] = useState({
@@ -15,6 +17,18 @@ const BasicProfile = () => {
     phone_number: '',
     date_of_birth: '',
   })
+
+  useEffect(() => {
+    const root = userProfileData?.data ?? userProfileData ?? {}
+    const profile = root?.user_profile || {}
+    setForm((prev) => ({
+      ...prev,
+      first_name: profile?.first_name || prev.first_name,
+      last_name: profile?.last_name || prev.last_name,
+      phone_number: profile?.phone_number || prev.phone_number,
+      date_of_birth: profile?.date_of_birth ? String(profile.date_of_birth).slice(0, 10) : prev.date_of_birth,
+    }))
+  }, [userProfileData])
 
   if (!FEATURE_ONBOARDING) {
     return (
@@ -36,8 +50,14 @@ const BasicProfile = () => {
         date_of_birth: form.date_of_birth,
       })
       await saveOnboardingStage('basic_profile')
+      await loadProfile({ force: true })
       setNotice('Profile saved successfully.')
     } catch (error: any) {
+      const errors = error?.response?.data?.errors
+      if (Array.isArray(errors) && errors.length > 0) {
+        setNotice(errors.join(', '))
+        return
+      }
       const message = buildApiErrorMessage({
         status: error?.response?.status,
         data: error?.response?.data,

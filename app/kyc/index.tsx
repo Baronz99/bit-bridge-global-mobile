@@ -171,7 +171,10 @@ export default function KycCenter() {
   const proofType = profile?.proof_of_address_type
   const idDocUrl = profile?.id_document_url
   const proofUrl = profile?.proof_of_address_url
-  const docsComplete = Boolean(idType && hasAddress && proofType && proofUrl && idDocUrl)
+  const isNinFlow = String(idType || '').toLowerCase() === 'nin'
+  const docsComplete = Boolean(
+    idType && hasAddress && proofType && proofUrl && (isNinFlow || idDocUrl)
+  )
   const useCase = String(status?.primary_use_case || status?.user_profile?.primary_use_case || '')
     .trim()
     .toLowerCase()

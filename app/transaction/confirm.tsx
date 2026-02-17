@@ -11,6 +11,7 @@ import { getOrder } from '@/api/orders'
 import { Ionicons } from '@expo/vector-icons'
 import LoadingIndicator from '@/components/loadingIndicator'
 import { log } from '@/utils/log'
+import { resolveElectricityIdentity } from '@/utils/electricityIdentity'
 
 const Row = ({ label, value }: { label: string; value?: string | number }) => (
   <View className="flex-row justify-between items-start py-2">
@@ -140,6 +141,7 @@ export default function TransactionSuccessScreen() {
     }
     return true
   }, [data])
+  const electricityIdentity = useMemo(() => resolveElectricityIdentity(data), [data])
   const effectiveReference = useMemo(
     () => pickFirst(resolvedReference, isBillRef(receiptRef) ? receiptRef : '', reference),
     [resolvedReference, receiptRef, reference]
@@ -502,8 +504,8 @@ export default function TransactionSuccessScreen() {
         )}
 
         <Row label="Meter/Phone" value={(data as any)?.meter_number || (data as any)?.phone_number} />
-        {!!(data as any)?.customerName && <Row label="Customer Name" value={(data as any)?.customerName} />}
-        {!!(data as any)?.address && <Row label="Address" value={(data as any)?.address} />}
+        {!!electricityIdentity.customerName && <Row label="Customer Name" value={electricityIdentity.customerName} />}
+        {!!electricityIdentity.serviceAddress && <Row label="Address" value={electricityIdentity.serviceAddress} />}
         <Row label="Provider" value={(data as any)?.biller} />
         {(data as any)?.units && <Row label="Units (kWh)" value={(data as any)?.units ?? '-'} />}
         {!!(data as any)?.service_charge &&

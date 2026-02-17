@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ActivityIndicator, ScrollView, Text, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
+import * as SecureStore from 'expo-secure-store'
 import NotificationAlert from '@/components/notification'
 import DepositAccountSection from '@/components/DepositAccountSection'
 import AnchorAccountView from '@/components/AnchorAccountView'
@@ -16,10 +17,12 @@ import { resolveUserProfile } from '@/services/auth/resolveUserProfile'
 import { isKycAlreadyCompleted } from '@/utils/anchorAccount'
 import { warn } from '@/utils/logger'
 
+const ANCHOR_FORM_DRAFT_KEY = 'anchor_account_form_draft_v1'
+
 const AnchorAccountScreen = () => {
   const params = useLocalSearchParams()
   const router = useRouter()
-  const { onLogout, userProfileData } = useAuth()
+  const { onLogout, userProfileData, loadProfile } = useAuth()
   const [loading, setLoading] = useState(false)
   const [notice, setNotice] = useState<{ message: string | null; error: boolean }>({
     message: null,
@@ -38,6 +41,41 @@ const AnchorAccountScreen = () => {
     dob: '',
     gender: '',
   })
+
+  useEffect(() => {
+    let isMounted = true
+    const loadDraft = async () => {
+      try {
+        const raw = await SecureStore.getItemAsync(ANCHOR_FORM_DRAFT_KEY)
+        if (!raw || !isMounted) return
+        const parsed = JSON.parse(raw)
+        setAnchorForm((prev) => ({
+          ...prev,
+          address: String(parsed?.address || prev.address || ''),
+          city: String(parsed?.city || prev.city || ''),
+          state: String(parsed?.state || prev.state || ''),
+          postal_code: String(parsed?.postal_code || prev.postal_code || ''),
+          bvn: String(parsed?.bvn || prev.bvn || ''),
+          dob: String(parsed?.dob || prev.dob || ''),
+          gender: String(parsed?.gender || prev.gender || ''),
+        }))
+      } catch {
+        // Ignore corrupt draft state.
+      }
+    }
+    void loadDraft()
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  useEffect(() => {
+    void SecureStore.setItemAsync(ANCHOR_FORM_DRAFT_KEY, JSON.stringify(anchorForm)).catch(() => {})
+  }, [anchorForm])
+
+  useEffect(() => {
+    void loadProfile({ force: true }).catch(() => {})
+  }, [loadProfile])
 
   const profile = useMemo(() => {
     if (typeof resolveUserProfile !== 'function') {
@@ -144,6 +182,13 @@ const AnchorAccountScreen = () => {
       setNotice({ message: 'Deposit account already exists.', error: false })
       return
     }
+    if (!prefilledPhone) {
+      setNotice({
+        message: 'Phone number is required. Update your phone in profile, then retry.',
+        error: true,
+      })
+      return
+    }
     const missing: string[] = []
     if (!anchorForm.address.trim()) missing.push('address')
     if (!anchorForm.city.trim()) missing.push('city')
@@ -180,6 +225,7 @@ const AnchorAccountScreen = () => {
         },
       })
       setNotice({ message: response?.message || 'Deposit account created.', error: false })
+      await SecureStore.deleteItemAsync(ANCHOR_FORM_DRAFT_KEY).catch(() => {})
       await anchorState.refresh({ force: true })
       shouldRefresh = false
     } catch (error: any) {

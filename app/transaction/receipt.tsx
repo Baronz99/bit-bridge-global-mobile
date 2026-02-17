@@ -224,6 +224,45 @@ const ReceiptScreen = () => {
         : serviceType === 'ELECTRICITY' && Number.isFinite(serviceChargeFromMeta) && serviceChargeFromMeta > 0
           ? [{ label: 'service charge', amount: serviceChargeFromMeta, currency: raw.currency || 'NGN' }]
           : []
+    const rawRecord = raw as Record<string, unknown>
+    const normalizedMeta = {
+      ...(raw.meta || {}),
+      customerName:
+        cleanText(raw?.meta?.customerName) ||
+        cleanText(raw?.meta?.customer_name) ||
+        cleanText(raw?.meta?.name) ||
+        cleanText(rawRecord.customerName) ||
+        cleanText(rawRecord.customer_name) ||
+        cleanText(rawRecord.name),
+      customer_name:
+        cleanText(raw?.meta?.customer_name) ||
+        cleanText(raw?.meta?.customerName) ||
+        cleanText(rawRecord.customer_name) ||
+        cleanText(rawRecord.customerName) ||
+        cleanText(raw?.meta?.name) ||
+        cleanText(rawRecord.name),
+      address:
+        cleanText(raw?.meta?.address) ||
+        cleanText(raw?.meta?.service_address) ||
+        cleanText(raw?.meta?.meter_address) ||
+        cleanText(rawRecord.address) ||
+        cleanText(rawRecord.service_address) ||
+        cleanText(rawRecord.meter_address),
+      service_address:
+        cleanText(raw?.meta?.service_address) ||
+        cleanText(raw?.meta?.address) ||
+        cleanText(raw?.meta?.meter_address) ||
+        cleanText(rawRecord.service_address) ||
+        cleanText(rawRecord.address) ||
+        cleanText(rawRecord.meter_address),
+      meter_address:
+        cleanText(raw?.meta?.meter_address) ||
+        cleanText(raw?.meta?.service_address) ||
+        cleanText(raw?.meta?.address) ||
+        cleanText(rawRecord.meter_address) ||
+        cleanText(rawRecord.service_address) ||
+        cleanText(rawRecord.address),
+    }
 
     const normalized = {
       reference: raw.reference || String(reference || timelineId || '--'),
@@ -239,7 +278,7 @@ const ReceiptScreen = () => {
       subtitle: raw.subtitle,
       parties: raw.parties,
       provider: raw.provider,
-      meta: raw.meta,
+      meta: normalizedMeta,
       legacy: raw.legacy,
       value_amount: raw.value_amount ?? computedValue,
       wallet_amount_charged: raw.wallet_amount_charged ?? walletAmount,
