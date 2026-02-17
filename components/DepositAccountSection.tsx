@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { Alert, Text, TouchableOpacity, View } from 'react-native'
 import FormInput from '@/components/FormInput'
 import FormSelect from '@/components/FormSelect'
-import { getAnchorNextStep, normalizeAnchorOnboarding } from '@/services/useAnchorOnboarding'
+import { normalizeAnchorOnboarding } from '@/services/useAnchorOnboarding'
 
 export type DepositAccountSectionProps = {
   normalized: ReturnType<typeof normalizeAnchorOnboarding>
@@ -50,21 +50,16 @@ const DepositAccountSection = ({
   onRefresh,
   anchorForm,
   setAnchorForm,
-  prefilledDob,
-  prefilledGender,
-  prefilledAddress,
-  prefilledCity,
-  prefilledState,
-  prefilledPostal,
   platformTier2 = false,
   onGoToKyc,
   prefilledPhone,
   onGoToProfile,
 }: DepositAccountSectionProps) => {
   const [showRawAccountNumber, setShowRawAccountNumber] = useState(false)
-  const step = useMemo(() => getAnchorNextStep(normalized), [normalized])
+  const step = normalized.nextStep
   const maskedAccountNumber = normalized.displayAccountNumber || '----'
   const hasRawAccountNumber = Boolean(normalized.rawAccountNumber)
+  const hasPhone = Boolean(String(prefilledPhone || '').trim())
   const accountNumberToDisplay =
     showRawAccountNumber && hasRawAccountNumber
       ? String(normalized.rawAccountNumber)
@@ -98,6 +93,19 @@ const DepositAccountSection = ({
     if (!normalized.hasAccountNumber) return 'Generate your account number to fund your wallet.'
     return 'You are ready to fund your wallet.'
   }, [normalized, platformTier2])
+  const stepTitle = useMemo(() => {
+    if (step === 'CREATE_ANCHOR') return 'Step 1 of 4: Create customer profile'
+    if (step === 'DO_KYC') return 'Step 2 of 4: Complete KYC verification'
+    if (step === 'GENERATE_NUMBER') return 'Step 3 of 4: Generate account number'
+    return 'Step 4 of 4: Done'
+  }, [step])
+  const requiredNow = useMemo(() => {
+    if (!platformTier2) return ['Tier 2 verification']
+    if (step === 'CREATE_ANCHOR') return ['Phone on profile', 'Address', 'City', 'State', 'Postal code', 'BVN (11 digits)', 'Date of birth (YYYY-MM-DD)']
+    if (step === 'DO_KYC') return ['BVN (11 digits)', 'Date of birth (YYYY-MM-DD)']
+    if (step === 'GENERATE_NUMBER') return ['No extra input required']
+    return ['Setup complete']
+  }, [platformTier2, step])
 
   const inactiveNumberMessage =
     normalized.hasAnchorAccount && normalized.hasAccountNumber && normalized.kycState != 'verified'
@@ -117,13 +125,23 @@ const DepositAccountSection = ({
       case 'CREATE_ANCHOR':
         return { label: 'Create deposit profile', onPress: onCreateAnchor }
       case 'DO_KYC':
+        if (normalized.kycState === 'pending') return null
         return { label: 'Verify identity', onPress: onVerifyKyc }
       case 'GENERATE_NUMBER':
         return { label: 'Generate Account Number', onPress: onGenerateAccount }
       default:
         return null
     }
-  }, [step, platformTier2, normalized.backendFlowState, onCreateAnchor, onVerifyKyc, onGenerateAccount, onGoToProfile])
+  }, [
+    step,
+    platformTier2,
+    normalized.backendFlowState,
+    normalized.kycState,
+    onCreateAnchor,
+    onVerifyKyc,
+    onGenerateAccount,
+    onGoToProfile,
+  ])
 
   if (step == 'DONE') {
     return (
@@ -208,7 +226,14 @@ const DepositAccountSection = ({
       </View>
 
       <View className="rounded-xl border border-gray-800 bg-gray-950/60 p-3">
+        <Text className="text-white text-sm font-semibold">{stepTitle}</Text>
         <Text className="text-gray-200 text-xs">{explanation}</Text>
+        <Text className="text-gray-400 text-xs mt-2">Required now:</Text>
+        {requiredNow.map((item) => (
+          <Text key={item} className="text-gray-300 text-xs mt-1">
+            • {item}
+          </Text>
+        ))}
       </View>
 
       <View className="mt-1">
@@ -271,6 +296,11 @@ const DepositAccountSection = ({
             value={prefilledPhone || ''}
             editable={false}
           />
+          {!hasPhone ? (
+            <Text className="text-amber-300 text-xs mt-1">
+              Phone is missing. Add phone number in profile before continuing.
+            </Text>
+          ) : null}
           {onGoToProfile ? (
             <TouchableOpacity onPress={onGoToProfile} className="mt-2 self-start">
               <Text className="text-alt text-xs">Edit phone in profile</Text>
@@ -279,25 +309,21 @@ const DepositAccountSection = ({
           <FormInput
             label="Address"
             value={anchorForm.address}
-            editable={!prefilledAddress}
             onChangeText={(value: string) => setAnchorForm({ ...anchorForm, address: value })}
           />
           <FormInput
             label="City"
             value={anchorForm.city}
-            editable={!prefilledCity}
             onChangeText={(value: string) => setAnchorForm({ ...anchorForm, city: value })}
           />
           <FormInput
             label="State"
             value={anchorForm.state}
-            editable={!prefilledState}
             onChangeText={(value: string) => setAnchorForm({ ...anchorForm, state: value })}
           />
           <FormInput
             label="Postal code"
             value={anchorForm.postal_code}
-            editable={!prefilledPostal}
             onChangeText={(value: string) => setAnchorForm({ ...anchorForm, postal_code: value })}
           />
           <FormInput
@@ -309,13 +335,11 @@ const DepositAccountSection = ({
           <FormInput
             label="Date of Birth (YYYY-MM-DD)"
             value={anchorForm.dob}
-            editable={!prefilledDob}
             onChangeText={(value: string) => setAnchorForm({ ...anchorForm, dob: value })}
           />
           <FormSelect
             label="Gender (optional)"
             selectedValue={anchorForm.gender}
-            disabled={!!prefilledGender}
             onValueChange={(value: string) => setAnchorForm({ ...anchorForm, gender: value })}
             options={[
               { label: 'Select gender', value: '' },
@@ -335,6 +359,11 @@ const DepositAccountSection = ({
             value={prefilledPhone || ''}
             editable={false}
           />
+          {!hasPhone ? (
+            <Text className="text-amber-300 text-xs mt-1">
+              Phone is missing. Add phone number in profile before continuing.
+            </Text>
+          ) : null}
           {onGoToProfile ? (
             <TouchableOpacity onPress={onGoToProfile} className="mt-2 self-start">
               <Text className="text-alt text-xs">Edit phone in profile</Text>
@@ -349,13 +378,11 @@ const DepositAccountSection = ({
           <FormInput
             label="Date of Birth (YYYY-MM-DD)"
             value={anchorForm.dob}
-            editable={!prefilledDob}
             onChangeText={(value: string) => setAnchorForm({ ...anchorForm, dob: value })}
           />
           <FormSelect
             label="Gender (optional)"
             selectedValue={anchorForm.gender}
-            disabled={!!prefilledGender}
             onValueChange={(value: string) => setAnchorForm({ ...anchorForm, gender: value })}
             options={[
               { label: 'Select gender', value: '' },

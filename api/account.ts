@@ -389,13 +389,13 @@ export const verifyKyc = async (payload: {
     })
     return res.data
   } catch (err: any) {
-    const msg = errMsg(err, 'Failed to verify KYC')
+    const parsed = parseAnchorApiError(err)
     warn('[verifyKyc error]', {
-      message: msg,
-      status: err?.response?.status,
+      message: parsed.message,
+      status: parsed.status,
       data: err?.response?.data,
       url: err?.config?.url,
     })
-    throw new Error(msg)
+    throw parsed
   }
 }

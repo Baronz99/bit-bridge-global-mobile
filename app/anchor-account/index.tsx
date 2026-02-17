@@ -99,6 +99,10 @@ const AnchorAccountScreen = () => {
     if (raw.startsWith('0') && raw.length >= 11) return `234${raw.slice(1)}`
     return raw.replace(/\s+/g, '')
   }
+  const isValidBvn = (value?: string | null) => /^\d{11}$/.test(String(value || '').trim())
+  const isValidDob = (value?: string | null) => /^\d{4}-\d{2}-\d{2}$/.test(String(value || '').trim())
+  const isValidEmail = (value?: string | null) =>
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim())
 
   const prefilledDob = profile?.dob || profile?.date_of_birth
   const prefilledGender = profile?.gender
@@ -182,9 +186,36 @@ const AnchorAccountScreen = () => {
       setNotice({ message: 'Deposit account already exists.', error: false })
       return
     }
-    if (!prefilledPhone) {
+    const trimmedPhone = String(prefilledPhone || '').trim()
+    const trimmedFirstName = String(prefilledFirstName || '').trim()
+    const trimmedLastName = String(prefilledLastName || '').trim()
+    const trimmedEmail = String(prefilledEmail || '').trim()
+
+    if (!trimmedPhone) {
       setNotice({
         message: 'Phone number is required. Update your phone in profile, then retry.',
+        error: true,
+      })
+      return
+    }
+    if (!/^234\d{10}$/.test(trimmedPhone)) {
+      setNotice({
+        message:
+          'Phone number must be in Nigerian E.164 format (2348012345678). Update your profile phone and retry.',
+        error: true,
+      })
+      return
+    }
+    if (!trimmedFirstName || !trimmedLastName) {
+      setNotice({
+        message: 'First name and last name are required. Update your profile and retry.',
+        error: true,
+      })
+      return
+    }
+    if (!isValidEmail(trimmedEmail)) {
+      setNotice({
+        message: 'A valid email is required. Update your profile and retry.',
         error: true,
       })
       return
@@ -203,6 +234,14 @@ const AnchorAccountScreen = () => {
       })
       return
     }
+    if (!isValidBvn(anchorForm.bvn)) {
+      setNotice({ message: 'BVN must be exactly 11 digits.', error: true })
+      return
+    }
+    if (!isValidDob(anchorForm.dob)) {
+      setNotice({ message: 'Date of birth must be in YYYY-MM-DD format.', error: true })
+      return
+    }
 
     setLoading(true)
     setNotice({ message: null, error: false })
@@ -211,17 +250,17 @@ const AnchorAccountScreen = () => {
     try {
       const response = await createAnchorAccount({
         account: {
-          address: anchorForm.address,
-          city: anchorForm.city,
-          state: anchorForm.state,
-          postal_code: anchorForm.postal_code,
-          bvn: anchorForm.bvn,
-          dob: anchorForm.dob,
-          gender: anchorForm.gender,
-          first_name: prefilledFirstName,
-          last_name: prefilledLastName,
-          phone_number: prefilledPhone,
-          email: prefilledEmail,
+          address: anchorForm.address.trim(),
+          city: anchorForm.city.trim(),
+          state: anchorForm.state.trim(),
+          postal_code: anchorForm.postal_code.trim(),
+          bvn: anchorForm.bvn.trim(),
+          dob: anchorForm.dob.trim(),
+          gender: anchorForm.gender.trim() || undefined,
+          first_name: trimmedFirstName,
+          last_name: trimmedLastName,
+          phone_number: trimmedPhone,
+          email: trimmedEmail,
         },
       })
       setNotice({ message: response?.message || 'Deposit account created.', error: false })
@@ -374,6 +413,14 @@ const AnchorAccountScreen = () => {
       setNotice({ message: 'BVN and date of birth are required.', error: true })
       return
     }
+    if (!isValidBvn(anchorForm.bvn)) {
+      setNotice({ message: 'BVN must be exactly 11 digits.', error: true })
+      return
+    }
+    if (!isValidDob(anchorForm.dob)) {
+      setNotice({ message: 'Date of birth must be in YYYY-MM-DD format.', error: true })
+      return
+    }
     setLoading(true)
     setNotice({ message: null, error: false })
     try {
@@ -386,7 +433,7 @@ const AnchorAccountScreen = () => {
       setNotice({ message: response?.message || 'Verified successfully.', error: false })
       await anchorState.refresh({ force: true })
     } catch (error: any) {
-      const status = error?.response?.status
+      const status = error?.response?.status ?? error?.status
       const messageText = String(
         error?.response?.data?.message || error?.message || ''
       ).toLowerCase()

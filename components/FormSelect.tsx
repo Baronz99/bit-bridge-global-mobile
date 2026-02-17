@@ -1,8 +1,16 @@
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { ScrollView, Text, TouchableOpacity, View } from 'react-native'
 import React, { useMemo, useState } from 'react'
 import AppModal from '@/components/modal/Modal'
 
-const FormSelect = ({ label, selectedValue, onValueChange, options, placeholder, placeHolder }: any) => {
+const FormSelect = ({
+  label,
+  selectedValue,
+  onValueChange,
+  options,
+  placeholder,
+  placeHolder,
+  disabled = false,
+}: any) => {
   const [open, setOpen] = useState(false)
   const items = Array.isArray(options) ? options : []
 
@@ -34,13 +42,18 @@ const FormSelect = ({ label, selectedValue, onValueChange, options, placeholder,
       <Text className="text-white mb-4">{label}</Text>
 
       <TouchableOpacity
-        onPress={() => setOpen(true)}
-        className="flex-row items-center justify-between bg-gray-950 border border-gray-800 rounded-xl px-4 py-4"
+        onPress={() => {
+          if (disabled) return
+          setOpen(true)
+        }}
+        className={`flex-row items-center justify-between border rounded-xl px-4 py-4 ${
+          disabled ? 'bg-gray-900 border-gray-900 opacity-70' : 'bg-gray-950 border-gray-800'
+        }`}
       >
         <Text className={hasValue ? 'text-white text-sm' : 'text-gray-400 text-sm'}>
           {displayLabel}
         </Text>
-        <Text className="text-gray-500 text-base">▾</Text>
+        <Text className="text-gray-500 text-base">v</Text>
       </TouchableOpacity>
 
       <AppModal open={open} onclose={() => setOpen(false)}>
@@ -48,14 +61,11 @@ const FormSelect = ({ label, selectedValue, onValueChange, options, placeholder,
           <Text className="text-white text-base font-semibold mb-3">{label}</Text>
 
           {items.length === 0 ? (
-            <Text className="text-gray-400 text-sm text-center py-6">
-              No options available.
-            </Text>
+            <Text className="text-gray-400 text-sm text-center py-6">No options available.</Text>
           ) : (
             <ScrollView style={{ maxHeight: 320 }}>
               {items.map((option: any, idx: number) => {
-                const isSelected =
-                  String(option?.value ?? '') === String(selectedValue ?? '')
+                const isSelected = String(option?.value ?? '') === String(selectedValue ?? '')
 
                 // Guaranteed unique key
                 const key = `${String(option?.value ?? option?.label ?? 'opt')}-${idx}`
@@ -84,5 +94,3 @@ const FormSelect = ({ label, selectedValue, onValueChange, options, placeholder,
 }
 
 export default FormSelect
-
-const styles = StyleSheet.create({})
