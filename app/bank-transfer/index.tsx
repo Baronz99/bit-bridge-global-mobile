@@ -372,6 +372,28 @@ const BankTransferScreen = () => {
           <Text className="text-gray-300 mb-4">
             {flowStep === 1 ? 'Step 1 of 3: Recipient details' : 'Step 2 of 3: Amount and narration'}
           </Text>
+          <View className="flex-row items-center mb-4">
+            {[
+              { id: 1, label: 'Recipient' },
+              { id: 2, label: 'Details' },
+              { id: 3, label: 'Review' },
+            ].map((item, index, arr) => {
+              const active = flowStep >= item.id
+              return (
+                <View key={item.label} className={`flex-1 ${index === arr.length - 1 ? '' : 'mr-2'}`}>
+                  <View
+                    className={`rounded-lg border px-2 py-2 ${
+                      active ? 'border-app-primary bg-app-primary/15' : 'border-gray-800 bg-gray-900'
+                    }`}
+                  >
+                    <Text className={`${active ? 'text-app-primary' : 'text-gray-500'} text-[11px] text-center font-semibold`}>
+                      {item.id}. {item.label}
+                    </Text>
+                  </View>
+                </View>
+              )
+            })}
+          </View>
 
           <NotificationAlert message={notice.message} error={notice.error} data={notice.data} />
 
@@ -428,6 +450,9 @@ const BankTransferScreen = () => {
               placeholderTextColor="gray"
               className={`${beneficiaryLocked ? 'bg-gray-900' : 'bg-gray-950'} border border-gray-800 rounded-xl px-4 py-4 text-white`}
             />
+            <Text className="text-gray-500 text-[11px] mt-2">
+              Enter account number, choose bank, then we verify recipient before you continue.
+            </Text>
 
             <SearchablePicker
               label="Saved beneficiary (optional quick-fill)"
