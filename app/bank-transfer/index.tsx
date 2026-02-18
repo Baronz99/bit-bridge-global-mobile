@@ -107,6 +107,7 @@ const BankTransferScreen = () => {
   const [quotedDailySpent, setQuotedDailySpent] = useState(0)
   const [quotedAmount, setQuotedAmount] = useState(0)
   const [feeEstimated, setFeeEstimated] = useState(true)
+  const [flowStep, setFlowStep] = useState<1 | 2>(1)
 
   const tier = useMemo(() => getTierFromProfile(userProfileData), [userProfileData])
   const tierEligible = isTierEligibleForBankTransfer(tier)
@@ -171,6 +172,11 @@ const BankTransferScreen = () => {
     narrationValue.length > 0 &&
     accountLookupStatus === 'success' &&
     amountValidation.valid
+  const canContinueRecipient =
+    tierEligible &&
+    !!formData.bank_code &&
+    sanitizeDigits(formData.account_number).length === 10 &&
+    accountLookupStatus === 'success'
 
   useEffect(() => {
     const loadData = async () => {
@@ -344,6 +350,11 @@ const BankTransferScreen = () => {
     })
   }
 
+  const handleRecipientContinue = () => {
+    if (!canContinueRecipient) return
+    setFlowStep(2)
+  }
+
   if (!tierEligible) {
     return (
       <View className="flex-1 bg-primary px-4">
@@ -358,7 +369,9 @@ const BankTransferScreen = () => {
     <View className="flex-1 bg-primary px-4">
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
         <View className="pt-10">
-          <Text className="text-gray-300 mb-4">Step 1 of 3: Recipient and amount</Text>
+          <Text className="text-gray-300 mb-4">
+            {flowStep === 1 ? 'Step 1 of 3: Recipient details' : 'Step 2 of 3: Amount and narration'}
+          </Text>
 
           <NotificationAlert message={notice.message} error={notice.error} data={notice.data} />
 
@@ -370,10 +383,11 @@ const BankTransferScreen = () => {
             </Text>
             <Text className="text-gray-500 text-xs mt-1">Daily limit: {dailyLimit.toLocaleString('en-NG')}</Text>
             <Text className="text-gray-600 text-[10px] mt-1">
-              Today's spent: {formatNaira(effectiveTodaySpent)}
+              Today spent: {formatNaira(effectiveTodaySpent)}
             </Text>
           </View>
 
+          {flowStep === 1 && (
           <View className="bg-gray-900 border border-gray-800 rounded-2xl p-4 mb-4">
             <View className="flex-row items-center justify-between mb-3">
               <Text className="text-white text-base font-semibold">Recipient</Text>
@@ -390,8 +404,33 @@ const BankTransferScreen = () => {
               ) : null}
             </View>
 
+            <Text className="text-white mb-2">Account Number</Text>
+            <TextInput
+              ref={accountNumberRef}
+              value={formData.account_number}
+              onChangeText={(text) => {
+                const next = sanitizeDigits(text).slice(0, 10)
+                setFormData((prev) => ({
+                  ...prev,
+                  account_number: next,
+                  beneficiary_name: '',
+                  account_name: '',
+                  counter_party_id: '',
+                }))
+                setAccountLookupStatus('idle')
+                setAccountLookupError(null)
+                lastLookupKeyRef.current = ''
+              }}
+              keyboardType="numeric"
+              maxLength={10}
+              editable={!beneficiaryLocked}
+              placeholder="Enter or paste 10-digit account number"
+              placeholderTextColor="gray"
+              className={`${beneficiaryLocked ? 'bg-gray-900' : 'bg-gray-950'} border border-gray-800 rounded-xl px-4 py-4 text-white`}
+            />
+
             <SearchablePicker
-              label="Saved beneficiary (optional)"
+              label="Saved beneficiary (optional quick-fill)"
               selectedValue={selectedBeneficiary}
               options={beneficiaryOptions}
               placeholder="Select beneficiary"
@@ -450,30 +489,6 @@ const BankTransferScreen = () => {
               />
             </View>
 
-            <Text className="text-white mb-2 mt-4">Account Number</Text>
-            <TextInput
-              ref={accountNumberRef}
-              value={formData.account_number}
-              onChangeText={(text) => {
-                const next = sanitizeDigits(text).slice(0, 10)
-                setFormData((prev) => ({
-                  ...prev,
-                  account_number: next,
-                  beneficiary_name: '',
-                  account_name: '',
-                  counter_party_id: '',
-                }))
-                setAccountLookupStatus('idle')
-                setAccountLookupError(null)
-                lastLookupKeyRef.current = ''
-              }}
-              keyboardType="numeric"
-              maxLength={10}
-              editable={!beneficiaryLocked}
-              placeholder="Enter or paste 10-digit account number"
-              placeholderTextColor="gray"
-              className={`${beneficiaryLocked ? 'bg-gray-900' : 'bg-gray-950'} border border-gray-800 rounded-xl px-4 py-4 text-white`}
-            />
             {accountLookupStatus === 'loading' ? (
               <Text className="text-gray-400 text-xs mt-2">Verifying recipient...</Text>
             ) : null}
@@ -501,8 +516,19 @@ const BankTransferScreen = () => {
               <Switch value={saveBeneficiary} onValueChange={setSaveBeneficiary} />
             </View>
           </View>
+          )}
 
+          {flowStep === 2 && (
           <View className="bg-gray-900 border border-gray-800 rounded-2xl p-4 mb-4">
+            <Text className="text-white text-base font-semibold mb-3">Recipient summary</Text>
+            <View className="bg-gray-950 border border-gray-800 rounded-xl p-3 mb-4">
+              <Text className="text-gray-400 text-xs">Bank</Text>
+              <Text className="text-white text-sm mt-1">{selectedBankLabel || '-'}</Text>
+              <Text className="text-gray-400 text-xs mt-3">Account number</Text>
+              <Text className="text-white text-sm mt-1">{formData.account_number || '-'}</Text>
+              <Text className="text-gray-400 text-xs mt-3">Account name</Text>
+              <Text className="text-white text-sm mt-1">{formData.account_name || '-'}</Text>
+            </View>
             <Text className="text-white text-base font-semibold mb-3">Amount</Text>
             <Text className="text-white mb-2">Amount (NGN)</Text>
             <View className="flex-row items-center border border-gray-800 rounded-xl bg-gray-950 px-4">
@@ -557,7 +583,9 @@ const BankTransferScreen = () => {
               </View>
             ) : null}
           </View>
+          )}
 
+          {flowStep === 2 && (
           <View className="bg-gray-900 border border-gray-800 rounded-2xl p-4 mb-4">
             <View className="flex-row items-center justify-between">
               <Text className="text-white text-base font-semibold">Narration</Text>
@@ -573,15 +601,31 @@ const BankTransferScreen = () => {
             />
             {!narrationValue ? <Text className="text-red-300 text-xs mt-2">Narration is required.</Text> : null}
           </View>
+          )}
 
           <Text className="text-gray-500 text-xs mb-3">{BANK_TRANSFER_TIER_REQUIREMENT_COPY}</Text>
-          <TouchableOpacity
-            onPress={handleContinue}
-            disabled={!canContinue || loading}
-            className={`${canContinue ? 'bg-theme-primary' : 'bg-gray-700'} py-5 rounded-xl`}
-          >
-            <Text className="text-alt font-semibold text-center">Continue to review</Text>
-          </TouchableOpacity>
+          {flowStep === 1 ? (
+            <TouchableOpacity
+              onPress={handleRecipientContinue}
+              disabled={!canContinueRecipient || loading}
+              className={`${canContinueRecipient ? 'bg-theme-primary' : 'bg-gray-700'} py-5 rounded-xl`}
+            >
+              <Text className="text-alt font-semibold text-center">Continue to amount</Text>
+            </TouchableOpacity>
+          ) : (
+            <View>
+              <TouchableOpacity
+                onPress={handleContinue}
+                disabled={!canContinue || loading}
+                className={`${canContinue ? 'bg-theme-primary' : 'bg-gray-700'} py-5 rounded-xl`}
+              >
+                <Text className="text-alt font-semibold text-center">Continue to review</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setFlowStep(1)} className="py-4">
+                <Text className="text-app-primary text-center">Back to recipient</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       </ScrollView>
     </View>
