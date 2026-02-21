@@ -4,6 +4,7 @@ import moneyFormat from '@/utils/moneyFormat'
 import { icons } from '@/constants/icons'
 import { BRAND_NAME } from '@/constants/brand'
 import { resolveElectricityIdentity } from '@/utils/electricityIdentity'
+import { resolveTransferLifecycle } from '@/utils/transferLifecycle'
 
 type ReceiptStatus = 'successful' | 'pending' | 'failed' | 'timed_out'
 
@@ -78,6 +79,22 @@ const statusPill = (statusRaw: string) => {
     return { label: 'Timed out', bg: 'bg-orange-500/15', border: 'border-orange-500/30', text: 'text-orange-300' }
   }
   return { label: 'Pending', bg: 'bg-amber-500/15', border: 'border-amber-500/30', text: 'text-amber-300' }
+}
+
+const failureStatusCopy = (statusRaw: string) => {
+  const lifecycle = resolveTransferLifecycle({ lifecycle_state: statusRaw, status: statusRaw })
+  switch (lifecycle.state) {
+    case 'failed_refunded':
+      return 'Funds were returned to your wallet.'
+    case 'failed_reversal_pending':
+      return 'Debit occurred. Reversal is in progress.'
+    case 'failed_unrecovered':
+      return 'Reversal is pending. Contact support with this reference.'
+    case 'released':
+      return 'Funds were released back to your available balance.'
+    default:
+      return lifecycle.message || 'Transaction failed.'
+  }
 }
 
 const clean = (value?: any) => {
@@ -314,6 +331,7 @@ const BankReceiptCard = ({
   ].filter((row) => Boolean(row.value))
 
   const normalizedStatus = normalizeStatus(String(status))
+  const failedStatusCopy = failureStatusCopy(String(status))
   const isSuccess = normalizedStatus === 'successful'
   const hasFeeBreakdown = typeof totalFees === 'number' && totalFees > 0
   const shouldShowBreakdown =
@@ -384,7 +402,7 @@ const BankReceiptCard = ({
           !isSuccess && (
             <View className="mt-3 space-y-1">
               {reason ? <Row label="Reason" value={reason} /> : null}
-              <Row label="Status" value="No debit was made" />
+              <Row label="Status" value={failedStatusCopy} />
             </View>
           )
         )}
@@ -548,4 +566,5 @@ const BankReceiptCard = ({
 }
 
 export default BankReceiptCard
+
 

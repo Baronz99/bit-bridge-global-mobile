@@ -171,7 +171,7 @@ const ReceiptScreen = () => {
     }
 
     const statusRaw = String(raw.status || 'pending').toLowerCase()
-    const isSuccess = ['success', 'completed'].includes(statusRaw)
+    const isSuccess = ['success', 'completed', 'approved', 'paid'].includes(statusRaw)
     const rewardAmount = Number(raw.reward_applied ?? raw.commission_used ?? 0)
     const baseAmount = Number(raw.amount ?? 0)
     const explicitValueAmount = Number(raw.value_amount)
@@ -431,3 +431,5 @@ const ReceiptScreen = () => {
   }
 
 export default ReceiptScreen
+
+

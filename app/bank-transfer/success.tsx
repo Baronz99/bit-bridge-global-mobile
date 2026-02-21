@@ -2,6 +2,7 @@ import React, { useMemo } from 'react'
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { formatNaira, maskAccountNumber } from '@/utils/bankTransfer'
+import { resolveTransferLifecycle } from '@/utils/transferLifecycle'
 
 type TransferSummary = {
   bank_name: string
@@ -17,6 +18,10 @@ type TransferSummary = {
   total_debit: number
   description?: string
   transfer_reference: string
+  lifecycle_state?: string
+  status?: string
+  display_message?: string
+  transfer_id?: string
 }
 
 const parseSummary = (raw: any): TransferSummary | null => {
@@ -31,6 +36,16 @@ const parseSummary = (raw: any): TransferSummary | null => {
   }
 }
 
+const balanceImpactCopy = (state: string) => {
+  if (state === 'failed_refunded' || state === 'released') return 'Funds have been returned to your available balance.'
+  if (state === 'failed_reversal_pending') return 'Debit occurred. Reversal is in progress.'
+  if (state === 'failed_unrecovered') return 'Reversal is pending. Contact support with your transfer reference.'
+  if (state === 'pending_provider' || state === 'reserved' || state === 'pending') {
+    return 'Amount may remain reserved until provider confirmation is complete.'
+  }
+  return 'Transfer was completed and reflected in your wallet ledger.'
+}
+
 const SuccessScreen = () => {
   const router = useRouter()
   const { summary } = useLocalSearchParams<{ summary?: string }>()
@@ -39,12 +54,34 @@ const SuccessScreen = () => {
   const transferFee = Number(payload?.fee_breakdown?.platform_fee ?? 0)
   const stampDutyFee = Number(payload?.fee_breakdown?.stamp_duty_fee ?? 0)
 
+  const lifecycle = useMemo(
+    () =>
+      resolveTransferLifecycle({
+        lifecycle_state: payload?.lifecycle_state,
+        status: payload?.status,
+        display_message: payload?.display_message,
+      }),
+    [payload?.display_message, payload?.lifecycle_state, payload?.status]
+  )
+
+  const headerTitle = lifecycle.isSuccess
+    ? 'Transfer Successful'
+    : lifecycle.isFailure
+      ? 'Transfer Failed'
+      : 'Transfer Submitted'
+
+  const stepLabel = lifecycle.isSuccess
+    ? 'Step 3 of 3: Completed'
+    : lifecycle.isFailure
+      ? 'Step 3 of 3: Update required'
+      : 'Step 3 of 3: Processing'
+
   if (!payload) {
     return (
       <View className="flex-1 bg-primary px-4">
         <View className="pt-10">
-          <Text className="text-white text-2xl mb-2">Transfer Complete</Text>
-          <Text className="text-gray-300">Transfer was submitted successfully.</Text>
+          <Text className="text-white text-2xl mb-2">Transfer Update</Text>
+          <Text className="text-gray-300">Transfer was submitted. Check timeline for latest status.</Text>
           <TouchableOpacity
             onPress={() => router.replace('/(tabs)/wallet')}
             className="bg-theme-primary py-4 rounded-xl mt-4"
@@ -60,8 +97,9 @@ const SuccessScreen = () => {
     <View className="flex-1 bg-primary px-4">
       <ScrollView contentContainerStyle={{ paddingBottom: 30 }}>
         <View className="pt-10">
-          <Text className="text-white text-2xl mb-2">Transfer Successful</Text>
-          <Text className="text-gray-300 mb-4">Step 3 of 3: Completed</Text>
+          <Text className="text-white text-2xl mb-2">{headerTitle}</Text>
+          <Text className="text-gray-300 mb-1">{stepLabel}</Text>
+          <Text className="text-gray-500 text-xs mb-4">{lifecycle.message}</Text>
 
           <View className="bg-gray-900 border border-gray-800 rounded-2xl p-4">
             <Text className="text-white text-base font-semibold mb-3">Receipt</Text>
@@ -98,6 +136,9 @@ const SuccessScreen = () => {
             <Text className="text-gray-400 text-xs">Total Debit</Text>
             <Text className="text-white text-sm mb-2">{formatNaira(Number(payload.total_debit || 0))}</Text>
 
+            <Text className="text-gray-400 text-xs">Balance impact</Text>
+            <Text className="text-white text-sm mb-2">{balanceImpactCopy(lifecycle.state)}</Text>
+
             {payload.description ? (
               <>
                 <Text className="text-gray-400 text-xs">Narration</Text>
@@ -129,3 +170,4 @@ const SuccessScreen = () => {
 }
 
 export default SuccessScreen
+

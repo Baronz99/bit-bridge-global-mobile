@@ -3,6 +3,7 @@ import React, { useMemo } from 'react'
 import { Text, TouchableOpacity, View } from 'react-native'
 import { Feather } from '@expo/vector-icons'
 import moneyFormat from '@/utils/moneyFormat'
+import { resolveTransferLifecycle } from '@/utils/transferLifecycle'
 
 type TimelineCardProps = {
   item: Record<string, any>
@@ -32,15 +33,12 @@ const getSubtitle = (kind: string, record: any) => {
 }
 
 const getStatusLabel = (record: any) => {
-  const s = norm(record.status)
-  if (!s) return ''
-  if (s.includes('approved') || s.includes('successful') || s.includes('completed') || s.includes('paid'))
-    return 'Successful'
-  if (s.includes('pending') || s.includes('initialized') || s.includes('processing')) return 'Pending'
-  if (s.includes('failed') || s.includes('declined')) return 'Failed'
-  if (s.includes('reversed') || s.includes('reversal')) return 'Reversed'
-  if (s.includes('resolved')) return 'Resolved'
-  return String(record.status)
+  const lifecycle = resolveTransferLifecycle({
+    lifecycle_state: record?.lifecycle_state,
+    status: record?.status,
+    display_message: record?.display_message,
+  })
+  return lifecycle.shortLabel
 }
 
 const getStatusTone = (label: string) => {
@@ -185,3 +183,5 @@ const TimelineCard = ({ item, onPress }: TimelineCardProps) => {
 }
 
 export default TimelineCard
+
+

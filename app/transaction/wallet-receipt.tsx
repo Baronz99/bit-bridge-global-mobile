@@ -4,6 +4,7 @@ import { useLocalSearchParams } from 'expo-router'
 import { getTransactions } from '@/api/transactions'
 import moneyFormat from '@/utils/moneyFormat'
 import BankReceiptCard from '@/components/receipt/BankReceiptCard'
+import { resolveTransferLifecycle } from '@/utils/transferLifecycle'
 
 type WalletReceiptParams = {
   id?: string
@@ -11,6 +12,8 @@ type WalletReceiptParams = {
   amount?: string
   currency?: string
   status?: string
+  lifecycle_state?: string
+  display_message?: string
   description?: string
   created_at?: string
   wallet_type?: string
@@ -31,16 +34,6 @@ const safeNum = (v: unknown, fallback = 0) => {
   return Number.isFinite(n) ? n : fallback
 }
 
-const normalizeStatus = (value: unknown) => safeStr(value, 'pending').toLowerCase()
-
-const toReceiptStatus = (raw: string): 'successful' | 'pending' | 'failed' | 'timed_out' => {
-  const s = normalizeStatus(raw)
-  if (s.includes('success') || s.includes('complete') || s.includes('approved')) return 'successful'
-  if (s.includes('timedout') || s.includes('timed_out') || s.includes('timeout')) return 'timed_out'
-  if (s.includes('fail') || s.includes('declin') || s.includes('revers')) return 'failed'
-  return 'pending'
-}
-
 const isTunnelConversion = (address: unknown) =>
   safeStr(address).toLowerCase().includes('tunnel conversion')
 
@@ -50,7 +43,16 @@ const WalletReceiptScreen = () => {
   const reference = useMemo(() => safeStr(params.reference || params.id, '--'), [params.id, params.reference])
   const amount = useMemo(() => safeNum(params.amount, 0), [params.amount])
   const currency = useMemo(() => safeStr(params.currency, 'NGN'), [params.currency])
-  const status = useMemo(() => toReceiptStatus(safeStr(params.status, 'pending')), [params.status])
+  const lifecycle = useMemo(
+    () =>
+      resolveTransferLifecycle({
+        lifecycle_state: params.lifecycle_state,
+        status: params.status,
+        display_message: params.display_message,
+      }),
+    [params.display_message, params.lifecycle_state, params.status]
+  )
+  const status = useMemo(() => lifecycle.state, [lifecycle.state])
   const description = useMemo(() => safeStr(params.description, 'Wallet transaction'), [params.description])
   const createdAt = useMemo(() => safeStr(params.created_at, '--'), [params.created_at])
   const walletType = useMemo(() => safeStr(params.wallet_type, 'ngn').toLowerCase(), [params.wallet_type])
@@ -234,4 +236,5 @@ const WalletReceiptScreen = () => {
 }
 
 export default WalletReceiptScreen
+
 

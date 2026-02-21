@@ -5,6 +5,7 @@ import useFetch from '@/services/useFetch'
 import { getTransactionRecord } from '@/api/transactions'
 import moneyFormat from '@/utils/moneyFormat'
 import PerfTrace from '@/utils/perfTrace'
+import { resolveTransferLifecycle } from '@/utils/transferLifecycle'
 import { FEATURE_DISPUTES } from '@/constants/featureFlags'
 
 const Row = ({ label, value }: { label: string; value?: string | number }) => (
@@ -94,15 +95,17 @@ const TransactionRecordScreen = () => {
     }
   }
 
-  const statusLabel = String((data as any)?.status || 'pending').toLowerCase()
-  const statusClass =
-    statusLabel === 'approved'
-      ? 'bg-green-700'
-      : statusLabel === 'initialized'
-        ? 'bg-yellow-700'
-        : statusLabel === 'failed'
-          ? 'bg-red-700'
-          : 'bg-gray-700'
+  const lifecycle = resolveTransferLifecycle({
+    lifecycle_state: (data as any)?.lifecycle_state,
+    status: (data as any)?.status,
+    display_message: (data as any)?.display_message,
+  })
+  const statusLabel = lifecycle.shortLabel.toLowerCase()
+  const statusClass = lifecycle.isSuccess
+    ? 'bg-green-700'
+    : lifecycle.isFailure
+      ? 'bg-red-700'
+      : 'bg-yellow-700'
 
   return (
     <View className="flex-1 bg-primary px-4">
@@ -138,7 +141,7 @@ const TransactionRecordScreen = () => {
               </View>
             </View>
 
-            <Row label="Status" value={(data as any)?.status} />
+            <Row label="Status" value={lifecycle.message} />
             <Row label="Amount" value={moneyFormat((data as any)?.amount ?? 0)} />
             <Row label="Type" value={(data as any)?.transaction_type || (data as any)?.type} />
             <Row label="Reference" value={(data as any)?.reference || (data as any)?.id} />
@@ -217,3 +220,5 @@ const TransactionRecordScreen = () => {
 }
 
 export default TransactionRecordScreen
+
+

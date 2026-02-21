@@ -6,6 +6,7 @@ import NotificationAlert from '@/components/notification'
 import { verifyTransfer } from '@/api/account'
 import { useAuth } from '@/services/useAuth'
 import { buildApiErrorMessage } from '@/utils/apiErrorMessage'
+import { resolveTransferLifecycle } from '@/utils/transferLifecycle'
 
 type NoticeState = { message: string | null; error: boolean; data: any | null }
 
@@ -56,6 +57,12 @@ const TransferStatusScreen = () => {
     }
   }, [transfer_id])
 
+  const lifecycle = resolveTransferLifecycle({
+    lifecycle_state: result?.lifecycle_state,
+    status: result?.status,
+    display_message: result?.display_message,
+  })
+
   return (
     <View className="flex-1 bg-primary px-4">
       <View className="pt-10">
@@ -67,9 +74,10 @@ const TransferStatusScreen = () => {
         {result && (
           <View className="bg-gray-900 rounded-xl p-4 mt-4">
             <Text className="text-white mb-1">Result</Text>
-            <Text className="text-gray-300">Status: {result?.status || 'N/A'}</Text>
+            <Text className="text-gray-300">Status: {lifecycle.shortLabel || 'N/A'}</Text>
+            <Text className="text-gray-400 text-xs mt-1">{lifecycle.message}</Text>
             {result?.amount !== undefined && (
-              <Text className="text-gray-300">Amount: {result.amount}</Text>
+              <Text className="text-gray-300 mt-2">Amount: {result.amount}</Text>
             )}
             {result?.reference && (
               <Text className="text-gray-400">Reference: {result.reference}</Text>
@@ -91,6 +99,4 @@ const TransferStatusScreen = () => {
 }
 
 export default TransferStatusScreen
-
-
 

@@ -24,7 +24,24 @@ const norm = (s?: any) => String(s || '').toLowerCase().trim()
 
 const isTerminalStatus = (s?: string) => {
   const v = norm(s)
-  return ['completed', 'approved', 'success', 'paid', 'failed', 'declined', 'cancelled', 'canceled', 'refunded'].includes(v)
+  return [
+    'completed',
+    'approved',
+    'success',
+    'paid',
+    'failed',
+    'failed_refunded',
+    'failed_reversal_pending',
+    'failed_unrecovered',
+    'released',
+    'declined',
+    'cancelled',
+    'canceled',
+    'refunded',
+    'timed_out',
+    'timedout',
+    'timeout',
+  ].includes(v)
 }
 
 const isSuccessfulStatus = (s?: string) => {
@@ -34,7 +51,7 @@ const isSuccessfulStatus = (s?: string) => {
 
 const isStillProcessing = (s?: string) => {
   const v = norm(s)
-  return ['initialized', 'pending', 'processing', 'in_progress', 'queued'].includes(v)
+  return ['initialized', 'pending', 'processing', 'in_progress', 'queued', 'reserved', 'pending_provider'].includes(v)
 }
 
 const isElectricity = (serviceType?: any) => String(serviceType || '').trim().toUpperCase() === 'ELECTRICITY'
@@ -669,3 +686,4 @@ export default function TransactionSuccessScreen() {
     </View>
   )
 }
+

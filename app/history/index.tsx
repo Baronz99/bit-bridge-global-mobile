@@ -5,6 +5,7 @@ import useFetch from '@/services/useFetch'
 import moneyFormat from '@/utils/moneyFormat'
 import { getUserOrders } from '@/api/billOrder'
 import { getTransactions } from '@/api/transactions'
+import { resolveTransferLifecycle } from '@/utils/transferLifecycle'
 
 const index = () => {
   const [activeTab, setActiveTab] = useState<'orders' | 'wallet'>('orders')
@@ -199,22 +200,27 @@ const index = () => {
   const ordersCount = filteredOrders.length
   const walletCount = filteredTransactions.length
   const statusTone = (status: string) => {
-    if (status === 'completed' || status === 'approved') return 'text-green-400'
-    if (status === 'pending' || status === 'initialized' || status === 'reserved') return 'text-yellow-400'
-    if (status === 'released') return 'text-sky-300'
+    const normalized = resolveTransferLifecycle({ lifecycle_state: status, status }).state
+    if (normalized === 'completed' || normalized === 'approved') return 'text-green-400'
+    if (normalized === 'failed_refunded' || normalized === 'released') return 'text-sky-300'
+    if (normalized === 'pending_provider' || normalized === 'pending' || normalized === 'initialized' || normalized === 'reserved') return 'text-yellow-400'
     return 'text-red-400'
   }
 
   const isPrimaryTransaction = (item: any) => item?.show_in_primary_feed !== false
 
   const transactionState = (item: any) =>
-    String(item?.lifecycle_state || item?.status || 'pending').toLowerCase()
+    resolveTransferLifecycle({
+      lifecycle_state: item?.lifecycle_state,
+      status: item?.status,
+      display_message: item?.display_message,
+    }).state
 
   const statusFilterValue = (item: any) => {
     const state = transactionState(item)
     if (state === 'completed') return 'approved'
-    if (state === 'reserved') return 'initialized'
-    if (state === 'released') return 'failed'
+    if (state === 'reserved' || state === 'pending_provider' || state === 'pending') return 'initialized'
+    if (state === 'failed_refunded' || state === 'failed_reversal_pending' || state === 'failed_unrecovered' || state === 'released') return 'failed'
     return state
   }
 
@@ -499,3 +505,5 @@ const index = () => {
 }
 
 export default index
+
+

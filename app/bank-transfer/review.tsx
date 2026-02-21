@@ -16,6 +16,7 @@ import {
   isLikelyNetworkTimeout,
   isTierEligibleForBankTransfer,
 } from '@/utils/bankTransfer'
+import { resolveTransferLifecycle } from '@/utils/transferLifecycle'
 
 type NoticeState = { message: string | null; error: boolean; data: any | null }
 
@@ -196,6 +197,11 @@ const ReviewTransferScreen = () => {
         dailyLimitRemaining: Number(draft.daily_remaining_before || 0),
         totalDebit: backendTotalDebit,
       })
+      const lifecycle = resolveTransferLifecycle({
+        lifecycle_state: responseData?.lifecycle_state,
+        status: responseData?.status,
+        display_message: responseData?.display_message || response?.message,
+      })
 
       setPinModalOpen(false)
       router.replace({
@@ -214,6 +220,9 @@ const ReviewTransferScreen = () => {
               response?.id ||
               '',
             daily_remaining_after: nextDailyRemaining,
+            lifecycle_state: lifecycle.state,
+            status: responseData?.status || lifecycle.state,
+            display_message: lifecycle.message,
           }),
         },
       })
@@ -379,3 +388,5 @@ const ReviewTransferScreen = () => {
 }
 
 export default ReviewTransferScreen
+
+

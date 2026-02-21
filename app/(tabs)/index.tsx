@@ -36,6 +36,7 @@ import ViewBox from '@/components/view-box/ViewBoxIcon'
 import { FEATURE_LEGACY_HOME } from '@/constants/featureFlags'
 import { getTierFromProfile, isTierEligibleForBankTransfer } from '@/utils/bankTransfer'
 import { log } from '@/utils/logger'
+import { resolveTransferLifecycle } from '@/utils/transferLifecycle'
 
 // ---------------------------
 // Types
@@ -73,16 +74,16 @@ const formatRelative = (iso: any) => {
   return `${days}d ago`
 }
 
-const normalizeStatus = (raw: any) => s(raw, 'pending').toLowerCase()
-
-const toBankStatus = (raw: any): 'successful' | 'pending' | 'failed' | 'timed_out' => {
-  const v = normalizeStatus(raw)
-  if (v.includes('success') || v.includes('complete') || v.includes('approved') || v.includes('paid'))
-    return 'successful'
-  if (v.includes('timedout') || v.includes('timed_out') || v.includes('timeout'))
-    return 'timed_out'
-  if (v.includes('fail') || v.includes('declin') || v.includes('revers') || v.includes('error'))
-    return 'failed'
+const toBankStatus = (item: TimelineItem): 'successful' | 'pending' | 'failed' | 'timed_out' => {
+  const lifecycle = resolveTransferLifecycle({
+    lifecycle_state: item?.lifecycle_state,
+    status: item?.status,
+    display_message: item?.display_message,
+  })
+  const state = String(lifecycle.state)
+  if (state.includes('timeout')) return 'timed_out'
+  if (lifecycle.isSuccess) return 'successful'
+  if (lifecycle.isFailure) return 'failed'
   return 'pending'
 }
 
@@ -793,7 +794,7 @@ export default function Index() {
                   const subtitle = getHomeRowSubtitle(item)
                   const amount = getHomeRowAmount(item)
                   const currency = getHomeRowCurrency(item)
-                  const status = toBankStatus(item?.status)
+                  const status = toBankStatus(item)
                   const when = formatRelative(item?.occurred_at ?? item?.created_at ?? item?.updated_at)
                   const receiptRef = getBestReceiptReference(item)
                   const showChevron = true
@@ -1017,4 +1018,5 @@ const LabelText = ({ label, value }: any) => (
     <Text className="text-white text-center">{value}</Text>
   </View>
 )
+
 
