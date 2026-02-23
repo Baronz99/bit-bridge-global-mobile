@@ -139,10 +139,10 @@ export const getBillOrder = async (id: string) => {
 
 export const confirmPayment = async ({
   queryId,
-  payment_method,
+  payment_method = 'wallet',
 }: {
   queryId: string
-  payment_method: string
+  payment_method?: 'wallet'
 }) => {
   try {
     const res = await client.get(`/payment_processors/${queryId}/confirm_payment`, {
@@ -156,12 +156,12 @@ export const confirmPayment = async ({
 
 export const initializeBillOrderPayment = async ({
   queryId,
-  payment_method = 'card',
+  payment_method = 'wallet',
   redirect_url,
   use_commission = false,
 }: {
   queryId: string
-  payment_method?: 'card' | 'wallet'
+  payment_method?: 'wallet'
   redirect_url?: string
   use_commission?: boolean
 }) => {
