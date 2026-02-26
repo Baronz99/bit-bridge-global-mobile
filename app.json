@@ -48,7 +48,10 @@
         "foregroundImage": "./assets/icons/adaptive-foreground.png",
         "backgroundColor": "#FFFFFF"
       },
-      "package": "com.vortech.bitbridgeapp"
+      "package": "com.vortech.bitbridgeapp",
+      "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -70,7 +73,8 @@
       "expo-font",
       "expo-web-browser",
       "expo-local-authentication",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "./plugins/withBlockSystemAlertWindow"
     ],
     "experiments": {
       "typedRoutes": true

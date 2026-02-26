@@ -202,10 +202,18 @@ const BankReceiptCard = ({
   const safeValueAmount = Number.isFinite(Number(valueAmount)) ? Number(valueAmount) : undefined
   const safeWalletAmount = typeof walletAmount === 'number' ? walletAmount : safeAmount
   const safeRewardAmount = typeof rewardAmount === 'number' ? rewardAmount : 0
+  const receiptCategory = clean(meta?.receipt_category || meta?.receiptCategory).toLowerCase()
+  const transactionDirection = clean(meta?.transaction_direction || meta?.transactionDirection).toLowerCase()
   const transactionType = clean(meta?.transaction_type || meta?.tx_type).toLowerCase()
   const purposeHint = clean(meta?.purpose).toLowerCase()
   const receiptText = `${clean(event)} ${clean(kind)} ${clean(title)} ${clean(subtitle)}`.toLowerCase()
+  const incomingTransferMeta =
+    meta?.incoming_transfer && typeof meta.incoming_transfer === 'object'
+      ? (meta.incoming_transfer as Record<string, any>)
+      : null
+  const isIncomingTransfer = receiptCategory === 'incoming_transfer' || transactionDirection === 'inbound'
   const isCreditReceipt =
+    isIncomingTransfer ||
     transactionType === 'deposit' ||
     purposeHint.includes('wallet_fund') ||
     receiptText.includes('wallet funding') ||
@@ -246,6 +254,20 @@ const BankReceiptCard = ({
   const customerName = extractMetaValue(meta, ['customerName', 'customer_name', 'name'])
   const customerEmail = maskEmail(extractMetaValue(meta, ['customerEmail', 'customer_email', 'email']))
   const sessionId = clean(meta?.sessionId)
+  const incomingProviderName = clean(incomingTransferMeta?.provider_name || provider?.name)
+  const incomingProviderReference = clean(incomingTransferMeta?.provider_reference) || providerReference
+  const incomingSessionId = clean(incomingTransferMeta?.session_id) || sessionId
+  const incomingSenderName =
+    clean(incomingTransferMeta?.sender_name) || clean(parties?.sender_name) || customerName
+  const incomingSenderBank =
+    clean(incomingTransferMeta?.sender_bank_name) || clean(parties?.sender_bank_name)
+  const incomingSenderAccountMasked = maskAccountNumber(
+    clean(incomingTransferMeta?.sender_account_number) || clean(parties?.sender_account_number)
+  )
+  const incomingRecipientWalletType =
+    clean(incomingTransferMeta?.recipient_wallet_type) || clean(parties?.wallet_type)
+  const incomingRecipientWalletCurrency =
+    clean(incomingTransferMeta?.recipient_wallet_currency) || safeCurrency
   const serviceType = String(
     meta?.service_type ||
       parties?.service_type ||
@@ -294,11 +316,20 @@ const BankReceiptCard = ({
   const monnifyMetaKeys =
     meta && Object.keys(meta).some((key) => /monnify/i.test(key))
   const isMonnifyDeposit =
+    !isIncomingTransfer &&
     reference?.toLowerCase().startsWith('fbg-') &&
     (includesMonnify(title) || includesMonnify(event) || includesMonnify(kind) || monnifyMetaKeys)
 
-  const displayTitle = isMonnifyDeposit ? 'Wallet Funding' : clean(title) || 'Receipt'
-  const displaySubtitle = isMonnifyDeposit ? 'via Monnify' : clean(subtitle)
+  const displayTitle = isIncomingTransfer
+    ? 'Incoming bank transfer'
+    : isMonnifyDeposit
+      ? 'Wallet Funding'
+      : clean(title) || 'Receipt'
+  const displaySubtitle = isIncomingTransfer
+    ? (incomingProviderName ? `via ${incomingProviderName}` : clean(subtitle))
+    : isMonnifyDeposit
+      ? 'via Monnify'
+      : clean(subtitle)
   const displayTime = formatReceiptDate(createdAt)
   const receiptNo = clean(reference) || '--'
 
@@ -321,8 +352,8 @@ const BankReceiptCard = ({
 
   const referenceLabel = isMonnifyDeposit ? 'Monnify reference' : 'Provider reference'
   const identifierRows = [
-    { label: referenceLabel, value: providerReference, mono: true },
-    { label: 'Session ID', value: sessionId, mono: true },
+    { label: referenceLabel, value: incomingProviderReference || providerReference, mono: true },
+    { label: 'Session ID', value: incomingSessionId, mono: true },
     { label: 'Payment channel', value: channelValue },
     { label: 'Customer name', value: electricityCustomerName || customerName },
     { label: 'Customer email', value: customerEmail },
@@ -486,6 +517,22 @@ const BankReceiptCard = ({
           <Row label="Name" value={beneficiary} />
           <Row label="Bank" value={bankName} />
           <Row label="Account" value={accountNumberMasked} mono />
+        </>
+      ) : null}
+
+      {isIncomingTransfer && (incomingSenderName || incomingSenderBank || incomingSenderAccountMasked) ? (
+        <>
+          <Divider />
+          <Text className="text-gray-400 text-[11px] uppercase tracking-widest mb-2">Source account</Text>
+          <Row label="Name" value={incomingSenderName} />
+          <Row label="Bank" value={incomingSenderBank} />
+          <Row label="Account" value={incomingSenderAccountMasked} mono />
+          {incomingRecipientWalletType ? (
+            <Row
+              label="Recipient wallet"
+              value={`${incomingRecipientWalletType.toUpperCase()} (${incomingRecipientWalletCurrency.toUpperCase()})`}
+            />
+          ) : null}
         </>
       ) : null}
 
