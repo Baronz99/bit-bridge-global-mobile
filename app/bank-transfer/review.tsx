@@ -175,7 +175,9 @@ const ReviewTransferScreen = () => {
         },
       })
 
-      const responseData = response?.data || {}
+      const responseData =
+        ((response as any)?.data && typeof (response as any).data === 'object' ? (response as any).data : null) ||
+        (response && typeof response === 'object' ? response : {})
       const backendFee = Number(
         responseData?.fee ??
           responseData?.fees ??
@@ -200,7 +202,7 @@ const ReviewTransferScreen = () => {
       const lifecycle = resolveTransferLifecycle({
         lifecycle_state: responseData?.lifecycle_state,
         status: responseData?.status,
-        display_message: responseData?.display_message || response?.message,
+        display_message: responseData?.display_message || responseData?.message || response?.message,
       })
 
       setPinModalOpen(false)

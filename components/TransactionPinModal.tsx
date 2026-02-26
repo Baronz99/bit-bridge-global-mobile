@@ -64,7 +64,7 @@ const TransactionPinModal = ({
             disabled={!canSubmit}
             className={`${canSubmit ? 'bg-orange-700' : 'bg-gray-700'} py-3 flex-1 rounded-xl`}
           >
-            <Text className="text-white text-center">Confirm</Text>
+            <Text className="text-white text-center">{loading ? "Confirming..." : "Confirm"}</Text>
           </TouchableOpacity>
         </View>
       </View>
