@@ -6,6 +6,7 @@ import moneyFormat from '@/utils/moneyFormat'
 import { getUserOrders } from '@/api/billOrder'
 import { getTransactions } from '@/api/transactions'
 import { resolveTransferLifecycle } from '@/utils/transferLifecycle'
+import { formatWalletHistoryPresentation } from '@/utils/walletHistoryPresentation'
 
 const index = () => {
   const [activeTab, setActiveTab] = useState<'orders' | 'wallet'>('orders')
@@ -438,8 +439,7 @@ const index = () => {
                 filteredTransactions.map((item: any, index: number) => {
                   const reference = item?.reference ?? item?.transfer_reference ?? item?.id
                   const status = transactionState(item)
-                  const typeLabel = item?.transaction_type || item?.type || 'transaction'
-                  const message = item?.display_message
+                  const presentation = formatWalletHistoryPresentation(item)
                   if (!reference) {
                     return (
                       <View
@@ -448,9 +448,8 @@ const index = () => {
                       >
                         <View className="flex-row justify-between items-start">
                           <View className="flex-1 pr-3">
-                            <Text className="text-white font-semibold">{typeLabel}</Text>
-                            <Text className="text-gray-500 text-xs mt-1">Reference pending</Text>
-                            {message ? <Text className="text-gray-400 text-xs mt-1">{message}</Text> : null}
+                            <Text className="text-white font-semibold">{presentation.title}</Text>
+                            <Text className="text-gray-500 text-xs mt-1">{presentation.subtitle}</Text>
                           </View>
                           <View className="items-end">
                             <Text className="text-white font-semibold">
@@ -476,11 +475,8 @@ const index = () => {
                       <TouchableOpacity className="mb-3 rounded-2xl border border-gray-800 bg-gray-900 px-4 py-4">
                         <View className="flex-row justify-between items-start">
                           <View className="flex-1 pr-3">
-                            <Text className="text-white font-semibold">{typeLabel}</Text>
-                            <Text className="text-gray-500 text-xs mt-1">
-                              Ref {reference}
-                            </Text>
-                            {message ? <Text className="text-gray-400 text-xs mt-1">{message}</Text> : null}
+                            <Text className="text-white font-semibold">{presentation.title}</Text>
+                            <Text className="text-gray-500 text-xs mt-1">{presentation.subtitle}</Text>
                           </View>
                           <View className="items-end">
                             <Text className="text-white font-semibold">

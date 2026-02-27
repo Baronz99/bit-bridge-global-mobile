@@ -6,6 +6,7 @@ import BankReceiptCard from '@/components/receipt/BankReceiptCard'
 import client from '@/api/client'
 import { isValidReceiptReference } from '../../src/navigation/receiptNav'
 import PerfTrace from '@/utils/perfTrace'
+import { formatWalletHistoryPresentation } from '@/utils/walletHistoryPresentation'
 
 type ReceiptParams = { reference?: string; timelineId?: string }
 type ReceiptCacheEntry = { data: ReceiptDTO; cachedAt: number }
@@ -298,6 +299,34 @@ const ReceiptScreen = () => {
 
   const uiTitle = useMemo(() => {
     if (!receipt) return 'Transaction receipt'
+    const looksWallet = [receipt.kind, receipt.event, receipt.title]
+      .map((value) => String(value || '').toLowerCase())
+      .some(
+        (value) =>
+          value.includes('wallet') ||
+          value.includes('deposit') ||
+          value.includes('withdraw') ||
+          value.includes('transfer') ||
+          value.includes('conversion')
+      )
+    if (looksWallet) {
+      const walletView = formatWalletHistoryPresentation({
+        transaction_type: receipt?.meta?.transaction_type || receipt?.meta?.type || receipt?.kind,
+        type: receipt?.kind,
+        description:
+          cleanText(receipt?.meta?.description) ||
+          cleanText(receipt?.subtitle) ||
+          cleanText(receipt?.event) ||
+          cleanText(receipt?.title),
+        display_message: cleanText(receipt?.message),
+        beneficiary_name: cleanText(receipt?.parties?.beneficiary_name || receipt?.meta?.beneficiary_name),
+        account_name: cleanText(receipt?.parties?.account_name || receipt?.meta?.account_name),
+        bank_name: cleanText(receipt?.parties?.bank_name || receipt?.meta?.bank_name),
+        account_number: cleanText(receipt?.parties?.account_number || receipt?.meta?.account_number),
+        reference: cleanText(receipt?.reference),
+      })
+      return walletView.title
+    }
     const baseTitle = receipt.title || receipt.event || receipt.kind || ''
     const normalized = baseTitle.toLowerCase()
     if (normalized.includes('webhook') || normalized.includes('monnify')) {
@@ -397,7 +426,23 @@ const ReceiptScreen = () => {
                 provider={receipt.provider}
                 event={receipt.event}
                 kind={receipt.kind}
-                subtitle={receipt.subtitle}
+                subtitle={
+                  receipt.subtitle ||
+                  formatWalletHistoryPresentation({
+                    transaction_type: receipt?.meta?.transaction_type || receipt?.meta?.type || receipt?.kind,
+                    type: receipt?.kind,
+                    description:
+                      cleanText(receipt?.meta?.description) ||
+                      cleanText(receipt?.event) ||
+                      cleanText(receipt?.title),
+                    display_message: cleanText(receipt?.message),
+                    reference: cleanText(receipt?.reference),
+                    beneficiary_name: cleanText(receipt?.parties?.beneficiary_name || receipt?.meta?.beneficiary_name),
+                    account_name: cleanText(receipt?.parties?.account_name || receipt?.meta?.account_name),
+                    bank_name: cleanText(receipt?.parties?.bank_name || receipt?.meta?.bank_name),
+                    account_number: cleanText(receipt?.parties?.account_number || receipt?.meta?.account_number),
+                  }).subtitle
+                }
               valueAmount={
                 receipt.value_amount ??
                 (typeof receipt.total_amount === 'number'

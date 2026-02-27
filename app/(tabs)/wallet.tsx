@@ -23,6 +23,7 @@ import AppModal from '@/components/modal/Modal'
 import { isPrimaryTransaction as isPrimaryTransactionFromUtils } from '@/utils/timelineRefs'
 import { getTierFromProfile, isTierEligibleForBankTransfer } from '@/utils/bankTransfer'
 import { warn } from '@/utils/logger'
+import { formatWalletHistoryPresentation } from '@/utils/walletHistoryPresentation'
 
 const REFRESH_TIMEOUT_MS = 15000
 const TX_PAGE_LIMIT = 30
@@ -659,9 +660,8 @@ const WalletScreen = () => {
               filteredTransactions.map((item: any, index: number) => {
                 const reference = item?.reference ?? item?.transfer_reference ?? item?.id
                 const status = transactionState(item)
-                const description = getWalletDescription(item)
                 const currency = isTunnelMode ? 'USD' : 'NGN'
-                const message = item?.display_message
+                const presentation = formatWalletHistoryPresentation(item)
 
 	                return (
 	                  <TouchableOpacity
@@ -682,11 +682,8 @@ const WalletScreen = () => {
 	                  >
                     <View className="flex-row justify-between items-start">
                           <View className="flex-1 pr-3">
-                            <Text className="text-white font-semibold">{description}</Text>
-                            <Text className="text-gray-500 text-xs mt-1">
-                              Ref {reference || 'pending'}
-                            </Text>
-                            {message ? <Text className="text-gray-400 text-xs mt-1">{message}</Text> : null}
+                            <Text className="text-white font-semibold">{presentation.title}</Text>
+                            <Text className="text-gray-500 text-xs mt-1">{presentation.subtitle}</Text>
                           </View>
 
                           <View className="items-end">
