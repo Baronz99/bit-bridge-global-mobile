@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useFocusEffect } from '@react-navigation/native'
 import { ActivityIndicator, ScrollView, Text, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import * as SecureStore from 'expo-secure-store'
@@ -52,7 +53,6 @@ const AnchorAccountScreen = () => {
           city: String(parsed?.city || prev.city || ''),
           state: String(parsed?.state || prev.state || ''),
           postal_code: String(parsed?.postal_code || prev.postal_code || ''),
-          bvn: String(parsed?.bvn || prev.bvn || ''),
           dob: String(parsed?.dob || prev.dob || ''),
           gender: String(parsed?.gender || prev.gender || ''),
         }))
@@ -67,7 +67,15 @@ const AnchorAccountScreen = () => {
   }, [])
 
   useEffect(() => {
-    void SecureStore.setItemAsync(ANCHOR_FORM_DRAFT_KEY, JSON.stringify(anchorForm)).catch(() => {})
+    const draft = {
+      address: anchorForm.address,
+      city: anchorForm.city,
+      state: anchorForm.state,
+      postal_code: anchorForm.postal_code,
+      dob: anchorForm.dob,
+      gender: anchorForm.gender,
+    }
+    void SecureStore.setItemAsync(ANCHOR_FORM_DRAFT_KEY, JSON.stringify(draft)).catch(() => {})
   }, [anchorForm])
 
   useEffect(() => {
@@ -138,6 +146,7 @@ const AnchorAccountScreen = () => {
 
   const handleRefresh = useCallback(async () => {
     try {
+      await loadProfile({ force: true }).catch(() => {})
       await anchorState.refresh({ force: true })
     } catch (error: any) {
       const status = error?.response?.status
@@ -146,7 +155,13 @@ const AnchorAccountScreen = () => {
         return
       }
     }
-  }, [anchorState, onLogout])
+  }, [anchorState, loadProfile, onLogout])
+
+  useFocusEffect(
+    useCallback(() => {
+      handleRefresh().catch(() => {})
+    }, [handleRefresh])
+  )
 
   useEffect(() => {
     if (anchorState.error?.response?.status === 401) {
@@ -326,6 +341,25 @@ const AnchorAccountScreen = () => {
     }
   }
 
+  const profileUpdatedAt = useMemo(() => {
+    const raw = profile?.updated_at || profileRoot?.updated_at
+    if (!raw) return null
+    const parsed = new Date(raw)
+    if (Number.isNaN(parsed.getTime())) return null
+    return parsed
+  }, [profile?.updated_at, profileRoot?.updated_at])
+
+  const profileFreshnessLabel = useMemo(() => {
+    if (!profileUpdatedAt) return null
+    const minutes = Math.max(0, Math.floor((Date.now() - profileUpdatedAt.getTime()) / 60000))
+    if (minutes < 1) return 'Using profile data updated just now'
+    if (minutes === 1) return 'Using profile data updated 1 min ago'
+    if (minutes < 60) return `Using profile data updated ${minutes} mins ago`
+    const hours = Math.floor(minutes / 60)
+    if (hours === 1) return 'Using profile data updated 1 hour ago'
+    return `Using profile data updated ${hours} hours ago`
+  }, [profileUpdatedAt])
+
   const ensureAccountNumber = async () => {
     if (!normalized.hasAnchorAccount) return
     if (normalized.hasAccountNumber) {
@@ -464,6 +498,9 @@ const AnchorAccountScreen = () => {
               Complete the steps below to enable NGN deposits.
             </Text>
           )}
+          {profileFreshnessLabel ? (
+            <Text className="text-gray-500 mt-2 text-xs">{profileFreshnessLabel}</Text>
+          ) : null}
         </View>
 
         {loading || anchorState.loading ? (

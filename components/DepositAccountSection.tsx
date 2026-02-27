@@ -60,6 +60,7 @@ const DepositAccountSection = ({
   const maskedAccountNumber = normalized.displayAccountNumber || '----'
   const hasRawAccountNumber = Boolean(normalized.rawAccountNumber)
   const hasPhone = Boolean(String(prefilledPhone || '').trim())
+  const hasValidPhone = /^234\d{10}$/.test(String(prefilledPhone || '').trim())
   const accountNumberToDisplay =
     showRawAccountNumber && hasRawAccountNumber
       ? String(normalized.rawAccountNumber)
@@ -114,6 +115,9 @@ const DepositAccountSection = ({
 
   const primaryAction = useMemo(() => {
     if (!platformTier2) return null
+    if ((!hasPhone || !hasValidPhone) && onGoToProfile) {
+      return { label: 'Update Profile', onPress: async () => onGoToProfile() }
+    }
     if (
       (normalized.backendFlowState === 'blocked_profile_incomplete' ||
         normalized.backendFlowState === 'blocked_phone_exists') &&
@@ -123,11 +127,14 @@ const DepositAccountSection = ({
     }
     switch (step) {
       case 'CREATE_ANCHOR':
+        if (normalized.capabilities?.can_create_anchor_profile === false) return null
         return { label: 'Create deposit profile', onPress: onCreateAnchor }
       case 'DO_KYC':
+        if (normalized.capabilities?.can_submit_anchor_kyc === false) return null
         if (normalized.kycState === 'pending') return null
         return { label: 'Verify identity', onPress: onVerifyKyc }
       case 'GENERATE_NUMBER':
+        if (normalized.capabilities?.can_provision_account_number === false) return null
         return { label: 'Generate Account Number', onPress: onGenerateAccount }
       default:
         return null
@@ -137,6 +144,9 @@ const DepositAccountSection = ({
     platformTier2,
     normalized.backendFlowState,
     normalized.kycState,
+    normalized.capabilities,
+    hasPhone,
+    hasValidPhone,
     onCreateAnchor,
     onVerifyKyc,
     onGenerateAccount,
