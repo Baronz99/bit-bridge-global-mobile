@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useFocusEffect } from '@react-navigation/native'
-import { getAccounts, getUserAnchorAccountDetail } from '@/api/account'
+import { getAnchorOnboardingState, getUserAnchorAccountDetail } from '@/api/account'
 import { log } from '@/utils/log'
 
 export type AnchorKycState = 'unknown' | 'not_started' | 'pending' | 'verified'
@@ -30,9 +30,12 @@ export type NormalizedAnchorOnboarding = {
   backendFlowState: AnchorFlowState
   backendNextAction: string | null
   blockingReason?: string
+  capabilities?: Record<string, boolean> | null
+  requirements?: Record<string, unknown> | null
 }
 
 type AnchorOnboardingStoreState = {
+  onboardingResponse: any | null | undefined
   detailResponse: any | null | undefined
   userAccountsResponse: any | null | undefined
   loading: boolean
@@ -43,11 +46,13 @@ type AnchorOnboardingStoreState = {
 type Listener = (state: AnchorOnboardingStoreState) => void
 
 type RefreshResponse = {
+  onboardingResponse: any | null
   detailResponse: any | null
   userAccountsResponse: any | null | undefined
 }
 
 const store: AnchorOnboardingStoreState = {
+  onboardingResponse: undefined,
   detailResponse: undefined,
   userAccountsResponse: undefined,
   loading: false,
@@ -168,8 +173,15 @@ const extractDetailData = (detailResponse: any) => {
   return payload as Record<string, any>
 }
 
-const parseBackendFlow = (detailResponse: any): { state: AnchorFlowState; nextAction: string | null } => {
-  const flow = detailResponse?.flow || detailResponse?.data?.flow
+const parseBackendFlow = (
+  onboardingResponse: any,
+  detailResponse: any
+): { state: AnchorFlowState; nextAction: string | null } => {
+  const flow =
+    onboardingResponse?.flow ||
+    onboardingResponse?.data?.flow ||
+    detailResponse?.flow ||
+    detailResponse?.data?.flow
   const state = String(flow?.state || '').trim().toLowerCase()
   const nextAction = String(flow?.next_action || '').trim() || null
 
@@ -274,15 +286,22 @@ const detectAccountNumberPaths = (detailResponse: any, userAccountsResponse?: an
 
 export const normalizeAnchorOnboarding = (
   detailResponse: any,
-  userAccountsResponse?: any
+  userAccountsResponse?: any,
+  onboardingResponse?: any
 ): NormalizedAnchorOnboarding => {
-  const backendFlow = parseBackendFlow(detailResponse)
-  const isHydrated = detailResponse !== undefined || userAccountsResponse !== undefined
+  const backendFlow = parseBackendFlow(onboardingResponse, detailResponse)
+  const isHydrated =
+    onboardingResponse !== undefined || detailResponse !== undefined || userAccountsResponse !== undefined
   const detailData = extractDetailData(detailResponse)
   const accounts = extractAccountsList(userAccountsResponse)
   const anchorAccount = detectAnchorAccount(accounts)
+  const onboardingData = asObj(onboardingResponse?.data)
+  const onboardingCapabilities = asObj(onboardingResponse?.capabilities)
+  const onboardingRequirements = asObj(onboardingResponse?.requirements)
 
   const hasAnchorAccount =
+    onboardingResponse?.has_anchor_account === true ||
+    onboardingData?.has_anchor_account === true ||
     detailResponse?.has_anchor_account === true ||
     Boolean(anchorAccount) ||
     Boolean(detailData && Object.keys(detailData).length > 0)
@@ -319,9 +338,14 @@ export const normalizeAnchorOnboarding = (
     Boolean(accountNumber),
     anchorAccount
   )
-  const hasAccountNumber = Boolean(accountNumber)
+  const hasAccountNumber =
+    onboardingResponse?.has_deposit_account === true ||
+    onboardingData?.has_deposit_account === true ||
+    Boolean(accountNumber)
   const depositReady =
-    backendFlow.state === 'provisioned' || (kycState === 'verified' && hasAccountNumber)
+    backendFlow.state === 'provisioned' ||
+    onboardingCapabilities?.can_fund_wallet === true ||
+    (kycState === 'verified' && hasAccountNumber)
 
   const nextStep: AnchorNextStep =
     backendFlow.state === 'not_started'
@@ -372,6 +396,8 @@ export const normalizeAnchorOnboarding = (
     backendFlowState: backendFlow.state,
     backendNextAction: backendFlow.nextAction,
     blockingReason,
+    capabilities: Object.keys(onboardingCapabilities).length ? onboardingCapabilities : null,
+    requirements: Object.keys(onboardingRequirements).length ? onboardingRequirements : null,
   }
 }
 
@@ -641,8 +667,9 @@ const logDerivedState = (state: NormalizedAnchorOnboarding) => {
 }
 
 const fetchAnchorOnboarding = async (options?: { force?: boolean }): Promise<RefreshResponse> => {
-  if (!options?.force && store.detailResponse !== undefined && !isStale(store.lastFetchedAt)) {
+  if (!options?.force && store.onboardingResponse !== undefined && !isStale(store.lastFetchedAt)) {
     return {
+      onboardingResponse: store.onboardingResponse ?? null,
       detailResponse: store.detailResponse ?? null,
       userAccountsResponse: store.userAccountsResponse,
     }
@@ -652,23 +679,9 @@ const fetchAnchorOnboarding = async (options?: { force?: boolean }): Promise<Ref
   setStore({ loading: true, error: null })
   inFlight = (async () => {
     try {
+      const onboardingResponse = await getAnchorOnboardingState()
       const detailResponse = await getUserAnchorAccountDetail()
-      const normalized = normalizeAnchorOnboarding(detailResponse)
-      let userAccountsResponse: any | undefined
-
-      // Always attempt local accounts fetch for parity with backend-canonical account fields.
-      // If it fails, keep detail response unless critical fields are missing.
-      try {
-        userAccountsResponse = await getAccounts()
-      } catch (accountsError) {
-        const requiresLocalFallback =
-          !normalized.hasAccountNumber ||
-          !normalized.accountName ||
-          !normalized.bankName
-        if (requiresLocalFallback) {
-          throw accountsError
-        }
-      }
+      const userAccountsResponse: any | undefined = undefined
 
       if (options?.force) {
         didLogShapes = false
@@ -676,6 +689,7 @@ const fetchAnchorOnboarding = async (options?: { force?: boolean }): Promise<Ref
       logResponseShapes(detailResponse, userAccountsResponse)
 
       setStore({
+        onboardingResponse: onboardingResponse ?? null,
         detailResponse: detailResponse ?? null,
         userAccountsResponse: userAccountsResponse ?? store.userAccountsResponse,
         loading: false,
@@ -684,15 +698,20 @@ const fetchAnchorOnboarding = async (options?: { force?: boolean }): Promise<Ref
       })
 
       logDerivedState(
-        normalizeAnchorOnboarding(detailResponse ?? null, userAccountsResponse)
+        normalizeAnchorOnboarding(detailResponse ?? null, userAccountsResponse, onboardingResponse ?? null)
       )
 
-      return { detailResponse: detailResponse ?? null, userAccountsResponse }
+      return {
+        onboardingResponse: onboardingResponse ?? null,
+        detailResponse: detailResponse ?? null,
+        userAccountsResponse,
+      }
     } catch (error) {
       setStore({
         loading: false,
         error,
         lastFetchedAt: Date.now(),
+        onboardingResponse: store.onboardingResponse ?? null,
         detailResponse: store.detailResponse ?? null,
       })
       throw error
@@ -722,23 +741,28 @@ export const useAnchorOnboarding = (options?: {
 
   useEffect(() => {
     if (options?.autoFetchOnMount === false) return
-    if (state.detailResponse === undefined && !state.loading) {
+    if (state.onboardingResponse === undefined && !state.loading) {
       refresh().catch(() => {})
     }
-  }, [options?.autoFetchOnMount, refresh, state.detailResponse, state.loading])
+  }, [options?.autoFetchOnMount, refresh, state.onboardingResponse, state.loading])
 
   useFocusEffect(
     useCallback(() => {
       if (options?.autoFetchOnFocus !== true) return
-      if (state.detailResponse === undefined || isStale(state.lastFetchedAt)) {
+      if (state.onboardingResponse === undefined || isStale(state.lastFetchedAt)) {
         refresh().catch(() => {})
       }
-    }, [options?.autoFetchOnFocus, refresh, state.detailResponse, state.lastFetchedAt])
+    }, [options?.autoFetchOnFocus, refresh, state.onboardingResponse, state.lastFetchedAt])
   )
 
   const normalized = useMemo(
-    () => normalizeAnchorOnboarding(state.detailResponse, state.userAccountsResponse),
-    [state.detailResponse, state.userAccountsResponse]
+    () =>
+      normalizeAnchorOnboarding(
+        state.detailResponse,
+        state.userAccountsResponse,
+        state.onboardingResponse
+      ),
+    [state.onboardingResponse, state.detailResponse, state.userAccountsResponse]
   )
 
   return {
@@ -750,6 +774,7 @@ export const useAnchorOnboarding = (options?: {
 
 export const __resetAnchorOnboardingStore = () => {
   if (!__DEV__) return
+  store.onboardingResponse = undefined
   store.detailResponse = undefined
   store.userAccountsResponse = undefined
   store.loading = false

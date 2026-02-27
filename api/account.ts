@@ -52,14 +52,38 @@ export const getUserAnchorAccountDetail = async () => {
   }
 }
 
+export const getAnchorOnboardingState = async () => {
+  try {
+    const res = await client.get('/accounts/anchor_onboarding_state')
+    return res.data
+  } catch (err: any) {
+    const msg = errMsg(err)
+    warn('[getAnchorOnboardingState error]', {
+      message: msg,
+      status: err?.response?.status,
+      data: err?.response?.data,
+      url: err?.config?.url,
+    })
+    throw err
+  }
+}
+
 const parseAccountError = (err: any) => {
   const status = err?.response?.status
   const data = err?.response?.data || {}
   return {
     status,
+    success: data?.success,
+    error: data?.error,
     error_code: data?.error_code,
     message: data?.message || err?.message,
     missing_fields: Array.isArray(data?.missing_fields) ? data.missing_fields : [],
+    details: data?.details || null,
+    flow: data?.flow || data?.meta?.flow || null,
+    requirements: data?.requirements || null,
+    capabilities: data?.capabilities || null,
+    request_id: data?.request_id || data?.meta?.request_id || null,
+    response: err?.response,
   }
 }
 
@@ -67,10 +91,16 @@ const parseAnchorApiError = (err: any) => {
   const data = err?.response?.data || {}
   return {
     status: err?.response?.status,
+    success: data?.success,
     message: data?.message || err?.message || 'Something went wrong',
     error: data?.error,
     error_code: data?.error_code || data?.error,
     errors: Array.isArray(data?.errors) ? data.errors : [],
+    details: data?.details || null,
+    retryable: data?.retryable === true || data?.meta?.retryable === true,
+    capabilities: data?.capabilities || null,
+    requirements: data?.requirements || null,
+    request_id: data?.request_id || data?.meta?.request_id || null,
     meta: data?.meta || null,
     flow: data?.flow || data?.meta?.flow || null,
     response: err?.response,

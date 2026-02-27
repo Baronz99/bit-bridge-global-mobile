@@ -9,7 +9,6 @@ import { createAnchorAccount, createDepositAccount, verifyKyc } from '@/api/acco
 import {
   useAnchorOnboarding,
   normalizeAnchorOnboarding,
-  type NormalizedAnchorOnboarding,
 } from '@/services/useAnchorOnboarding'
 import { buildApiErrorMessage } from '@/utils/apiErrorMessage'
 import { useAuth } from '@/services/useAuth'
@@ -28,8 +27,6 @@ const AnchorAccountScreen = () => {
     message: null,
     error: false,
   })
-  const [kycOverrideVerified, setKycOverrideVerified] = useState(false)
-  const [kycOverridePending, setKycOverridePending] = useState(false)
   const anchorState = useAnchorOnboarding({ autoFetchOnMount: true, autoFetchOnFocus: false })
   const refreshHandledRef = useRef(false)
   const [anchorForm, setAnchorForm] = useState({
@@ -130,27 +127,14 @@ const AnchorAccountScreen = () => {
   }, [prefilledDob, prefilledGender, prefilledAddress, prefilledCity, prefilledState, prefilledPostal])
 
   const normalized = useMemo(
-    () => normalizeAnchorOnboarding(anchorState.detailResponse, anchorState.userAccountsResponse),
-    [anchorState.detailResponse, anchorState.userAccountsResponse]
+    () =>
+      normalizeAnchorOnboarding(
+        anchorState.detailResponse,
+        anchorState.userAccountsResponse,
+        anchorState.onboardingResponse
+      ),
+    [anchorState.onboardingResponse, anchorState.detailResponse, anchorState.userAccountsResponse]
   )
-  const effectiveNormalized = useMemo<NormalizedAnchorOnboarding>(() => {
-    if (!kycOverrideVerified && !kycOverridePending) return normalized
-    const hasAccountNumber = normalized.hasAccountNumber
-    if (kycOverrideVerified) {
-      return {
-        ...normalized,
-        kycState: 'verified',
-        depositReady: hasAccountNumber,
-        nextStep: hasAccountNumber ? 'DONE' : 'GENERATE_NUMBER',
-      }
-    }
-    return {
-      ...normalized,
-      kycState: 'pending',
-      depositReady: false,
-      nextStep: hasAccountNumber ? 'DONE' : 'GENERATE_NUMBER',
-    }
-  }, [normalized, kycOverrideVerified, kycOverridePending])
 
   const handleRefresh = useCallback(async () => {
     try {
@@ -343,8 +327,8 @@ const AnchorAccountScreen = () => {
   }
 
   const ensureAccountNumber = async () => {
-    if (!effectiveNormalized.hasAnchorAccount) return
-    if (effectiveNormalized.hasAccountNumber) {
+    if (!normalized.hasAnchorAccount) return
+    if (normalized.hasAccountNumber) {
       setNotice({ message: 'Account number already generated.', error: false })
       return
     }
@@ -357,7 +341,11 @@ const AnchorAccountScreen = () => {
       const refreshed = await anchorState.refresh({ force: true })
       shouldRefresh = false
       const refreshedNormalized = refreshed
-        ? normalizeAnchorOnboarding(refreshed.detailResponse, refreshed.userAccountsResponse)
+        ? normalizeAnchorOnboarding(
+            refreshed.detailResponse,
+            refreshed.userAccountsResponse,
+            refreshed.onboardingResponse
+          )
         : null
       if (refreshedNormalized?.hasAccountNumber) {
         setNotice({ message: 'Account number generated.', error: false })
@@ -429,7 +417,6 @@ const AnchorAccountScreen = () => {
         dob: anchorForm.dob.trim(),
         gender: anchorForm.gender.trim() || undefined,
       })
-      setKycOverrideVerified(true)
       setNotice({ message: response?.message || 'Verified successfully.', error: false })
       await anchorState.refresh({ force: true })
     } catch (error: any) {
@@ -442,16 +429,12 @@ const AnchorAccountScreen = () => {
         return
       }
       if (status === 422 && messageText.includes('already completed')) {
-        setKycOverrideVerified(true)
-        setKycOverridePending(false)
         await anchorState.refresh({ force: true })
         setNotice({ message: 'Already verified.', error: false })
         await ensureAccountNumber()
         return
       }
       if (isKycAlreadyCompleted(error)) {
-        setKycOverrideVerified(true)
-        setKycOverridePending(false)
         await anchorState.refresh({ force: true })
         setNotice({ message: 'Already verified.', error: false })
         await ensureAccountNumber()
@@ -495,17 +478,17 @@ const AnchorAccountScreen = () => {
           </View>
         ) : null}
 
-        {effectiveNormalized.depositReady ? (
+        {normalized.depositReady ? (
           <AnchorAccountView
             statusLabel="Deposit account ready"
-            displayAccountNumber={effectiveNormalized.displayAccountNumber || null}
-            rawAccountNumber={effectiveNormalized.rawAccountNumber || null}
-            accountName={effectiveNormalized.accountName || null}
-            bankName={effectiveNormalized.bankName || null}
+            displayAccountNumber={normalized.displayAccountNumber || null}
+            rawAccountNumber={normalized.rawAccountNumber || null}
+            accountName={normalized.accountName || null}
+            bankName={normalized.bankName || null}
           />
         ) : (
           <DepositAccountSection
-            normalized={effectiveNormalized}
+            normalized={normalized}
             loading={loading}
             onCreateAnchor={ensureAnchorAccount}
             onVerifyKyc={handleKycSubmit}
