@@ -50,7 +50,7 @@ const TIER_CONFIG = {
   },
   tier_2: {
     title: 'Tier 2 - Full access',
-    description: 'BVN verified + ID upload + address. Unlocks cards, tunnel, transfers.',
+    description: 'BVN verified + (ID document or verified NIN) + address/proof. Unlocks cards, tunnel, transfers.',
   },
   tier_3: {
     title: 'Tier 3 - Advanced verification',
@@ -159,6 +159,8 @@ export default function KycCenter() {
   const phoneVerified = !!status?.phone_verified
   const bvnStatus = status?.user_kyc?.bvn_status
   const bvnVerified = bvnStatus === 'verified'
+  const ninStatus = String(status?.user_kyc?.nin_status || '').toLowerCase()
+  const ninVerified = ninStatus === 'verified'
 
   const tierLabel = useMemo(() => status?.kyc_level || 'tier_0', [status?.kyc_level])
   const normalizedTier = normalizeTierKey(tierLabel as string)
@@ -171,9 +173,9 @@ export default function KycCenter() {
   const proofType = profile?.proof_of_address_type
   const idDocUrl = profile?.id_document_url
   const proofUrl = profile?.proof_of_address_url
-  const isNinFlow = String(idType || '').toLowerCase() === 'nin'
+  const identityVerified = Boolean(idDocUrl || ninVerified)
   const docsComplete = Boolean(
-    idType && hasAddress && proofType && proofUrl && (isNinFlow || idDocUrl)
+    idType && hasAddress && proofType && proofUrl && identityVerified
   )
   const useCase = String(status?.primary_use_case || status?.user_profile?.primary_use_case || '')
     .trim()
@@ -271,11 +273,11 @@ export default function KycCenter() {
           ) : null}
           <StepRow
             title="Documents & address"
-            description={
-              docsComplete
-                ? 'ID type, address, and proof documents are on file.'
-                : 'Upload your ID document and proof of address.'
-            }
+              description={
+                docsComplete
+                  ? 'Identity evidence, address, and proof of address are on file.'
+                  : 'Upload ID document or verify NIN, plus proof of address.'
+              }
             done={docsComplete}
             cta={docsComplete ? 'View documents' : 'Upload documents'}
             href="/kyc/documents"
@@ -330,6 +332,14 @@ export default function KycCenter() {
         </Text>
         {status?.user_kyc?.bvn_last4 ? (
           <Text className="text-gray-500 text-xs mt-2">BVN ending •••• {status.user_kyc.bvn_last4}</Text>
+        ) : null}
+      </View>
+
+      <View className="bg-gray-900 rounded-2xl p-4 mb-4">
+        <Text className="text-white font-semibold mb-2">NIN details</Text>
+        <Text className="text-gray-400 text-xs">{ninVerified ? 'Verified' : ninStatus || 'Pending'}</Text>
+        {status?.user_kyc?.nin_last4 ? (
+          <Text className="text-gray-500 text-xs mt-2">NIN ending •••• {status.user_kyc.nin_last4}</Text>
         ) : null}
       </View>
 

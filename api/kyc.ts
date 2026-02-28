@@ -54,6 +54,25 @@ export type BvnVerifyResponse = {
   message?: string
 }
 
+export type NinVerifyPayload = {
+  nin?: string
+  number?: string
+}
+
+export type NinVerifyResponse = {
+  status: string
+  tier?: string
+  nin_last4?: string
+  prembly_reference?: string
+  verified_at?: string
+  reason?: string
+  message?: string
+  requirements?: {
+    missing?: string[]
+    next_steps?: string[]
+  }
+}
+
 export type KycStatusResponse = {
   data?: {
     kyc_level?: string
@@ -89,6 +108,14 @@ export type KycStatusResponse = {
       bvn_provider?: string
       bvn_provider_reference?: string
       bvn_verified_at?: string
+      nin_status?: string
+      nin_last4?: string
+      nin_provider?: string
+      nin_provider_reference?: string
+      nin_verified_at?: string
+      nin_last_result_status?: string
+      nin_last_result_reason?: string
+      nin_last_checked_at?: string
       bvn_name_match?: boolean
       bvn_dob_match?: boolean
       bvn_first_name_match?: boolean
@@ -149,6 +176,16 @@ export const verifyPhoneOtp = async (payload: PhoneVerificationVerifyPayload) =>
 export const verifyBvn = async (payload: BvnVerifyPayload) => {
   const res = await client.post('/kyc/bvn/verify', payload)
   return res.data as BvnVerifyResponse
+}
+
+export const verifyNin = async (payload: NinVerifyPayload) => {
+  const res = await client.post('/kyc/nin/verify', payload)
+  return res.data as NinVerifyResponse
+}
+
+export const getNinStatus = async () => {
+  const res = await client.get('/kyc/nin/status')
+  return res.data as NinVerifyResponse
 }
 
 export const getKycStatus = async () => {

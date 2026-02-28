@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native'
 import * as DocumentPicker from 'expo-document-picker'
 import { useRouter } from 'expo-router'
@@ -6,6 +6,7 @@ import ScreenContainer from '@/components/ScreenContainer'
 import FormInput from '@/components/FormInput'
 import FormSelect from '@/components/FormSelect'
 import { updateKycDocuments } from '@/api/kycDocuments'
+import { NinVerifyResponse, verifyNin } from '@/api/kyc'
 import { useAuth } from '@/services/useAuth'
 
 const ID_TYPE_OPTIONS = [
@@ -82,7 +83,9 @@ const KycDocumentsScreen = () => {
   const profile = userRoot?.user_profile || {}
 
   const [saving, setSaving] = useState(false)
+  const [verifyingNin, setVerifyingNin] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
+  const [ninResult, setNinResult] = useState<NinVerifyResponse | null>(null)
 
   const [form, setForm] = useState({
     id_type: '',
@@ -123,8 +126,17 @@ const KycDocumentsScreen = () => {
   }, [userRoot, profile])
 
   const needsIdUpload = useMemo(() => form.id_type && form.id_type !== 'nin', [form.id_type])
+  const ninInput = String(form.nin || '').trim()
+  const ninValid = useMemo(() => /^\d{11}$/.test(ninInput), [ninInput])
+  const ninStatusFromProfile = String(userRoot?.user_kyc?.nin_status || '').toLowerCase()
+  const ninVerified = (ninResult?.status || ninStatusFromProfile) === 'verified'
   const hasIdDocOnFile = Boolean(profile?.id_document_url)
   const hasProofOnFile = Boolean(profile?.proof_of_address_url)
+
+  const parseErrorMessage = (error: unknown) => {
+    const e = error as { response?: { data?: { message?: string; error?: string } }; message?: string }
+    return e?.response?.data?.message || e?.response?.data?.error || e?.message || 'Unable to verify NIN.'
+  }
 
   const pickDocument = async (setter: typeof setIdDocument) => {
     const result = await DocumentPicker.getDocumentAsync({
@@ -180,14 +192,57 @@ const KycDocumentsScreen = () => {
         id_document: idDocument,
         proof_of_address: proofDocument,
       })
-      await loadProfile({ force: true })
-      setNotice('Documents updated successfully.')
-    } catch (error: any) {
-      setNotice(error?.message || 'Unable to save documents.')
+      if (form.id_type === 'nin' && ninValid) {
+        setVerifyingNin(true)
+        try {
+          const res = await verifyNin({ nin: ninInput })
+          setNinResult(res)
+          await loadProfile({ force: true })
+          if (res.status === 'verified') {
+            setNotice('Documents saved and NIN verified successfully.')
+          } else {
+            setNotice(res.message || 'Documents saved. NIN verification is pending.')
+          }
+        } catch (error: unknown) {
+          await loadProfile({ force: true })
+          setNotice(`Documents saved. ${parseErrorMessage(error)}`)
+        } finally {
+          setVerifyingNin(false)
+        }
+      } else {
+        await loadProfile({ force: true })
+        setNotice('Documents updated successfully.')
+      }
+    } catch (error: unknown) {
+      setNotice(parseErrorMessage(error))
     } finally {
       setSaving(false)
     }
   }
+
+  const handleVerifyNin = useCallback(async () => {
+    if (!ninValid) {
+      setNotice('Enter a valid 11-digit NIN.')
+      return
+    }
+
+    setVerifyingNin(true)
+    setNotice(null)
+    try {
+      const res = await verifyNin({ nin: ninInput })
+      setNinResult(res)
+      await loadProfile({ force: true })
+      if (res.status === 'verified') {
+        setNotice('NIN verified successfully.')
+      } else {
+        setNotice(res.message || 'NIN verification submitted.')
+      }
+    } catch (error: unknown) {
+      setNotice(parseErrorMessage(error))
+    } finally {
+      setVerifyingNin(false)
+    }
+  }, [loadProfile, ninInput, ninValid])
 
   return (
     <ScreenContainer>
@@ -217,6 +272,24 @@ const KycDocumentsScreen = () => {
               keyboardType="numeric"
               onChangeText={(value: string) => setForm({ ...form, nin: value })}
             />
+            <TouchableOpacity
+              onPress={handleVerifyNin}
+              disabled={verifyingNin || !ninValid}
+              className={`py-3 rounded-xl items-center mt-3 ${
+                verifyingNin || !ninValid ? 'bg-gray-800 border border-gray-700' : 'bg-app-primary'
+              }`}
+            >
+              {verifyingNin ? (
+                <ActivityIndicator />
+              ) : (
+                <Text className={`${verifyingNin || !ninValid ? 'text-gray-400' : 'text-black'} font-semibold`}>
+                  {ninVerified ? 'Re-verify NIN' : 'Verify NIN'}
+                </Text>
+              )}
+            </TouchableOpacity>
+            <Text className={`text-xs mt-2 ${ninVerified ? 'text-green-400' : 'text-gray-400'}`}>
+              NIN status: {ninVerified ? 'verified' : ninStatusFromProfile || 'unverified'}
+            </Text>
           </View>
         ) : null}
 
@@ -298,9 +371,9 @@ const KycDocumentsScreen = () => {
       <TouchableOpacity
         onPress={handleSave}
         className="bg-app-primary py-4 rounded-xl mt-6"
-        disabled={saving}
+        disabled={saving || verifyingNin}
       >
-        {saving ? (
+        {saving || verifyingNin ? (
           <ActivityIndicator />
         ) : (
           <Text className="text-black text-center font-semibold">Save documents</Text>
