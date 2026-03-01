@@ -107,7 +107,7 @@ const StepRow = ({
         <StatusPill label={done ? 'Done' : 'Pending'} ok={done} />
       </View>
       <Text className="text-gray-400 text-xs mt-1">{description}</Text>
-      {!done && href ? (
+      {href ? (
         <Link href={href} asChild>
           <TouchableOpacity
             className={`border border-gray-800 py-2 rounded-xl items-center mt-3 ${
