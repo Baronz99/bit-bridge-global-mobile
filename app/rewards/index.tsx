@@ -22,6 +22,51 @@ const RewardsScreen = () => {
     return []
   }, [data])
 
+  const recentRewards = useMemo(() => {
+    const keyFor = (reward: any, index: number) =>
+      String(
+        reward?.id ??
+          reward?.reference ??
+          reward?.transaction_id ??
+          reward?.created_at ??
+          reward?.createdAt ??
+          `${reward?.title ?? 'reward'}-${reward?.amount ?? 0}-${index}`
+      )
+
+    const toTimestamp = (value: any) => {
+      if (value === null || value === undefined) return -1
+      if (typeof value === 'number') {
+        const ms = value > 1_000_000_000_000 ? value : value > 1_000_000_000 ? value * 1000 : value
+        return Number.isFinite(ms) ? ms : -1
+      }
+      const raw = String(value).trim()
+      if (!raw) return -1
+      const asNum = Number(raw)
+      if (!Number.isNaN(asNum)) {
+        const ms = asNum > 1_000_000_000_000 ? asNum : asNum > 1_000_000_000 ? asNum * 1000 : asNum
+        return Number.isFinite(ms) ? ms : -1
+      }
+      const parsed = new Date(raw).getTime()
+      return Number.isNaN(parsed) ? -1 : parsed
+    }
+
+    const seen = new Set<string>()
+    const normalized = rewards.filter((reward: any, index: number) => {
+      const key = keyFor(reward, index)
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+
+    normalized.sort((a: any, b: any) => {
+      const aTs = toTimestamp(a?.created_at ?? a?.createdAt ?? a?.occurred_at)
+      const bTs = toTimestamp(b?.created_at ?? b?.createdAt ?? b?.occurred_at)
+      return bTs - aTs
+    })
+
+    return normalized.slice(0, 30)
+  }, [rewards])
+
   const rewardsTotal = useMemo(() => {
     return rewards.reduce((sum: number, reward: any) => {
       const amount = Number(reward?.amount ?? 0)
@@ -206,13 +251,13 @@ const RewardsScreen = () => {
           </View>
 
           <View className="gap-3">
-          {rewards.length === 0 && !loading ? (
+          {recentRewards.length === 0 && !loading ? (
             <View className="bg-gray-900 border border-gray-800 rounded-xl p-4">
               <Text className="text-gray-300 text-center">No rewards yet.</Text>
             </View>
           ) : null}
 
-          {rewards.map((reward: any, index: number) => {
+          {recentRewards.map((reward: any, index: number) => {
             const status = String(reward?.status || '').toLowerCase()
             const statusTone =
               status === 'completed'
@@ -224,9 +269,11 @@ const RewardsScreen = () => {
               <View key={reward?.id ?? index} className="bg-gray-900 border border-gray-800 rounded-2xl p-4">
                 <View className="flex-row justify-between items-start">
                   <View className="flex-1 pr-3">
-                    <Text className="text-white font-semibold">{reward?.title || 'Reward'}</Text>
+                    <Text className="text-white font-semibold" numberOfLines={2}>
+                      {reward?.title || 'Reward'}
+                    </Text>
                     <Text className="text-gray-500 text-xs mt-1">
-                      {dateFormat(reward?.created_at || '')}
+                      {dateFormat(reward?.created_at ?? reward?.createdAt ?? reward?.occurred_at ?? reward?.date)}
                     </Text>
                   </View>
                   <View className="items-end">
