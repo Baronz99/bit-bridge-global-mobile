@@ -3,6 +3,7 @@ import { Alert, Text, TouchableOpacity, View } from 'react-native'
 import FormInput from '@/components/FormInput'
 import FormSelect from '@/components/FormSelect'
 import { normalizeAnchorOnboarding } from '@/services/useAnchorOnboarding'
+import { isValidNgPhone } from '@/utils/phone'
 
 export type DepositAccountSectionProps = {
   normalized: ReturnType<typeof normalizeAnchorOnboarding>
@@ -60,7 +61,7 @@ const DepositAccountSection = ({
   const maskedAccountNumber = normalized.displayAccountNumber || '----'
   const hasRawAccountNumber = Boolean(normalized.rawAccountNumber)
   const hasPhone = Boolean(String(prefilledPhone || '').trim())
-  const hasValidPhone = /^234\d{10}$/.test(String(prefilledPhone || '').trim())
+  const hasValidPhone = isValidNgPhone(prefilledPhone)
   const accountNumberToDisplay =
     showRawAccountNumber && hasRawAccountNumber
       ? String(normalized.rawAccountNumber)

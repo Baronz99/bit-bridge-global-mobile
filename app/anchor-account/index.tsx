@@ -16,6 +16,11 @@ import { useAuth } from '@/services/useAuth'
 import { resolveUserProfile } from '@/services/auth/resolveUserProfile'
 import { isKycAlreadyCompleted } from '@/utils/anchorAccount'
 import { warn } from '@/utils/logger'
+import {
+  isValidNgPhone,
+  normalizeNgPhoneForApi,
+  resolveAnchorPrefilledPhone,
+} from '@/utils/phone'
 
 const ANCHOR_FORM_DRAFT_KEY = 'anchor_account_form_draft_v1'
 
@@ -96,14 +101,6 @@ const AnchorAccountScreen = () => {
     .toLowerCase()
   const platformTier2 = kycLevel === 'tier_2' || kycLevel === 'tier2' || kycLevel === 'tier_3' || kycLevel === 'tier3'
 
-  const normalizePhone = (value?: string | null) => {
-    const raw = String(value || '').trim()
-    if (!raw) return ''
-    if (raw.startsWith('+')) return raw.replace(/\s+/g, '')
-    if (raw.startsWith('234')) return raw.replace(/\s+/g, '')
-    if (raw.startsWith('0') && raw.length >= 11) return `234${raw.slice(1)}`
-    return raw.replace(/\s+/g, '')
-  }
   const isValidBvn = (value?: string | null) => /^\d{11}$/.test(String(value || '').trim())
   const isValidDob = (value?: string | null) => /^\d{4}-\d{2}-\d{2}$/.test(String(value || '').trim())
   const isValidEmail = (value?: string | null) =>
@@ -118,9 +115,7 @@ const AnchorAccountScreen = () => {
   const prefilledFirstName = profile?.first_name
   const prefilledLastName = profile?.last_name
   const prefilledEmail = profile?.email || profileRoot?.email
-  const prefilledPhone = normalizePhone(
-    profile?.phone_number || profileRoot?.phone_number || profileRoot?.phone_e164 || profileRoot?.phone
-  )
+  const prefilledPhone = resolveAnchorPrefilledPhone(profile, profileRoot)
 
   useEffect(() => {
     setAnchorForm((prev) => ({
@@ -186,6 +181,7 @@ const AnchorAccountScreen = () => {
       return
     }
     const trimmedPhone = String(prefilledPhone || '').trim()
+    const phoneForApi = normalizeNgPhoneForApi(trimmedPhone)
     const trimmedFirstName = String(prefilledFirstName || '').trim()
     const trimmedLastName = String(prefilledLastName || '').trim()
     const trimmedEmail = String(prefilledEmail || '').trim()
@@ -197,10 +193,10 @@ const AnchorAccountScreen = () => {
       })
       return
     }
-    if (!/^234\d{10}$/.test(trimmedPhone)) {
+    if (!isValidNgPhone(trimmedPhone)) {
       setNotice({
         message:
-          'Phone number must be in Nigerian E.164 format (2348012345678). Update your profile phone and retry.',
+          'Phone number must be in Nigerian E.164 format (+2348012345678). Update your profile phone and retry.',
         error: true,
       })
       return
@@ -258,7 +254,7 @@ const AnchorAccountScreen = () => {
           gender: anchorForm.gender.trim() || undefined,
           first_name: trimmedFirstName,
           last_name: trimmedLastName,
-          phone_number: trimmedPhone,
+          phone_number: phoneForApi || trimmedPhone,
           email: trimmedEmail,
         },
       })
