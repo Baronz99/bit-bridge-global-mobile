@@ -76,6 +76,17 @@ const COUNTRY_OPTIONS = [
   { label: 'Other', value: 'Other' },
 ]
 
+const NIN_REASON_LABELS: Record<string, string> = {
+  profile_incomplete:
+    'Profile details are incomplete for NIN matching. Complete your basic profile and retry.',
+  provider_incomplete: 'NIN provider returned incomplete data. Please retry later.',
+  name_mismatch: 'NIN name does not fully match your profile. Update profile details and retry.',
+  mismatch: 'NIN details do not match your profile records.',
+  watchlisted: 'NIN requires manual compliance review.',
+  nin_invalid: 'NIN is invalid. Confirm the 11-digit number and retry.',
+  provider_unavailable: 'NIN verification service is currently unavailable. Please retry shortly.',
+}
+
 const KycDocumentsScreen = () => {
   const router = useRouter()
   const { userProfileData, loadProfile } = useAuth()
@@ -113,15 +124,15 @@ const KycDocumentsScreen = () => {
   useEffect(() => {
     setForm((prev) => ({
       ...prev,
-      id_type: userRoot?.id_type || '',
-      nin: userRoot?.id_number || '',
-      address_line1: profile?.address_line1 || '',
-      address_line2: profile?.address_line2 || '',
-      city: profile?.city || '',
-      state: profile?.state || '',
-      country: profile?.country || '',
-      postal_code: profile?.postal_code || '',
-      proof_of_address_type: profile?.proof_of_address_type || '',
+      id_type: userRoot?.id_type || prev.id_type || '',
+      nin: userRoot?.id_number || prev.nin || '',
+      address_line1: profile?.address_line1 || prev.address_line1 || '',
+      address_line2: profile?.address_line2 || prev.address_line2 || '',
+      city: profile?.city || prev.city || '',
+      state: profile?.state || prev.state || '',
+      country: profile?.country || prev.country || '',
+      postal_code: profile?.postal_code || prev.postal_code || '',
+      proof_of_address_type: profile?.proof_of_address_type || prev.proof_of_address_type || '',
     }))
   }, [userRoot, profile])
 
@@ -129,6 +140,7 @@ const KycDocumentsScreen = () => {
   const ninInput = String(form.nin || '').trim()
   const ninValid = useMemo(() => /^\d{11}$/.test(ninInput), [ninInput])
   const ninStatusFromProfile = String(userRoot?.user_kyc?.nin_status || '').toLowerCase()
+  const ninStatus = String(ninResult?.status || ninStatusFromProfile || '').toLowerCase()
   const ninVerified = (ninResult?.status || ninStatusFromProfile) === 'verified'
   const hasIdDocOnFile = Boolean(profile?.id_document_url)
   const hasProofOnFile = Boolean(profile?.proof_of_address_url)
@@ -136,6 +148,19 @@ const KycDocumentsScreen = () => {
   const parseErrorMessage = (error: unknown) => {
     const e = error as { response?: { data?: { message?: string; error?: string } }; message?: string }
     return e?.response?.data?.message || e?.response?.data?.error || e?.message || 'Unable to verify NIN.'
+  }
+
+  const describeNinResult = (res?: NinVerifyResponse | null) => {
+    if (!res) return null
+    const status = String(res.status || '').toLowerCase()
+    const reason = String(res.reason || '').toLowerCase()
+    if (status === 'verified') return 'NIN verified successfully.'
+    if (res.message) return res.message
+    if (reason && NIN_REASON_LABELS[reason]) return NIN_REASON_LABELS[reason]
+    if (status === 'pending_review' || status === 'pending') return 'NIN verification is pending review.'
+    if (status === 'mismatch') return 'NIN details do not match your profile records.'
+    if (status === 'failed' || status === 'error') return 'NIN verification failed. Please retry.'
+    return 'NIN verification submitted.'
   }
 
   const pickDocument = async (setter: typeof setIdDocument) => {
@@ -229,20 +254,21 @@ const KycDocumentsScreen = () => {
     setVerifyingNin(true)
     setNotice(null)
     try {
+      await updateKycDocuments({
+        user_profile_id: profile?.id,
+        id_type: 'nin',
+        nin: ninInput,
+      })
       const res = await verifyNin({ nin: ninInput })
       setNinResult(res)
       await loadProfile({ force: true })
-      if (res.status === 'verified') {
-        setNotice('NIN verified successfully.')
-      } else {
-        setNotice(res.message || 'NIN verification submitted.')
-      }
+      setNotice(describeNinResult(res))
     } catch (error: unknown) {
       setNotice(parseErrorMessage(error))
     } finally {
       setVerifyingNin(false)
     }
-  }, [loadProfile, ninInput, ninValid])
+  }, [describeNinResult, loadProfile, ninInput, ninValid, profile?.id])
 
   return (
     <ScreenContainer>
@@ -288,7 +314,7 @@ const KycDocumentsScreen = () => {
               )}
             </TouchableOpacity>
             <Text className={`text-xs mt-2 ${ninVerified ? 'text-green-400' : 'text-gray-400'}`}>
-              NIN status: {ninVerified ? 'verified' : ninStatusFromProfile || 'unverified'}
+              NIN status: {ninVerified ? 'verified' : ninStatus || 'unverified'}
             </Text>
           </View>
         ) : null}
