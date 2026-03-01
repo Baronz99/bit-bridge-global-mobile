@@ -7,6 +7,8 @@ import moneyFormat from '@/utils/moneyFormat'
 import { dateFormat } from '@/utils/dateFormat'
 import { Ionicons } from '@expo/vector-icons'
 
+const RECENT_REWARDS_LIMIT = 10
+
 const RewardsScreen = () => {
   const { data, loading, error, refetch } = useFetch(() => getRewards())
 
@@ -64,7 +66,7 @@ const RewardsScreen = () => {
       return bTs - aTs
     })
 
-    return normalized.slice(0, 30)
+    return normalized.slice(0, RECENT_REWARDS_LIMIT)
   }, [rewards])
 
   const rewardsTotal = useMemo(() => {
@@ -246,6 +248,8 @@ const RewardsScreen = () => {
               </Text>
             </View>
             <Text className="text-gray-400 text-xs text-right">
+              Latest {RECENT_REWARDS_LIMIT}
+              {'\n'}
               Month total: {moneyFormat(monthEarned)}
             </Text>
           </View>
@@ -259,6 +263,16 @@ const RewardsScreen = () => {
 
           {recentRewards.map((reward: any, index: number) => {
             const status = String(reward?.status || '').toLowerCase()
+            const rewardDate = dateFormat(
+              reward?.created_at ??
+                reward?.createdAt ??
+                reward?.occurred_at ??
+                reward?.date ??
+                reward?.timestamp ??
+                reward?.updated_at ??
+                reward?.updatedAt,
+              ''
+            )
             const statusTone =
               status === 'completed'
                 ? 'text-green-400'
@@ -272,9 +286,11 @@ const RewardsScreen = () => {
                     <Text className="text-white font-semibold" numberOfLines={2}>
                       {reward?.title || 'Reward'}
                     </Text>
-                    <Text className="text-gray-500 text-xs mt-1">
-                      {dateFormat(reward?.created_at ?? reward?.createdAt ?? reward?.occurred_at ?? reward?.date)}
-                    </Text>
+                    {rewardDate ? (
+                      <Text className="text-gray-500 text-xs mt-1">
+                        {rewardDate}
+                      </Text>
+                    ) : null}
                   </View>
                   <View className="items-end">
                     <Text className="text-white font-semibold">
