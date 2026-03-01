@@ -9,7 +9,10 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "test": "jest --watchAll",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "release:guard:pr": "node scripts/release/guard-production-release.mjs --mode=pr",
+    "release:guard:prod": "node scripts/release/guard-production-release.mjs --mode=release",
+    "release:ota:production": "npx eas update --branch production --message \"release(production): $GITHUB_SHA\" --non-interactive"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
