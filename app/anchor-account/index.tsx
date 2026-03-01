@@ -155,7 +155,7 @@ const AnchorAccountScreen = () => {
         return
       }
     }
-  }, [anchorState, loadProfile, onLogout])
+  }, [anchorState.refresh, loadProfile, onLogout])
 
   useFocusEffect(
     useCallback(() => {
