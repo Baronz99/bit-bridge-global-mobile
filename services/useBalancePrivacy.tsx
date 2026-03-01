@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+﻿import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import * as SecureStore from 'expo-secure-store'
 
 const BALANCE_PRIVACY_KEY = 'balance_privacy_hidden_v1'
@@ -119,10 +119,12 @@ export const BalancePrivacyProvider = ({ children }: { children: React.ReactNode
   }, [balancesHidden, persist])
 
   const maskFormattedAmount = useCallback((formatted: string) => {
-    const value = String(formatted || '')
-    if (!value) return '••••••'
-    const masked = value.replace(/\d/g, '•')
-    return masked === value ? '••••••' : masked
+    const value = String(formatted || '').trim()
+    if (!value) return '********'
+
+    const currencyMatch = value.match(/^([^0-9\-\s]+)/)
+    const currencyPrefix = currencyMatch?.[1]?.trim()
+    return currencyPrefix ? `${currencyPrefix} ********` : '********'
   }, [])
 
   const value = useMemo(
@@ -144,4 +146,5 @@ export const useBalancePrivacy = () => {
   if (!ctx) throw new Error('useBalancePrivacy must be used within BalancePrivacyProvider')
   return ctx
 }
+
 
