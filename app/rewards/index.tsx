@@ -30,6 +30,7 @@ const RewardsScreen = () => {
         reward?.id ??
           reward?.reference ??
           reward?.transaction_id ??
+          reward?.earned_at ??
           reward?.created_at ??
           reward?.createdAt ??
           `${reward?.title ?? 'reward'}-${reward?.amount ?? 0}-${index}`
@@ -61,8 +62,8 @@ const RewardsScreen = () => {
     })
 
     normalized.sort((a: any, b: any) => {
-      const aTs = toTimestamp(a?.created_at ?? a?.createdAt ?? a?.occurred_at)
-      const bTs = toTimestamp(b?.created_at ?? b?.createdAt ?? b?.occurred_at)
+      const aTs = toTimestamp(a?.earned_at ?? a?.created_at ?? a?.createdAt ?? a?.occurred_at)
+      const bTs = toTimestamp(b?.earned_at ?? b?.created_at ?? b?.createdAt ?? b?.occurred_at)
       return bTs - aTs
     })
 
@@ -264,7 +265,8 @@ const RewardsScreen = () => {
           {recentRewards.map((reward: any, index: number) => {
             const status = String(reward?.status || '').toLowerCase()
             const rewardDate = dateFormat(
-              reward?.created_at ??
+              reward?.earned_at ??
+                reward?.created_at ??
                 reward?.createdAt ??
                 reward?.occurred_at ??
                 reward?.date ??
