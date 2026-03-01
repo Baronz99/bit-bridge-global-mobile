@@ -16,10 +16,10 @@ import { useAuth } from '@/services/useAuth'
 import { resolveUserProfile } from '@/services/auth/resolveUserProfile'
 import { isKycAlreadyCompleted } from '@/utils/anchorAccount'
 import { warn } from '@/utils/logger'
+import { resolveAnchorPrefill } from '@/utils/anchorOnboardingPrefill'
 import {
   isValidNgPhone,
   normalizeNgPhoneForApi,
-  resolveAnchorPrefilledPhone,
 } from '@/utils/phone'
 
 const ANCHOR_FORM_DRAFT_KEY = 'anchor_account_form_draft_v1'
@@ -35,6 +35,7 @@ const AnchorAccountScreen = () => {
   })
   const anchorState = useAnchorOnboarding({ autoFetchOnMount: true, autoFetchOnFocus: false })
   const refreshHandledRef = useRef(false)
+  const scrollRef = useRef<ScrollView | null>(null)
   const [anchorForm, setAnchorForm] = useState({
     address: '',
     city: '',
@@ -106,16 +107,20 @@ const AnchorAccountScreen = () => {
   const isValidEmail = (value?: string | null) =>
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim())
 
-  const prefilledDob = profile?.dob || profile?.date_of_birth
-  const prefilledGender = profile?.gender
-  const prefilledAddress = profile?.address_line1
-  const prefilledCity = profile?.city
-  const prefilledState = profile?.state
-  const prefilledPostal = profile?.postal_code
-  const prefilledFirstName = profile?.first_name
-  const prefilledLastName = profile?.last_name
-  const prefilledEmail = profile?.email || profileRoot?.email
-  const prefilledPhone = resolveAnchorPrefilledPhone(profile, profileRoot)
+  const anchorPrefill = useMemo(
+    () => resolveAnchorPrefill(profile, profileRoot),
+    [profile, profileRoot]
+  )
+  const prefilledDob = anchorPrefill.dob
+  const prefilledGender = anchorPrefill.gender
+  const prefilledAddress = anchorPrefill.address
+  const prefilledCity = anchorPrefill.city
+  const prefilledState = anchorPrefill.state
+  const prefilledPostal = anchorPrefill.postalCode
+  const prefilledFirstName = anchorPrefill.firstName
+  const prefilledLastName = anchorPrefill.lastName
+  const prefilledEmail = anchorPrefill.email
+  const prefilledPhone = anchorPrefill.phone
 
   useEffect(() => {
     setAnchorForm((prev) => ({
@@ -126,8 +131,9 @@ const AnchorAccountScreen = () => {
       city: prefilledCity || prev.city,
       state: prefilledState || prev.state,
       postal_code: prefilledPostal || prev.postal_code,
+      bvn: anchorPrefill.bvn || prev.bvn,
     }))
-  }, [prefilledDob, prefilledGender, prefilledAddress, prefilledCity, prefilledState, prefilledPostal])
+  }, [prefilledDob, prefilledGender, prefilledAddress, prefilledCity, prefilledState, prefilledPostal, anchorPrefill.bvn])
 
   const normalized = useMemo(
     () =>
@@ -170,6 +176,24 @@ const AnchorAccountScreen = () => {
       handleRefresh().catch(() => {})
     }
   }, [params?.refresh, handleRefresh])
+
+  const createProfileBlockReason = useMemo(() => {
+    if (!platformTier2) return 'Complete Tier 2 verification before creating a deposit profile.'
+    if (normalized.hasAnchorAccount) return null
+
+    const missing: string[] = []
+    if (!String(prefilledFirstName || '').trim()) missing.push('first name')
+    if (!String(prefilledLastName || '').trim()) missing.push('last name')
+    if (!isValidEmail(prefilledEmail)) missing.push('valid email')
+    if (!isValidNgPhone(prefilledPhone)) missing.push('phone number')
+
+    return missing.length ? `Update your profile first: ${missing.join(', ')}.` : null
+  }, [platformTier2, normalized.hasAnchorAccount, prefilledFirstName, prefilledLastName, prefilledEmail, prefilledPhone])
+
+  useEffect(() => {
+    if (!notice.message) return
+    scrollRef.current?.scrollTo({ y: 0, animated: true })
+  }, [notice.message])
 
   const ensureAnchorAccount = async () => {
     if (!platformTier2) {
@@ -483,7 +507,7 @@ const AnchorAccountScreen = () => {
 
   return (
     <View className="flex-1 bg-primary px-4">
-      <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+      <ScrollView ref={scrollRef} contentContainerStyle={{ paddingBottom: 40 }}>
         <View className="mt-6 rounded-3xl border border-gray-800 bg-gray-900/80 p-5">
           <Text className="text-white/70 text-xs tracking-widest uppercase">Deposit account</Text>
           <Text className="text-white text-2xl font-semibold mt-2">Deposit account</Text>
@@ -539,6 +563,7 @@ const AnchorAccountScreen = () => {
             onGoToKyc={() => router.push('/kyc')}
             prefilledPhone={prefilledPhone}
             onGoToProfile={() => router.push('/accountProfile')}
+            actionBlockReason={createProfileBlockReason}
           />
         )}
       </ScrollView>

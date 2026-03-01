@@ -40,6 +40,7 @@ export type DepositAccountSectionProps = {
   onGoToKyc?: () => void
   prefilledPhone?: string
   onGoToProfile?: () => void
+  actionBlockReason?: string | null
 }
 
 const DepositAccountSection = ({
@@ -55,6 +56,7 @@ const DepositAccountSection = ({
   onGoToKyc,
   prefilledPhone,
   onGoToProfile,
+  actionBlockReason,
 }: DepositAccountSectionProps) => {
   const [showRawAccountNumber, setShowRawAccountNumber] = useState(false)
   const step = normalized.nextStep
@@ -408,6 +410,12 @@ const DepositAccountSection = ({
           <Text className="text-gray-500 text-xs">
             Anchor is verifying your identity. Tap refresh to update the status.
           </Text>
+        </View>
+      ) : null}
+
+      {actionBlockReason ? (
+        <View className="mt-3 rounded-xl border border-amber-500/40 bg-amber-900/20 p-3">
+          <Text className="text-amber-200 text-xs">{actionBlockReason}</Text>
         </View>
       ) : null}
 
