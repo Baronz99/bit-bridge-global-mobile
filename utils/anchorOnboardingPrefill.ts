@@ -8,6 +8,23 @@ const asRecord = (value: unknown): AnyRecord => {
 }
 
 const normalizeText = (value: unknown): string => String(value || '').trim()
+const normalizeSpaces = (value: unknown): string => normalizeText(value).replace(/\s+/g, ' ')
+
+const normalizeName = (value: unknown): string => normalizeSpaces(value)
+const normalizeEmail = (value: unknown): string => normalizeText(value).toLowerCase()
+const normalizePostalCode = (value: unknown): string => normalizeSpaces(value)
+const normalizeState = (value: unknown): string => {
+  const raw = normalizeSpaces(value)
+  if (!raw) return ''
+  const lowered = raw.toLowerCase()
+  if (lowered == 'fct' || lowered == 'abuja' || lowered == 'fct (abuja)') return 'FCT'
+  return raw
+}
+const normalizeGender = (value: unknown): string => {
+  const raw = normalizeText(value).toLowerCase()
+  if (raw == 'male' || raw == 'female') return raw
+  return ''
+}
 
 const pickFirst = (sources: AnyRecord[], keys: string[]): string => {
   for (const source of sources) {
@@ -58,16 +75,16 @@ export const resolveAnchorPrefill = (profilePayload: unknown, rootPayload?: unkn
   const idType = pickFirst(sources, ['id_type']).toLowerCase()
 
   return {
-    firstName: pickFirst(sources, ['first_name', 'firstname', 'given_name']),
-    lastName: pickFirst(sources, ['last_name', 'lastname', 'surname', 'family_name']),
-    email: pickFirst(sources, ['email']),
+    firstName: normalizeName(pickFirst(sources, ['first_name', 'firstname', 'given_name'])),
+    lastName: normalizeName(pickFirst(sources, ['last_name', 'lastname', 'surname', 'family_name'])),
+    email: normalizeEmail(pickFirst(sources, ['email'])),
     phone: resolveAnchorPrefilledPhone(profilePayload, rootPayload),
-    address: pickFirst(sources, ['address_line1', 'address_line_1', 'addressLine_1', 'addressLine1', 'address', 'street_address', 'residential_address']),
-    city: pickFirst(sources, ['city', 'town', 'lga_city']),
-    state: pickFirst(sources, ['state', 'state_of_residence', 'province', 'region']),
-    postalCode: pickFirst(sources, ['postal_code', 'postcode', 'zip_code', 'zip']),
+    address: normalizeSpaces(pickFirst(sources, ['address_line1', 'address_line_1', 'addressLine_1', 'addressLine1', 'address', 'street_address', 'residential_address'])),
+    city: normalizeSpaces(pickFirst(sources, ['city', 'town', 'lga_city'])),
+    state: normalizeState(pickFirst(sources, ['state', 'state_of_residence', 'province', 'region'])),
+    postalCode: normalizePostalCode(pickFirst(sources, ['postal_code', 'postcode', 'zip_code', 'zip'])),
     dob: normalizeDob(pickFirst(sources, ['dob', 'date_of_birth', 'birthdate'])),
     bvn: normalizeBvn(pickFirst(sources, ['bvn', 'bvn_number']) || (idType == 'bvn' ? pickFirst(sources, ['id_number']) : '')),
-    gender: pickFirst(sources, ['gender']).toLowerCase(),
+    gender: normalizeGender(pickFirst(sources, ['gender'])),
   }
 }

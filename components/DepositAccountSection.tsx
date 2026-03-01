@@ -118,6 +118,9 @@ const DepositAccountSection = ({
 
   const primaryAction = useMemo(() => {
     if (!platformTier2) return null
+    if (step === 'CREATE_ANCHOR' && actionBlockReason && onGoToProfile) {
+      return { label: 'Update Profile', onPress: async () => onGoToProfile() }
+    }
     if ((!hasPhone || !hasValidPhone) && onGoToProfile) {
       return { label: 'Update Profile', onPress: async () => onGoToProfile() }
     }
@@ -153,6 +156,7 @@ const DepositAccountSection = ({
     onCreateAnchor,
     onVerifyKyc,
     onGenerateAccount,
+    actionBlockReason,
     onGoToProfile,
   ])
 
