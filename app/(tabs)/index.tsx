@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   FlatList,
@@ -202,7 +202,7 @@ const getHomeRowSubtitle = (t: TimelineItem) => {
 
   if (biller) return biller
   if (service) return service
-  if (bank && addr) return `${bank} • ${addr}`
+  if (bank && addr) return `${bank} â€¢ ${addr}`
   if (bank) return bank
   if (addr) return addr
   if (circle) return circle
@@ -245,7 +245,7 @@ export default function Index() {
   const [sendOpen, setSendOpen] = useState(false)
   const [loader, setLoader] = useState(false)
 
-  // ✅ Recent Activity toggle (money vs all)
+  // âœ… Recent Activity toggle (money vs all)
   const [activityMode, setActivityMode] = useState<'money' | 'all'>('money')
 
   useEffect(() => {
@@ -272,12 +272,12 @@ export default function Index() {
   const fetchRecentPurchases = useCallback(() => getRescentPurchaseOrder(), [])
   const fetchRecentOrders = useCallback(() => getUserOrders(), [])
 
-  // Old deposits-only transactions (kept, but not main “Recent Activity”)
+  // Old deposits-only transactions (kept, but not main â€œRecent Activityâ€)
   const fetchRecentTransactions = useCallback(() => {
     return getTransactions({ params: { transaction_type: 'deposit' } })
   }, [])
 
-  // ✅ Recent Activity from Timeline — Home should NOT be noisy
+  // âœ… Recent Activity from Timeline â€” Home should NOT be noisy
   const fetchRecentTimeline = useCallback(() => {
     // IMPORTANT: for Home, show_alerts should be false for bank-grade signal
     return listTimeline({ limit: 25, show_alerts: false } as any)
@@ -569,6 +569,9 @@ export default function Index() {
                 <Text className="text-white text-3xl font-semibold mt-2">
                   {bridgeBalanceDisplay}
                 </Text>
+                {balancesHidden ? (
+                  <Text className="text-white/50 text-xs mt-1">Balances hidden</Text>
+                ) : null}
                 <View className="flex-row mt-3 items-center gap-2">
                   <Image source={icons.trophy} className="w-5 h-5" />
                   <Text className="text-white text-sm">
@@ -582,10 +585,10 @@ export default function Index() {
                   onPress={() => {
                     void toggleBalancesVisibility()
                   }}
-                  className="gap-2 items-center rounded-full flex-row py-1 px-3 bg-gray-900/60 border border-gray-800"
+                  className="gap-2 items-center rounded-full flex-row py-1.5 px-3 bg-black/30 border border-white/15"
                 >
                   <Feather name={balancesHidden ? 'eye-off' : 'eye'} size={12} color="white" />
-                  <Text className="text-white text-xs">{balancesHidden ? 'Show' : 'Hide'}</Text>
+                  <Text className="text-white text-xs">{balancesHidden ? 'Show balances' : 'Hide balances'}</Text>
                 </TouchableOpacity>
                 <Link href={'/history' as any} asChild>
                   <TouchableOpacity className="gap-2 items-center rounded-full flex-row py-1 px-3 bg-gray-900/60 border border-gray-800">
@@ -749,7 +752,7 @@ export default function Index() {
             </View>
           ) : null}
 
-          {/* ✅ Recent Activity (Bank-grade Home Rows) */}
+          {/* âœ… Recent Activity (Bank-grade Home Rows) */}
           <View className="mb-8">
             <View className="flex-row items-center justify-between mb-3">
               <Text className="text-white text-lg font-semibold">Recent Activity</Text>
@@ -881,7 +884,7 @@ export default function Index() {
             ) : null}
           </View>
 
-          {/* Existing horizontal “recent purchases” list (kept) */}
+          {/* Existing horizontal â€œrecent purchasesâ€ list (kept) */}
           <View>
             {recentPurchasesLoading ? (
               <ActivityIndicator />
@@ -1035,5 +1038,6 @@ const LabelText = ({ label, value }: any) => (
     <Text className="text-white text-center">{value}</Text>
   </View>
 )
+
 
 

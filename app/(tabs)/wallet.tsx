@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+﻿import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
@@ -236,7 +236,7 @@ const WalletScreen = () => {
     void refreshWalletFetches()
   }, [refreshWalletFetches, transactionFilter, walletMode])
 
-  // ✅ HARD FILTER by wallet type so NGN cannot leak into USD (or vice versa)
+  // âœ… HARD FILTER by wallet type so NGN cannot leak into USD (or vice versa)
   const walletScopedTransactions = useMemo(() => {
     return txRows.filter((item: any) => {
       const t = getItemWalletType(item)
@@ -336,8 +336,8 @@ const WalletScreen = () => {
     const txType = String(item?.transaction_type || item?.type || '').toLowerCase()
 
     if (address.includes('tunnel conversion') || address.includes('conversion')) {
-      if (isTunnelMode) return txType === 'withdrawal' ? 'Convert USD → NGN' : 'Convert NGN → USD'
-      return txType === 'withdrawal' ? 'Convert NGN → USD' : 'Convert USD → NGN'
+      if (isTunnelMode) return txType === 'withdrawal' ? 'Convert USD â†’ NGN' : 'Convert NGN â†’ USD'
+      return txType === 'withdrawal' ? 'Convert NGN â†’ USD' : 'Convert USD â†’ NGN'
     }
 
     if (address.includes('virtual card funding')) return 'Card funding'
@@ -420,7 +420,7 @@ const WalletScreen = () => {
     }
   }
 
-  // ✅ Pull-to-refresh
+  // âœ… Pull-to-refresh
   const onRefresh = useCallback(async () => {
     setRefreshing(true)
     try {
@@ -457,7 +457,7 @@ const WalletScreen = () => {
           onPress={() => {
             void toggleBalancesVisibility()
           }}
-          className="gap-2 items-center rounded-full flex-row py-1 px-3 bg-gray-900/60 border border-gray-800"
+          className="gap-2 items-center rounded-full flex-row py-1.5 px-3 bg-black/30 border border-white/15"
         >
           <Feather name={balancesHidden ? 'eye-off' : 'eye'} size={12} color="white" />
           <Text className="text-white text-xs">{balancesHidden ? 'Show balances' : 'Hide balances'}</Text>
@@ -470,6 +470,9 @@ const WalletScreen = () => {
           <Text className="text-white text-3xl font-semibold mt-2">
             {bridgeBalanceDisplay}
           </Text>
+          {balancesHidden ? (
+            <Text className="text-white/50 text-xs mt-1">Balances hidden</Text>
+          ) : null}
 
           <View className="flex-row gap-3 mt-4">
             <TouchableOpacity
@@ -492,7 +495,7 @@ const WalletScreen = () => {
               onPress={() => router.push('/convert-ngn-to-usd')}
               className="bg-gray-900 border border-gray-800 py-3 flex-1 rounded-xl"
             >
-              <Text className="text-white text-center text-xs">Convert NGN → USD</Text>
+              <Text className="text-white text-center text-xs">Convert NGN â†’ USD</Text>
             </TouchableOpacity>
           </View>
 
@@ -577,6 +580,9 @@ const WalletScreen = () => {
               <Text className={`text-3xl font-semibold mt-2 ${tunnelBalanceClass}`}>
                 {tunnelBalanceDisplay}
               </Text>
+              {balancesHidden ? (
+                <Text className="text-orange-200/70 text-xs mt-1">Balances hidden</Text>
+              ) : null}
 
               <View className="flex-row gap-2 mt-4">
                 <TouchableOpacity
@@ -584,7 +590,7 @@ const WalletScreen = () => {
                   className="border py-3 flex-1 rounded-xl"
                   style={{ backgroundColor: 'rgba(9, 8, 6, 0.7)', borderColor: 'rgba(245, 158, 11, 0.4)' }}
                 >
-                  <Text className="text-white text-center text-xs">Convert USD → NGN</Text>
+                  <Text className="text-white text-center text-xs">Convert USD â†’ NGN</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -890,3 +896,4 @@ const WalletScreen = () => {
 }
 
 export default WalletScreen
+
