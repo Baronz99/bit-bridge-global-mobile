@@ -335,6 +335,11 @@ const AnchorAccountScreen = () => {
         return
       }
       if (status === 422 && !Array.isArray(data?.missing_fields)) {
+        const backendMessage = String(data?.message || '').trim()
+        if (backendMessage) {
+          setNotice({ message: backendMessage, error: true })
+          return
+        }
         setNotice({
           message:
             'We could not verify your phone with Anchor. Please confirm your phone number in profile (E.164 format, e.g. 2348012345678) and try again.',
