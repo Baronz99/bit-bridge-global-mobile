@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useFocusEffect } from '@react-navigation/native'
-import { getAnchorOnboardingState, getUserAnchorAccountDetail } from '@/api/account'
+import { getAccounts, getAnchorOnboardingState, getUserAnchorAccountDetail } from '@/api/account'
 import { log } from '@/utils/log'
 
 export type AnchorKycState = 'unknown' | 'not_started' | 'pending' | 'verified'
@@ -679,9 +679,19 @@ const fetchAnchorOnboarding = async (options?: { force?: boolean }): Promise<Ref
   setStore({ loading: true, error: null })
   inFlight = (async () => {
     try {
-      const onboardingResponse = await getAnchorOnboardingState()
-      const detailResponse = await getUserAnchorAccountDetail()
-      const userAccountsResponse: any | undefined = undefined
+      const [onboardingResponse, detailResponse, userAccountsResponse] = await Promise.all([
+        getAnchorOnboardingState(),
+        getUserAnchorAccountDetail(),
+        getAccounts().catch((error) => {
+          if (shouldLogDev()) {
+            log('[Anchor Onboarding] getAccounts fallback failed', {
+              message: (error as any)?.message,
+              status: (error as any)?.response?.status,
+            })
+          }
+          return undefined
+        }),
+      ])
 
       if (options?.force) {
         didLogShapes = false
