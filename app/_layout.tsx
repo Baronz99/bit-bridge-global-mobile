@@ -6,6 +6,7 @@ import './globals.css'
 
 import { AuthProvider } from '@/services/useAuth'
 import { AppLockProvider } from '../services/useAppLock'
+import { BalancePrivacyProvider } from '@/services/useBalancePrivacy'
 import { useAuth } from '@/services/useAuth'
 import { setLastFatalError } from '@/services/fatalError'
 import { FEATURE_TIMELINE } from '@/constants/featureFlags'
@@ -149,9 +150,10 @@ export default function RootLayout() {
   return (
     <RootErrorBoundary>
       <AuthProvider>
-        <AppLockProvider>
-          <StartupGate>
-            <StatusBar hidden={false} barStyle="light-content" backgroundColor="black" />
+        <BalancePrivacyProvider>
+          <AppLockProvider>
+            <StartupGate>
+              <StatusBar hidden={false} barStyle="light-content" backgroundColor="black" />
 
             <Stack
               screenOptions={{
@@ -279,8 +281,9 @@ export default function RootLayout() {
         <Stack.Screen name="confirmEmail" options={{ headerTitle: 'Email Confirmation' }} />
         <Stack.Screen name="confirmation" options={{ headerTitle: 'Confirm Email' }} />
             </Stack>
-          </StartupGate>
-        </AppLockProvider>
+            </StartupGate>
+          </AppLockProvider>
+        </BalancePrivacyProvider>
       </AuthProvider>
     </RootErrorBoundary>
   )

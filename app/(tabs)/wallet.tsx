@@ -11,7 +11,9 @@ import {
   ScrollView,
 } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
+import { Feather } from '@expo/vector-icons'
 import { useAuth } from '@/services/useAuth'
+import { useBalancePrivacy } from '@/services/useBalancePrivacy'
 import moneyFormat from '@/utils/moneyFormat'
 import useFetch from '@/services/useFetch'
 import { getTransactions } from '@/api/transactions'
@@ -30,6 +32,7 @@ const TX_PAGE_LIMIT = 30
 
 const WalletScreen = () => {
   const { userProfileData } = useAuth()
+  const { balancesHidden, toggleBalancesVisibility, maskFormattedAmount } = useBalancePrivacy()
   const router = useRouter()
 
   const [walletMode, setWalletMode] = useState<'bridge' | 'tunnel'>('bridge')
@@ -215,6 +218,17 @@ const WalletScreen = () => {
 
   const tunnelWallet = walletData?.data?.tunnel
   const tunnelBalanceValue = Number(tunnelWallet?.balance ?? tunnelWallet?.amount ?? 0)
+  const bridgeBalanceLabel = moneyFormat(Number.isFinite(walletBalanceValue) ? walletBalanceValue : 0)
+  const tunnelBalanceLabel = moneyFormat(
+    Number.isFinite(tunnelBalanceValue) ? tunnelBalanceValue : 0,
+    'USD'
+  )
+  const bridgeBalanceDisplay = balancesHidden
+    ? maskFormattedAmount(bridgeBalanceLabel)
+    : bridgeBalanceLabel
+  const tunnelBalanceDisplay = balancesHidden
+    ? maskFormattedAmount(tunnelBalanceLabel)
+    : tunnelBalanceLabel
 
 
   // Refetch when switching wallets or changing filters
@@ -438,11 +452,23 @@ const WalletScreen = () => {
         </TouchableOpacity>
       </View>
 
+      <View className="mt-3 flex-row justify-end">
+        <TouchableOpacity
+          onPress={() => {
+            void toggleBalancesVisibility()
+          }}
+          className="gap-2 items-center rounded-full flex-row py-1 px-3 bg-gray-900/60 border border-gray-800"
+        >
+          <Feather name={balancesHidden ? 'eye-off' : 'eye'} size={12} color="white" />
+          <Text className="text-white text-xs">{balancesHidden ? 'Show balances' : 'Hide balances'}</Text>
+        </TouchableOpacity>
+      </View>
+
       {!isTunnelMode ? (
         <>
           <Text className="text-white/70 text-xs tracking-widest uppercase mt-4">Bridge Wallet</Text>
           <Text className="text-white text-3xl font-semibold mt-2">
-            {moneyFormat(Number.isFinite(walletBalanceValue) ? walletBalanceValue : 0)}
+            {bridgeBalanceDisplay}
           </Text>
 
           <View className="flex-row gap-3 mt-4">
@@ -549,7 +575,7 @@ const WalletScreen = () => {
           {tunnelWallet ? (
             <>
               <Text className={`text-3xl font-semibold mt-2 ${tunnelBalanceClass}`}>
-                {moneyFormat(Number.isFinite(tunnelBalanceValue) ? tunnelBalanceValue : 0, 'USD')}
+                {tunnelBalanceDisplay}
               </Text>
 
               <View className="flex-row gap-2 mt-4">

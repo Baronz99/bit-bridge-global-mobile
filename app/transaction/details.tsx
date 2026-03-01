@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import useNotification from '@/hooks/useNotification'
 import useFetch from '@/services/useFetch'
 import { useAuth } from '@/services/useAuth'
+import { useBalancePrivacy } from '@/services/useBalancePrivacy'
 import { getPurchaseOrder } from '@/api/billOrder'
 import Summary from '@/components/cards/Summary'
 import Loader from '@/components/Loader'
@@ -28,7 +29,16 @@ const ConfirmDetails = () => {
   const { notification, setNotification } = useNotification()
   const router = useRouter()
   const { userProfileData, loadProfile } = useAuth()
+  const { balancesHidden, maskFormattedAmount } = useBalancePrivacy()
   const walletBalanceValue = Number(userProfileData?.wallet?.balance ?? 0)
+  const walletBalanceLabel = moneyFormat(userProfileData?.wallet?.balance)
+  const commissionLabel = moneyFormat(userProfileData?.wallet?.commission ?? 0)
+  const walletBalanceDisplay = balancesHidden
+    ? maskFormattedAmount(walletBalanceLabel)
+    : walletBalanceLabel
+  const commissionDisplay = balancesHidden
+    ? maskFormattedAmount(commissionLabel)
+    : commissionLabel
   const { getStatus } = useServiceAvailability()
 
   const { data } = useFetch<any>(
@@ -151,11 +161,11 @@ const ConfirmDetails = () => {
       <View className="flex-row justify-between items-center mb-3">
         <View>
           <Text className="text-sm text-gray-200">Balance</Text>
-          <Text className="text-2xl font-bold mt-1 text-white">{moneyFormat(userProfileData?.wallet?.balance)}</Text>
+          <Text className="text-2xl font-bold mt-1 text-white">{walletBalanceDisplay}</Text>
         </View>
         <View className="flex-row items-center bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
           <Text className="text-xs text-amber-600 font-semibold mr-2">Bonus</Text>
-          <Text className="text-sm font-medium text-amber-800">{moneyFormat(userProfileData?.wallet?.commission ?? 0)}</Text>
+          <Text className="text-sm font-medium text-amber-800">{commissionDisplay}</Text>
         </View>
       </View>
 

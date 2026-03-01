@@ -106,7 +106,7 @@ const DepositAccountSection = ({
   const requiredNow = useMemo(() => {
     if (!platformTier2) return ['Tier 2 verification']
     if (step === 'CREATE_ANCHOR') return ['Phone on profile', 'Address', 'City', 'State', 'Postal code', 'BVN (11 digits)', 'Date of birth (YYYY-MM-DD)']
-    if (step === 'DO_KYC') return ['BVN (11 digits)', 'Date of birth (YYYY-MM-DD)']
+    if (step === 'DO_KYC') return ['BVN (11 digits)', 'Date of birth (YYYY-MM-DD)', 'Gender']
     if (step === 'GENERATE_NUMBER') return ['No extra input required']
     return ['Setup complete']
   }, [platformTier2, step])
@@ -365,7 +365,7 @@ const DepositAccountSection = ({
             ]}
           />
         </View>
-      ) : normalized.kycState === 'not_started' ? (
+      ) : step === 'DO_KYC' ? (
         <View className="mt-4">
           <Text className="text-gray-200 text-sm mb-2">Verify identity</Text>
           <Text className="text-gray-500 text-xs mb-3">
@@ -398,7 +398,7 @@ const DepositAccountSection = ({
             onChangeText={(value: string) => setAnchorForm({ ...anchorForm, dob: value })}
           />
           <FormSelect
-            label="Gender (optional)"
+            label="Gender"
             selectedValue={anchorForm.gender}
             onValueChange={(value: string) => setAnchorForm({ ...anchorForm, gender: value })}
             options={[

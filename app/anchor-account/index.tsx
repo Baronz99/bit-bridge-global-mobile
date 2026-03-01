@@ -460,6 +460,10 @@ const AnchorAccountScreen = () => {
       setNotice({ message: 'BVN and date of birth are required.', error: true })
       return
     }
+    if (!anchorForm.gender.trim()) {
+      setNotice({ message: 'Gender is required.', error: true })
+      return
+    }
     if (!isValidBvn(anchorForm.bvn)) {
       setNotice({ message: 'BVN must be exactly 11 digits.', error: true })
       return
@@ -491,6 +495,20 @@ const AnchorAccountScreen = () => {
         await anchorState.refresh({ force: true })
         setNotice({ message: 'Already verified.', error: false })
         await ensureAccountNumber()
+        return
+      }
+      if (status === 422 && Array.isArray(error?.details?.missing_fields)) {
+        setNotice({
+          message: `Complete KYC fields: ${error.details.missing_fields.join(', ')}`,
+          error: true,
+        })
+        return
+      }
+      if (status === 422 && Array.isArray(error?.response?.data?.details?.missing_fields)) {
+        setNotice({
+          message: `Complete KYC fields: ${error.response.data.details.missing_fields.join(', ')}`,
+          error: true,
+        })
         return
       }
       if (isKycAlreadyCompleted(error)) {

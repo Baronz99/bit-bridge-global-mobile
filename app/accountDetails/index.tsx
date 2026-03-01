@@ -1,4 +1,5 @@
 import { useAuth } from '@/services/useAuth'
+import { useBalancePrivacy } from '@/services/useBalancePrivacy'
 import moneyFormat from '@/utils/moneyFormat'
 import { Feather } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
@@ -8,7 +9,12 @@ const AccouuntDetails = () => {
   const {
     userProfileData,
   } = useAuth()
+  const { balancesHidden, maskFormattedAmount } = useBalancePrivacy()
   const router = useRouter()
+  const walletBalanceLabel = moneyFormat(userProfileData?.wallet?.balance)
+  const walletBalanceDisplay = balancesHidden
+    ? maskFormattedAmount(walletBalanceLabel)
+    : walletBalanceLabel
 
   return (
     <View className="flex-1 bg-primary">
@@ -23,7 +29,7 @@ const AccouuntDetails = () => {
                   Wallet Balance
                 </Text>
                 <Text className="text-white text-left text-4xl my-2  font-bold">
-                  {moneyFormat(userProfileData?.wallet?.balance)}
+                  {walletBalanceDisplay}
                 </Text>
               </View>
 

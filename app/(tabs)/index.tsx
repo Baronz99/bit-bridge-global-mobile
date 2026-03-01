@@ -21,6 +21,7 @@ import { icons } from '@/constants/icons'
 import { images } from '@/constants/images'
 
 import { useAuth } from '@/services/useAuth'
+import { useBalancePrivacy } from '@/services/useBalancePrivacy'
 import useFetch from '@/services/useFetch'
 
 import moneyFormat from '@/utils/moneyFormat'
@@ -229,6 +230,7 @@ const getHomeRowCurrency = (t: TimelineItem) => {
 // ---------------------------
 export default function Index() {
   const { authState, userProfileData, loadProfile, loading, authHydrated } = useAuth()
+  const { balancesHidden, toggleBalancesVisibility, maskFormattedAmount } = useBalancePrivacy()
   const router = useRouter()
   const didKickoffProfileRef = useRef(false)
 
@@ -511,6 +513,12 @@ export default function Index() {
   }, [recentTimelineRaw, activityMode])
 
   const showTopError = (recentPurchasesError as any)?.message || (timelineError as any)?.message
+  const bridgeBalanceLabel = moneyFormat((userProfileData as any)?.wallet?.balance ?? 0)
+  const commissionLabel = moneyFormat((userProfileData as any)?.wallet?.commission ?? 0)
+  const bridgeBalanceDisplay = balancesHidden
+    ? maskFormattedAmount(bridgeBalanceLabel)
+    : bridgeBalanceLabel
+  const commissionDisplay = balancesHidden ? maskFormattedAmount(commissionLabel) : commissionLabel
 
   const goToTimeline = useCallback(() => {
     router.push('/(tabs)/timeline' as any)
@@ -559,17 +567,26 @@ export default function Index() {
               <View>
                 <Text className="text-white/70 text-xs tracking-widest uppercase">Bridge Wallet</Text>
                 <Text className="text-white text-3xl font-semibold mt-2">
-                  {moneyFormat((userProfileData as any)?.wallet?.balance ?? 0)}
+                  {bridgeBalanceDisplay}
                 </Text>
                 <View className="flex-row mt-3 items-center gap-2">
                   <Image source={icons.trophy} className="w-5 h-5" />
                   <Text className="text-white text-sm">
-                    {moneyFormat((userProfileData as any)?.wallet?.commission ?? 0)}
+                    {commissionDisplay}
                   </Text>
                 </View>
               </View>
 
               <View className="flex-col items-end gap-2">
+                <TouchableOpacity
+                  onPress={() => {
+                    void toggleBalancesVisibility()
+                  }}
+                  className="gap-2 items-center rounded-full flex-row py-1 px-3 bg-gray-900/60 border border-gray-800"
+                >
+                  <Feather name={balancesHidden ? 'eye-off' : 'eye'} size={12} color="white" />
+                  <Text className="text-white text-xs">{balancesHidden ? 'Show' : 'Hide'}</Text>
+                </TouchableOpacity>
                 <Link href={'/history' as any} asChild>
                   <TouchableOpacity className="gap-2 items-center rounded-full flex-row py-1 px-3 bg-gray-900/60 border border-gray-800">
                     <Text className="text-white text-xs">History</Text>

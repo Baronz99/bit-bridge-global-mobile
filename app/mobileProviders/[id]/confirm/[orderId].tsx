@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import useNotification from '@/hooks/useNotification'
 import useFetch from '@/services/useFetch'
 import { useAuth } from '@/services/useAuth'
+import { useBalancePrivacy } from '@/services/useBalancePrivacy'
 import { getPurchaseOrder } from '@/api/billOrder'
 import Summary from '@/components/cards/Summary'
 import Loader from '@/components/Loader'
@@ -23,7 +24,16 @@ const ConfirmScreen = () => {
   const router = useRouter()
   const { notification, setNotification } = useNotification()
   const { userProfileData, loadProfile } = useAuth()
+  const { balancesHidden, maskFormattedAmount } = useBalancePrivacy()
   const walletBalanceValue = Number(userProfileData?.wallet?.balance ?? 0)
+  const walletBalanceLabel = moneyFormat(userProfileData?.wallet?.balance)
+  const commissionLabel = moneyFormat(userProfileData?.wallet?.commission ?? 0)
+  const walletBalanceDisplay = balancesHidden
+    ? maskFormattedAmount(walletBalanceLabel)
+    : walletBalanceLabel
+  const commissionDisplay = balancesHidden
+    ? maskFormattedAmount(commissionLabel)
+    : commissionLabel
   const [resolvedBillOrderId, setResolvedBillOrderId] = useState<string | null>(null)
   const [resolveError, setResolveError] = useState<string | null>(null)
   const [fundPrompt, setFundPrompt] = useState<{ open: boolean; shortfall: number }>({ open: false, shortfall: 0 })
@@ -148,11 +158,11 @@ const ConfirmScreen = () => {
       <View className="flex-row justify-between items-center mt-4">
         <View>
           <Text className="text-xs text-gray-400">Balance</Text>
-          <Text className="text-xl font-semibold mt-1 text-white">{moneyFormat(userProfileData?.wallet?.balance)}</Text>
+          <Text className="text-xl font-semibold mt-1 text-white">{walletBalanceDisplay}</Text>
         </View>
         <View className="flex-row items-center bg-gray-900 border border-gray-800 px-3 py-1 rounded-full">
           <Text className="text-xs text-gray-300 font-semibold mr-2">Bonus</Text>
-          <Text className="text-sm font-medium text-white">{moneyFormat(userProfileData?.wallet?.commission ?? 0)}</Text>
+          <Text className="text-sm font-medium text-white">{commissionDisplay}</Text>
         </View>
       </View>
 
