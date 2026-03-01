@@ -154,6 +154,7 @@ export type Tier3StatusResponse = {
 export type Tier3StartResponse = {
   status?: string
   message?: string
+  detail?: string
   error?: string
 }
 

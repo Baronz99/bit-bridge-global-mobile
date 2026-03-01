@@ -7,11 +7,17 @@ import Loader from '@/components/Loader'
 import NotificationAlert from '@/components/notification'
 import { apiErrorMessage } from '@/utils/apiErrorMessage'
 
+type NoticeState = {
+  message: string | null
+  error: boolean
+  data: any | null
+}
+
 const TunnelActivationScreen = () => {
   const router = useRouter()
   const { onLogout } = useAuth()
   const [loading, setLoading] = useState(false)
-  const [notice, setNotice] = useState({
+  const [notice, setNotice] = useState<NoticeState>({
     message: null,
     error: false,
     data: null,

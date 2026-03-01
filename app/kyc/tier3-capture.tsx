@@ -289,7 +289,7 @@ const Tier3CaptureScreen = () => {
           <Text className="text-gray-300 text-xs mb-3">- Hold still to avoid blur.</Text>
 
           <TouchableOpacity
-            disabled={status === 'processing' || status === 'verified'}
+            disabled={loading}
             onPress={() => setHasReadGuidance((v) => !v)}
             className={`rounded-xl py-2 items-center mb-3 ${
               hasReadGuidance ? 'bg-emerald-600/80' : 'bg-gray-800'
