@@ -1,4 +1,12 @@
-import { Image, ScrollView, Text, TouchableOpacity, View } from 'react-native'
+import {
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import useFetch from '@/services/useFetch'
@@ -7,7 +15,6 @@ import { images } from '@/constants/images'
 import FormInput from '@/components/FormInput'
 import { useAuth } from '@/services/useAuth'
 import { splitString } from '@/utils'
-import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
 import { createPurchaseOrder, getPriceList } from '@/api/billOrder'
 import { createOrderFromPurchase } from '@/api/orders'
 import FormSelect from '@/components/FormSelect'
@@ -111,13 +118,21 @@ const ProvideDertails = () => {
   }
 
   return (
-    <View className="flex-1 bg-primary px-4">
+    <>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 24 : 0}
+    >
+      <View className="flex-1 bg-primary px-4">
       <ScrollView
         contentContainerStyle={{
           paddingBottom: 80,
         }}
         showsVerticalScrollIndicator={false}
         className="flex-1"
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
       >
         <View className="mt-6 rounded-3xl border border-gray-800 bg-gray-900/80 p-5">
           <Text className="text-white/70 text-xs tracking-widest uppercase">Mobile</Text>
@@ -143,7 +158,6 @@ const ProvideDertails = () => {
 
         <View className="mt-6 rounded-2xl border border-gray-800 bg-gray-900/70 p-4">
           <Text className="text-white text-sm font-semibold">Top Up Details</Text>
-          <KeyboardAvoidWrapper>
             <View className="mt-3">
               <FormInput
                 name="billerCode"
@@ -189,11 +203,12 @@ const ProvideDertails = () => {
                 <Text className="text-white text-center font-semibold">Proceed</Text>
               </TouchableOpacity>
             </View>
-          </KeyboardAvoidWrapper>
         </View>
       </ScrollView>
+      </View>
+    </KeyboardAvoidingView>
       <Loader open={loader} />
-    </View>
+    </>
   )
 }
 

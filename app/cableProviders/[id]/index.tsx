@@ -1,4 +1,12 @@
-import { Image, ScrollView, Text, TouchableOpacity, View } from 'react-native'
+import {
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native'
 import React, { useCallback, useEffect, useState } from 'react'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import useFetch from '@/services/useFetch'
@@ -6,7 +14,6 @@ import { getProvision } from '@/api/products'
 import { images } from '@/constants/images'
 import FormInput from '@/components/FormInput'
 import { splitString } from '@/utils'
-import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
 import { createPurchaseOrder, getPriceList } from '@/api/billOrder'
 import { createOrderFromPurchase } from '@/api/orders'
 import FormSelect from '@/components/FormSelect'
@@ -83,18 +90,25 @@ const ProvideDertails = () => {
   }
 
   return (
-    <View className="flex-1 bg-primary px-4 ">
+    <>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 24 : 0}
+    >
+      <View className="flex-1 bg-primary px-4 ">
       <ScrollView
         contentContainerStyle={{
           paddingBottom: 80,
         }}
         showsVerticalScrollIndicator={false}
         className="flex-1"
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
       >
         <View className="py-6">
           <Image source={getImageByKey(String(splitString(data?.name)))} className="w-full h-40 rounded-lg" />
 
-          <KeyboardAvoidWrapper>
             <View>
               <FormInput
                 name="billerCode"
@@ -138,12 +152,13 @@ const ProvideDertails = () => {
                 <Text className="text-alt text-center">Proceed</Text>
               </TouchableOpacity>
             </View>
-          </KeyboardAvoidWrapper>
         </View>
       </ScrollView>
+      </View>
+    </KeyboardAvoidingView>
 
       <Loader open={loader} />
-    </View>
+    </>
   )
 }
 

@@ -1,4 +1,12 @@
-import { Image, ScrollView, Text, TouchableOpacity, View } from 'react-native'
+import {
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import useFetch from '@/services/useFetch'
 import { getProducts } from '@/api/products'
@@ -10,7 +18,6 @@ import { splitString } from '@/utils'
 import SelectBoxIcon from '@/components/select-box/SelectBoxIcon'
 import { createPurchaseOrder } from '@/api/billOrder'
 import { createOrderFromPurchase } from '@/api/orders'
-import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
 import FormInput from '@/components/FormInput'
 import FormSelect from '@/components/FormSelect'
 import Loader from '@/components/Loader'
@@ -113,8 +120,17 @@ const index = () => {
 
   return (
     <>
-      <View className="flex-1 bg-primary px-4">
-        <ScrollView contentContainerStyle={{ paddingBottom: 80 }}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 24 : 0}
+      >
+        <View className="flex-1 bg-primary px-4">
+        <ScrollView
+          contentContainerStyle={{ paddingBottom: 80 }}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+        >
           <View className="mt-6 rounded-3xl border border-gray-800 bg-gray-900/80 p-5">
             <Text className="text-white/70 text-xs tracking-widest uppercase">Mobile</Text>
             <Text className="text-white text-2xl font-semibold mt-2">Airtime Top Up</Text>
@@ -145,7 +161,6 @@ const index = () => {
 
           <View className="mt-6 rounded-2xl border border-gray-800 bg-gray-900/70 p-4">
             <Text className="text-white text-sm font-semibold">Top Up Details</Text>
-            <KeyboardAvoidWrapper>
               <View className="mt-3">
                 <FormInput
                   name="billerCode"
@@ -191,10 +206,10 @@ const index = () => {
                   <Text className="text-white text-center font-semibold">Proceed</Text>
                 </TouchableOpacity>
               </View>
-            </KeyboardAvoidWrapper>
           </View>
         </ScrollView>
-      </View>
+        </View>
+      </KeyboardAvoidingView>
       <Loader open={loader} />
     </>
   )
