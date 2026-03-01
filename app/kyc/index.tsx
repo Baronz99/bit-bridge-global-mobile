@@ -104,10 +104,19 @@ const StepRow = ({
     <View className="flex-1">
       <View className="flex-row items-center justify-between">
         <Text className="text-white font-semibold">{title}</Text>
-        <StatusPill label={done ? 'Done' : 'Pending'} ok={done} />
+        <View className="flex-row items-center gap-2">
+          <StatusPill label={done ? 'Done' : 'Pending'} ok={done} />
+          {done && href ? (
+            <Link href={href} asChild>
+              <TouchableOpacity className="px-2 py-1 rounded-lg border border-gray-700 bg-gray-950">
+                <Text className="text-white text-[11px] font-semibold">{cta}</Text>
+              </TouchableOpacity>
+            </Link>
+          ) : null}
+        </View>
       </View>
       <Text className="text-gray-400 text-xs mt-1">{description}</Text>
-      {href ? (
+      {href && !done ? (
         <Link href={href} asChild>
           <TouchableOpacity
             className={`border border-gray-800 py-2 rounded-xl items-center mt-3 ${
@@ -167,6 +176,7 @@ export default function KycCenter() {
   const rawTier = String(status?.kyc_level || 'tier_0').toLowerCase()
   const profile = status?.user_profile || {}
   const idType = status?.id_type || profile?.id_type || ''
+  const normalizedIdType = String(idType || '').trim().toLowerCase()
   const hasAddress = Boolean(
     profile?.address_line1 && profile?.city && profile?.state && profile?.country
   )
@@ -174,6 +184,13 @@ export default function KycCenter() {
   const idDocUrl = profile?.id_document_url
   const proofUrl = profile?.proof_of_address_url
   const identityVerified = Boolean(idDocUrl || ninVerified)
+  const ninLast4 = status?.user_kyc?.nin_last4
+  const showNinDetails = Boolean(
+    normalizedIdType === 'nin' ||
+      ninVerified ||
+      ninLast4 ||
+      (ninStatus && ninStatus !== 'unverified' && ninStatus !== 'pending')
+  )
   const docsComplete = Boolean(
     idType && hasAddress && proofType && proofUrl && identityVerified
   )
@@ -279,7 +296,7 @@ export default function KycCenter() {
                   : 'Upload ID document or verify NIN, plus proof of address.'
               }
             done={docsComplete}
-            cta={docsComplete ? 'View documents' : 'Upload documents'}
+            cta={docsComplete ? 'View / Edit' : 'Upload documents'}
             href="/kyc/documents"
           />
           {tier3Enabled && tier2Complete ? (
@@ -335,13 +352,15 @@ export default function KycCenter() {
         ) : null}
       </View>
 
+      {showNinDetails ? (
       <View className="bg-gray-900 rounded-2xl p-4 mb-4">
         <Text className="text-white font-semibold mb-2">NIN details</Text>
-        <Text className="text-gray-400 text-xs">{ninVerified ? 'Verified' : ninStatus || 'Pending'}</Text>
+        <Text className="text-gray-400 text-xs">{ninVerified ? 'Verified' : ninStatus || 'Unverified'}</Text>
         {status?.user_kyc?.nin_last4 ? (
           <Text className="text-gray-500 text-xs mt-2">NIN ending •••• {status.user_kyc.nin_last4}</Text>
         ) : null}
       </View>
+      ) : null}
 
     </ScrollView>
   )
