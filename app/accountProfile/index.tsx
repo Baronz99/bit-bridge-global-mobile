@@ -388,7 +388,30 @@ const index = () => {
   const phoneVerified = Boolean(userRoot?.phone_verified || userProfile?.phone_verified || userRoot?.phone_verified_at || userProfile?.phone_verified_at)
   const bvnStatus = String(userRoot?.user_kyc?.bvn_status || '')
   const bvnVerified = bvnStatus === 'verified'
-  const tier2Complete = kycLevel === 'tier_2' || kycLevel === 'tier2' || kycLevel === 'tier_3' || kycLevel === 'tier3'
+  const requirements =
+    userRoot?.kyc_requirements ?? userRoot?.requirements ?? userRoot?.user_kyc?.requirements
+  const tier2ByLevel =
+    kycLevel === 'tier_2' || kycLevel === 'tier2' || kycLevel === 'tier_3' || kycLevel === 'tier3'
+  const addressComplete = Boolean(
+    String(userProfile?.address_line1 ?? '').trim() &&
+      String(userProfile?.city ?? '').trim() &&
+      String(userProfile?.state ?? '').trim()
+  )
+  const idUploaded = Boolean(userProfile?.id_document_uploaded || userProfile?.id_document_url)
+  const proofUploaded = Boolean(
+    userProfile?.proof_of_address_uploaded || userProfile?.proof_of_address_url
+  )
+  const ninVerified = String(userRoot?.user_kyc?.nin_status || '').trim().toLowerCase() === 'verified'
+  const identityVerified = idUploaded || ninVerified
+  const inferredMissing = [
+    ...(bvnVerified ? [] : ['bvn']),
+    ...(addressComplete ? [] : ['address']),
+    ...(identityVerified ? [] : ['identity']),
+    ...(proofUploaded ? [] : ['proof_of_address']),
+  ]
+  const tier2Missing = Array.isArray(requirements?.missing) ? requirements.missing : inferredMissing
+  const tier2Complete = tier2ByLevel || tier2Missing.length === 0
+  const tierLabel = kycLevel.replace(/[_-]/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase())
 
   const [formInput, setFormInput] = useState<ProfileFormValues>(defaultProfileFormValues)
   const [loading, setLoading] = useState(false)
@@ -456,7 +479,7 @@ const index = () => {
                   <View className="flex-row items-center justify-between">
                     <Text className="text-white font-semibold">Profile status</Text>
                     <View className="px-3 py-1 rounded-full bg-app-primary/15 border border-app-primary/30">
-                      <Text className="text-app-primary text-xs font-semibold">{kycLevel}</Text>
+                      <Text className="text-app-primary text-xs font-semibold">{tierLabel}</Text>
                     </View>
                   </View>
                   <View className="flex-row flex-wrap mt-3" style={{ gap: 8 }}>
@@ -470,6 +493,22 @@ const index = () => {
                       <Text className="text-xs text-gray-200">Tier 2 {tier2Complete ? 'complete' : 'incomplete'}</Text>
                     </View>
                   </View>
+                  {!tier2Complete ? (
+                    <Text className="text-gray-400 text-xs mt-3">
+                      Missing for Tier 2:{' '}
+                      {tier2Missing
+                        .map((item: string) => {
+                          if (item === 'bvn') return 'BVN'
+                          if (item === 'address') return 'address'
+                          if (item === 'identity') return 'ID or NIN verification'
+                          if (item === 'proof_of_address') return 'proof of address'
+                          return item
+                        })
+                        .join(', ')}
+                    </Text>
+                  ) : (
+                    <Text className="text-emerald-400 text-xs mt-3">Tier 2 requirements completed.</Text>
+                  )}
                 </View>
 
                 <ProfileHeaderCard

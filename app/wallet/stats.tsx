@@ -3,6 +3,7 @@ import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'rea
 import useFetch from '@/services/useFetch'
 import { getStatistics } from '@/api/statistics'
 import { FEATURE_STATS } from '@/constants/featureFlags'
+import moneyFormat from '@/utils/moneyFormat'
 
 const WalletStats = () => {
   const { data, loading, error, refetch } = useFetch(() => getStatistics())
@@ -10,6 +11,18 @@ const WalletStats = () => {
   const stats = useMemo(() => {
     return data?.data ?? data
   }, [data])
+
+  const totals = useMemo(() => {
+    const users = Number(stats?.users || 0)
+    const totalDeposits = Number(stats?.total_deposits || 0)
+    const totalWithdrawals = Number(stats?.total_withdrawals || 0)
+
+    return {
+      users: Number.isFinite(users) ? users : 0,
+      totalDeposits: Number.isFinite(totalDeposits) ? totalDeposits : 0,
+      totalWithdrawals: Number.isFinite(totalWithdrawals) ? totalWithdrawals : 0,
+    }
+  }, [stats])
 
   if (!FEATURE_STATS) {
     return (
@@ -43,10 +56,18 @@ const WalletStats = () => {
         ) : null}
 
         <View className="bg-gray-900 rounded-xl p-4 mt-6">
-          <Text className="text-white font-semibold">Raw Stats</Text>
-          <Text className="text-gray-400 text-xs mt-2">
-            {stats ? JSON.stringify(stats) : 'No stats available.'}
-          </Text>
+          <Text className="text-white font-semibold">Users</Text>
+          <Text className="text-gray-100 text-2xl mt-2">{totals.users.toLocaleString()}</Text>
+        </View>
+
+        <View className="bg-gray-900 rounded-xl p-4 mt-3">
+          <Text className="text-white font-semibold">Total deposits</Text>
+          <Text className="text-gray-100 text-2xl mt-2">{moneyFormat(totals.totalDeposits)}</Text>
+        </View>
+
+        <View className="bg-gray-900 rounded-xl p-4 mt-3">
+          <Text className="text-white font-semibold">Total withdrawals</Text>
+          <Text className="text-gray-100 text-2xl mt-2">{moneyFormat(totals.totalWithdrawals)}</Text>
         </View>
       </ScrollView>
     </View>
