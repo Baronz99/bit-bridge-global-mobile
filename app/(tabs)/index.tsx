@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   FlatList,
@@ -202,7 +202,7 @@ const getHomeRowSubtitle = (t: TimelineItem) => {
 
   if (biller) return biller
   if (service) return service
-  if (bank && addr) return `${bank} â€¢ ${addr}`
+  if (bank && addr) return `${bank} - ${addr}`
   if (bank) return bank
   if (addr) return addr
   if (circle) return circle
@@ -245,7 +245,7 @@ export default function Index() {
   const [sendOpen, setSendOpen] = useState(false)
   const [loader, setLoader] = useState(false)
 
-  // âœ… Recent Activity toggle (money vs all)
+  // Recent Activity toggle (money vs all)
   const [activityMode, setActivityMode] = useState<'money' | 'all'>('money')
 
   useEffect(() => {
@@ -272,12 +272,12 @@ export default function Index() {
   const fetchRecentPurchases = useCallback(() => getRescentPurchaseOrder(), [])
   const fetchRecentOrders = useCallback(() => getUserOrders(), [])
 
-  // Old deposits-only transactions (kept, but not main â€œRecent Activityâ€)
+  // Old deposits-only transactions (kept, but not main "Recent Activity")
   const fetchRecentTransactions = useCallback(() => {
     return getTransactions({ params: { transaction_type: 'deposit' } })
   }, [])
 
-  // âœ… Recent Activity from Timeline â€” Home should NOT be noisy
+  // Recent Activity from Timeline - Home should NOT be noisy
   const fetchRecentTimeline = useCallback(() => {
     // IMPORTANT: for Home, show_alerts should be false for bank-grade signal
     return listTimeline({ limit: 25, show_alerts: false } as any)
@@ -752,7 +752,7 @@ export default function Index() {
             </View>
           ) : null}
 
-          {/* âœ… Recent Activity (Bank-grade Home Rows) */}
+          {/* Recent Activity (Bank-grade Home Rows) */}
           <View className="mb-8">
             <View className="flex-row items-center justify-between mb-3">
               <Text className="text-white text-lg font-semibold">Recent Activity</Text>
@@ -884,7 +884,7 @@ export default function Index() {
             ) : null}
           </View>
 
-          {/* Existing horizontal â€œrecent purchasesâ€ list (kept) */}
+          {/* Existing horizontal "recent purchases" list (kept) */}
           <View>
             {recentPurchasesLoading ? (
               <ActivityIndicator />
@@ -1038,6 +1038,3 @@ const LabelText = ({ label, value }: any) => (
     <Text className="text-white text-center">{value}</Text>
   </View>
 )
-
-
-
