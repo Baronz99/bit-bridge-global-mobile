@@ -99,20 +99,18 @@ const StepRow = ({
       </Text>
     </View>
     <View className="flex-1">
-      <View className="flex-row items-center justify-between">
-        <Text className="text-white font-semibold">{title}</Text>
-        <View className="flex-row items-center gap-2">
-          <StatusPill label={done ? 'Done' : 'Pending'} ok={done} />
-          {done && href ? (
-            <Link href={href} asChild>
-              <TouchableOpacity className="px-2 py-1 rounded-lg border border-gray-700 bg-gray-950">
-                <Text className="text-white text-[11px] font-semibold">{cta}</Text>
-              </TouchableOpacity>
-            </Link>
-          ) : null}
-        </View>
+      <View className="flex-row items-start justify-between gap-2">
+        <Text className="text-white font-semibold flex-1">{title}</Text>
+        <StatusPill label={done ? 'Done' : 'Pending'} ok={done} />
       </View>
       <Text className="text-gray-400 text-xs mt-1">{description}</Text>
+      {done && href ? (
+        <Link href={href} asChild>
+          <TouchableOpacity className="self-start px-2 py-1 rounded-lg border border-gray-700 bg-gray-950 mt-3">
+            <Text className="text-white text-[11px] font-semibold">{cta}</Text>
+          </TouchableOpacity>
+        </Link>
+      ) : null}
       {href && !done ? (
         <Link href={href} asChild>
           <TouchableOpacity
@@ -299,17 +297,6 @@ export default function KycCenter() {
             cta={tier2IdentityComplete ? 'View / Edit' : 'Upload identity'}
             href="/kyc/documents"
           />
-          <StepRow
-            title="Address verification (Tier 4)"
-            description={
-              tier4Complete
-                ? 'Address and proof of address are verified.'
-                : 'Add complete address and upload proof of address.'
-            }
-            done={tier4Complete}
-            cta={tier4Complete ? 'View / Edit' : 'Complete address'}
-            href="/kyc/documents"
-          />
           {tier3Enabled && tier2Complete ? (
             <StepRow
               title="Tier 3 live selfie"
@@ -334,6 +321,17 @@ export default function KycCenter() {
               disabled={tier3Pending || tier3Verified}
             />
           ) : null}
+          <StepRow
+            title="Address verification (Tier 4)"
+            description={
+              tier4Complete
+                ? 'Address and proof of address are verified.'
+                : 'Add complete address and upload proof of address.'
+            }
+            done={tier4Complete}
+            cta={tier4Complete ? 'View / Edit' : 'Complete address'}
+            href="/kyc/documents"
+          />
         </View>
       </View>
 
