@@ -266,7 +266,7 @@ export default function RootLayout() {
         <Stack.Screen name="wallet/stats" options={{ headerTitle: 'Wallet Stats' }} />
         <Stack.Screen name="legal/index" options={{ headerTitle: 'Legal' }} />
 
-        <Stack.Screen name="accountProfile/index" options={{ headerTitle: 'Update Profile' }} />
+        <Stack.Screen name="accountProfile/index" options={{ headerTitle: 'Profile' }} />
         <Stack.Screen name="accountDetails/index" options={{ headerTitle: 'Account Details' }} />
         <Stack.Screen name="accounts/index" options={{ headerTitle: 'Virtual Accounts' }} />
         <Stack.Screen name="accounts/create" options={{ headerTitle: 'Create Account' }} />
