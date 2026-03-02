@@ -334,11 +334,11 @@ const BankReceiptCard = ({
   const conversionDirection = clean(meta?.conversion_direction || conversionMeta?.direction)
   const conversionDirectionLabel =
     conversionDirection === 'ngn_to_usd'
-      ? 'NGN → USD'
+      ? 'NGN to USD'
       : conversionDirection === 'usd_to_ngn'
-        ? 'USD → NGN'
+        ? 'USD to NGN'
         : clean(conversionMeta?.from) && clean(conversionMeta?.to)
-          ? `${clean(conversionMeta?.from)} → ${clean(conversionMeta?.to)}`
+          ? `${clean(conversionMeta?.from)} to ${clean(conversionMeta?.to)}`
           : ''
   const conversionFrom = clean(conversionMeta?.from)
   const conversionTo = clean(conversionMeta?.to)
@@ -684,5 +684,3 @@ const BankReceiptCard = ({
 }
 
 export default BankReceiptCard
-
-

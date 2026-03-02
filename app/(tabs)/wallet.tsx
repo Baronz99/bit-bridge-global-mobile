@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
@@ -238,7 +238,7 @@ const WalletScreen = () => {
     void refreshWalletFetches()
   }, [refreshWalletFetches, transactionFilter, walletMode])
 
-  // âœ… HARD FILTER by wallet type so NGN cannot leak into USD (or vice versa)
+  // HARD FILTER by wallet type so NGN cannot leak into USD (or vice versa)
   const walletScopedTransactions = useMemo(() => {
     return txRows.filter((item: any) => {
       const t = getItemWalletType(item)
@@ -338,8 +338,8 @@ const WalletScreen = () => {
     const txType = String(item?.transaction_type || item?.type || '').toLowerCase()
 
     if (address.includes('tunnel conversion') || address.includes('conversion')) {
-      if (isTunnelMode) return txType === 'withdrawal' ? 'Convert USD â†’ NGN' : 'Convert NGN â†’ USD'
-      return txType === 'withdrawal' ? 'Convert NGN â†’ USD' : 'Convert USD â†’ NGN'
+      if (isTunnelMode) return txType === 'withdrawal' ? 'Convert USD to NGN' : 'Convert NGN to USD'
+      return txType === 'withdrawal' ? 'Convert NGN to USD' : 'Convert USD to NGN'
     }
 
     if (address.includes('virtual card funding')) return 'Card funding'
@@ -422,7 +422,7 @@ const WalletScreen = () => {
     }
   }
 
-  // âœ… Pull-to-refresh
+  // Pull-to-refresh
   const onRefresh = useCallback(async () => {
     setRefreshing(true)
     try {
@@ -497,7 +497,7 @@ const WalletScreen = () => {
               onPress={() => router.push('/convert-ngn-to-usd')}
               className="bg-gray-900 border border-gray-800 py-3 flex-1 rounded-xl"
             >
-              <Text className="text-white text-center text-xs">Convert NGN â†’ USD</Text>
+              <Text className="text-white text-center text-xs">Convert NGN to USD</Text>
             </TouchableOpacity>
           </View>
 
@@ -592,7 +592,7 @@ const WalletScreen = () => {
                   className="border py-3 flex-1 rounded-xl"
                   style={{ backgroundColor: 'rgba(9, 8, 6, 0.7)', borderColor: 'rgba(245, 158, 11, 0.4)' }}
                 >
-                  <Text className="text-white text-center text-xs">Convert USD â†’ NGN</Text>
+                  <Text className="text-white text-center text-xs">Convert USD to NGN</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -907,4 +907,3 @@ const WalletScreen = () => {
 }
 
 export default WalletScreen
-
