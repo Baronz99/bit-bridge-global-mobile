@@ -390,24 +390,21 @@ const index = () => {
   const bvnVerified = bvnStatus === 'verified'
   const requirements =
     userRoot?.kyc_requirements ?? userRoot?.requirements ?? userRoot?.user_kyc?.requirements
+  const idType = String(userRoot?.id_type || userProfile?.id_type || '').trim()
   const tier2ByLevel =
-    kycLevel === 'tier_2' || kycLevel === 'tier2' || kycLevel === 'tier_3' || kycLevel === 'tier3'
-  const addressComplete = Boolean(
-    String(userProfile?.address_line1 ?? '').trim() &&
-      String(userProfile?.city ?? '').trim() &&
-      String(userProfile?.state ?? '').trim()
-  )
+    kycLevel === 'tier_2' ||
+    kycLevel === 'tier2' ||
+    kycLevel === 'tier_3' ||
+    kycLevel === 'tier3' ||
+    kycLevel === 'tier_4' ||
+    kycLevel === 'tier4'
   const idUploaded = Boolean(userProfile?.id_document_uploaded || userProfile?.id_document_url)
-  const proofUploaded = Boolean(
-    userProfile?.proof_of_address_uploaded || userProfile?.proof_of_address_url
-  )
   const ninVerified = String(userRoot?.user_kyc?.nin_status || '').trim().toLowerCase() === 'verified'
   const identityVerified = idUploaded || ninVerified
   const inferredMissing = [
     ...(bvnVerified ? [] : ['bvn']),
-    ...(addressComplete ? [] : ['address']),
+    ...(idType ? [] : ['id_type']),
     ...(identityVerified ? [] : ['identity']),
-    ...(proofUploaded ? [] : ['proof_of_address']),
   ]
   const tier2Missing = Array.isArray(requirements?.missing) ? requirements.missing : inferredMissing
   const tier2Complete = tier2ByLevel || tier2Missing.length === 0
@@ -499,9 +496,8 @@ const index = () => {
                       {tier2Missing
                         .map((item: string) => {
                           if (item === 'bvn') return 'BVN'
-                          if (item === 'address') return 'address'
+                          if (item === 'id_type') return 'ID type'
                           if (item === 'identity') return 'ID or NIN verification'
-                          if (item === 'proof_of_address') return 'proof of address'
                           return item
                         })
                         .join(', ')}
@@ -572,7 +568,7 @@ const index = () => {
                   <Text className="text-gray-500 text-xs mt-1">Status: {phoneVerified ? 'Verified' : 'Not verified'}</Text>
                 </SectionCard>
 
-                <SectionCard title={tier2Complete ? 'Address (optional)' : 'Address (required for Tier 2)'}>
+                <SectionCard title="Address">
                   <Field
                     label="Address Line 1"
                     value={formInput.address_line1}

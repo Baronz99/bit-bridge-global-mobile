@@ -180,15 +180,8 @@ const KycDocumentsScreen = () => {
     if (form.id_type === 'nin' && !/^\d{11}$/.test(String(form.nin || '').trim())) {
       return 'Enter a valid 11-digit NIN.'
     }
-    if (!form.address_line1 || !form.city || !form.state || !form.postal_code) {
-      return 'Address line 1, city, state, and postal code are required.'
-    }
-    if (!form.proof_of_address_type) return 'Select a proof of address type.'
     if (needsIdUpload && !idDocument && !hasIdDocOnFile) {
       return 'Upload your ID document to continue.'
-    }
-    if (!proofDocument && !hasProofOnFile) {
-      return 'Upload proof of address to continue.'
     }
     return null
   }
@@ -275,7 +268,7 @@ const KycDocumentsScreen = () => {
       <View className="rounded-3xl border border-gray-800 bg-gray-900/80 p-5">
         <Text className="text-white text-xl font-semibold">Documents & Address</Text>
         <Text className="text-gray-400 text-xs mt-2">
-          Upload identity and proof of address documents to complete Tier 2 verification.
+          Complete Tier 2 with identity verification. Address and proof of address support Tier 4.
         </Text>
       </View>
 
@@ -371,7 +364,7 @@ const KycDocumentsScreen = () => {
       </View>
 
       <View className="mt-5 rounded-2xl border border-gray-800 bg-gray-900/70 p-4">
-        <Text className="text-white text-base font-semibold mb-3">Proof of address</Text>
+        <Text className="text-white text-base font-semibold mb-3">Proof of address (Tier 4)</Text>
         <FormSelect
           label="Proof type"
           selectedValue={form.proof_of_address_type}

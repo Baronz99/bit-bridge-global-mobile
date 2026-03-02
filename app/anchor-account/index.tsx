@@ -100,7 +100,13 @@ const AnchorAccountScreen = () => {
   const kycLevel = String(profileRoot?.kyc_level || profileRoot?.user_kyc?.kyc_level || 'tier_0')
     .trim()
     .toLowerCase()
-  const platformTier2 = kycLevel === 'tier_2' || kycLevel === 'tier2' || kycLevel === 'tier_3' || kycLevel === 'tier3'
+  const platformTier2 =
+    kycLevel === 'tier_2' ||
+    kycLevel === 'tier2' ||
+    kycLevel === 'tier_3' ||
+    kycLevel === 'tier3' ||
+    kycLevel === 'tier_4' ||
+    kycLevel === 'tier4'
 
   const isValidBvn = (value?: string | null) => /^\d{11}$/.test(String(value || '').trim())
   const isValidDob = (value?: string | null) => /^\d{4}-\d{2}-\d{2}$/.test(String(value || '').trim())
