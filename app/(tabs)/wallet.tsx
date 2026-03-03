@@ -31,7 +31,7 @@ const REFRESH_TIMEOUT_MS = 15000
 const TX_PAGE_LIMIT = 30
 
 const WalletScreen = () => {
-  const { userProfileData } = useAuth()
+  const { userProfileData, loadProfile } = useAuth()
   const { balancesHidden, toggleBalancesVisibility, maskFormattedAmount } = useBalancePrivacy()
   const router = useRouter()
 
@@ -864,13 +864,11 @@ const WalletScreen = () => {
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={() => {
+            onPress={async () => {
               setSendOpen(false)
-              if (canUseBankTransfer) {
-                router.push('/bank-transfer')
-              } else {
-                router.push('/bank-transfer/locked')
-              }
+              const refreshed = await loadProfile({ force: true }).catch(() => userProfileData)
+              const eligible = isTierEligibleForBankTransfer(getTierFromProfile(refreshed))
+              router.push(eligible ? '/bank-transfer' : '/bank-transfer/locked')
             }}
             className={`border py-3 rounded-xl items-center mt-3 ${
               canUseBankTransfer ? 'bg-gray-950 border-gray-800' : 'bg-gray-900 border-gray-700'

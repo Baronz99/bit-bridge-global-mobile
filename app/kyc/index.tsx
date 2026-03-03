@@ -49,31 +49,28 @@ const TIER_CONFIG = {
     description: 'Phone verified + basic profile. Unlocks core wallet usage.',
   },
   tier_2: {
-    title: 'Tier 2 - Full access',
-    description: 'BVN verified + (ID document or verified NIN) + address/proof. Unlocks cards, tunnel, transfers.',
+    title: 'Tier 2 - Verified Identity',
+    description: 'BVN verified + ID type + (verified NIN or uploaded ID document). Unlocks cards, tunnel, transfers.',
   },
   tier_3: {
-    title: 'Tier 3 - Advanced verification',
-    description: 'Liveness + advanced checks. Includes all Tier 2 capabilities.',
+    title: 'Tier 3 - Biometric Verified',
+    description: 'Liveness/biometric verification completed. Includes all Tier 2 capabilities.',
+  },
+  tier_4: {
+    title: 'Tier 4 - Verified Address',
+    description: 'Full verification: Tier 3 + complete address + proof of address.',
   },
 }
 
-const tierOrder = ['tier_0', 'tier_1', 'tier_2', 'tier_3'] as const
+const tierOrder = ['tier_0', 'tier_1', 'tier_2', 'tier_3', 'tier_4'] as const
 
 const normalizeTierKey = (raw: string | undefined) => {
   const key = (raw || 'tier_0').toString().toLowerCase()
   if (key === 'nil' || key === '') return 'tier_0'
   if (key === 'tier2') return 'tier_2'
   if (key === 'tier3') return 'tier_3'
+  if (key === 'tier4') return 'tier_4'
   return (tierOrder.includes(key as typeof tierOrder[number]) ? key : 'tier_0') as typeof tierOrder[number]
-}
-
-const getTierState = (currentTier: string, tier: string) => {
-  const currentIndex = tierOrder.indexOf(currentTier as typeof tierOrder[number])
-  const tierIndex = tierOrder.indexOf(tier as typeof tierOrder[number])
-  if (tierIndex < currentIndex) return 'completed'
-  if (tierIndex === currentIndex) return 'current'
-  return 'locked'
 }
 
 const StepRow = ({
@@ -102,20 +99,18 @@ const StepRow = ({
       </Text>
     </View>
     <View className="flex-1">
-      <View className="flex-row items-center justify-between">
-        <Text className="text-white font-semibold">{title}</Text>
-        <View className="flex-row items-center gap-2">
-          <StatusPill label={done ? 'Done' : 'Pending'} ok={done} />
-          {done && href ? (
-            <Link href={href} asChild>
-              <TouchableOpacity className="px-2 py-1 rounded-lg border border-gray-700 bg-gray-950">
-                <Text className="text-white text-[11px] font-semibold">{cta}</Text>
-              </TouchableOpacity>
-            </Link>
-          ) : null}
-        </View>
+      <View className="flex-row items-start justify-between gap-2">
+        <Text className="text-white font-semibold flex-1">{title}</Text>
+        <StatusPill label={done ? 'Done' : 'Pending'} ok={done} />
       </View>
       <Text className="text-gray-400 text-xs mt-1">{description}</Text>
+      {done && href ? (
+        <Link href={href} asChild>
+          <TouchableOpacity className="self-start px-2 py-1 rounded-lg border border-gray-700 bg-gray-950 mt-3">
+            <Text className="text-white text-[11px] font-semibold">{cta}</Text>
+          </TouchableOpacity>
+        </Link>
+      ) : null}
       {href && !done ? (
         <Link href={href} asChild>
           <TouchableOpacity
@@ -173,7 +168,6 @@ export default function KycCenter() {
 
   const tierLabel = useMemo(() => status?.kyc_level || 'tier_0', [status?.kyc_level])
   const normalizedTier = normalizeTierKey(tierLabel as string)
-  const rawTier = String(status?.kyc_level || 'tier_0').toLowerCase()
   const profile = status?.user_profile || {}
   const idType = status?.id_type || profile?.id_type || ''
   const normalizedIdType = String(idType || '').trim().toLowerCase()
@@ -184,6 +178,7 @@ export default function KycCenter() {
   const idDocUrl = profile?.id_document_url
   const proofUrl = profile?.proof_of_address_url
   const identityVerified = Boolean(idDocUrl || ninVerified)
+  const hasIdType = Boolean(String(idType || '').trim())
   const ninLast4 = status?.user_kyc?.nin_last4
   const showNinDetails = Boolean(
     normalizedIdType === 'nin' ||
@@ -191,9 +186,8 @@ export default function KycCenter() {
       ninLast4 ||
       (ninStatus && ninStatus !== 'unverified' && ninStatus !== 'pending')
   )
-  const docsComplete = Boolean(
-    idType && hasAddress && proofType && proofUrl && identityVerified
-  )
+  const tier2IdentityComplete = Boolean(hasIdType && identityVerified)
+  const tier4AddressComplete = Boolean(hasAddress && proofType && proofUrl)
   const useCase = String(status?.primary_use_case || status?.user_profile?.primary_use_case || '')
     .trim()
     .toLowerCase()
@@ -204,9 +198,13 @@ export default function KycCenter() {
   )
   const phoneVerifiedAt = profile?.phone_verified_at || status?.phone_verified_at
   const tier1Complete = hasBasicProfile && (phoneVerified || !!phoneVerifiedAt)
-  const tier3Verified = rawTier === 'tier_3'
+  const tier3Verified = normalizedTier === 'tier_3' || normalizedTier === 'tier_4'
   const tier2Complete =
-    normalizedTier === 'tier_2' || normalizedTier === 'tier_3' || (tier1Complete && bvnVerified && docsComplete)
+    normalizedTier === 'tier_2' ||
+    normalizedTier === 'tier_3' ||
+    normalizedTier === 'tier_4' ||
+    (tier1Complete && bvnVerified && tier2IdentityComplete)
+  const tier4Complete = normalizedTier === 'tier_4' || (tier3Verified && tier4AddressComplete)
   const tier3Enabled = FEATURE_KYC_CENTER
   const tier3Status = status?.user_kyc?.tier3_status || ''
   const tier3Pending = ['pending', 'processing'].includes(tier3Status)
@@ -289,14 +287,14 @@ export default function KycCenter() {
             />
           ) : null}
           <StepRow
-            title="Documents & address"
+            title="Identity verification"
               description={
-                docsComplete
-                  ? 'Identity evidence, address, and proof of address are on file.'
-                  : 'Upload ID document or verify NIN, plus proof of address.'
+                tier2IdentityComplete
+                  ? 'ID type and identity evidence are on file.'
+                  : 'Select ID type, then upload ID document or verify NIN.'
               }
-            done={docsComplete}
-            cta={docsComplete ? 'View / Edit' : 'Upload documents'}
+            done={tier2IdentityComplete}
+            cta={tier2IdentityComplete ? 'View / Edit' : 'Upload identity'}
             href="/kyc/documents"
           />
           {tier3Enabled && tier2Complete ? (
@@ -323,6 +321,20 @@ export default function KycCenter() {
               disabled={tier3Pending || tier3Verified}
             />
           ) : null}
+          <StepRow
+            title="Address verification (Tier 4)"
+            description={
+              tier4Complete
+                ? 'Address and proof of address are verified.'
+                : tier3Verified
+                ? 'Add complete address and upload proof of address.'
+                : 'Complete Tier 3 live selfie before address verification.'
+            }
+            done={tier4Complete}
+            cta={tier4Complete ? 'View / Edit' : tier3Verified ? 'Complete address' : 'Complete Tier 3 first'}
+            href={tier3Verified ? '/kyc/documents' : undefined}
+            disabled={!tier3Verified}
+          />
         </View>
       </View>
 

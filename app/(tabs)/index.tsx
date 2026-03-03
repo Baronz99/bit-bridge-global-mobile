@@ -1006,9 +1006,11 @@ export default function Index() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={() => {
+            onPress={async () => {
               setSendOpen(false)
-              router.push((canUseBankTransfer ? '/bank-transfer' : '/bank-transfer/locked') as any)
+              const refreshed = await loadProfile({ force: true }).catch(() => userProfileData)
+              const eligible = isTierEligibleForBankTransfer(getTierFromProfile(refreshed))
+              router.push((eligible ? '/bank-transfer' : '/bank-transfer/locked') as any)
             }}
             className={`border py-3 rounded-xl items-center mt-3 ${
               canUseBankTransfer ? 'bg-gray-950 border-gray-800' : 'bg-gray-900 border-gray-700'
