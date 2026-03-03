@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { ActivityIndicator, ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import NotificationAlert from '@/components/notification'
 import SearchablePicker from '@/components/bankTransfer/SearchablePicker'
@@ -72,6 +72,7 @@ const extractCounterPartyId = (payload: any): string => {
 const BankTransferScreen = () => {
   const router = useRouter()
   const { userProfileData, onLogout, loadProfile } = useAuth()
+  const scrollRef = useRef<ScrollView | null>(null)
   const accountNumberRef = useRef<TextInput | null>(null)
   const amountRef = useRef<TextInput | null>(null)
   const resolveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -390,6 +391,13 @@ const BankTransferScreen = () => {
     setFlowStep(2)
   }
 
+  const focusField = (ref: React.RefObject<TextInput>, y: number) => {
+    requestAnimationFrame(() => {
+      scrollRef.current?.scrollTo({ y, animated: true })
+      setTimeout(() => ref.current?.focus(), 120)
+    })
+  }
+
   if (!tierGateResolved) {
     return (
       <View className="flex-1 bg-primary items-center justify-center">
@@ -409,65 +417,89 @@ const BankTransferScreen = () => {
   }
 
   return (
-    <View className="flex-1 bg-primary px-4">
-      <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-        <View className="pt-10">
-          <Text className="text-gray-300 mb-4">
-            {flowStep === 1 ? 'Step 1 of 3: Recipient details' : 'Step 2 of 3: Amount and narration'}
-          </Text>
-          <View className="flex-row items-center mb-4">
+    <KeyboardAvoidingView
+      className="flex-1 bg-primary"
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 86 : 0}
+    >
+      <View className="flex-1 bg-primary px-4">
+        <ScrollView
+          ref={scrollRef}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 40 }}
+        >
+          <View className="pt-10">
+            <Text className="text-white text-xl font-semibold">Transfer setup</Text>
+            <Text className="text-gray-400 text-xs mt-1 mb-4">
+              {flowStep === 1 ? 'Step 1 of 3: Recipient details' : 'Step 2 of 3: Amount and narration'}
+            </Text>
+            <View className="flex-row items-center mb-4">
             {[
               { id: 1, label: 'Recipient' },
               { id: 2, label: 'Details' },
               { id: 3, label: 'Review' },
             ].map((item, index, arr) => {
-              const active = flowStep >= item.id
+              const completed = flowStep > item.id
+              const current = flowStep === item.id
               return (
                 <View key={item.label} className={`flex-1 ${index === arr.length - 1 ? '' : 'mr-2'}`}>
                   <View
                     className={`rounded-lg border px-2 py-2 ${
-                      active ? 'border-app-primary bg-app-primary/15' : 'border-gray-800 bg-gray-900'
+                      current
+                        ? 'border-app-primary bg-app-primary/15'
+                        : completed
+                        ? 'border-emerald-600/50 bg-emerald-900/15'
+                        : 'border-gray-800 bg-gray-900'
                     }`}
                   >
-                    <Text className={`${active ? 'text-app-primary' : 'text-gray-500'} text-[11px] text-center font-semibold`}>
+                    <Text
+                      className={`text-[11px] text-center font-semibold ${
+                        current ? 'text-app-primary' : completed ? 'text-emerald-300' : 'text-gray-500'
+                      }`}
+                    >
                       {item.id}. {item.label}
                     </Text>
                   </View>
                 </View>
               )
             })}
-          </View>
-
-          <NotificationAlert message={notice.message} error={notice.error} data={notice.data} />
-
-          <View className="bg-gray-900 border border-gray-800 rounded-2xl p-4 mb-4">
-            <Text className="text-gray-400 text-xs uppercase tracking-widest">Available Balance</Text>
-            <Text className="text-white text-2xl font-semibold mt-2">{formatNaira(availableBalance)}</Text>
-            <Text className="text-gray-300 text-xs mt-2">
-              Daily limit remaining: {formatNaira(dailyLimitRemaining)}
-            </Text>
-            <Text className="text-gray-500 text-xs mt-1">Daily limit: {dailyLimit.toLocaleString('en-NG')}</Text>
-            <Text className="text-gray-600 text-[10px] mt-1">
-              Today spent: {formatNaira(effectiveTodaySpent)}
-            </Text>
-          </View>
-
-          {flowStep === 1 && (
-          <View className="bg-gray-900 border border-gray-800 rounded-2xl p-4 mb-4">
-            <View className="flex-row items-center justify-between mb-3">
-              <Text className="text-white text-base font-semibold">Recipient</Text>
-              {beneficiaryLocked ? (
-                <TouchableOpacity
-                  onPress={() => {
-                    setSelectedBeneficiary('')
-                    setFormData((prev) => ({ ...prev, counter_party_id: '', beneficiary_name: '' }))
-                    setAccountLookupStatus('idle')
-                  }}
-                >
-                  <Text className="text-app-primary text-xs">Edit</Text>
-                </TouchableOpacity>
-              ) : null}
             </View>
+
+            <NotificationAlert message={notice.message} error={notice.error} data={notice.data} />
+
+            <View className="bg-gray-900 border border-gray-800 rounded-2xl p-4 mb-4">
+              <Text className="text-gray-400 text-xs uppercase tracking-widest">Available Balance</Text>
+              <Text className="text-white text-2xl font-semibold mt-2">{formatNaira(availableBalance)}</Text>
+              <Text className="text-gray-300 text-xs mt-2">
+                Daily limit remaining: {formatNaira(dailyLimitRemaining)}
+              </Text>
+              <Text className="text-gray-500 text-xs mt-1">Daily limit: {dailyLimit.toLocaleString('en-NG')}</Text>
+              <Text className="text-gray-500 text-[11px] mt-1">
+                Today spent: {formatNaira(effectiveTodaySpent)}
+              </Text>
+            </View>
+
+            {flowStep === 1 && (
+              <View className="bg-gray-900 border border-gray-800 rounded-2xl p-4 mb-4">
+                <View className="flex-row items-center justify-between mb-3">
+                  <View>
+                    <Text className="text-white text-base font-semibold">Recipient</Text>
+                    <Text className="text-gray-500 text-xs mt-1">Enter account details and verify recipient.</Text>
+                  </View>
+                  {beneficiaryLocked ? (
+                    <TouchableOpacity
+                      onPress={() => {
+                        setSelectedBeneficiary('')
+                        setFormData((prev) => ({ ...prev, counter_party_id: '', beneficiary_name: '' }))
+                        setAccountLookupStatus('idle')
+                      }}
+                    >
+                      <Text className="text-app-primary text-xs">Edit</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
 
             <Text className="text-white mb-2">Account Number</Text>
             <TextInput
@@ -491,6 +523,7 @@ const BankTransferScreen = () => {
               editable={!beneficiaryLocked}
               placeholder="Enter or paste 10-digit account number"
               placeholderTextColor="gray"
+              onFocus={() => scrollRef.current?.scrollTo({ y: 240, animated: true })}
               className={`${beneficiaryLocked ? 'bg-gray-900' : 'bg-gray-950'} border border-gray-800 rounded-xl px-4 py-4 text-white`}
             />
             <Text className="text-gray-500 text-[11px] mt-2">
@@ -498,7 +531,7 @@ const BankTransferScreen = () => {
             </Text>
 
             <SearchablePicker
-              label="Saved beneficiary (optional quick-fill)"
+              label="Saved beneficiary (optional)"
               selectedValue={selectedBeneficiary}
               options={beneficiaryOptions}
               placeholder="Select beneficiary"
@@ -552,7 +585,7 @@ const BankTransferScreen = () => {
                   setAccountLookupStatus('idle')
                   setAccountLookupError(null)
                   lastLookupKeyRef.current = ''
-                  setTimeout(() => accountNumberRef.current?.focus(), 120)
+                  focusField(accountNumberRef, 240)
                 }}
               />
             </View>
@@ -583,34 +616,35 @@ const BankTransferScreen = () => {
               <Text className="text-white text-sm">Save beneficiary</Text>
               <Switch value={saveBeneficiary} onValueChange={setSaveBeneficiary} />
             </View>
-          </View>
-          )}
+              </View>
+            )}
 
-          {flowStep === 2 && (
-          <View className="bg-gray-900 border border-gray-800 rounded-2xl p-4 mb-4">
-            <Text className="text-white text-base font-semibold mb-3">Recipient summary</Text>
-            <View className="bg-gray-950 border border-gray-800 rounded-xl p-3 mb-4">
-              <Text className="text-gray-400 text-xs">Bank</Text>
-              <Text className="text-white text-sm mt-1">{selectedBankLabel || '-'}</Text>
-              <Text className="text-gray-400 text-xs mt-3">Account number</Text>
-              <Text className="text-white text-sm mt-1">{formData.account_number || '-'}</Text>
-              <Text className="text-gray-400 text-xs mt-3">Account name</Text>
-              <Text className="text-white text-sm mt-1">{formData.account_name || '-'}</Text>
-            </View>
-            <Text className="text-white text-base font-semibold mb-3">Amount</Text>
-            <Text className="text-white mb-2">Amount (NGN)</Text>
-            <View className="flex-row items-center border border-gray-800 rounded-xl bg-gray-950 px-4">
-              <Text className="text-gray-300 mr-2">N</Text>
-              <TextInput
-                ref={amountRef}
-                value={formData.amount}
-                onChangeText={(text) => setFormData((prev) => ({ ...prev, amount: text.replace(/[^0-9.]/g, '') }))}
-                keyboardType="numeric"
-                placeholder="0.00"
-                placeholderTextColor="gray"
-                className="flex-1 py-4 text-white"
-              />
-            </View>
+            {flowStep === 2 && (
+              <View className="bg-gray-900 border border-gray-800 rounded-2xl p-4 mb-4">
+                <Text className="text-white text-base font-semibold mb-3">Recipient summary</Text>
+                <View className="bg-gray-950 border border-gray-800 rounded-xl p-3 mb-4">
+                  <Text className="text-gray-400 text-xs">Bank</Text>
+                  <Text className="text-white text-sm mt-1">{selectedBankLabel || '-'}</Text>
+                  <Text className="text-gray-400 text-xs mt-3">Account number</Text>
+                  <Text className="text-white text-sm mt-1">{formData.account_number || '-'}</Text>
+                  <Text className="text-gray-400 text-xs mt-3">Account name</Text>
+                  <Text className="text-white text-sm mt-1">{formData.account_name || '-'}</Text>
+                </View>
+                <Text className="text-white text-base font-semibold mb-3">Amount</Text>
+                <Text className="text-white mb-2">Amount (NGN)</Text>
+                <View className="flex-row items-center border border-gray-800 rounded-xl bg-gray-950 px-4">
+                  <Text className="text-gray-300 mr-2">N</Text>
+                  <TextInput
+                    ref={amountRef}
+                    value={formData.amount}
+                    onChangeText={(text) => setFormData((prev) => ({ ...prev, amount: text.replace(/[^0-9.]/g, '') }))}
+                    keyboardType="numeric"
+                    placeholder="0.00"
+                    placeholderTextColor="gray"
+                    onFocus={() => scrollRef.current?.scrollTo({ y: 520, animated: true })}
+                    className="flex-1 py-4 text-white"
+                  />
+                </View>
 
             <View className="flex-row flex-wrap mt-3 gap-2">
               {QUICK_AMOUNTS.map((quick) => (
@@ -650,28 +684,29 @@ const BankTransferScreen = () => {
                 {quoteLoading ? <Text className="text-gray-600 text-[10px] mt-2">Refreshing quote...</Text> : null}
               </View>
             ) : null}
-          </View>
-          )}
+              </View>
+            )}
 
-          {flowStep === 2 && (
-          <View className="bg-gray-900 border border-gray-800 rounded-2xl p-4 mb-4">
-            <View className="flex-row items-center justify-between">
-              <Text className="text-white text-base font-semibold">Narration</Text>
-              <Text className="text-gray-400 text-xs">{formData.description.length}/50</Text>
-            </View>
-            <TextInput
-              value={formData.description}
-              onChangeText={(text) => setFormData((prev) => ({ ...prev, description: text.slice(0, 50) }))}
-              placeholder="Narration for this transfer"
-              placeholderTextColor="gray"
-              className="border border-gray-800 rounded-xl px-4 py-4 text-white bg-gray-950 mt-3"
-              maxLength={50}
-            />
-            {!narrationValue ? <Text className="text-red-300 text-xs mt-2">Narration is required.</Text> : null}
-          </View>
-          )}
+            {flowStep === 2 && (
+              <View className="bg-gray-900 border border-gray-800 rounded-2xl p-4 mb-4">
+                <View className="flex-row items-center justify-between">
+                  <Text className="text-white text-base font-semibold">Narration</Text>
+                  <Text className="text-gray-400 text-xs">{formData.description.length}/50</Text>
+                </View>
+                <TextInput
+                  value={formData.description}
+                  onChangeText={(text) => setFormData((prev) => ({ ...prev, description: text.slice(0, 50) }))}
+                  placeholder="Narration for this transfer"
+                  placeholderTextColor="gray"
+                  onFocus={() => scrollRef.current?.scrollTo({ y: 760, animated: true })}
+                  className="border border-gray-800 rounded-xl px-4 py-4 text-white bg-gray-950 mt-3"
+                  maxLength={50}
+                />
+                {!narrationValue ? <Text className="text-red-300 text-xs mt-2">Narration is required.</Text> : null}
+              </View>
+            )}
 
-          <Text className="text-gray-500 text-xs mb-3">{BANK_TRANSFER_TIER_REQUIREMENT_COPY}</Text>
+            <Text className="text-gray-500 text-xs mb-3">{BANK_TRANSFER_TIER_REQUIREMENT_COPY}</Text>
           {flowStep === 1 ? (
             <TouchableOpacity
               onPress={handleRecipientContinue}
@@ -694,9 +729,10 @@ const BankTransferScreen = () => {
               </TouchableOpacity>
             </View>
           )}
+          </View>
+        </ScrollView>
         </View>
-      </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   )
 }
 
