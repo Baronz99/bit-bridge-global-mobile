@@ -154,6 +154,10 @@ const KycDocumentsScreen = () => {
     if (!res) return null
     const status = String(res.status || '').toLowerCase()
     const reason = String(res.reason || '').toLowerCase()
+    const displayTitle = String(res.display?.title || '').trim()
+    const displayMessage = String(res.display?.message || '').trim()
+    if (displayTitle && displayMessage) return `${displayTitle}: ${displayMessage}`
+    if (displayMessage) return displayMessage
     if (status === 'verified') return 'NIN verified successfully.'
     if (res.message) return res.message
     if (reason && NIN_REASON_LABELS[reason]) return NIN_REASON_LABELS[reason]

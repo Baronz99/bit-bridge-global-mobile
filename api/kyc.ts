@@ -73,7 +73,15 @@ export type NinVerifyResponse = {
   nin_last4?: string
   prembly_reference?: string
   verified_at?: string
+  reason_code?: string
   reason?: string
+  display?: {
+    severity?: 'info' | 'success' | 'warning' | 'error'
+    title?: string
+    message?: string
+    action?: string
+    action_label?: string
+  }
   message?: string
   requirements?: {
     missing?: string[]
