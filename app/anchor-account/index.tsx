@@ -244,21 +244,11 @@ const AnchorAccountScreen = () => {
     if (!anchorForm.city.trim()) missing.push('city')
     if (!anchorForm.state.trim()) missing.push('state')
     if (!anchorForm.postal_code.trim()) missing.push('postal_code')
-    if (!anchorForm.bvn.trim()) missing.push('bvn')
-    if (!anchorForm.dob.trim()) missing.push('dob')
     if (missing.length > 0) {
       setNotice({
         message: `Complete your profile: ${missing.join(', ')}`,
         error: true,
       })
-      return
-    }
-    if (!isValidBvn(anchorForm.bvn)) {
-      setNotice({ message: 'BVN must be exactly 11 digits.', error: true })
-      return
-    }
-    if (!isValidDob(anchorForm.dob)) {
-      setNotice({ message: 'Date of birth must be in YYYY-MM-DD format.', error: true })
       return
     }
 
@@ -273,9 +263,6 @@ const AnchorAccountScreen = () => {
           city: anchorForm.city.trim(),
           state: anchorForm.state.trim(),
           postal_code: anchorForm.postal_code.trim(),
-          bvn: anchorForm.bvn.trim(),
-          dob: anchorForm.dob.trim(),
-          gender: anchorForm.gender.trim() || undefined,
           first_name: trimmedFirstName,
           last_name: trimmedLastName,
           phone_number: phoneForApi || trimmedPhone,

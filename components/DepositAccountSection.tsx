@@ -105,7 +105,7 @@ const DepositAccountSection = ({
   }, [step])
   const requiredNow = useMemo(() => {
     if (!platformTier2) return ['Tier 2 verification']
-    if (step === 'CREATE_ANCHOR') return ['Phone on profile', 'Address', 'City', 'State', 'Postal code', 'BVN (11 digits)', 'Date of birth (YYYY-MM-DD)']
+    if (step === 'CREATE_ANCHOR') return ['Phone on profile', 'Address', 'City', 'State', 'Postal code']
     if (step === 'DO_KYC') return ['BVN (11 digits)', 'Date of birth (YYYY-MM-DD)', 'Gender']
     if (step === 'GENERATE_NUMBER') return ['No extra input required']
     return ['Setup complete']
@@ -342,27 +342,6 @@ const DepositAccountSection = ({
             label="Postal code"
             value={anchorForm.postal_code}
             onChangeText={(value: string) => setAnchorForm({ ...anchorForm, postal_code: value })}
-          />
-          <FormInput
-            label="BVN"
-            value={anchorForm.bvn}
-            onChangeText={(value: string) => setAnchorForm({ ...anchorForm, bvn: value })}
-            keyboardType="numeric"
-          />
-          <FormInput
-            label="Date of Birth (YYYY-MM-DD)"
-            value={anchorForm.dob}
-            onChangeText={(value: string) => setAnchorForm({ ...anchorForm, dob: value })}
-          />
-          <FormSelect
-            label="Gender (optional)"
-            selectedValue={anchorForm.gender}
-            onValueChange={(value: string) => setAnchorForm({ ...anchorForm, gender: value })}
-            options={[
-              { label: 'Select gender', value: '' },
-              { label: 'Male', value: 'male' },
-              { label: 'Female', value: 'female' },
-            ]}
           />
         </View>
       ) : step === 'DO_KYC' ? (
