@@ -213,6 +213,7 @@ export default function RootLayout() {
 
         <Stack.Screen name="transaction/confirm" options={{ headerTitle: 'Status' }} />
         <Stack.Screen name="transaction/details" options={{ headerTitle: 'Transaction Details' }} />
+        <Stack.Screen name="transaction/receipt" options={{ headerTitle: 'Receipt' }} />
         <Stack.Screen
           name="transaction/record/[reference]"
           options={{ headerTitle: 'Wallet Transaction' }}

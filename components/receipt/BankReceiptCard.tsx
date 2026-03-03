@@ -81,7 +81,14 @@ const statusPill = (statusRaw: string) => {
   return { label: 'Pending', bg: 'bg-amber-500/15', border: 'border-amber-500/30', text: 'text-amber-300' }
 }
 
-const failureStatusCopy = (statusRaw: string) => {
+const failureStatusCopy = (statusRaw: string, options?: { isBill?: boolean; isElectricity?: boolean }) => {
+  if (options?.isElectricity) {
+    return 'Electricity payment failed. If debited, reversal is processed automatically. Contact support with your reference if it persists.'
+  }
+  if (options?.isBill) {
+    return 'Bill payment failed. If debited, reversal is processed automatically. Contact support with your reference if it persists.'
+  }
+
   const lifecycle = resolveTransferLifecycle({ lifecycle_state: statusRaw, status: statusRaw })
   switch (lifecycle.state) {
     case 'failed_refunded':
@@ -103,6 +110,26 @@ const clean = (value?: any) => {
   const low = v.toLowerCase()
   if (low === 'undefined' || low === 'null') return ''
   return v
+}
+
+const formatProviderLabel = (value?: string) => {
+  const raw = clean(value)
+  if (!raw) return ''
+  const key = raw.toLowerCase()
+  const lookup: Record<string, string> = {
+    abuja: 'Abuja Disco',
+    eko: 'Eko Disco',
+    ikeja: 'Ikeja Disco',
+    ibadan: 'Ibadan Disco',
+    enugu: 'Enugu Disco',
+    jos: 'Jos Disco',
+    kaduna: 'Kaduna Disco',
+    kano: 'Kano Disco',
+    ph: 'Port Harcourt Disco',
+    bhu: 'Benin Disco',
+  }
+  if (lookup[key]) return lookup[key]
+  return raw.replace(/\b\w/g, (ch) => ch.toUpperCase())
 }
 
 const maskAccountNumber = (value?: string) => {
@@ -284,7 +311,8 @@ const BankReceiptCard = ({
   const electricityAddress = electricityIdentity.serviceAddress
   const electricityMeter = clean(meta?.meter_number) || clean(parties?.recipient)
   const electricityMeterType = clean(meta?.meter_type)
-  const electricityBiller = clean(meta?.biller) || clean(parties?.biller) || clean(provider?.name)
+  const electricityBillerRaw = clean(meta?.biller) || clean(parties?.biller) || clean(provider?.name)
+  const electricityBiller = formatProviderLabel(electricityBillerRaw)
   const electricityServiceCharge = Number(meta?.service_charge ?? 0)
   const conversionMeta = meta?.fx && typeof meta.fx === 'object' ? (meta.fx as Record<string, any>) : null
   const isConversionReceipt =
@@ -353,6 +381,8 @@ const BankReceiptCard = ({
   const referenceLabel = isMonnifyDeposit ? 'Monnify reference' : 'Provider reference'
   const identifierRows = [
     { label: referenceLabel, value: incomingProviderReference || providerReference, mono: true },
+    { label: 'Provider response code', value: extractMetaValue(meta, ['provider_response_code', 'responseCode']) },
+    { label: 'Failure code', value: extractMetaValue(meta, ['failure_reason_code', 'failure_code']) },
     { label: 'Session ID', value: incomingSessionId, mono: true },
     { label: 'Payment channel', value: channelValue },
     { label: 'Customer name', value: electricityCustomerName || customerName },
@@ -362,7 +392,10 @@ const BankReceiptCard = ({
   ].filter((row) => Boolean(row.value))
 
   const normalizedStatus = normalizeStatus(String(status))
-  const failedStatusCopy = failureStatusCopy(String(status))
+  const failedStatusCopy = failureStatusCopy(String(status), {
+    isBill: clean(kind).toLowerCase() === 'bill',
+    isElectricity: isElectricityReceipt,
+  })
   const isSuccess = normalizedStatus === 'successful'
   const hasFeeBreakdown = typeof totalFees === 'number' && totalFees > 0
   const shouldShowBreakdown =
