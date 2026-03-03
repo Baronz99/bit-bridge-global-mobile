@@ -1,5 +1,5 @@
-import React, { useMemo, useRef, useState } from 'react'
-import { ScrollView, Text, TouchableOpacity, View } from 'react-native'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import NotificationAlert from '@/components/notification'
 import TransactionPinModal from '@/components/TransactionPinModal'
@@ -68,10 +68,12 @@ const extractCounterPartyId = (payload: any): string => {
   return nested ? String(nested) : ''
 }
 
+const FORCE_REFRESH_RETRY_DELAY_MS = 1700
+
 const ReviewTransferScreen = () => {
   const router = useRouter()
   const { draft: draftParam } = useLocalSearchParams<{ draft?: string }>()
-  const { onLogout, userProfileData } = useAuth()
+  const { onLogout, userProfileData, loadProfile } = useAuth()
   const [loading, setLoading] = useState(false)
   const [pinModalOpen, setPinModalOpen] = useState(false)
   const [pinError, setPinError] = useState<string | null>(null)
@@ -89,6 +91,8 @@ const ReviewTransferScreen = () => {
     () => isTierEligibleForBankTransfer(getTierFromProfile(userProfileData)),
     [userProfileData]
   )
+  const [tierGateResolved, setTierGateResolved] = useState(false)
+  const [effectiveTierEligible, setEffectiveTierEligible] = useState(tierEligible)
   const dailyRemainingAfter = useMemo(() => {
     if (!draft) return 0
     return computeDailyRemainingAfterTransfer({
@@ -108,6 +112,38 @@ const ReviewTransferScreen = () => {
       String(draft.description || '').trim()
     )
   }, [draft])
+
+  useEffect(() => {
+    let mounted = true
+    const resolveTierGate = async () => {
+      if (tierEligible) {
+        if (mounted) {
+          setEffectiveTierEligible(true)
+          setTierGateResolved(true)
+        }
+        return
+      }
+
+      let refreshed = await loadProfile({ force: true }).catch(() => userProfileData)
+      let eligible = isTierEligibleForBankTransfer(getTierFromProfile(refreshed))
+      if (!eligible) {
+        await new Promise((resolve) => setTimeout(resolve, FORCE_REFRESH_RETRY_DELAY_MS))
+        refreshed = await loadProfile({ force: true }).catch(() => refreshed)
+        eligible = isTierEligibleForBankTransfer(getTierFromProfile(refreshed))
+      }
+
+      if (mounted) {
+        setEffectiveTierEligible(eligible)
+        setTierGateResolved(true)
+      }
+    }
+
+    setTierGateResolved(false)
+    void resolveTierGate()
+    return () => {
+      mounted = false
+    }
+  }, [tierEligible, loadProfile, userProfileData])
 
   const resolveInterBankCounterPartyId = async (payload: TransferDraft): Promise<string> => {
     const existing = String(payload?.counter_party_id || '').trim()
@@ -297,7 +333,15 @@ const ReviewTransferScreen = () => {
     )
   }
 
-  if (!tierEligible) {
+  if (!tierGateResolved) {
+    return (
+      <View className="flex-1 bg-primary items-center justify-center">
+        <ActivityIndicator />
+      </View>
+    )
+  }
+
+  if (!effectiveTierEligible) {
     return (
       <View className="flex-1 bg-primary px-4">
         <View className="pt-10">

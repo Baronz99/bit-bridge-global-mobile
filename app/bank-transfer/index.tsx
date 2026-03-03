@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import { ActivityIndicator, ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import NotificationAlert from '@/components/notification'
 import SearchablePicker from '@/components/bankTransfer/SearchablePicker'
@@ -52,6 +52,7 @@ type TransferDraft = {
 
 const QUICK_AMOUNTS = [5000, 10000, 20000, 50000]
 const MIN_TRANSFER_AMOUNT = 150
+const FORCE_REFRESH_RETRY_DELAY_MS = 1700
 
 const sanitizeDigits = (value: string) => String(value || '').replace(/\D/g, '')
 
@@ -70,7 +71,7 @@ const extractCounterPartyId = (payload: any): string => {
 
 const BankTransferScreen = () => {
   const router = useRouter()
-  const { userProfileData, onLogout } = useAuth()
+  const { userProfileData, onLogout, loadProfile } = useAuth()
   const accountNumberRef = useRef<TextInput | null>(null)
   const amountRef = useRef<TextInput | null>(null)
   const resolveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -111,6 +112,8 @@ const BankTransferScreen = () => {
 
   const tier = useMemo(() => getTierFromProfile(userProfileData), [userProfileData])
   const tierEligible = isTierEligibleForBankTransfer(tier)
+  const [tierGateResolved, setTierGateResolved] = useState(false)
+  const [effectiveTierEligible, setEffectiveTierEligible] = useState(tierEligible)
   const dailyLimit = quotedDailyLimit > 0 ? quotedDailyLimit : getTierDailyLimit(tier)
   const effectiveTodaySpent = quotedDailySpent > 0 ? quotedDailySpent : todaySpent
   const dailyLimitRemaining = Math.max(0, dailyLimit - effectiveTodaySpent)
@@ -166,17 +169,49 @@ const BankTransferScreen = () => {
     quotedAmount === amountValue
 
   const canContinue =
-    tierEligible &&
+    effectiveTierEligible &&
     !!formData.bank_code &&
     sanitizeDigits(formData.account_number).length === 10 &&
     narrationValue.length > 0 &&
     accountLookupStatus === 'success' &&
     amountValidation.valid
   const canContinueRecipient =
-    tierEligible &&
+    effectiveTierEligible &&
     !!formData.bank_code &&
     sanitizeDigits(formData.account_number).length === 10 &&
     accountLookupStatus === 'success'
+
+  useEffect(() => {
+    let mounted = true
+    const resolveTierGate = async () => {
+      if (tierEligible) {
+        if (mounted) {
+          setEffectiveTierEligible(true)
+          setTierGateResolved(true)
+        }
+        return
+      }
+
+      let refreshed = await loadProfile({ force: true }).catch(() => userProfileData)
+      let eligible = isTierEligibleForBankTransfer(getTierFromProfile(refreshed))
+      if (!eligible) {
+        await new Promise((resolve) => setTimeout(resolve, FORCE_REFRESH_RETRY_DELAY_MS))
+        refreshed = await loadProfile({ force: true }).catch(() => refreshed)
+        eligible = isTierEligibleForBankTransfer(getTierFromProfile(refreshed))
+      }
+
+      if (mounted) {
+        setEffectiveTierEligible(eligible)
+        setTierGateResolved(true)
+      }
+    }
+
+    setTierGateResolved(false)
+    void resolveTierGate()
+    return () => {
+      mounted = false
+    }
+  }, [tierEligible, loadProfile, userProfileData])
 
   useEffect(() => {
     const loadData = async () => {
@@ -355,7 +390,15 @@ const BankTransferScreen = () => {
     setFlowStep(2)
   }
 
-  if (!tierEligible) {
+  if (!tierGateResolved) {
+    return (
+      <View className="flex-1 bg-primary items-center justify-center">
+        <ActivityIndicator />
+      </View>
+    )
+  }
+
+  if (!effectiveTierEligible) {
     return (
       <View className="flex-1 bg-primary px-4">
         <View className="pt-10">
