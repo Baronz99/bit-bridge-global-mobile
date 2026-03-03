@@ -81,7 +81,12 @@ export default function BvnScreen() {
         <View className="bg-gray-900 rounded-2xl p-4 mb-4">
           <Text className="text-white font-semibold">Result</Text>
           <Text className="text-gray-300 mt-1">Status: {result.status}</Text>
-          {result.reason ? <Text className="text-gray-400 mt-1">Reason: {result.reason}</Text> : null}
+          {result.display?.title ? <Text className="text-gray-200 mt-2 font-semibold">{result.display.title}</Text> : null}
+          {result.display?.message ? <Text className="text-gray-400 mt-1">{result.display.message}</Text> : null}
+          {!result.display?.message && result.message ? <Text className="text-gray-400 mt-1">{result.message}</Text> : null}
+          {!result.display?.message && !result.message && result.reason ? (
+            <Text className="text-gray-400 mt-1">Reason: {result.reason}</Text>
+          ) : null}
           {result.tier ? <Text className="text-gray-400 mt-1">Tier: {result.tier}</Text> : null}
           {result.bvn_last4 ? <Text className="text-gray-400 mt-1">BVN: ****{result.bvn_last4}</Text> : null}
         </View>

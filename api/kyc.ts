@@ -48,7 +48,15 @@ export type BvnVerifyResponse = {
   match_score?: number
   prembly_reference?: string
   verified_at?: string
+  reason_code?: string
   reason?: string
+  display?: {
+    severity?: 'info' | 'success' | 'warning' | 'error'
+    title?: string
+    message?: string
+    action?: string
+    action_label?: string
+  }
   locked_until?: string
   bvn_locked_until?: string
   message?: string
