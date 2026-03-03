@@ -46,6 +46,14 @@ const balanceImpactCopy = (state: string) => {
   return 'Transfer was completed and reflected in your wallet ledger.'
 }
 
+const statusBadgeStyle = (state: string) => {
+  if (state === 'completed') return { text: 'Successful', classes: 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300' }
+  if (state === 'failed' || state.startsWith('failed') || state === 'released') {
+    return { text: 'Failed', classes: 'bg-red-500/15 border-red-500/40 text-red-300' }
+  }
+  return { text: 'Pending', classes: 'bg-amber-500/15 border-amber-500/40 text-amber-300' }
+}
+
 const SuccessScreen = () => {
   const router = useRouter()
   const { summary } = useLocalSearchParams<{ summary?: string }>()
@@ -53,6 +61,7 @@ const SuccessScreen = () => {
   const payload = useMemo(() => parseSummary(summary), [summary])
   const transferFee = Number(payload?.fee_breakdown?.platform_fee ?? 0)
   const stampDutyFee = Number(payload?.fee_breakdown?.stamp_duty_fee ?? 0)
+  const canOpenReceipt = Boolean(String(payload?.transfer_reference || '').trim())
 
   const lifecycle = useMemo(
     () =>
@@ -75,6 +84,7 @@ const SuccessScreen = () => {
     : lifecycle.isFailure
       ? 'Step 3 of 3: Update required'
       : 'Step 3 of 3: Processing'
+  const badge = statusBadgeStyle(lifecycle.state)
 
   if (!payload) {
     return (
@@ -97,12 +107,17 @@ const SuccessScreen = () => {
     <View className="flex-1 bg-primary px-4">
       <ScrollView contentContainerStyle={{ paddingBottom: 30 }}>
         <View className="pt-10">
-          <Text className="text-white text-2xl mb-2">{headerTitle}</Text>
-          <Text className="text-gray-300 mb-1">{stepLabel}</Text>
+          <View className="flex-row items-center justify-between">
+            <Text className="text-white text-2xl">{headerTitle}</Text>
+            <View className={`px-3 py-1 rounded-full border ${badge.classes}`}>
+              <Text className="text-[11px] font-semibold">{badge.text}</Text>
+            </View>
+          </View>
+          <Text className="text-gray-300 mt-2 mb-1">{stepLabel}</Text>
           <Text className="text-gray-500 text-xs mb-4">{lifecycle.message}</Text>
 
           <View className="bg-gray-900 border border-gray-800 rounded-2xl p-4">
-            <Text className="text-white text-base font-semibold mb-3">Receipt</Text>
+            <Text className="text-white text-base font-semibold mb-3">Transfer summary</Text>
 
             <Text className="text-gray-400 text-xs">From</Text>
             <Text className="text-white text-sm mb-2">BitBridge NGN Wallet</Text>
@@ -151,17 +166,28 @@ const SuccessScreen = () => {
           </View>
 
           <TouchableOpacity
-            onPress={() => router.replace('/(tabs)/wallet')}
+            onPress={() => {
+              if (canOpenReceipt) {
+                router.replace({
+                  pathname: '/transaction/receipt',
+                  params: { reference: String(payload.transfer_reference || '') },
+                })
+                return
+              }
+              router.replace('/(tabs)/timeline')
+            }}
             className="bg-theme-primary py-4 rounded-xl mt-5"
           >
-            <Text className="text-alt text-center font-semibold">Done</Text>
+            <Text className="text-alt text-center font-semibold">
+              {canOpenReceipt ? 'View Receipt' : 'View Timeline'}
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={() => router.push('/(tabs)/timeline')}
+            onPress={() => router.replace('/(tabs)/wallet')}
             className="bg-gray-900 border border-gray-800 py-4 rounded-xl mt-3"
           >
-            <Text className="text-white text-center">View in Timeline</Text>
+            <Text className="text-white text-center">Done</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>

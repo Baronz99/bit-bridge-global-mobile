@@ -405,7 +405,7 @@ const TimelineScreen = () => {
   /**
    * ✅ Routing priority:
    * 1) CardReceipt only if cardId exists AND it truly looks like a card-linked wallet txn.
-   * 2) If receipt reference exists -> /transaction/timeline-receipt
+   * 2) If receipt reference exists -> /transaction/receipt
    * 3) wallet-tx-* with no receipt ref -> modal
    * 4) else /timeline/[id]
    */

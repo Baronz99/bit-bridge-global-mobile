@@ -76,7 +76,7 @@ const BankTransferLayout = () => {
       <Stack.Screen name="index" options={{ headerTitle: 'Bank Transfer' }} />
       <Stack.Screen name="locked" options={{ headerTitle: 'Bank Transfer Access' }} />
       <Stack.Screen name="review" options={{ headerTitle: 'Review Transfer' }} />
-      <Stack.Screen name="success" options={{ headerTitle: 'Transfer Success' }} />
+      <Stack.Screen name="success" options={{ headerTitle: 'Transfer Status' }} />
     </Stack>
   )
 }
