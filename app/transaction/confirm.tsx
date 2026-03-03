@@ -1,4 +1,4 @@
-import { Alert, AppState, Pressable, Share, Text, View } from 'react-native'
+import { Alert, AppState, Pressable, ScrollView, Share, Text, View } from 'react-native'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 
@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons'
 import LoadingIndicator from '@/components/loadingIndicator'
 import { log } from '@/utils/log'
 import { resolveElectricityIdentity } from '@/utils/electricityIdentity'
+import PaymentProgressCard from '@/components/payment/PaymentProgressCard'
 
 const Row = ({ label, value }: { label: string; value?: string | number }) => (
   <View className="flex-row justify-between items-start py-2">
@@ -461,18 +462,18 @@ export default function TransactionSuccessScreen() {
           </Text>
         </View>
       ) : (
-        <View className="items-center pt-14 pb-8 px-6">
-          <View className="w-16 h-16 rounded-full bg-slate-800 items-center justify-center mb-4">
-            <Ionicons name="time-outline" size={34} color="#94a3b8" />
-          </View>
-          <Text className="text-2xl font-bold text-white">
-            {(data as any)?.status ? `Status: ${(data as any)?.status}` : 'Processing...'}
-          </Text>
-          <Text className="text-gray-400 mt-1">
-            {isElectricity((data as any)?.service_type) && isSuccessfulStatus((data as any)?.status)
-              ? 'Payment succeeded. Finalizing electricity token...'
-              : 'If this stays pending, please wait a moment — it may be confirming.'}
-          </Text>
+        <View className="px-4 pt-12 pb-3">
+          <PaymentProgressCard
+            state={pollCountRef.current * 5 >= 120 ? 'delayed' : 'processing'}
+            elapsedSeconds={pollCountRef.current * 5}
+            reference={pickFirst((data as any)?.reference, (data as any)?.id, reference, '-')}
+            message={
+              isElectricity((data as any)?.service_type) && isSuccessfulStatus((data as any)?.status)
+                ? 'Payment succeeded. Provider is finalizing your electricity token.'
+                : 'Payment is being confirmed with provider. We are refreshing automatically.'
+            }
+            onCheckNow={() => safeRefetch(true)}
+          />
         </View>
       )}
 
@@ -667,23 +668,26 @@ export default function TransactionSuccessScreen() {
     <View className="flex-1 px-1 bg-primary">
       {loading ? (
         <LoadingIndicator />
-      ) : reference && receiptType === 'fbg' ? (
-        transactionContent
-      ) : source === 'order' ? (
-        orderContent
       ) : (
-        billContent
-      )}
+        <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
+          {reference && receiptType === 'fbg' ? (
+            transactionContent
+          ) : source === 'order' ? (
+            orderContent
+          ) : (
+            billContent
+          )}
 
-      <View className="mt-auto px-4 pb-8 pt-6">
-        <Pressable
-          onPress={() => router.push('/')}
-          className="w-full h-14 rounded-2xl bg-theme-primary items-center justify-center"
-        >
-          <Text className="text-white font-semibold text-base">Back to Home</Text>
-        </Pressable>
-      </View>
+          <View className="px-4 pb-8 pt-6">
+            <Pressable
+              onPress={() => router.push('/')}
+              className="w-full h-14 rounded-2xl bg-theme-primary items-center justify-center"
+            >
+              <Text className="text-white font-semibold text-base">Back to Home</Text>
+            </Pressable>
+          </View>
+        </ScrollView>
+      )}
     </View>
   )
 }
-

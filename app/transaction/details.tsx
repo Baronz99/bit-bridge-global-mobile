@@ -1,4 +1,4 @@
-import { Alert, Switch, Text, TouchableOpacity, View } from 'react-native'
+import { Alert, ScrollView, Switch, Text, TouchableOpacity, View } from 'react-native'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import useNotification from '@/hooks/useNotification'
@@ -17,6 +17,7 @@ import { resolveElectricityIdentity } from '@/utils/electricityIdentity'
 import useBillPaymentIntentFlow from '@/hooks/useBillPaymentIntentFlow'
 import useServiceAvailability from '@/hooks/useServiceAvailability'
 import ServiceStatusPill from '@/components/service-availability/ServiceStatusPill'
+import PaymentProgressCard from '@/components/payment/PaymentProgressCard'
 
 const ConfirmDetails = () => {
   const { orderId, id, resume, intentId: routeIntentId } = useLocalSearchParams()
@@ -125,7 +126,6 @@ const ConfirmDetails = () => {
     [
       applyCommission,
       billTotal,
-      electricityIdentity.customerName,
       flow,
       isElectricityVerificationPending,
       resolveError,
@@ -140,9 +140,14 @@ const ConfirmDetails = () => {
     [data?.biller, data?.service_type, getStatus]
   )
   const canViewReceipt = flow.uiState === 'completed'
+  const pendingReference = useMemo(
+    () => String(data?.reference || resolvedBillOrderId || routeOrderId || '').trim(),
+    [data?.reference, resolvedBillOrderId, routeOrderId]
+  )
 
   return (
     <View className="flex-1 p-4 bg-primary">
+      <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 32 }} showsVerticalScrollIndicator={false}>
       <View className="mb-6">
         <Text className="text-2xl font-bold text-white text-center">Confirm Payment</Text>
         <Text className="text-sm text-white text-center mt-1">Review the details before you pay.</Text>
@@ -191,23 +196,13 @@ const ConfirmDetails = () => {
       ) : null}
 
       {flow.uiState === 'processing' || flow.uiState === 'timed_out' ? (
-        <View className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 mb-3 mt-2">
-          <Text className="text-yellow-200 text-center">
-            {flow.uiState === 'timed_out'
-              ? 'Payment is still processing. Check status to continue.'
-              : flow.message || 'Payment pending. We are checking status.'}
-          </Text>
-          {flow.uiState === 'timed_out' ? (
-            <>
-              <TouchableOpacity onPress={() => flow.pollStatus()} className="border rounded-md mt-3 border-alt py-3">
-                <Text className="text-alt text-center">Check status</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => router.push('/utility/power')} className="border rounded-md mt-3 border-gray-600 py-3">
-                <Text className="text-gray-300 text-center">Back to bills</Text>
-              </TouchableOpacity>
-            </>
-          ) : null}
-        </View>
+        <PaymentProgressCard
+          state={flow.uiState === 'timed_out' ? 'delayed' : 'processing'}
+          message={flow.uiState === 'timed_out' ? 'Payment is still processing. You can check now or wait.' : flow.message || 'Bill payment processing. Checking status...'}
+          reference={pendingReference}
+          onCheckNow={() => flow.pollStatus()}
+          onBack={flow.uiState === 'timed_out' ? () => router.push('/utility/power') : undefined}
+        />
       ) : null}
 
       {flow.uiState === 'failed' ? (
@@ -233,6 +228,8 @@ const ConfirmDetails = () => {
           <Text className="text-gray-300 text-center">View Receipt</Text>
         </TouchableOpacity>
       ) : null}
+
+      </ScrollView>
 
       <Loader open={flow.isBusy} />
 
@@ -276,3 +273,4 @@ const ConfirmDetails = () => {
 }
 
 export default ConfirmDetails
+
