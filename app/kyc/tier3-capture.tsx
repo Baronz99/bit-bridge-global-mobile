@@ -60,6 +60,13 @@ const normalizeTier3State = (res: any): Tier3State => {
   return 'failed'
 }
 
+const extractTier3StatusPayload = (res: any) => {
+  if (!res || typeof res !== 'object') return {}
+  if (typeof res.tier3_status === 'string') return res
+  if (res.data && typeof res.data === 'object') return res.data
+  return res
+}
+
 const Tier3CaptureScreen = () => {
   const router = useRouter()
   const isFocused = useIsFocused()
@@ -84,7 +91,8 @@ const Tier3CaptureScreen = () => {
 
   const fetchStatus = async () => {
     const res = await getTier3Status().catch(() => null)
-    const current = res?.tier3_status?.toLowerCase()
+    const payload = extractTier3StatusPayload(res)
+    const current = String(payload?.tier3_status || '').toLowerCase()
     if (current === 'verified') {
       submitStartedAtRef.current = null
       setStatus('verified')
@@ -94,7 +102,7 @@ const Tier3CaptureScreen = () => {
     else if (current === 'failed' || current === 'rejected') {
       submitStartedAtRef.current = null
       setStatus('failed')
-      if (res?.tier3_error) setMessage(prettyTier3Error(res.tier3_error))
+      if (payload?.tier3_error) setMessage(prettyTier3Error(payload.tier3_error))
     } else {
       const withinSubmitGraceWindow =
         submitStartedAtRef.current !== null && Date.now() - submitStartedAtRef.current < 45_000

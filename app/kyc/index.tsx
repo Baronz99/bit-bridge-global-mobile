@@ -326,11 +326,14 @@ export default function KycCenter() {
             description={
               tier4Complete
                 ? 'Address and proof of address are verified.'
-                : 'Add complete address and upload proof of address.'
+                : tier3Verified
+                ? 'Add complete address and upload proof of address.'
+                : 'Complete Tier 3 live selfie before address verification.'
             }
             done={tier4Complete}
-            cta={tier4Complete ? 'View / Edit' : 'Complete address'}
-            href="/kyc/documents"
+            cta={tier4Complete ? 'View / Edit' : tier3Verified ? 'Complete address' : 'Complete Tier 3 first'}
+            href={tier3Verified ? '/kyc/documents' : undefined}
+            disabled={!tier3Verified}
           />
         </View>
       </View>

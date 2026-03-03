@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { ActivityIndicator, View } from 'react-native'
 import { Redirect, Stack, usePathname } from 'expo-router'
 import { useAuth } from '@/services/useAuth'
@@ -6,7 +6,33 @@ import { getTierFromProfile, isTierEligibleForBankTransfer } from '@/utils/bankT
 
 const BankTransferLayout = () => {
   const pathname = usePathname()
-  const { userProfileData, authHydrated, loading, profileLoading } = useAuth()
+  const { userProfileData, authHydrated, loading, profileLoading, loadProfile } = useAuth()
+  const [eligibilityRecheckDone, setEligibilityRecheckDone] = useState(false)
+  const eligible = isTierEligibleForBankTransfer(getTierFromProfile(userProfileData))
+  const onLockedRoute = pathname?.endsWith('/bank-transfer/locked')
+
+  useEffect(() => {
+    let mounted = true
+    if (!authHydrated || loading || profileLoading) return
+    if (eligible || onLockedRoute || eligibilityRecheckDone) return
+
+    ;(async () => {
+      await loadProfile({ force: true }).catch(() => null)
+      if (mounted) setEligibilityRecheckDone(true)
+    })()
+
+    return () => {
+      mounted = false
+    }
+  }, [
+    authHydrated,
+    eligible,
+    eligibilityRecheckDone,
+    loadProfile,
+    loading,
+    onLockedRoute,
+    profileLoading,
+  ])
 
   if (!authHydrated || loading || profileLoading) {
     return (
@@ -16,8 +42,13 @@ const BankTransferLayout = () => {
     )
   }
 
-  const eligible = isTierEligibleForBankTransfer(getTierFromProfile(userProfileData))
-  const onLockedRoute = pathname?.endsWith('/bank-transfer/locked')
+  if (!eligible && !onLockedRoute && !eligibilityRecheckDone) {
+    return (
+      <View className="flex-1 bg-primary items-center justify-center">
+        <ActivityIndicator />
+      </View>
+    )
+  }
 
   if (!eligible && !onLockedRoute) {
     return <Redirect href="/bank-transfer/locked" />
