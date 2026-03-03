@@ -1,4 +1,4 @@
-import { Text, TouchableOpacity, View } from 'react-native'
+import { ScrollView, Text, TouchableOpacity, View } from 'react-native'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import useFetch from '@/services/useFetch'
@@ -104,6 +104,7 @@ const CableTvConfirmScreen = () => {
 
   return (
     <View className="flex-1 px-4 bg-primary w-full">
+      <ScrollView contentContainerStyle={{ paddingBottom: 32 }} showsVerticalScrollIndicator={false}>
       <View className="mb-6">
         <Text className="text-2xl font-bold text-white text-center">Confirm Payment</Text>
         <Text className="text-sm text-white text-center mt-1">Review the details before you pay.</Text>
@@ -158,6 +159,7 @@ const CableTvConfirmScreen = () => {
           <Text className="text-gray-300 text-center">View Receipt</Text>
         </TouchableOpacity>
       ) : null}
+      </ScrollView>
       {flow.isBusy && <Loader open={flow.isBusy} />}
 
       <AppModal open={fundPrompt.open} onclose={() => setFundPrompt({ open: false, shortfall: 0 })}>

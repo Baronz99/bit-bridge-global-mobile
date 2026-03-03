@@ -1,4 +1,4 @@
-import { Alert, Animated, Text, TouchableOpacity, View } from 'react-native'
+import { Alert, Animated, ScrollView, Text, TouchableOpacity, View } from 'react-native'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import useNotification from '@/hooks/useNotification'
@@ -139,6 +139,7 @@ const ConfirmScreen = () => {
 
   return (
     <View className="flex-1 p-4 bg-primary">
+      <ScrollView contentContainerStyle={{ paddingBottom: 32 }} showsVerticalScrollIndicator={false}>
       <View className="mt-6 rounded-3xl border border-gray-800 bg-gray-900/80 p-5">
         <Text className="text-white/70 text-xs tracking-widest uppercase">Mobile</Text>
         <Text className="text-white text-2xl font-semibold mt-2">Confirm Payment</Text>
@@ -220,6 +221,7 @@ const ConfirmScreen = () => {
           <Text className="text-gray-300 text-center">View Receipt</Text>
         </TouchableOpacity>
       ) : null}
+      </ScrollView>
 
       <Loader open={flow.isBusy} />
 

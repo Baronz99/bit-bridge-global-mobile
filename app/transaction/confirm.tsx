@@ -1,4 +1,4 @@
-import { Alert, AppState, Pressable, Share, Text, View } from 'react-native'
+import { Alert, AppState, Pressable, ScrollView, Share, Text, View } from 'react-native'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 
@@ -665,24 +665,26 @@ export default function TransactionSuccessScreen() {
 
   return (
     <View className="flex-1 px-1 bg-primary">
-      {loading ? (
-        <LoadingIndicator />
-      ) : reference && receiptType === 'fbg' ? (
-        transactionContent
-      ) : source === 'order' ? (
-        orderContent
-      ) : (
-        billContent
-      )}
+      {loading ? <LoadingIndicator /> : (
+        <ScrollView contentContainerStyle={{ paddingBottom: 32 }} showsVerticalScrollIndicator={false}>
+          {reference && receiptType === 'fbg' ? (
+            transactionContent
+          ) : source === 'order' ? (
+            orderContent
+          ) : (
+            billContent
+          )}
 
-      <View className="mt-auto px-4 pb-8 pt-6">
-        <Pressable
-          onPress={() => router.push('/')}
-          className="w-full h-14 rounded-2xl bg-theme-primary items-center justify-center"
-        >
-          <Text className="text-white font-semibold text-base">Back to Home</Text>
-        </Pressable>
-      </View>
+          <View className="px-4 pb-8 pt-6">
+            <Pressable
+              onPress={() => router.push('/')}
+              className="w-full h-14 rounded-2xl bg-theme-primary items-center justify-center"
+            >
+              <Text className="text-white font-semibold text-base">Back to Home</Text>
+            </Pressable>
+          </View>
+        </ScrollView>
+      )}
     </View>
   )
 }

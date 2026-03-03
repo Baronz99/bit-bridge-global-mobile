@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef } from 'react'
-import { ActivityIndicator, Alert, Share, Text, TouchableOpacity, View } from 'react-native'
+import { ActivityIndicator, Alert, ScrollView, Share, Text, TouchableOpacity, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import useFetch from '@/services/useFetch'
 import { getTransactionRecord } from '@/api/transactions'
@@ -109,6 +109,7 @@ const TransactionRecordScreen = () => {
 
   return (
     <View className="flex-1 bg-primary px-4">
+      <ScrollView contentContainerStyle={{ paddingBottom: 32 }} showsVerticalScrollIndicator={false}>
       <View className="pt-10">
         <Text className="text-white text-2xl mb-2">Wallet Transaction</Text>
         <Text className="text-gray-300 mb-6">Review your wallet transaction details.</Text>
@@ -215,6 +216,7 @@ const TransactionRecordScreen = () => {
           ) : null}
         </View>
       </View>
+      </ScrollView>
     </View>
   )
 }
