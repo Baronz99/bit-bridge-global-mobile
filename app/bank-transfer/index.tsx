@@ -87,6 +87,7 @@ const BankTransferScreen = () => {
   const [availableBalance, setAvailableBalance] = useState(0)
   const [todaySpent, setTodaySpent] = useState(0)
   const [saveBeneficiary, setSaveBeneficiary] = useState(false)
+  const [showBeneficiaryPicker, setShowBeneficiaryPicker] = useState(false)
   const [selectedBeneficiary, setSelectedBeneficiary] = useState('')
   const [recentBankCodes, setRecentBankCodes] = useState<string[]>([])
   const [formData, setFormData] = useState({
@@ -530,43 +531,6 @@ const BankTransferScreen = () => {
               Enter account number, choose bank, then we verify recipient before you continue.
             </Text>
 
-            <SearchablePicker
-              label="Saved beneficiary (optional)"
-              selectedValue={selectedBeneficiary}
-              options={beneficiaryOptions}
-              placeholder="Select beneficiary"
-              onSelect={(option) => {
-                const data = option.data || {}
-                const bankCode = String(data?.bank_code || data?.bankCode || '').trim()
-                const bankName = String(data?.bank_name || data?.bankName || data?.bank || '').trim()
-                const accountNumber = sanitizeDigits(String(data?.account_number || data?.accountNumber || '')).slice(0, 10)
-                const beneficiaryName = String(data?.account_name || data?.beneficiary_name || data?.name || '').trim()
-                const selectedValue = String(
-                  option.value ||
-                    data?.id ||
-                    data?.beneficiary_id ||
-                    data?.counter_party_id ||
-                    `${bankCode}:${accountNumber}`
-                )
-                setSelectedBeneficiary(selectedValue)
-                setFormData((prev) => ({
-                  ...prev,
-                  bank_code: bankCode || prev.bank_code,
-                  bank_name: bankName || prev.bank_name,
-                  account_number: accountNumber || prev.account_number,
-                  account_name: beneficiaryName || '',
-                  beneficiary_name: beneficiaryName || '',
-                  counter_party_id: extractCounterPartyId(data),
-                }))
-                if (bankCode) {
-                  setRecentBankCodes((prev) => [bankCode, ...prev.filter((item) => item !== bankCode)].slice(0, 6))
-                }
-                setAccountLookupStatus('idle')
-                setAccountLookupError(null)
-                lastLookupKeyRef.current = ''
-              }}
-            />
-
             <View className="mt-4">
               <BankPickerSheet
                 selectedValue={formData.bank_code}
@@ -588,6 +552,61 @@ const BankTransferScreen = () => {
                   focusField(accountNumberRef, 240)
                 }}
               />
+            </View>
+
+            <View className="mt-4 border border-gray-800 rounded-xl bg-gray-950/40">
+              <TouchableOpacity
+                onPress={() => setShowBeneficiaryPicker((prev) => !prev)}
+                className="flex-row items-center justify-between px-4 py-3"
+              >
+                <View>
+                  <Text className="text-white text-sm font-semibold">Use saved beneficiary (optional)</Text>
+                  <Text className="text-gray-500 text-[11px] mt-1">
+                    Quick-fill recipient details from your saved list.
+                  </Text>
+                </View>
+                <Text className="text-gray-400 text-lg">{showBeneficiaryPicker ? '−' : '+'}</Text>
+              </TouchableOpacity>
+              {showBeneficiaryPicker ? (
+                <View className="px-4 pb-4">
+                  <SearchablePicker
+                    label="Saved beneficiary"
+                    selectedValue={selectedBeneficiary}
+                    options={beneficiaryOptions}
+                    placeholder="Select beneficiary"
+                    onSelect={(option) => {
+                      const data = option.data || {}
+                      const bankCode = String(data?.bank_code || data?.bankCode || '').trim()
+                      const bankName = String(data?.bank_name || data?.bankName || data?.bank || '').trim()
+                      const accountNumber = sanitizeDigits(String(data?.account_number || data?.accountNumber || '')).slice(0, 10)
+                      const beneficiaryName = String(data?.account_name || data?.beneficiary_name || data?.name || '').trim()
+                      const selectedValue = String(
+                        option.value ||
+                          data?.id ||
+                          data?.beneficiary_id ||
+                          data?.counter_party_id ||
+                          `${bankCode}:${accountNumber}`
+                      )
+                      setSelectedBeneficiary(selectedValue)
+                      setFormData((prev) => ({
+                        ...prev,
+                        bank_code: bankCode || prev.bank_code,
+                        bank_name: bankName || prev.bank_name,
+                        account_number: accountNumber || prev.account_number,
+                        account_name: beneficiaryName || '',
+                        beneficiary_name: beneficiaryName || '',
+                        counter_party_id: extractCounterPartyId(data),
+                      }))
+                      if (bankCode) {
+                        setRecentBankCodes((prev) => [bankCode, ...prev.filter((item) => item !== bankCode)].slice(0, 6))
+                      }
+                      setAccountLookupStatus('idle')
+                      setAccountLookupError(null)
+                      lastLookupKeyRef.current = ''
+                    }}
+                  />
+                </View>
+              ) : null}
             </View>
 
             {accountLookupStatus === 'loading' ? (
