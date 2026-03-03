@@ -39,6 +39,8 @@ import { getTierFromProfile, isTierEligibleForBankTransfer } from '@/utils/bankT
 import { log } from '@/utils/logger'
 import { resolveTransferLifecycle } from '@/utils/transferLifecycle'
 
+const FORCE_REFRESH_RETRY_DELAY_MS = 1700
+
 // ---------------------------
 // Types
 // ---------------------------
@@ -1008,8 +1010,13 @@ export default function Index() {
           <TouchableOpacity
             onPress={async () => {
               setSendOpen(false)
-              const refreshed = await loadProfile({ force: true }).catch(() => userProfileData)
-              const eligible = isTierEligibleForBankTransfer(getTierFromProfile(refreshed))
+              let refreshed = await loadProfile({ force: true }).catch(() => userProfileData)
+              let eligible = isTierEligibleForBankTransfer(getTierFromProfile(refreshed))
+              if (!eligible) {
+                await new Promise((resolve) => setTimeout(resolve, FORCE_REFRESH_RETRY_DELAY_MS))
+                refreshed = await loadProfile({ force: true }).catch(() => refreshed)
+                eligible = isTierEligibleForBankTransfer(getTierFromProfile(refreshed))
+              }
               router.push((eligible ? '/bank-transfer' : '/bank-transfer/locked') as any)
             }}
             className={`border py-3 rounded-xl items-center mt-3 ${

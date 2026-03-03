@@ -4,6 +4,8 @@ import { Redirect, Stack, usePathname } from 'expo-router'
 import { useAuth } from '@/services/useAuth'
 import { getTierFromProfile, isTierEligibleForBankTransfer } from '@/utils/bankTransfer'
 
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
 const BankTransferLayout = () => {
   const pathname = usePathname()
   const { userProfileData, authHydrated, loading, profileLoading, loadProfile } = useAuth()
@@ -17,7 +19,12 @@ const BankTransferLayout = () => {
     if (eligible || onLockedRoute || eligibilityRecheckDone) return
 
     ;(async () => {
-      await loadProfile({ force: true }).catch(() => null)
+      let refreshed = await loadProfile({ force: true }).catch(() => null)
+      if (!isTierEligibleForBankTransfer(getTierFromProfile(refreshed))) {
+        // Bypass useAuth rapid-force throttling window for definitive tier recheck.
+        await delay(1700)
+        refreshed = await loadProfile({ force: true }).catch(() => refreshed)
+      }
       if (mounted) setEligibilityRecheckDone(true)
     })()
 
