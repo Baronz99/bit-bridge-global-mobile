@@ -170,7 +170,7 @@ const ReviewTransferScreen = () => {
   }
 
   const handleSubmit = async (transactionPin: string) => {
-    if (!tierEligible) {
+    if (!effectiveTierEligible) {
       setNotice({ message: 'Bank transfer is available from Tier 2.', error: true, data: null })
       return
     }

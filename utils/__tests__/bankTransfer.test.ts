@@ -22,6 +22,12 @@ describe('bank transfer tier gating', () => {
     expect(isTierEligibleForBankTransfer(tier)).toBe(true)
     expect(getTierDailyLimit(tier)).toBe(3000000)
   })
+
+  it('allows tier 4 and uses 3,000,000 daily limit', () => {
+    const tier = normalizeTier('tier_4')
+    expect(isTierEligibleForBankTransfer(tier)).toBe(true)
+    expect(getTierDailyLimit(tier)).toBe(3000000)
+  })
 })
 
 describe('bank transfer amount validation', () => {

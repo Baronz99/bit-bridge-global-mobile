@@ -1,11 +1,20 @@
-export type NormalizedTier = 'tier_0' | 'tier_1' | 'tier_2' | 'tier_3'
+export type NormalizedTier = 'tier_0' | 'tier_1' | 'tier_2' | 'tier_3' | 'tier_4'
 
 export const normalizeTier = (value: unknown): NormalizedTier => {
   const raw = String(value || 'tier_0').trim().toLowerCase()
+  if (raw === 'tier4' || raw === 'tier_4') return 'tier_4'
   if (raw === 'tier2' || raw === 'tier_2') return 'tier_2'
   if (raw === 'tier3' || raw === 'tier_3') return 'tier_3'
   if (raw === 'tier_1' || raw === 'tier1') return 'tier_1'
   return 'tier_0'
+}
+
+const TIER_RANKS: Record<NormalizedTier, number> = {
+  tier_0: 0,
+  tier_1: 1,
+  tier_2: 2,
+  tier_3: 3,
+  tier_4: 4,
 }
 
 export const getTierFromProfile = (profile: any): NormalizedTier => {
@@ -14,13 +23,14 @@ export const getTierFromProfile = (profile: any): NormalizedTier => {
 }
 
 export const getTierDailyLimit = (tier: NormalizedTier): number => {
+  if (tier === 'tier_4') return 3000000
   if (tier === 'tier_2') return 500000
   if (tier === 'tier_3') return 3000000
   return 0
 }
 
 export const isTierEligibleForBankTransfer = (tier: NormalizedTier): boolean =>
-  tier === 'tier_2' || tier === 'tier_3'
+  TIER_RANKS[tier] >= TIER_RANKS.tier_2
 
 export const BANK_TRANSFER_TIER_REQUIREMENT_COPY = 'Only Tier 2+ users can use bank transfers.'
 
