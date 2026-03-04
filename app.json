@@ -73,6 +73,7 @@
       "expo-font",
       "expo-web-browser",
       "expo-local-authentication",
+      "expo-notifications",
       "@react-native-community/datetimepicker",
       "./plugins/withBlockSystemAlertWindow"
     ],
