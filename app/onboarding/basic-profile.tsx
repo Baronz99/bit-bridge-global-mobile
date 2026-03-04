@@ -1,16 +1,19 @@
 import React, { useEffect, useState } from 'react'
-import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native'
+import { ActivityIndicator, Platform, Text, TouchableOpacity, View } from 'react-native'
 import FormInput from '@/components/FormInput'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
 import { updateBasicProfile, saveOnboardingStage } from '@/api/onboarding'
 import { FEATURE_ONBOARDING } from '@/constants/featureFlags'
 import { buildApiErrorMessage } from '@/utils/apiErrorMessage'
 import { useAuth } from '@/services/useAuth'
+import DateTimePicker from '@react-native-community/datetimepicker'
 
 const BasicProfile = () => {
   const { userProfileData, loadProfile } = useAuth()
   const [loading, setLoading] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
+  const [showDatePicker, setShowDatePicker] = useState(false)
+  const [dateValue, setDateValue] = useState<Date | null>(null)
   const [form, setForm] = useState({
     first_name: '',
     last_name: '',
@@ -28,6 +31,10 @@ const BasicProfile = () => {
       phone_number: profile?.phone_number || prev.phone_number,
       date_of_birth: profile?.date_of_birth ? String(profile.date_of_birth).slice(0, 10) : prev.date_of_birth,
     }))
+    if (profile?.date_of_birth) {
+      const parsed = new Date(String(profile.date_of_birth))
+      if (!Number.isNaN(parsed.getTime())) setDateValue(parsed)
+    }
   }, [userProfileData])
 
   if (!FEATURE_ONBOARDING) {
@@ -93,11 +100,23 @@ const BasicProfile = () => {
               keyboardType="phone-pad"
               onChangeText={(value: string) => setForm({ ...form, phone_number: value })}
             />
-            <FormInput
-              label="Date of Birth (YYYY-MM-DD)"
-              value={form.date_of_birth}
-              onChangeText={(value: string) => setForm({ ...form, date_of_birth: value })}
-            />
+            <View className="mt-3">
+              <Text className="text-gray-300 text-sm mb-2">Date of Birth</Text>
+              <TouchableOpacity
+                onPress={() => setShowDatePicker(true)}
+                className="bg-[#111827] border border-[rgba(255,255,255,0.12)] rounded-2xl px-4 py-3"
+              >
+                <Text className="text-white">
+                  {form.date_of_birth
+                    ? new Date(form.date_of_birth).toLocaleDateString(undefined, {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                      })
+                    : 'Select date of birth'}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {notice ? <Text className="text-yellow-400 mt-2">{notice}</Text> : null}
@@ -115,6 +134,22 @@ const BasicProfile = () => {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidWrapper>
+
+      {showDatePicker ? (
+        <DateTimePicker
+          value={dateValue || new Date(1990, 0, 1)}
+          mode="date"
+          display={Platform.OS === 'ios' ? 'inline' : 'calendar'}
+          maximumDate={new Date()}
+          onChange={(_, selectedDate) => {
+            setShowDatePicker(false)
+            if (!selectedDate) return
+            const iso = selectedDate.toISOString().slice(0, 10)
+            setDateValue(selectedDate)
+            setForm((prev) => ({ ...prev, date_of_birth: iso }))
+          }}
+        />
+      ) : null}
     </View>
   )
 }

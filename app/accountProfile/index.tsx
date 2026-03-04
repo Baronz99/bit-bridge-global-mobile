@@ -20,6 +20,7 @@ import { icons } from '@/constants/icons'
 import Loader from '@/components/Loader'
 import AppAlert from '@/components/app-notification/AppAlert'
 import DateTimePicker from '@react-native-community/datetimepicker'
+import FormSelect from '@/components/FormSelect'
 
 const countryOptions = [
   'Nigeria',
@@ -38,6 +39,48 @@ const countryOptions = [
   'Australia',
   'Singapore',
   'Malaysia',
+]
+
+const STATE_OPTIONS = [
+  { label: 'Select state', value: '' },
+  { label: 'Abia', value: 'Abia' },
+  { label: 'Adamawa', value: 'Adamawa' },
+  { label: 'Akwa Ibom', value: 'Akwa Ibom' },
+  { label: 'Anambra', value: 'Anambra' },
+  { label: 'Bauchi', value: 'Bauchi' },
+  { label: 'Bayelsa', value: 'Bayelsa' },
+  { label: 'Benue', value: 'Benue' },
+  { label: 'Borno', value: 'Borno' },
+  { label: 'Cross River', value: 'Cross River' },
+  { label: 'Delta', value: 'Delta' },
+  { label: 'Ebonyi', value: 'Ebonyi' },
+  { label: 'Edo', value: 'Edo' },
+  { label: 'Ekiti', value: 'Ekiti' },
+  { label: 'Enugu', value: 'Enugu' },
+  { label: 'FCT (Abuja)', value: 'FCT' },
+  { label: 'Gombe', value: 'Gombe' },
+  { label: 'Imo', value: 'Imo' },
+  { label: 'Jigawa', value: 'Jigawa' },
+  { label: 'Kaduna', value: 'Kaduna' },
+  { label: 'Kano', value: 'Kano' },
+  { label: 'Katsina', value: 'Katsina' },
+  { label: 'Kebbi', value: 'Kebbi' },
+  { label: 'Kogi', value: 'Kogi' },
+  { label: 'Kwara', value: 'Kwara' },
+  { label: 'Lagos', value: 'Lagos' },
+  { label: 'Nasarawa', value: 'Nasarawa' },
+  { label: 'Niger', value: 'Niger' },
+  { label: 'Ogun', value: 'Ogun' },
+  { label: 'Ondo', value: 'Ondo' },
+  { label: 'Osun', value: 'Osun' },
+  { label: 'Oyo', value: 'Oyo' },
+  { label: 'Plateau', value: 'Plateau' },
+  { label: 'Rivers', value: 'Rivers' },
+  { label: 'Sokoto', value: 'Sokoto' },
+  { label: 'Taraba', value: 'Taraba' },
+  { label: 'Yobe', value: 'Yobe' },
+  { label: 'Zamfara', value: 'Zamfara' },
+  { label: 'Other', value: 'Other' },
 ]
 
 /*
@@ -97,6 +140,11 @@ const normalizeOptionalString = (value?: string | null) => {
   return trimmed && trimmed.length ? trimmed : undefined
 }
 
+const normalizeGender = (value?: string | null) => {
+  const normalized = String(value || '').trim().toLowerCase()
+  return normalized === 'male' || normalized === 'female' ? normalized : undefined
+}
+
 const fromApiProfileToForm = (payload: any): ProfileFormValues => {
   const userProfile = payload?.user_profile ?? payload?.profile ?? {}
   const name = userProfile?.name
@@ -110,7 +158,7 @@ const fromApiProfileToForm = (payload: any): ProfileFormValues => {
     state: userProfile?.state ?? '',
     postal_code: userProfile?.postal_code ?? '',
     user_profile_id: userProfile?.id ? String(userProfile.id) : '',
-    gender: userProfile?.gender ?? userProfile?.sex ?? undefined,
+    gender: normalizeGender(userProfile?.gender ?? userProfile?.sex),
     country: normalizeOptionalString(userProfile?.country ?? userProfile?.nationality),
     date_of_birth: normalizeDateString(userProfile?.date_of_birth ?? userProfile?.dob ?? ''),
   }
@@ -126,7 +174,7 @@ const fromFormToApiPayload = (values: ProfileFormValues): ProfileFormValues => (
   state: values.state.trim(),
   postal_code: values.postal_code.trim(),
   user_profile_id: values.user_profile_id,
-  gender: values.gender,
+  gender: normalizeGender(values.gender),
   country: normalizeOptionalString(values.country),
   date_of_birth: normalizeDateString(values.date_of_birth),
 })
@@ -234,7 +282,7 @@ const GenderSegment = ({
   value?: string
   onSelect: (value: string) => void
 }) => {
-  const options = ['male', 'female', 'other']
+  const options = ['male', 'female']
   return (
     <View className="space-y-2">
       <Text className="text-gray-400 text-xs" style={{ lineHeight: 18 }}>
@@ -388,7 +436,13 @@ const index = () => {
   const phoneVerified = Boolean(userRoot?.phone_verified || userProfile?.phone_verified || userRoot?.phone_verified_at || userProfile?.phone_verified_at)
   const bvnStatus = String(userRoot?.user_kyc?.bvn_status || '')
   const bvnVerified = bvnStatus === 'verified'
-  const tier2Complete = kycLevel === 'tier_2' || kycLevel === 'tier2' || kycLevel === 'tier_3' || kycLevel === 'tier3'
+  const tier2Complete =
+    kycLevel === 'tier_2' ||
+    kycLevel === 'tier2' ||
+    kycLevel === 'tier_3' ||
+    kycLevel === 'tier3' ||
+    kycLevel === 'tier_4' ||
+    kycLevel === 'tier4'
 
   const [formInput, setFormInput] = useState<ProfileFormValues>(defaultProfileFormValues)
   const [loading, setLoading] = useState(false)
@@ -533,7 +587,7 @@ const index = () => {
                   <Text className="text-gray-500 text-xs mt-1">Status: {phoneVerified ? 'Verified' : 'Not verified'}</Text>
                 </SectionCard>
 
-                <SectionCard title={tier2Complete ? 'Address (optional)' : 'Address (required for Tier 2)'}>
+                <SectionCard title={tier2Complete ? 'Address (recommended)' : 'Address (required for account number)'}>
                   <Field
                     label="Address Line 1"
                     value={formInput.address_line1}
@@ -548,11 +602,11 @@ const index = () => {
                     onChange={(value) => setFormInput((prev) => ({ ...prev, city: value }))}
                   />
 
-                  <Field
+                  <FormSelect
                     label="State"
-                    value={formInput.state}
-                    placeholder="e.g., Lagos State"
-                    onChange={(value) => setFormInput((prev) => ({ ...prev, state: value }))}
+                    selectedValue={formInput.state}
+                    onValueChange={(value: string) => setFormInput((prev) => ({ ...prev, state: value }))}
+                    options={STATE_OPTIONS}
                   />
 
                   <Field

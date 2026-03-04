@@ -48,7 +48,13 @@ const AnchorAccountScreen = () => {
   const kycLevel = String(profileRoot?.kyc_level || profileRoot?.user_kyc?.kyc_level || 'tier_0')
     .trim()
     .toLowerCase()
-  const platformTier2 = kycLevel === 'tier_2' || kycLevel === 'tier2' || kycLevel === 'tier_3' || kycLevel === 'tier3'
+  const platformTier2 =
+    kycLevel === 'tier_2' ||
+    kycLevel === 'tier2' ||
+    kycLevel === 'tier_3' ||
+    kycLevel === 'tier3' ||
+    kycLevel === 'tier_4' ||
+    kycLevel === 'tier4'
 
   const isValidEmail = (value?: string | null) =>
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim())
@@ -113,9 +119,26 @@ const AnchorAccountScreen = () => {
     if (!String(prefilledLastName || '').trim()) missing.push('last name')
     if (!isValidEmail(prefilledEmail)) missing.push('valid email')
     if (!isValidNgPhone(prefilledPhone)) missing.push('phone number')
+    if (!String(anchorPrefill.dob || '').trim()) missing.push('date of birth')
+    if (!String(anchorPrefill.gender || '').trim()) missing.push('gender (male/female)')
+    if (!String(anchorPrefill.address || '').trim()) missing.push('address')
+    if (!String(anchorPrefill.city || '').trim()) missing.push('city')
+    if (!String(anchorPrefill.state || '').trim()) missing.push('state')
 
     return missing.length ? `Update your profile first: ${missing.join(', ')}.` : null
-  }, [platformTier2, normalized.hasAnchorAccount, prefilledFirstName, prefilledLastName, prefilledEmail, prefilledPhone])
+  }, [
+    platformTier2,
+    normalized.hasAnchorAccount,
+    prefilledFirstName,
+    prefilledLastName,
+    prefilledEmail,
+    prefilledPhone,
+    anchorPrefill.dob,
+    anchorPrefill.gender,
+    anchorPrefill.address,
+    anchorPrefill.city,
+    anchorPrefill.state,
+  ])
 
   useEffect(() => {
     if (!notice.message) return
