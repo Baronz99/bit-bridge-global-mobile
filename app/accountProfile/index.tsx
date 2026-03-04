@@ -4,7 +4,6 @@ import {
   Modal,
   Platform,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
@@ -109,6 +108,19 @@ type ProfileFormValues = {
   date_of_birth: string
 }
 
+const TIER_LABELS: Record<string, string> = {
+  tier_0: 'Tier 0',
+  tier_1: 'Tier 1',
+  tier_2: 'Tier 2',
+  tier_3: 'Tier 3',
+  tier_4: 'Tier 4',
+  tier0: 'Tier 0',
+  tier1: 'Tier 1',
+  tier2: 'Tier 2',
+  tier3: 'Tier 3',
+  tier4: 'Tier 4',
+}
+
 const defaultProfileFormValues: ProfileFormValues = {
   email: '',
   first_name: '',
@@ -143,6 +155,18 @@ const normalizeOptionalString = (value?: string | null) => {
 const normalizeGender = (value?: string | null) => {
   const normalized = String(value || '').trim().toLowerCase()
   return normalized === 'male' || normalized === 'female' ? normalized : undefined
+}
+
+const formatTierLabel = (rawTier?: string) => {
+  const key = String(rawTier || 'tier_0').trim().toLowerCase()
+  if (TIER_LABELS[key]) return TIER_LABELS[key]
+  return key.replace(/[_-]/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase())
+}
+
+const capitalizeWord = (value?: string) => {
+  const text = String(value || '').trim().toLowerCase()
+  if (!text) return ''
+  return text.charAt(0).toUpperCase() + text.slice(1)
 }
 
 const fromApiProfileToForm = (payload: any): ProfileFormValues => {
@@ -436,16 +460,43 @@ const index = () => {
   const phoneVerified = Boolean(userRoot?.phone_verified || userProfile?.phone_verified || userRoot?.phone_verified_at || userProfile?.phone_verified_at)
   const bvnStatus = String(userRoot?.user_kyc?.bvn_status || '')
   const bvnVerified = bvnStatus === 'verified'
-  const tier2Complete =
+  const requirements =
+    userRoot?.kyc_requirements ?? userRoot?.requirements ?? userRoot?.user_kyc?.requirements
+  const checks = requirements?.checks ?? {}
+  const idType = String(userRoot?.id_type || userProfile?.id_type || '').trim()
+  const tier2ByLevel =
     kycLevel === 'tier_2' ||
     kycLevel === 'tier2' ||
     kycLevel === 'tier_3' ||
     kycLevel === 'tier3' ||
     kycLevel === 'tier_4' ||
     kycLevel === 'tier4'
+  const idUploaded = Boolean(userProfile?.id_document_uploaded || userProfile?.id_document_url)
+  const ninVerified = String(userRoot?.user_kyc?.nin_status || '').trim().toLowerCase() === 'verified'
+  const identityVerified = idUploaded || ninVerified
+  const inferredMissing = [
+    ...(bvnVerified ? [] : ['bvn']),
+    ...(idType ? [] : ['id_type']),
+    ...(identityVerified ? [] : ['identity']),
+  ]
+  const tier2Missing = Array.isArray(requirements?.missing) ? requirements.missing : inferredMissing
+  const tier2Complete =
+    typeof checks?.tier2_ready === 'boolean'
+      ? checks.tier2_ready
+      : tier2ByLevel || tier2Missing.length === 0
+  const tier3Complete =
+    typeof checks?.tier3_ready === 'boolean'
+      ? checks.tier3_ready
+      : kycLevel === 'tier_3' || kycLevel === 'tier_4' || kycLevel === 'tier3' || kycLevel === 'tier4'
+  const tier4Complete =
+    typeof checks?.tier4_ready === 'boolean'
+      ? checks.tier4_ready
+      : kycLevel === 'tier_4' || kycLevel === 'tier4'
+  const tierLabel = formatTierLabel(kycLevel)
 
   const [formInput, setFormInput] = useState<ProfileFormValues>(defaultProfileFormValues)
   const [loading, setLoading] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
   const [showDatePicker, setShowDatePicker] = useState(false)
   const [dateValue, setDateValue] = useState<Date | null>(null)
   const initialSnapshotRef = useRef<string>('')
@@ -462,6 +513,7 @@ const index = () => {
       setFormInput(payload)
       setDateValue(payload.date_of_birth ? new Date(payload.date_of_birth) : null)
       initialSnapshotRef.current = JSON.stringify(payload)
+      setIsEditing(false)
 
       setAlertState({
         error: false,
@@ -488,9 +540,16 @@ const index = () => {
 
   const isDirty = JSON.stringify(formInput) !== initialSnapshotRef.current
   const badges: string[] = []
-
   if (phoneVerified) badges.push('Phone Verified')
-  if (kycLevel) badges.push(kycLevel)
+  if (tierLabel) badges.push(tierLabel)
+
+  const statusMessage = tier4Complete
+    ? 'Full verification complete.'
+    : tier3Complete
+    ? 'Tier 3 verified. Add address and proof of address to complete Tier 4.'
+    : tier2Complete
+    ? 'Tier 2 complete. Finish live selfie to unlock Tier 3.'
+    : 'Complete your profile and identity checks to progress your verification tier.'
 
   return (
     <>
@@ -510,20 +569,30 @@ const index = () => {
                   <View className="flex-row items-center justify-between">
                     <Text className="text-white font-semibold">Profile status</Text>
                     <View className="px-3 py-1 rounded-full bg-app-primary/15 border border-app-primary/30">
-                      <Text className="text-app-primary text-xs font-semibold">{kycLevel}</Text>
+                      <Text className="text-app-primary text-xs font-semibold">{tierLabel}</Text>
                     </View>
                   </View>
-                  <View className="flex-row flex-wrap mt-3" style={{ gap: 8 }}>
-                    <View className="px-3 py-1 rounded-full border border-gray-700 bg-gray-900">
-                      <Text className="text-xs text-gray-200">Phone {phoneVerified ? 'verified' : 'unverified'}</Text>
-                    </View>
-                    <View className="px-3 py-1 rounded-full border border-gray-700 bg-gray-900">
-                      <Text className="text-xs text-gray-200">BVN {bvnVerified ? 'verified' : 'pending'}</Text>
-                    </View>
-                    <View className="px-3 py-1 rounded-full border border-gray-700 bg-gray-900">
-                      <Text className="text-xs text-gray-200">Tier 2 {tier2Complete ? 'complete' : 'incomplete'}</Text>
-                    </View>
+                  <View className="mt-3 space-y-2">
+                    <Text className="text-gray-200 text-xs">Identity: {tier2Complete ? 'Verified' : 'Pending'}</Text>
+                    <Text className="text-gray-200 text-xs">Biometric: {tier3Complete ? 'Verified' : 'Pending'}</Text>
+                    <Text className="text-gray-200 text-xs">Address: {tier4Complete ? 'Verified' : 'Pending'}</Text>
                   </View>
+                  {!tier2Complete && tier2Missing.length > 0 ? (
+                    <Text className="text-gray-400 text-xs mt-3">
+                      Missing for Tier 2:{' '}
+                      {tier2Missing
+                        .map((item: string) => {
+                          if (item === 'bvn') return 'BVN'
+                          if (item === 'id_type') return 'ID type'
+                          if (item === 'identity') return 'ID or NIN verification'
+                          return item
+                        })
+                        .join(', ')}
+                    </Text>
+                  ) : null}
+                  <Text className={`${tier4Complete ? 'text-emerald-400' : 'text-gray-400'} text-xs mt-3`}>
+                    {statusMessage}
+                  </Text>
                 </View>
 
                 <ProfileHeaderCard
@@ -534,87 +603,161 @@ const index = () => {
                   badges={badges}
                 />
 
+                <View className="flex-row justify-end">
+                  <TouchableOpacity
+                    className={`px-4 py-2 rounded-xl border ${isEditing ? 'border-gray-700 bg-gray-900' : 'border-app-primary/40 bg-app-primary/10'}`}
+                    onPress={() => {
+                      if (isEditing) {
+                        const initial = initialSnapshotRef.current
+                        if (initial) {
+                          const parsed = JSON.parse(initial) as ProfileFormValues
+                          setFormInput(parsed)
+                          setDateValue(parsed.date_of_birth ? new Date(parsed.date_of_birth) : null)
+                        }
+                        setIsEditing(false)
+                      } else {
+                        setIsEditing(true)
+                      }
+                    }}
+                  >
+                    <Text className={`${isEditing ? 'text-gray-200' : 'text-app-primary'} text-xs font-semibold`}>
+                      {isEditing ? 'Cancel edit' : 'Edit profile'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
                 <SectionCard title="Personal details">
-                  <Field
-                    label="First Name"
-                    value={formInput.first_name}
-                    placeholder=""
-                    onChange={(value) => setFormInput((prev) => ({ ...prev, first_name: value }))}
-                  />
+                  {isEditing ? (
+                    <Field
+                      label="First Name"
+                      value={formInput.first_name}
+                      placeholder=""
+                      onChange={(value) => setFormInput((prev) => ({ ...prev, first_name: value }))}
+                    />
+                  ) : (
+                    <ReadOnlyField label="First Name" value={formInput.first_name} />
+                  )}
 
-                  <Field
-                    label="Last Name"
-                    value={formInput.last_name}
-                    placeholder=""
-                    onChange={(value) => setFormInput((prev) => ({ ...prev, last_name: value }))}
-                  />
+                  {isEditing ? (
+                    <Field
+                      label="Last Name"
+                      value={formInput.last_name}
+                      placeholder=""
+                      onChange={(value) => setFormInput((prev) => ({ ...prev, last_name: value }))}
+                    />
+                  ) : (
+                    <ReadOnlyField label="Last Name" value={formInput.last_name} />
+                  )}
 
-                  <GenderSegment
-                    label="Gender"
-                    value={formInput.gender}
-                    onSelect={(value) => setFormInput((prev) => ({ ...prev, gender: value }))}
-                  />
+                  {isEditing ? (
+                    <GenderSegment
+                      label="Gender"
+                      value={formInput.gender}
+                      onSelect={(value) => setFormInput((prev) => ({ ...prev, gender: value }))}
+                    />
+                  ) : (
+                    <ReadOnlyField label="Gender" value={capitalizeWord(formInput.gender)} />
+                  )}
 
-                  <DateField
-                    label="Date of Birth"
-                    value={formInput.date_of_birth}
-                    onOpen={() => setShowDatePicker(true)}
-                  />
+                  {isEditing ? (
+                    <DateField
+                      label="Date of Birth"
+                      value={formInput.date_of_birth}
+                      onOpen={() => setShowDatePicker(true)}
+                    />
+                  ) : (
+                    <ReadOnlyField
+                      label="Date of Birth"
+                      value={
+                        formInput.date_of_birth
+                          ? new Date(formInput.date_of_birth).toLocaleDateString(undefined, {
+                              day: '2-digit',
+                              month: 'short',
+                              year: 'numeric',
+                            })
+                          : ''
+                      }
+                    />
+                  )}
 
                   <Text className="text-gray-500 text-xs">
                     Use the date on your ID. Future dates are not allowed.
                   </Text>
 
-                  <CountryPickerField
-                    label="Nationality"
-                    placeholder="Select nationality"
-                    value={formInput.country}
-                    onSelect={(value) => setFormInput((prev) => ({ ...prev, country: value }))}
-                  />
+                  {isEditing ? (
+                    <CountryPickerField
+                      label="Nationality"
+                      placeholder="Select nationality"
+                      value={formInput.country}
+                      onSelect={(value) => setFormInput((prev) => ({ ...prev, country: value }))}
+                    />
+                  ) : (
+                    <ReadOnlyField label="Nationality" value={formInput.country} />
+                  )}
                 </SectionCard>
 
                 <SectionCard title="Contact">
                   <ReadOnlyField label="Email" value={formInput.email} icon={icons.email} />
 
-                  <Field
-                    label="Phone"
-                    value={formInput.phone}
-                    placeholder=""
-                    onChange={(value) => setFormInput((prev) => ({ ...prev, phone: value }))}
-                  />
+                  {isEditing ? (
+                    <Field
+                      label="Phone"
+                      value={formInput.phone}
+                      placeholder=""
+                      onChange={(value) => setFormInput((prev) => ({ ...prev, phone: value }))}
+                    />
+                  ) : (
+                    <ReadOnlyField label="Phone" value={formInput.phone} />
+                  )}
 
                   <Text className="text-gray-500 text-xs">Used for security alerts and verification.</Text>
                   <Text className="text-gray-500 text-xs mt-1">Status: {phoneVerified ? 'Verified' : 'Not verified'}</Text>
                 </SectionCard>
 
                 <SectionCard title={tier2Complete ? 'Address (recommended)' : 'Address (required for account number)'}>
-                  <Field
-                    label="Address Line 1"
-                    value={formInput.address_line1}
-                    placeholder="Street address"
-                    onChange={(value) => setFormInput((prev) => ({ ...prev, address_line1: value }))}
-                  />
+                  {isEditing ? (
+                    <Field
+                      label="Address Line 1"
+                      value={formInput.address_line1}
+                      placeholder="Street address"
+                      onChange={(value) => setFormInput((prev) => ({ ...prev, address_line1: value }))}
+                    />
+                  ) : (
+                    <ReadOnlyField label="Address Line 1" value={formInput.address_line1} />
+                  )}
 
-                  <Field
-                    label="City"
-                    value={formInput.city}
-                    placeholder="e.g., Lagos"
-                    onChange={(value) => setFormInput((prev) => ({ ...prev, city: value }))}
-                  />
+                  {isEditing ? (
+                    <Field
+                      label="City"
+                      value={formInput.city}
+                      placeholder="e.g., Lagos"
+                      onChange={(value) => setFormInput((prev) => ({ ...prev, city: value }))}
+                    />
+                  ) : (
+                    <ReadOnlyField label="City" value={formInput.city} />
+                  )}
 
-                  <FormSelect
-                    label="State"
-                    selectedValue={formInput.state}
-                    onValueChange={(value: string) => setFormInput((prev) => ({ ...prev, state: value }))}
-                    options={STATE_OPTIONS}
-                  />
+                  {isEditing ? (
+                    <FormSelect
+                      label="State"
+                      selectedValue={formInput.state}
+                      onValueChange={(value: string) => setFormInput((prev) => ({ ...prev, state: value }))}
+                      options={STATE_OPTIONS}
+                    />
+                  ) : (
+                    <ReadOnlyField label="State" value={formInput.state} />
+                  )}
 
-                  <Field
-                    label="Postal Code"
-                    value={formInput.postal_code}
-                    placeholder="e.g., 900001"
-                    onChange={(value) => setFormInput((prev) => ({ ...prev, postal_code: value }))}
-                  />
+                  {isEditing ? (
+                    <Field
+                      label="Postal Code"
+                      value={formInput.postal_code}
+                      placeholder="e.g., 900001"
+                      onChange={(value) => setFormInput((prev) => ({ ...prev, postal_code: value }))}
+                    />
+                  ) : (
+                    <ReadOnlyField label="Postal Code" value={formInput.postal_code} />
+                  )}
                 </SectionCard>
               </View>
             </ScrollView>
@@ -624,7 +767,7 @@ const index = () => {
                 <Text className="text-red-500 text-sm text-center mb-2">{alertState.message}</Text>
               ) : null}
 
-              {isDirty || loading ? (
+              {isEditing ? (
                 <TouchableOpacity
                   className={`rounded-2xl px-4 py-3 items-center shadow-lg ${
                     isDirty && !loading ? 'bg-app-primary' : 'bg-gray-800'
@@ -636,7 +779,7 @@ const index = () => {
                 </TouchableOpacity>
               ) : (
                 <View className="items-center py-2">
-                  <Text className="text-gray-500 text-sm">All changes saved</Text>
+                  <Text className="text-gray-500 text-sm">Profile view mode</Text>
                 </View>
               )}
             </View>
@@ -673,5 +816,3 @@ const index = () => {
 }
 
 export default index
-
-const styles = StyleSheet.create({})
