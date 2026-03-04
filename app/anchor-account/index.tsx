@@ -114,6 +114,8 @@ const AnchorAccountScreen = () => {
     if (!platformTier2) return 'Complete Tier 2 verification before creating a deposit profile.'
     if (normalized.hasAnchorAccount) return null
 
+    const normalizedState = String(anchorPrefill.state || '').trim().toLowerCase()
+    const stateValid = normalizedState.length > 0 && normalizedState !== 'other'
     const missing: string[] = []
     if (!String(prefilledFirstName || '').trim()) missing.push('first name')
     if (!String(prefilledLastName || '').trim()) missing.push('last name')
@@ -123,7 +125,8 @@ const AnchorAccountScreen = () => {
     if (!String(anchorPrefill.gender || '').trim()) missing.push('gender (male/female)')
     if (!String(anchorPrefill.address || '').trim()) missing.push('address')
     if (!String(anchorPrefill.city || '').trim()) missing.push('city')
-    if (!String(anchorPrefill.state || '').trim()) missing.push('state')
+    if (!stateValid) missing.push('valid state')
+    if (!String(anchorPrefill.postalCode || '').trim()) missing.push('postal code')
 
     return missing.length ? `Update your profile first: ${missing.join(', ')}.` : null
   }, [
@@ -138,6 +141,7 @@ const AnchorAccountScreen = () => {
     anchorPrefill.address,
     anchorPrefill.city,
     anchorPrefill.state,
+    anchorPrefill.postalCode,
   ])
 
   useEffect(() => {

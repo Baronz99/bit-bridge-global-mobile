@@ -79,7 +79,6 @@ const STATE_OPTIONS = [
   { label: 'Taraba', value: 'Taraba' },
   { label: 'Yobe', value: 'Yobe' },
   { label: 'Zamfara', value: 'Zamfara' },
-  { label: 'Other', value: 'Other' },
 ]
 
 /*
