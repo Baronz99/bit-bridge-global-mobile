@@ -392,7 +392,7 @@ const BankTransferScreen = () => {
     setFlowStep(2)
   }
 
-  const focusField = (ref: React.RefObject<TextInput>, y: number) => {
+  const focusField = (ref: React.RefObject<TextInput | null>, y: number) => {
     requestAnimationFrame(() => {
       scrollRef.current?.scrollTo({ y, animated: true })
       setTimeout(() => ref.current?.focus(), 120)
