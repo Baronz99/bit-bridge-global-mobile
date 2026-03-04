@@ -58,7 +58,7 @@ const TIER_CONFIG = {
   },
   tier_4: {
     title: 'Tier 4 - Verified Address',
-    description: 'Full verification: Tier 3 + complete address + proof of address.',
+    description: 'Full verification: Tier 3 + proof of address.',
   },
 }
 
@@ -145,8 +145,9 @@ export default function KycCenter() {
     try {
       const res = await getKycStatus()
       setStatus(extractProfile(res))
-    } catch (err: any) {
-      setError(err?.message || 'Failed to load KYC status')
+    } catch (err: unknown) {
+      const message = err && typeof err === 'object' && 'message' in err ? String((err as { message?: string }).message) : ''
+      setError(message || 'Failed to load KYC status')
     } finally {
       setLoading(false)
     }
@@ -171,9 +172,6 @@ export default function KycCenter() {
   const profile = status?.user_profile || {}
   const idType = status?.id_type || profile?.id_type || ''
   const normalizedIdType = String(idType || '').trim().toLowerCase()
-  const hasAddress = Boolean(
-    profile?.address_line1 && profile?.city && profile?.state && profile?.country
-  )
   const proofType = profile?.proof_of_address_type
   const idDocUrl = profile?.id_document_url
   const proofUrl = profile?.proof_of_address_url
@@ -187,7 +185,7 @@ export default function KycCenter() {
       (ninStatus && ninStatus !== 'unverified' && ninStatus !== 'pending')
   )
   const tier2IdentityComplete = Boolean(hasIdType && identityVerified)
-  const tier4AddressComplete = Boolean(hasAddress && proofType && proofUrl)
+  const tier4AddressComplete = Boolean(proofType && proofUrl)
   const useCase = String(status?.primary_use_case || status?.user_profile?.primary_use_case || '')
     .trim()
     .toLowerCase()
@@ -325,14 +323,14 @@ export default function KycCenter() {
             title="Address verification (Tier 4)"
             description={
               tier4Complete
-                ? 'Address and proof of address are verified.'
+                ? 'Proof of address is verified.'
                 : tier3Verified
-                ? 'Add complete address and upload proof of address.'
+                ? 'Upload proof of address to complete Tier 4.'
                 : 'Complete Tier 3 live selfie before address verification.'
             }
             done={tier4Complete}
-            cta={tier4Complete ? 'View / Edit' : tier3Verified ? 'Complete address' : 'Complete Tier 3 first'}
-            href={tier3Verified ? '/kyc/documents' : undefined}
+            cta={tier4Complete ? 'View / Edit' : tier3Verified ? 'Complete Tier 4' : 'Complete Tier 3 first'}
+            href={tier3Verified ? '/kyc/address' : undefined}
             disabled={!tier3Verified}
           />
         </View>

@@ -1,6 +1,6 @@
 import client from '@/api/client'
 
-type KycDocumentsPayload = {
+export type KycDocumentsPayload = {
   user_profile_id?: string
   id_type?: string
   nin?: string
@@ -57,7 +57,7 @@ export const updateKycDocuments = async (payload: KycDocumentsPayload) => {
       uri: payload.id_document.uri,
       name: payload.id_document.name || 'id_document',
       type: payload.id_document.type || 'application/octet-stream',
-    } as any)
+    } as unknown as Blob)
   }
 
   if (payload.proof_of_address?.uri) {
@@ -65,7 +65,7 @@ export const updateKycDocuments = async (payload: KycDocumentsPayload) => {
       uri: payload.proof_of_address.uri,
       name: payload.proof_of_address.name || 'proof_of_address',
       type: payload.proof_of_address.type || 'application/octet-stream',
-    } as any)
+    } as unknown as Blob)
   }
 
   const response = await client.patch('/users/user_update', form, {

@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router'
 import ScreenContainer from '@/components/ScreenContainer'
 import FormInput from '@/components/FormInput'
 import FormSelect from '@/components/FormSelect'
-import { updateKycDocuments } from '@/api/kycDocuments'
+import { KycDocumentsPayload, updateKycDocuments } from '@/api/kycDocuments'
 import { NinVerifyResponse, verifyNin } from '@/api/kyc'
 import { useAuth } from '@/services/useAuth'
 
@@ -15,14 +15,6 @@ const ID_TYPE_OPTIONS = [
   { label: "Driver's licence", value: 'drivers_license' },
   { label: 'International passport', value: 'intl_passport' },
   { label: "Voter's card", value: 'voters_card' },
-]
-
-const PROOF_OPTIONS = [
-  { label: 'Select proof type', value: '' },
-  { label: 'Utility bill', value: 'utility_bill' },
-  { label: 'Bank statement', value: 'bank_statement' },
-  { label: 'Rent receipt', value: 'rent_receipt' },
-  { label: 'Other', value: 'other' },
 ]
 
 const STATE_OPTIONS = [
@@ -107,7 +99,6 @@ const KycDocumentsScreen = () => {
     state: '',
     country: '',
     postal_code: '',
-    proof_of_address_type: '',
   })
 
   const [idDocument, setIdDocument] = useState<{
@@ -115,12 +106,6 @@ const KycDocumentsScreen = () => {
     name?: string
     type?: string
   } | null>(null)
-  const [proofDocument, setProofDocument] = useState<{
-    uri: string
-    name?: string
-    type?: string
-  } | null>(null)
-
   useEffect(() => {
     setForm((prev) => ({
       ...prev,
@@ -132,7 +117,6 @@ const KycDocumentsScreen = () => {
       state: profile?.state || prev.state || '',
       country: profile?.country || prev.country || '',
       postal_code: profile?.postal_code || prev.postal_code || '',
-      proof_of_address_type: profile?.proof_of_address_type || prev.proof_of_address_type || '',
     }))
   }, [userRoot, profile])
 
@@ -143,7 +127,6 @@ const KycDocumentsScreen = () => {
   const ninStatus = String(ninResult?.status || ninStatusFromProfile || '').toLowerCase()
   const ninVerified = (ninResult?.status || ninStatusFromProfile) === 'verified'
   const hasIdDocOnFile = Boolean(profile?.id_document_url)
-  const hasProofOnFile = Boolean(profile?.proof_of_address_url)
 
   const parseErrorMessage = (error: unknown) => {
     const e = error as { response?: { data?: { message?: string; error?: string } }; message?: string }
@@ -187,12 +170,8 @@ const KycDocumentsScreen = () => {
     if (!form.address_line1 || !form.city || !form.state || !form.postal_code) {
       return 'Address line 1, city, state, and postal code are required.'
     }
-    if (!form.proof_of_address_type) return 'Select a proof of address type.'
     if (needsIdUpload && !idDocument && !hasIdDocOnFile) {
       return 'Upload your ID document to continue.'
-    }
-    if (!proofDocument && !hasProofOnFile) {
-      return 'Upload proof of address to continue.'
     }
     return null
   }
@@ -207,7 +186,7 @@ const KycDocumentsScreen = () => {
     setSaving(true)
     setNotice(null)
     try {
-      await updateKycDocuments({
+      const payload: KycDocumentsPayload = {
         user_profile_id: profile?.id,
         id_type: form.id_type,
         nin: form.id_type === 'nin' ? String(form.nin || '').trim() : undefined,
@@ -217,10 +196,10 @@ const KycDocumentsScreen = () => {
         state: form.state,
         country: form.country,
         postal_code: form.postal_code,
-        proof_of_address_type: form.proof_of_address_type,
         id_document: idDocument,
-        proof_of_address: proofDocument,
-      })
+      } as const
+
+      await updateKycDocuments(payload)
       if (form.id_type === 'nin' && ninValid) {
         setVerifyingNin(true)
         try {
@@ -277,9 +256,9 @@ const KycDocumentsScreen = () => {
   return (
     <ScreenContainer>
       <View className="rounded-3xl border border-gray-800 bg-gray-900/80 p-5">
-        <Text className="text-white text-xl font-semibold">Documents & Address</Text>
+        <Text className="text-white text-xl font-semibold">Identity verification</Text>
         <Text className="text-gray-400 text-xs mt-2">
-          Upload identity and proof of address documents to complete Tier 2 verification.
+          Complete Tier 2 identity checks. Address details are profile data and Tier 4 proof is handled separately.
         </Text>
       </View>
 
@@ -339,7 +318,10 @@ const KycDocumentsScreen = () => {
       </View>
 
       <View className="mt-5 rounded-2xl border border-gray-800 bg-gray-900/70 p-4">
-        <Text className="text-white text-base font-semibold mb-3">Address</Text>
+        <Text className="text-white text-base font-semibold mb-1">Address details (profile)</Text>
+        <Text className="text-gray-400 text-xs mb-3">
+          Keep this current. These fields are profile data and can also be edited from Profile.
+        </Text>
         <FormInput
           label="Address line 1"
           value={form.address_line1}
@@ -374,28 +356,6 @@ const KycDocumentsScreen = () => {
         />
       </View>
 
-      <View className="mt-5 rounded-2xl border border-gray-800 bg-gray-900/70 p-4">
-        <Text className="text-white text-base font-semibold mb-3">Proof of address</Text>
-        <FormSelect
-          label="Proof type"
-          selectedValue={form.proof_of_address_type}
-          onValueChange={(value: string) => setForm({ ...form, proof_of_address_type: value })}
-          options={PROOF_OPTIONS}
-        />
-
-        <View className="mt-4">
-          <Text className="text-gray-300 text-xs mb-2">Upload proof of address (image or PDF)</Text>
-          <TouchableOpacity
-            onPress={() => pickDocument(setProofDocument)}
-            className="bg-gray-950 border border-gray-800 py-3 rounded-xl items-center"
-          >
-            <Text className="text-white text-sm font-semibold">
-              {proofDocument?.name || (hasProofOnFile ? 'Document on file' : 'Choose file')}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
       {notice ? <Text className="text-yellow-400 text-xs mt-4">{notice}</Text> : null}
 
       <TouchableOpacity
@@ -406,8 +366,15 @@ const KycDocumentsScreen = () => {
         {saving || verifyingNin ? (
           <ActivityIndicator />
         ) : (
-          <Text className="text-black text-center font-semibold">Save documents</Text>
+          <Text className="text-black text-center font-semibold">Save identity details</Text>
         )}
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        onPress={() => router.push('/kyc/address')}
+        className="border border-app-primary py-3 rounded-xl mt-3"
+      >
+        <Text className="text-white text-center">Go to Address Verification (Tier 4)</Text>
       </TouchableOpacity>
 
       <TouchableOpacity

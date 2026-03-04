@@ -181,6 +181,7 @@ export default function RootLayout() {
         <Stack.Screen name="onboarding/kyc-profile" options={{ headerTitle: 'KYC Profile' }} />
         <Stack.Screen name="kyc/anchor-verify" options={{ headerTitle: 'Anchor KYC' }} />
         <Stack.Screen name="kyc/documents" options={{ headerTitle: 'KYC Documents' }} />
+        <Stack.Screen name="kyc/address" options={{ headerTitle: 'Address Verification' }} />
 
         <Stack.Screen name="mobileProviders/index" options={{ headerTitle: 'Mobile Top Up' }} />
         <Stack.Screen name="mobileProviders/[id]/index" options={{ headerTitle: 'Mobile Top Up' }} />
