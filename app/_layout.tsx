@@ -179,7 +179,6 @@ export default function RootLayout() {
         <Stack.Screen name="onboarding/basic-profile" options={{ headerTitle: 'Basic Profile' }} />
         <Stack.Screen name="onboarding/use-case" options={{ headerTitle: 'Use Case' }} />
         <Stack.Screen name="onboarding/kyc-profile" options={{ headerTitle: 'KYC Profile' }} />
-        <Stack.Screen name="kyc/anchor-verify" options={{ headerTitle: 'Anchor KYC' }} />
         <Stack.Screen name="kyc/documents" options={{ headerTitle: 'KYC Documents' }} />
         <Stack.Screen name="kyc/address" options={{ headerTitle: 'Address Verification' }} />
 

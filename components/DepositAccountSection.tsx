@@ -55,6 +55,7 @@ const DepositAccountSection = ({
     if (!platformTier2) return 'Complete Tier 2 verification before setting up a deposit account.'
     if (normalized.backendFlowState === 'blocked_profile_incomplete') return 'Your profile is incomplete. Update your profile to continue.'
     if (normalized.backendFlowState === 'blocked_phone_exists') return 'Phone number conflict at provider. Update your phone number and retry.'
+    if (normalized.backendFlowState === 'pending_kyc_review') return 'Anchor is reviewing your KYC. Refresh status in a moment.'
     if (normalized.backendFlowState === 'blocked_kyc') return 'Your account needs KYC eligibility before Anchor onboarding.'
     if (normalized.kycState === 'pending') return 'Anchor is currently reviewing your KYC submission.'
     if (normalized.depositReady) return 'Your deposit account is ready to receive funds.'

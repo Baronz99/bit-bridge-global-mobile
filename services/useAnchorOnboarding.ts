@@ -9,6 +9,7 @@ export type AnchorFlowState =
   | 'not_started'
   | 'blocked_profile_incomplete'
   | 'blocked_kyc'
+  | 'pending_kyc_review'
   | 'blocked_phone_exists'
   | 'customer_created_no_deposit_account'
   | 'temporary_provider_failure'
@@ -189,6 +190,7 @@ const parseBackendFlow = (
     'not_started',
     'blocked_profile_incomplete',
     'blocked_kyc',
+    'pending_kyc_review',
     'blocked_phone_exists',
     'customer_created_no_deposit_account',
     'temporary_provider_failure',
@@ -354,9 +356,11 @@ export const normalizeAnchorOnboarding = (
         ? 'CREATE_ANCHOR'
         : backendFlow.state === 'blocked_phone_exists'
           ? 'CREATE_ANCHOR'
-          : backendFlow.state === 'blocked_kyc'
+        : backendFlow.state === 'blocked_kyc'
+          ? 'DO_KYC'
+          : backendFlow.state === 'pending_kyc_review'
             ? 'DO_KYC'
-            : backendFlow.state === 'customer_created_no_deposit_account'
+          : backendFlow.state === 'customer_created_no_deposit_account'
               ? 'GENERATE_NUMBER'
               : backendFlow.state === 'temporary_provider_failure'
                 ? hasAnchorAccount
