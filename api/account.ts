@@ -408,6 +408,25 @@ export const createDepositAccount = async () => {
   }
 }
 
+export const setupAnchorOnboarding = async (payload?: { account?: Record<string, unknown> }) => {
+  try {
+    const accountPayload = payload?.account || {}
+    const res = await client.post('/accounts/setup_anchor_onboarding', {
+      account: accountPayload,
+    })
+    return res.data
+  } catch (err: any) {
+    const parsed = parseAnchorApiError(err)
+    warn('[setupAnchorOnboarding error]', {
+      message: parsed.message,
+      status: parsed.status,
+      data: err?.response?.data,
+      url: err?.config?.url,
+    })
+    throw parsed
+  }
+}
+
 export const verifyKyc = async (payload: {
   bvn: string
   dob: string
