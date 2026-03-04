@@ -54,6 +54,10 @@ const Profile = () => {
     .toString()
     .replace('_', ' ')
 
+  const isInternalAdmin = useMemo(() => {
+    const role = String(userProfileData?.role || userProfileData?.user_profile?.role || '').toLowerCase()
+    return role === 'admin' || role === 'super_admin'
+  }, [userProfileData])
   const sections = useMemo(() => {
     const data: { title: string; items: RowItem[] }[] = []
 
@@ -149,7 +153,7 @@ const Profile = () => {
       ],
     })
 
-    if (FEATURE_STATS) {
+    if (FEATURE_STATS && isInternalAdmin) {
       data.push({
         title: 'Wallet',
         items: [
@@ -229,6 +233,7 @@ const Profile = () => {
     FEATURE_PAYMENT_TOOLS,
     FEATURE_REWARDS,
     FEATURE_STATS,
+    isInternalAdmin,
     FEATURE_TIMELINE,
     FEATURE_TRANSACTION_PIN,
   ])
@@ -337,3 +342,4 @@ const Profile = () => {
 }
 
 export default Profile
+
