@@ -12,6 +12,7 @@ import { setLastFatalError } from '@/services/fatalError'
 import { FEATURE_TIMELINE } from '@/constants/featureFlags'
 import { log } from '@/utils/logger'
 import BootScreen from '@/src/components/BootScreen'
+import PushNotificationsBridge from '@/services/PushNotificationsBridge'
 
 void SplashScreen.preventAutoHideAsync().catch(() => {})
 
@@ -152,6 +153,7 @@ export default function RootLayout() {
       <AuthProvider>
         <BalancePrivacyProvider>
           <AppLockProvider>
+            <PushNotificationsBridge />
             <StartupGate>
               <StatusBar hidden={false} barStyle="light-content" backgroundColor="black" />
 
@@ -288,3 +290,4 @@ export default function RootLayout() {
     </RootErrorBoundary>
   )
 }
+
