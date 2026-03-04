@@ -61,7 +61,7 @@ const SuccessScreen = () => {
   const payload = useMemo(() => parseSummary(summary), [summary])
   const transferFee = Number(payload?.fee_breakdown?.platform_fee ?? 0)
   const stampDutyFee = Number(payload?.fee_breakdown?.stamp_duty_fee ?? 0)
-  const canOpenReceipt = Boolean(String(payload?.transfer_reference || '').trim())
+  const hasTransferReference = Boolean(String(payload?.transfer_reference || '').trim())
 
   const lifecycle = useMemo(
     () =>
@@ -167,9 +167,16 @@ const SuccessScreen = () => {
 
           <TouchableOpacity
             onPress={() => {
-              if (canOpenReceipt) {
+              if (lifecycle.isTerminal && hasTransferReference) {
                 router.replace({
                   pathname: '/transaction/receipt',
+                  params: { reference: String(payload.transfer_reference || '') },
+                })
+                return
+              }
+              if (hasTransferReference) {
+                router.replace({
+                  pathname: '/transaction/record/[reference]',
                   params: { reference: String(payload.transfer_reference || '') },
                 })
                 return
@@ -179,7 +186,7 @@ const SuccessScreen = () => {
             className="bg-theme-primary py-4 rounded-xl mt-5"
           >
             <Text className="text-alt text-center font-semibold">
-              {canOpenReceipt ? 'View Receipt' : 'View Timeline'}
+              {lifecycle.isTerminal && hasTransferReference ? 'View Receipt' : 'Track Transfer'}
             </Text>
           </TouchableOpacity>
 

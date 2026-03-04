@@ -26,6 +26,7 @@ import { isPrimaryTransaction as isPrimaryTransactionFromUtils } from '@/utils/t
 import { getTierFromProfile, isTierEligibleForBankTransfer } from '@/utils/bankTransfer'
 import { warn } from '@/utils/logger'
 import { formatWalletHistoryPresentation } from '@/utils/walletHistoryPresentation'
+import { resolveTransferLifecycle } from '@/utils/transferLifecycle'
 
 const REFRESH_TIMEOUT_MS = 15000
 const TX_PAGE_LIMIT = 30
@@ -312,7 +313,7 @@ const WalletScreen = () => {
 
   const statusTone = (status: string) => {
     if (status === 'approved' || status === 'completed') return 'text-green-400'
-    if (status === 'initialized' || status === 'pending' || status === 'reserved') return 'text-yellow-400'
+    if (status === 'initialized' || status === 'pending' || status === 'reserved' || status === 'pending_provider') return 'text-yellow-400'
     if (status === 'released') return 'text-sky-300'
     return 'text-red-400'
   }
@@ -686,7 +687,13 @@ const WalletScreen = () => {
             ) : (
               filteredTransactions.map((item: any, index: number) => {
                 const reference = item?.reference ?? item?.transfer_reference ?? item?.id
-                const status = transactionState(item)
+                const lifecycle = resolveTransferLifecycle({
+                  lifecycle_state: item?.lifecycle_state,
+                  status: item?.status,
+                  display_message: item?.display_message,
+                })
+                const status = lifecycle.state
+                const statusLabel = lifecycle.shortLabel
                 const currency = isTunnelMode ? 'USD' : 'NGN'
                 const presentation = formatWalletHistoryPresentation(item)
 
@@ -717,7 +724,7 @@ const WalletScreen = () => {
                             <Text className="text-white font-semibold">
                               {moneyFormat(displayAmount(item), currency)}
                             </Text>
-                            <Text className={`text-xs mt-1 ${statusTone(status)}`}>{status}</Text>
+                            <Text className={`text-xs mt-1 ${statusTone(status)}`}>{statusLabel}</Text>
                           </View>
                     </View>
 

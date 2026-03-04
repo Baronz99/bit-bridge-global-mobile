@@ -393,7 +393,13 @@ const index = () => {
                 </View>
               ) : (
                 filteredOrders.map((item: any, index: number) => {
-                  const status = String(item?.status || 'pending').toLowerCase()
+                  const lifecycle = resolveTransferLifecycle({
+                    lifecycle_state: item?.lifecycle_state,
+                    status: item?.status,
+                    display_message: item?.display_message,
+                  })
+                  const status = lifecycle.state
+                  const statusLabel = lifecycle.shortLabel
                   const reference = item?.reference ?? item?.id
                   return (
                     <Link
@@ -419,7 +425,7 @@ const index = () => {
                               {moneyFormat(item.amount)}
                             </Text>
                             <Text className={`text-xs mt-1 ${statusTone(status)}`}>
-                              {status}
+                              {statusLabel}
                             </Text>
                           </View>
                         </View>
@@ -438,7 +444,13 @@ const index = () => {
               ) : (
                 filteredTransactions.map((item: any, index: number) => {
                   const reference = item?.reference ?? item?.transfer_reference ?? item?.id
-                  const status = transactionState(item)
+                  const lifecycle = resolveTransferLifecycle({
+                    lifecycle_state: item?.lifecycle_state,
+                    status: item?.status,
+                    display_message: item?.display_message,
+                  })
+                  const status = lifecycle.state
+                  const statusLabel = lifecycle.shortLabel
                   const presentation = formatWalletHistoryPresentation(item)
                   if (!reference) {
                     return (
@@ -456,7 +468,7 @@ const index = () => {
                               {moneyFormat(displayAmount(item))}
                             </Text>
                             <Text className={`text-xs mt-1 ${statusTone(status)}`}>
-                              {status}
+                              {statusLabel}
                             </Text>
                           </View>
                         </View>
@@ -483,7 +495,7 @@ const index = () => {
                               {moneyFormat(displayAmount(item))}
                             </Text>
                             <Text className={`text-xs mt-1 ${statusTone(status)}`}>
-                              {status}
+                              {statusLabel}
                             </Text>
                           </View>
                         </View>
