@@ -2,13 +2,14 @@
   "expo": {
     "name": "BitBridge",
     "slug": "bit-bridge-global-mobile",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/icons/app-icon-1024.png",
     "scheme": "bitbridgeglobal",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
+      "buildNumber": "1",
       "supportsTablet": true,
       "bundleIdentifier": "com.emmykage.bitbridgeapp",
       "associatedDomains": [
