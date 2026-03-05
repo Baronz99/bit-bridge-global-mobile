@@ -160,13 +160,24 @@ const UseCaseScreen = () => {
       const last_name = basicProfile.last_name.trim()
       const date_of_birth = basicProfile.date_of_birth.trim()
       const hasBasicProfile = !!(first_name || last_name || date_of_birth)
+      let profileWarning: string | null = null
 
       if (hasBasicProfile) {
-        await updateBasicProfile({
-          first_name,
-          last_name,
-          date_of_birth,
-        })
+        try {
+          await updateBasicProfile({
+            first_name,
+            last_name,
+            date_of_birth,
+          })
+        } catch (error: any) {
+          // Do not block use-case persistence on profile validation failures.
+          profileWarning =
+            buildApiErrorMessage({
+              status: error?.response?.status,
+              data: error?.response?.data,
+              fallback: error?.message || 'Profile details could not be updated right now.',
+            }) || 'Profile details could not be updated right now.'
+        }
       }
 
       await saveOnboardingUseCase({
@@ -174,7 +185,11 @@ const UseCaseScreen = () => {
         onboarding_stage: 'use_case_selected',
       })
 
-      setNotice('Use case saved successfully.')
+      setNotice(
+        profileWarning
+          ? `Use case saved. Profile update skipped: ${profileWarning}`
+          : 'Use case saved successfully.'
+      )
 
       const needsKycNow = KYC_REQUIRED_NOW.includes(selectedUseCase)
       router.replace(needsKycNow ? '/kyc' : '/(tabs)')
@@ -310,7 +325,7 @@ const UseCaseScreen = () => {
               {submitting ? (
                 <ActivityIndicator />
               ) : (
-                <Text className="text-black text-sm font-semibold">Continue</Text>
+                <Text className="text-black text-sm font-semibold">Save use case</Text>
               )}
             </TouchableOpacity>
           </View>

@@ -553,7 +553,7 @@ const index = () => {
   return (
     <>
       <View className="flex-1 bg-gray-950">
-        <KeyboardAvoidWrapper>
+        <KeyboardAvoidWrapper scrollEnabled={false}>
           <View className="flex-1">
             <ScrollView
               contentContainerStyle={{ paddingBottom: 140, paddingHorizontal: 16, paddingTop: 24 }}
@@ -761,21 +761,34 @@ const index = () => {
               </View>
             </ScrollView>
 
-            <View className="border-t border-[rgba(255,255,255,0.08)] bg-gray-950 px-4 py-3">
+            <View className="border-t border-[rgba(255,255,255,0.08)] bg-gray-950 px-4 pt-3 pb-5">
               {alertState.error && alertState.message ? (
                 <Text className="text-red-500 text-sm text-center mb-2">{alertState.message}</Text>
               ) : null}
 
               {isEditing ? (
-                <TouchableOpacity
-                  className={`rounded-2xl px-4 py-3 items-center shadow-lg ${
-                    isDirty && !loading ? 'bg-app-primary' : 'bg-gray-800'
-                  }`}
-                  onPress={handleUpdate}
-                  disabled={!isDirty || loading}
-                >
-                  {loading ? <ActivityIndicator color="white" /> : <Text className="text-white font-semibold">Update Profile</Text>}
-                </TouchableOpacity>
+                <>
+                  {!isDirty && !loading ? (
+                    <Text className="text-gray-500 text-xs text-center mb-2">Make a change to enable save</Text>
+                  ) : null}
+                  <TouchableOpacity
+                    className={`rounded-2xl px-4 py-3 items-center shadow-lg border ${
+                      isDirty && !loading
+                        ? 'bg-app-primary border-app-primary'
+                        : 'bg-gray-800 border-gray-700'
+                    }`}
+                    onPress={handleUpdate}
+                    disabled={!isDirty || loading}
+                  >
+                    {loading ? (
+                      <ActivityIndicator color="white" />
+                    ) : (
+                      <Text className={`${isDirty ? 'text-black' : 'text-gray-300'} font-semibold`}>
+                        Save changes
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                </>
               ) : (
                 <View className="items-center py-2">
                   <Text className="text-gray-500 text-sm">Profile view mode</Text>
