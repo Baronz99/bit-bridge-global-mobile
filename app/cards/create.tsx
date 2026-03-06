@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
 import FormInput from '@/components/FormInput'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
-import { createCard, getUserCards, registerCardholder } from '@/api/cards'
+import { getCardSetupStatus, getUserCards, setupCard } from '@/api/cards'
 import { uploadSelfieToCloudinary } from '@/api/uploads'
 import { useAuth } from '@/services/useAuth'
 import { resolveUserProfile } from '@/services/auth/resolveUserProfile'
@@ -34,6 +34,8 @@ const isLikelyNetworkCreateError = (error: any) => {
   )
 }
 
+const nextIdempotencyKey = () => `card-setup-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+
 const CreateCard = () => {
   const router = useRouter()
   const { userProfileData } = useAuth()
@@ -45,8 +47,7 @@ const CreateCard = () => {
   const [selfieLocalUri, setSelfieLocalUri] = useState<string | null>(null)
   const [selfieImageUrl, setSelfieImageUrl] = useState<string | null>(null)
   const [cardholderStatus, setCardholderStatus] = useState<string>('idle')
-  const [cardholderStatusUpdatedAt, setCardholderStatusUpdatedAt] = useState<string | null>(null)
-  const [existingCardholderId, setExistingCardholderId] = useState<string | null>(null)
+  const [cardholderStatusUpdatedAt, setCardholderStatusUpdatedAt] = useState<string | null>(null)
   const [refreshingStatus, setRefreshingStatus] = useState(false)
   const [form, setForm] = useState({
     first_name: '',
@@ -126,6 +127,25 @@ const CreateCard = () => {
 
   const refreshCardholderState = async () => {
     try {
+      const setup = await getCardSetupStatus()
+      const data = setup?.data || {}
+      const state = String(setup?.state || '').toLowerCase()
+      const providerStatus = String(data?.cardholder_status || '').toLowerCase()
+
+      if (state === 'active' || String(data?.provider_card_id || '').trim()) setCardholderStatus('verified')
+      else if (state === 'cardholder_failed') setCardholderStatus('failed')
+      else if (state === 'cardholder_pending' || state === 'provider_pending') setCardholderStatus('pending_verification')
+      else if (providerStatus) setCardholderStatus(providerStatus)
+      else setCardholderStatus('idle')
+
+      setCardholderStatusUpdatedAt(String(data?.updated_at || '').trim() || null)
+      if (data?.card_id) setCreatedCardId(String(data.card_id))
+      return
+    } catch {
+      // fallback to cards list for backward compatibility
+    }
+
+    try {
       const raw = await getUserCards()
       const payload = raw?.data ?? raw
       let card: any = null
@@ -137,7 +157,6 @@ const CreateCard = () => {
       if (!card) {
         setCardholderStatus('idle')
         setCardholderStatusUpdatedAt(null)
-        setExistingCardholderId(null)
         return
       }
 
@@ -148,7 +167,6 @@ const CreateCard = () => {
       setCardholderStatusUpdatedAt(
         String(meta?.cardholder_status_updated_at || card?.updated_at || '').trim() || null
       )
-      setExistingCardholderId(String(card?.cardholder_id || '').trim() || null)
       const routeId = resolveCardRouteId(card)
       if (routeId) setCreatedCardId(routeId)
     } catch {
@@ -292,62 +310,42 @@ const CreateCard = () => {
         setLoading(false)
         return
       }
-
-      // Step 1: ensure cardholder verification record exists (async)
-      const normalizedStatus = String(cardholderStatus || '').toLowerCase()
-      let cardholderId = existingCardholderId
-
-      if (!['verified', 'pending_verification', 'manual_review'].includes(normalizedStatus)) {
-        if (!bvnVerified) {
-          setNotice('BVN must be verified before cardholder registration.')
-          setLoading(false)
-          return
-        }
-
-        const selfieUrl = await ensureSelfieUrl()
-        const registerRes = await registerCardholder({
+      const selfieUrl = await ensureSelfieUrl()
+      const setupRes = await setupCard(
+        {
           ...payload,
           registration_mode: 'async',
           id_type: 'NIGERIAN_BVN_VERIFICATION',
           selfie_image: selfieUrl,
-        })
+          wallet_type: 'usd',
+          currency: form.currency || 'USD',
+          card_limit: normalizedCardLimit,
+          card_pin: cardPin,
+        },
+        nextIdempotencyKey()
+      )
 
-        cardholderId =
-          registerRes?.data?.cardholder_id ||
-          registerRes?.data?.id ||
-          registerRes?.cardholder_id ||
-          registerRes?.id ||
-          null
+      const setupState = String(setupRes?.state || '').toLowerCase()
+      const setupData = setupRes?.data || {}
 
-        await refreshCardholderState()
-        setNotice(registerRes?.message || 'Cardholder submitted. Verification in progress.')
+      if (setupState === 'insufficient_balance') {
+        const shortfall = Number(setupData?.shortfall_usd || 0)
+        setNotice(`Insufficient Tunnel balance. Shortfall: $${shortfall.toFixed(2)}`)
         setLoading(false)
         return
       }
 
-      if (['pending_verification', 'manual_review'].includes(normalizedStatus)) {
-        setNotice('Cardholder verification is still in progress. Refresh status and retry once verified.')
-        setLoading(false)
+      if (setupState === 'active') {
+        const cardId = String(setupData?.card_id || '').trim() || resolveCardRouteId(setupRes)
+        setSuccess(setupRes?.message || 'Card created successfully.')
+        if (cardId) setCreatedCardId(String(cardId))
         return
       }
 
-      // Step 2: create card only when verified
-      const cardRes = await createCard({
-        cardholder_id: cardholderId || undefined,
-        currency: form.currency || 'USD',
-        wallet_type: 'usd',
-        card_limit: normalizedCardLimit,
-        card_pin: cardPin,
-      })
-
-      let cardId = resolveCardRouteId(cardRes)
-      if (!cardId) {
-        await refreshCardholderState()
-        cardId = resolveCardRouteId((await getUserCards()) as any)
-      }
-
-      setSuccess(cardRes?.message || 'Card created successfully.')
-      if (cardId) setCreatedCardId(String(cardId))
+      await refreshCardholderState()
+      setNotice(setupRes?.message || 'Card setup submitted. Please refresh status shortly.')
+      const cardId = String(setupData?.card_id || '').trim()
+      if (cardId) setCreatedCardId(cardId)
     } catch (error: any) {
       if (isLikelyNetworkCreateError(error)) {
         for (let attempt = 0; attempt < 6; attempt += 1) {
@@ -588,3 +586,5 @@ const CreateCard = () => {
 }
 
 export default CreateCard
+
+

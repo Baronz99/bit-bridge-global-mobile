@@ -1,4 +1,4 @@
-// src/api/cards.ts (MOBILE) — aligned with Web + Backend PCI reveal endpoint
+// src/api/cards.ts (MOBILE) - aligned with Web + Backend PCI reveal endpoint
 import client from '@/api/client'
 
 type Id = string | number
@@ -50,6 +50,57 @@ export const getUserCards = async () => {
 }
 
 /**
+ * One-button setup flow
+ */
+export const setupCard = async (
+  payload: {
+    first_name: string
+    last_name: string
+    email: string
+    phone_number: string
+    address_line1?: string
+    city?: string
+    state?: string
+    postal_code?: string
+    country?: string
+    registration_mode?: 'async' | 'sync'
+    id_type?: string
+    bvn?: string
+    selfie_image?: string
+    id_no?: string
+    id_image?: string
+    wallet_type?: string
+    currency?: string
+    card_limit?: string
+    card_pin?: string
+    requested_funding_usd?: number
+  },
+  idempotencyKey: string
+) => {
+  const endpoint = '/cards/setup_card'
+  try {
+    const res = await client.post(endpoint, { card: payload }, {
+      headers: {
+        'X-Idempotency-Key': idempotencyKey,
+      },
+    })
+    return res.data
+  } catch (err: any) {
+    throw buildApiError(err, 'Failed to setup card', endpoint)
+  }
+}
+
+export const getCardSetupStatus = async () => {
+  const endpoint = '/cards/setup_status'
+  try {
+    const res = await client.get(endpoint)
+    return res.data
+  } catch (err: any) {
+    throw buildApiError(err, 'Failed to fetch card setup status', endpoint)
+  }
+}
+
+/**
  * Card detail / balance / history (your existing routes)
  */
 export const getCardDetails = async (id: Id) => {
@@ -95,11 +146,7 @@ export const getCardFundingStatus = async (id: Id, reference?: string) => {
 }
 
 /**
- * ✅ PCI Reveal (NEW)
- * Backend controller: POST /api/v1/pci/cards/:id/reveal
- * Requires: card.transaction_pin (or card.pin) in body
- *
- * IMPORTANT: do not persist response anywhere (PAN/CVV).
+ * PCI Reveal
  */
 export const revealCard = async (id: string | number, transaction_pin: string) => {
   try {
@@ -112,10 +159,6 @@ export const revealCard = async (id: string | number, transaction_pin: string) =
   }
 }
 
-
-/**
- * Freeze / Unfreeze (your existing routes)
- */
 export const freezeCard = async (id: Id) => {
   try {
     const res = await client.patch(`/cards/${id}/freeze`)
@@ -134,10 +177,6 @@ export const unfreezeCard = async (id: Id) => {
   }
 }
 
-/**
- * ✅ Fund / Unload wallet (aligned to backend card flow)
- * If your backend accepts currency/wallet_type optionally, this still works.
- */
 export const fundCard = async (payload: {
   card_id: Id
   amount: number
@@ -188,10 +227,6 @@ export const unloadCard = async (payload: {
   }
 }
 
-/**
- * Cardholder + Create card (keep as-is unless backend expects {card: {...}})
- * If your backend expects envelope, tell me and I’ll align these too.
- */
 export const registerCardholder = async (payload: {
   first_name: string
   last_name: string
