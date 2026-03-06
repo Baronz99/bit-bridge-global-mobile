@@ -553,7 +553,7 @@ const index = () => {
   return (
     <>
       <View className="flex-1 bg-gray-950">
-        <KeyboardAvoidWrapper scrollEnabled={false}>
+        <KeyboardAvoidWrapper scrollEnabled={false} dismissOnTap={false}>
           <View className="flex-1">
             <ScrollView
               contentContainerStyle={{ paddingBottom: 140, paddingHorizontal: 16, paddingTop: 24 }}

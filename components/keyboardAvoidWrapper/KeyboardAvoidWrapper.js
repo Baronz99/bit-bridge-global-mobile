@@ -4,12 +4,17 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Text,
-  TouchableNativeFeedback,
+  TouchableWithoutFeedback,
   View,
 } from 'react-native'
 
-const KeyboardAvoidWrapper = ({ children, scrollEnabled = true }) => {
+const KeyboardAvoidWrapper = ({ children, scrollEnabled = true, dismissOnTap = true }) => {
+  const content = dismissOnTap ? (
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>{children}</TouchableWithoutFeedback>
+  ) : (
+    children
+  )
+
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
@@ -18,13 +23,9 @@ const KeyboardAvoidWrapper = ({ children, scrollEnabled = true }) => {
       <View className="flex-1 p-2">
         {scrollEnabled ? (
           <ScrollView showsVerticalScrollIndicator={false} className="">
-            <TouchableNativeFeedback onPress={Keyboard.dismiss}>{children}</TouchableNativeFeedback>
+            {content}
           </ScrollView>
-        ) : (
-          <TouchableNativeFeedback onPress={Keyboard.dismiss}>
-            <View className="flex-1">{children}</View>
-          </TouchableNativeFeedback>
-        )}
+        ) : <View className="flex-1">{content}</View>}
       </View>
     </KeyboardAvoidingView>
   )
