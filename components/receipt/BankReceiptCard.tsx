@@ -44,6 +44,7 @@ type BankReceiptCardProps = {
   valueAmount?: number
   walletAmount?: number
   rewardAmount?: number
+  financials?: Record<string, any>
   reason?: string
   timeline?: {
     step_key?: string
@@ -190,6 +191,7 @@ const BankReceiptCard = ({
   valueAmount,
   walletAmount,
   rewardAmount,
+  financials,
   reason,
   timeline,
 }: BankReceiptCardProps) => {
@@ -199,8 +201,21 @@ const BankReceiptCard = ({
 
   const safeCurrency = String(currency || 'NGN')
   const safeAmount = Number.isFinite(Number(amount)) ? Number(amount) : 0
-  const safeValueAmount = Number.isFinite(Number(valueAmount)) ? Number(valueAmount) : undefined
-  const safeWalletAmount = typeof walletAmount === 'number' ? walletAmount : safeAmount
+  const backendValueAmount = Number(financials?.value_amount)
+  const backendWalletCharged = Number(financials?.wallet_amount_charged)
+  const backendTotalFees = Number(financials?.total_fees)
+  const safeValueAmount =
+    Number.isFinite(Number(valueAmount))
+      ? Number(valueAmount)
+      : Number.isFinite(backendValueAmount)
+        ? backendValueAmount
+        : undefined
+  const safeWalletAmount =
+    typeof walletAmount === 'number'
+      ? walletAmount
+      : Number.isFinite(backendWalletCharged)
+        ? backendWalletCharged
+        : safeAmount
   const safeRewardAmount = typeof rewardAmount === 'number' ? rewardAmount : 0
   const receiptCategory = clean(meta?.receipt_category || meta?.receiptCategory).toLowerCase()
   const transactionDirection = clean(meta?.transaction_direction || meta?.transactionDirection).toLowerCase()
@@ -229,9 +244,16 @@ const BankReceiptCard = ({
         : undefined
       : feeDetails && feeDetails.length
         ? feeDetails.reduce((sum, entry) => sum + (Number(entry?.amount) || 0), 0)
-        : undefined
+        : Number.isFinite(backendTotalFees)
+          ? backendTotalFees
+          : undefined
   const net = typeof totalFees === 'number' ? Math.max(0, safeAmount - totalFees) : undefined
-  const computedNet = typeof netAmount === 'number' ? netAmount : net
+  const computedNet =
+    typeof netAmount === 'number'
+      ? netAmount
+      : Number.isFinite(backendValueAmount)
+        ? backendValueAmount
+        : net
 
   const beneficiary = clean(meta?.beneficiary)
   const bankName = clean(meta?.bankName)
@@ -287,6 +309,23 @@ const BankReceiptCard = ({
   const electricityBiller = clean(meta?.biller) || clean(parties?.biller) || clean(provider?.name)
   const electricityServiceCharge = Number(meta?.service_charge ?? 0)
   const conversionMeta = meta?.fx && typeof meta.fx === 'object' ? (meta.fx as Record<string, any>) : null
+  const cardEnrichment =
+    meta?.card_event_enrichment && typeof meta.card_event_enrichment === 'object'
+      ? (meta.card_event_enrichment as Record<string, any>)
+      : null
+  const cardMerchant = cardEnrichment?.merchant && typeof cardEnrichment.merchant === 'object'
+    ? (cardEnrichment.merchant as Record<string, any>)
+    : null
+  const cardTransaction = cardEnrichment?.transaction && typeof cardEnrichment.transaction === 'object'
+    ? (cardEnrichment.transaction as Record<string, any>)
+    : null
+  const cardFx = cardEnrichment?.fx && typeof cardEnrichment.fx === 'object'
+    ? (cardEnrichment.fx as Record<string, any>)
+    : null
+  const isCardReceipt =
+    clean(kind).toLowerCase() === 'card' ||
+    clean(event).toLowerCase().includes('card') ||
+    clean(title).toLowerCase().includes('card')
   const isConversionReceipt =
     Boolean(meta?.conversion) ||
     clean(event).toLowerCase().includes('conversion') ||
@@ -455,6 +494,38 @@ const BankReceiptCard = ({
       <Row label="Reference" value={receiptNo} mono />
       <Row label="Channel" value={channelValue} />
       <Row label="Narration" value={narration} />
+
+      {isCardReceipt && (cardMerchant || cardTransaction || cardFx) ? (
+        <>
+          <Divider />
+          <Text className="text-gray-400 text-[11px] uppercase tracking-widest mb-2">Card transaction details</Text>
+          <Row label="Merchant" value={clean(cardMerchant?.name) || beneficiary} />
+          <Row label="Category" value={clean(cardMerchant?.category)} />
+          <Row label="Group" value={clean(cardMerchant?.group)} />
+          <Row label="City" value={clean(cardMerchant?.city)} />
+          <Row label="Country" value={clean(cardMerchant?.country)} />
+          <Row label="Website" value={clean(cardMerchant?.website)} />
+          <Row label="Recurring" value={cardMerchant?.recurring === true ? 'Yes' : cardMerchant?.recurring === false ? 'No' : ''} />
+          <Row label="MCC" value={clean(cardTransaction?.merchant_category_code)} />
+          <Row label="Type" value={clean(cardTransaction?.card_transaction_type)} />
+          <Row label="Decline reason" value={clean(cardTransaction?.decline_reason) || clean(reason)} />
+          {Number.isFinite(Number(cardFx?.merchant_amount)) && clean(cardFx?.merchant_currency) ? (
+            <Row label="Merchant amount" value={moneyFormat(Number(cardFx?.merchant_amount), clean(cardFx?.merchant_currency))} />
+          ) : null}
+          {Number.isFinite(Number(cardFx?.billing_amount)) && clean(cardFx?.billing_currency) ? (
+            <Row label="Billing amount" value={moneyFormat(Number(cardFx?.billing_amount), clean(cardFx?.billing_currency))} />
+          ) : null}
+          {Number.isFinite(Number(cardFx?.fx_implied_rate)) ? (
+            <Row label="FX implied rate" value={String(cardFx?.fx_implied_rate)} />
+          ) : null}
+          {Number.isFinite(Number(cardFx?.fx_reference_rate)) ? (
+            <Row label="FX reference rate" value={String(cardFx?.fx_reference_rate)} />
+          ) : null}
+          {Number.isFinite(Number(cardFx?.fx_margin_usd)) ? (
+            <Row label="FX margin" value={moneyFormat(Number(cardFx?.fx_margin_usd), 'USD')} />
+          ) : null}
+        </>
+      ) : null}
 
       {isConversionReceipt && conversionMeta ? (
         <>

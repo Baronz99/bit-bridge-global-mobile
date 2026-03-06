@@ -56,6 +56,38 @@ const parseAmount = (v: any) => {
   return Number.isFinite(n) ? n : NaN
 }
 
+const normalizeCardHistoryAmount = (item: any) => {
+  const raw = Number(item?.amount ?? 0)
+  if (!Number.isFinite(raw)) return 0
+
+  const currency = String(item?.currency || 'USD').toUpperCase()
+  if (currency !== 'USD') return raw
+
+  const breakdown = item?.breakdown || {}
+  const principal = Number(breakdown?.principal_usd)
+  const totalDebit = Number(breakdown?.total_debit_usd)
+  const majorHint = Number.isFinite(principal) && principal > 0 ? principal : Number.isFinite(totalDebit) && totalDebit > 0 ? totalDebit : NaN
+
+  if (Number.isFinite(majorHint)) {
+    if (Math.abs(raw - majorHint) <= 0.01) return raw
+    const scaled = raw / 100
+    if (Math.abs(scaled - majorHint) <= 0.01) return scaled
+  }
+
+  return raw
+}
+
+const toCardReceiptReference = (item: any) => {
+  const explicit = safeStr(item?.reference, '')
+  if (explicit.startsWith('card-evt-')) return explicit
+
+  const id = safeStr(item?.id, '')
+  if (id.startsWith('evt-')) return `card-evt-${id.slice(4)}`
+  if (id.startsWith('card-evt-')) return id
+
+  return safeStr(item?.transaction_reference || explicit, '')
+}
+
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 const normalizeFundingState = (value: any) => {
@@ -696,10 +728,16 @@ const CardDetail = () => {
     (item: any, index: number) => {
       const reference = item?.transaction_reference || item?.reference || item?.id || `${cardsApiId}-${index}`
       const createdAt = item?.created_at || item?.createdAt || ''
-      const amountValue = Number(item?.amount ?? 0)
+      const amountValue = normalizeCardHistoryAmount(item)
       const description = formatHistoryLabel(item)
       const status = String(item?.status || 'pending')
       const breakdown = item?.breakdown || {}
+      const receiptReference = toCardReceiptReference(item)
+
+      if (receiptReference) {
+        router.push({ pathname: '/transaction/receipt', params: { reference: receiptReference } } as any)
+        return
+      }
 
       router.push({
         pathname: '/transaction/card-receipt',
@@ -972,7 +1010,7 @@ const CardDetail = () => {
 
           {historyPayload.map((item: any, index: number) => {
             const createdAt = item?.created_at || item?.createdAt || ''
-            const amountValue = Number(item?.amount ?? 0)
+            const amountValue = normalizeCardHistoryAmount(item)
             const description = formatHistoryLabel(item)
             const merchantSubtitle = historyMerchantSubtitle(item)
             const breakdown = item?.breakdown || {}

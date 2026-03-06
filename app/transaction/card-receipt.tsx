@@ -69,6 +69,29 @@ const breakdownTransactionFee = (breakdown: any) => {
   return Number.isFinite(feeSum) ? Math.max(0, feeSum) : 0
 }
 
+const normalizeUsdEventAmount = (amountRaw: any, breakdown: any, currency: string) => {
+  const raw = Number(amountRaw)
+  if (!Number.isFinite(raw)) return 0
+  if (String(currency || 'USD').toUpperCase() !== 'USD') return raw
+
+  const principal = Number(breakdown?.principal_usd)
+  const totalDebit = Number(breakdown?.total_debit_usd)
+  const majorHint =
+    Number.isFinite(principal) && principal > 0
+      ? principal
+      : Number.isFinite(totalDebit) && totalDebit > 0
+        ? totalDebit
+        : NaN
+
+  if (Number.isFinite(majorHint)) {
+    if (Math.abs(raw - majorHint) <= 0.01) return raw
+    const scaled = raw / 100
+    if (Math.abs(scaled - majorHint) <= 0.01) return scaled
+  }
+
+  return raw
+}
+
 const CardReceipt = () => {
   const router = useRouter()
   const params = useLocalSearchParams()
@@ -132,9 +155,10 @@ const CardReceipt = () => {
 
   const display = useMemo(() => {
     const source = tx || {}
+    const breakdown = source?.breakdown || null
     const createdAt = safeStr(source?.created_at || source?.createdAt, fallbackCreatedAt)
     const status = normalizeStatus(source?.status || fallbackStatus)
-    const amount = Number(source?.amount ?? fallbackAmount ?? 0)
+    const amount = normalizeUsdEventAmount(source?.amount ?? fallbackAmount ?? 0, breakdown, currency)
     const desc = formatLabel(source) || fallbackDesc
 
     const ref =
@@ -142,10 +166,8 @@ const CardReceipt = () => {
       reference ||
       (fallbackId ? `#${fallbackId}` : '')
 
-    const breakdown = source?.breakdown || null
-
     return { createdAt, status, amount, desc, ref, breakdown }
-  }, [tx, fallbackAmount, fallbackCreatedAt, fallbackDesc, fallbackStatus, reference, fallbackId])
+  }, [tx, fallbackAmount, fallbackCreatedAt, fallbackDesc, fallbackStatus, reference, fallbackId, currency])
 
   const [refreshing, setRefreshing] = useState(false)
 

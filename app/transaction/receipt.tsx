@@ -35,6 +35,15 @@ type ReceiptDTO = {
   total_display?: number
   total_amount?: number
   commission_used?: number
+  financials?: {
+    value_amount?: number
+    total_fees?: number
+    wallet_amount_charged?: number
+    total_debit?: number
+    expected_total_debit?: number
+    reconciliation_status?: string
+    [key: string]: any
+  }
   reason?: string
   message?: string
   error?: string
@@ -173,6 +182,10 @@ const ReceiptScreen = () => {
     const isSuccess = ['success', 'completed', 'approved', 'paid'].includes(statusRaw)
     const rewardAmount = Number(raw.reward_applied ?? raw.commission_used ?? 0)
     const baseAmount = Number(raw.amount ?? 0)
+    const backendFinancials = raw.financials && typeof raw.financials === 'object' ? raw.financials : undefined
+    const backendValueAmount = Number(backendFinancials?.value_amount)
+    const backendTotalDebit = Number(backendFinancials?.total_debit ?? backendFinancials?.expected_total_debit)
+    const backendWalletCharged = Number(backendFinancials?.wallet_amount_charged)
     const explicitValueAmount = Number(raw.value_amount)
     const explicitTotalDisplay = Number(raw.total_display)
     const explicitTotalAmount = Number(raw.total_amount)
@@ -181,10 +194,15 @@ const ReceiptScreen = () => {
     const hasExplicitTotalDisplay = Number.isFinite(explicitTotalDisplay)
     const hasExplicitTotalAmount = Number.isFinite(explicitTotalAmount)
     const hasExplicitWalletCharged = Number.isFinite(explicitWalletCharged)
+    const hasBackendValue = Number.isFinite(backendValueAmount)
+    const hasBackendTotalDebit = Number.isFinite(backendTotalDebit)
+    const hasBackendWalletCharged = Number.isFinite(backendWalletCharged)
 
     const computedValue =
       hasExplicitValue
         ? explicitValueAmount
+        : hasBackendValue
+          ? backendValueAmount
         : hasExplicitTotalDisplay
           ? explicitTotalDisplay
           : hasExplicitTotalAmount
@@ -198,6 +216,8 @@ const ReceiptScreen = () => {
     const walletAmount =
       hasExplicitWalletCharged
         ? explicitWalletCharged
+        : hasBackendWalletCharged
+          ? backendWalletCharged
         : hasExplicitTotalAmount
           ? Math.max(0, explicitTotalAmount - Math.max(0, rewardAmount))
           : hasExplicitValue
@@ -282,8 +302,9 @@ const ReceiptScreen = () => {
       value_amount: raw.value_amount ?? computedValue,
       wallet_amount_charged: raw.wallet_amount_charged ?? walletAmount,
       reward_applied: raw.reward_applied ?? rewardAmount,
-      total_display: raw.total_display ?? computedValue,
+      total_display: raw.total_display ?? (hasBackendTotalDebit ? backendTotalDebit : computedValue),
       commission_used: raw.commission_used,
+      financials: backendFinancials,
       reason: failReason,
       timeline: Array.isArray(raw.timeline) ? raw.timeline : [],
     } as ReceiptDTO
@@ -449,6 +470,7 @@ const ReceiptScreen = () => {
               }
                 walletAmount={receipt.wallet_amount_charged}
                 rewardAmount={receipt.reward_applied}
+                financials={receipt.financials}
                 reason={receipt.reason}
                 timeline={receipt.timeline}
               />
