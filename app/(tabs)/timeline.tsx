@@ -308,7 +308,12 @@ const TimelineScreen = () => {
         ).slice(0, 25)
         log('[Timeline] loaded', { count: (list as any[])?.length, kinds })
       }
-    } catch {
+    } catch (error: any) {
+      log('[Timeline] load failed', {
+        status: error?.response?.status,
+        data: error?.response?.data,
+        message: error?.message,
+      })
       setError('Unable to load timeline right now.')
       setItems([])
     } finally {
@@ -339,7 +344,12 @@ const TimelineScreen = () => {
       const cursor = (payload?.next_cursor as string) || (payload as any)?.data?.next_cursor || null
       setItems((prev) => [...prev, ...(list as Record<string, unknown>[])])
       setNextCursor(cursor)
-    } catch {
+    } catch (error: any) {
+      log('[Timeline] next page failed', {
+        status: error?.response?.status,
+        data: error?.response?.data,
+        message: error?.message,
+      })
       setNextCursor(null)
     }
   }
