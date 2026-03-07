@@ -445,24 +445,32 @@ export default function Index() {
     return curated
   }, [tierRank, hasCardAccess])
 
-  const prevsummary = useMemo(
-    () => [
+  const prevsummary = useMemo(() => {
+    const root = ((userProfileData as any)?.data ?? userProfileData ?? {}) as Record<string, any>
+    const wallet = (root?.wallet ?? {}) as Record<string, any>
+    const stats = (wallet?.wallet_stats ?? {}) as Record<string, any>
+
+    return [
       {
         id: 2,
-        label: 'Bought',
-        amount: (userProfileData as any)?.wallet?.total_bills ?? 0,
+        label: 'Bills',
+        amount: Number(stats?.bills_wallet_total ?? wallet?.total_bills ?? 0),
         icon: icons.walletColor,
       },
       {
         id: 3,
-        label: 'Withdrawals',
-        amount: (userProfileData as any)?.wallet?.withdrawn ?? 0,
+        label: 'Transfers',
+        amount: Number(stats?.bank_transfers_total ?? 0),
         icon: icons.withdraw,
       },
-      { id: 4, label: 'Sold', amount: 0, icon: icons.tag },
-    ],
-    [userProfileData]
-  )
+      {
+        id: 4,
+        label: 'Card spend',
+        amount: Number(stats?.card_spend_total ?? 0),
+        icon: icons.tag,
+      },
+    ]
+  }, [userProfileData])
 
   const handleRepurchase = async (id: string) => {
     try {
