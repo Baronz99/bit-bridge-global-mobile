@@ -47,10 +47,36 @@ const getInitials = (value: string) => {
     .toUpperCase()
 }
 
-const getShortName = (value: string) => {
+const maskEmail = (value: string) => {
   const clean = value.trim()
-  if (!clean) return 'Member'
-  return clean.includes('@') ? clean.split('@')[0] : clean
+  if (!clean || !clean.includes('@')) return clean
+  const [local, domain] = clean.split('@')
+  if (!domain) return clean
+  const visible = local.slice(0, 2)
+  const hidden = local.length > 2 ? '*'.repeat(Math.max(2, local.length - 2)) : '**'
+  return `${visible}${hidden}@${domain}`
+}
+
+const formatUsername = (value: string) => {
+  const clean = value.trim().replace(/^@+/, '')
+  return clean ? `@${clean}` : ''
+}
+
+const resolveIdentity = (user?: Record<string, unknown>) => {
+  const displayName = ((user?.display_name as string) || '').trim()
+  const username = ((user?.username as string) || '').trim()
+  const firstName = ((user?.first_name as string) || '').trim()
+  const lastName = ((user?.last_name as string) || '').trim()
+  const fullName = `${firstName} ${lastName}`.trim()
+  const email = ((user?.email as string) || '').trim()
+
+  const primary =
+    displayName || formatUsername(username) || fullName || (email ? maskEmail(email) : 'Member')
+
+  return {
+    primary,
+    maskedEmail: email ? maskEmail(email) : '',
+  }
 }
 
 const directionLabel = (value: string) => {
@@ -90,15 +116,13 @@ const formatTimestamp = (value: string) => {
 const buildActionText = (actor: string, direction: string, kind: string) => {
   const normalizedDirection = direction.toLowerCase()
   const normalizedKind = kind.toLowerCase()
-  const actorName = getShortName(actor)
-
   if (normalizedKind === 'fund' || normalizedDirection === 'credit' || normalizedDirection === 'in') {
-    return `${actorName} funded the circle`
+    return `${actor} funded the circle`
   }
   if (normalizedKind === 'payout' || normalizedDirection === 'debit' || normalizedDirection === 'out') {
-    return `${actorName} paid out to the main wallet`
+    return `${actor} paid out to the main wallet`
   }
-  return `${actorName} moved money in the group`
+  return `${actor} moved money in the group`
 }
 
 type SegmentTab = 'timeline' | 'activities' | 'about'
@@ -108,7 +132,8 @@ type CircleHeaderProps = {
   description: string
   memberCount: number
   role: string
-  ownerEmail: string
+  ownerLabel: string
+  ownerMaskedEmail: string
   canWithdraw: boolean
   balanceCents: number
   currency: string
@@ -121,7 +146,8 @@ const CircleHeader = ({
   description,
   memberCount,
   role,
-  ownerEmail,
+  ownerLabel,
+  ownerMaskedEmail,
   canWithdraw,
   balanceCents,
   currency,
@@ -159,8 +185,11 @@ const CircleHeader = ({
           </Text>
         </View>
         <View className="items-end">
-          {ownerEmail ? (
-            <Text className="text-gray-500 text-[10px]">Owner: {ownerEmail}</Text>
+          {ownerLabel ? (
+            <Text className="text-gray-500 text-[10px]">Owner: {ownerLabel}</Text>
+          ) : null}
+          {ownerMaskedEmail && ownerMaskedEmail !== ownerLabel ? (
+            <Text className="text-gray-500 text-[10px] mt-1">Contact: {ownerMaskedEmail}</Text>
           ) : null}
           {!canWithdraw ? (
             <Text className="text-gray-500 text-[10px] mt-1">Withdrawals are for owners/admins.</Text>
@@ -266,16 +295,15 @@ const SegmentTabs = ({
 type FeedItemProps = {
   record: Record<string, unknown>
   currency: string
-  index: number
 }
 
-const FeedItem = ({ record, currency, index }: FeedItemProps) => {
+const FeedItem = ({ record, currency }: FeedItemProps) => {
   const time = (record.occurred_at as string) || (record.created_at as string) || ''
   const amount = Number(record.amount_cents || 0) / 100
   const direction = (record.direction as string) || (record.kind as string) || 'movement'
   const kind = (record.kind as string) || ''
   const actor = record.user as Record<string, unknown> | undefined
-  const actorLabel = (actor?.email as string) || 'Member'
+  const actorLabel = resolveIdentity(actor).primary
   const actorInitials = getInitials(actorLabel || 'BB')
   const activity = record.circle_activity as Record<string, unknown> | undefined
   const activityName = (activity?.name as string) || ''
@@ -364,18 +392,16 @@ const CircleDetailScreen = () => {
   const role = (circle.current_user_role as string) || 'member'
   const canWithdraw = circle.can_withdraw === true
   const owner = circle.owner as Record<string, unknown> | undefined
-  const ownerEmail = (owner?.email as string) || ''
+  const ownerIdentity = resolveIdentity(owner)
+  const ownerLabel = ownerIdentity.primary
+  const ownerMaskedEmail = ownerIdentity.maskedEmail
   const createdAt = (circle.created_at as string) || ''
 
   const memberInitials = members
     .map((member) => {
       const record = (member ?? {}) as Record<string, unknown>
       const user = record.user as Record<string, unknown> | undefined
-      const displayName =
-        (user?.display_name as string) ||
-        (user?.email as string) ||
-        (user?.first_name as string) ||
-        'Member'
+      const displayName = resolveIdentity(user).primary
       return getInitials(displayName)
     })
     .slice(0, 3)
@@ -413,7 +439,8 @@ const CircleDetailScreen = () => {
               description={description}
               memberCount={memberCount}
               role={role}
-              ownerEmail={ownerEmail}
+              ownerLabel={ownerLabel}
+              ownerMaskedEmail={ownerMaskedEmail}
               canWithdraw={canWithdraw}
               balanceCents={balanceCents}
               currency={currency}
@@ -458,7 +485,6 @@ const CircleDetailScreen = () => {
                     key={String((item as Record<string, unknown>)?.id ?? `tx-${index}`)}
                     record={(item ?? {}) as Record<string, unknown>}
                     currency={currency}
-                    index={index}
                   />
                 ))
               )}
@@ -500,8 +526,11 @@ const CircleDetailScreen = () => {
             <View className="px-4 mt-4">
               <View className="bg-gray-900 border border-gray-800 rounded-2xl p-4">
                 <Text className="text-white text-base font-semibold">About this group</Text>
-                {ownerEmail ? (
-                  <Text className="text-gray-300 text-xs mt-2">Owner: {ownerEmail}</Text>
+                {ownerLabel ? (
+                  <Text className="text-gray-300 text-xs mt-2">Owner: {ownerLabel}</Text>
+                ) : null}
+                {ownerMaskedEmail && ownerMaskedEmail !== ownerLabel ? (
+                  <Text className="text-gray-400 text-xs mt-1">Contact: {ownerMaskedEmail}</Text>
                 ) : null}
                 <Text className="text-gray-300 text-xs mt-1">
                   Members: {memberCount}
@@ -515,11 +544,7 @@ const CircleDetailScreen = () => {
                   {members.slice(0, 6).map((member, index) => {
                     const record = (member ?? {}) as Record<string, unknown>
                     const user = record.user as Record<string, unknown> | undefined
-                    const displayName =
-                      (user?.display_name as string) ||
-                      (user?.email as string) ||
-                      (user?.first_name as string) ||
-                      'Member'
+                    const displayName = resolveIdentity(user).primary
                     return (
                       <View
                         key={`${displayName}-${index}`}

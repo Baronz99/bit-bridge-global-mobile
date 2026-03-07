@@ -25,6 +25,14 @@ export const inviteCircleMember = async (
   return res.data
 }
 
+
+export const updateMyCircleMembership = async (
+  id: string | number,
+  payload: CircleRecord
+): Promise<any> => {
+  const res = await client.patch(`/circles/${id}/memberships/me`, { membership: payload })
+  return res.data
+}
 export const fundCircle = async (
   id: string | number,
   payload: CircleRecord
