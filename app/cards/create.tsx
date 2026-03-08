@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
 import FormInput from '@/components/FormInput'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
-import { getCardSetupStatus, getUserCards, setupCard } from '@/api/cards'
+import { getCardSetupStatus, getUserCards, setupCard, setupCardholder } from '@/api/cards'
 import { uploadSelfieToCloudinary } from '@/api/uploads'
 import { useAuth } from '@/services/useAuth'
 import { resolveUserProfile } from '@/services/auth/resolveUserProfile'
@@ -310,13 +310,57 @@ const CreateCard = () => {
         setLoading(false)
         return
       }
-      const selfieUrl = await ensureSelfieUrl()
+      const cardholderPayload: any = {
+        ...payload,
+        registration_mode: 'async',
+        id_type: 'NIGERIAN_BVN_VERIFICATION',
+      }
+      if (selfieLocalUri || selfieImageUrl) {
+        cardholderPayload.selfie_image = await ensureSelfieUrl()
+      }
+
+      const cardholderRes = await setupCardholder(cardholderPayload, nextIdempotencyKey())
+      const cardholderState = String(cardholderRes?.state || '').toLowerCase()
+      const cardholderData = cardholderRes?.data || {}
+
+      if (cardholderState === 'needs_selfie_upload') {
+        setNotice('Selfie is required to verify cardholder. Upload a selfie and retry.')
+        setLoading(false)
+        return
+      }
+
+      if (cardholderState === 'cardholder_profile_incomplete') {
+        const missing = Array.isArray(cardholderData?.missing_fields) ? cardholderData.missing_fields.join(', ') : ''
+        setNotice(missing ? `Complete required fields: ${missing}` : (cardholderRes?.message || 'Complete required profile fields.'))
+        setLoading(false)
+        return
+      }
+
+      if (cardholderState === 'cardholder_pending' || cardholderState === 'provider_pending') {
+        await refreshCardholderState()
+        setNotice(cardholderRes?.message || 'Cardholder verification is pending. Please refresh status shortly.')
+        setLoading(false)
+        return
+      }
+
+      if (cardholderState === 'cardholder_failed') {
+        setNotice(cardholderRes?.message || 'Cardholder verification failed. Update profile details and retry.')
+        setLoading(false)
+        return
+      }
+
+      if (cardholderState !== 'cardholder_verified' && cardholderState !== 'active') {
+        await refreshCardholderState()
+        setNotice(cardholderRes?.message || 'Cardholder setup incomplete. Please retry.')
+        setLoading(false)
+        return
+      }
+
       const setupRes = await setupCard(
         {
           ...payload,
           registration_mode: 'async',
           id_type: 'NIGERIAN_BVN_VERIFICATION',
-          selfie_image: selfieUrl,
           wallet_type: 'usd',
           currency: form.currency || 'USD',
           card_limit: normalizedCardLimit,

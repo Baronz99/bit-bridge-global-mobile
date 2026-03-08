@@ -90,6 +90,43 @@ export const setupCard = async (
   }
 }
 
+export const setupCardholder = async (
+  payload: {
+    first_name: string
+    last_name: string
+    email: string
+    phone_number: string
+    address_line1?: string
+    city?: string
+    state?: string
+    postal_code?: string
+    country?: string
+    registration_mode?: 'async' | 'sync'
+    id_type?: string
+    bvn?: string
+    selfie_image?: string
+    id_no?: string
+    id_image?: string
+  },
+  idempotencyKey: string
+) => {
+  const endpoint = '/cards/setup_cardholder'
+  try {
+    const res = await client.post(
+      endpoint,
+      { card: payload },
+      {
+        headers: {
+          'X-Idempotency-Key': idempotencyKey,
+        },
+      }
+    )
+    return res.data
+  } catch (err: any) {
+    throw buildApiError(err, 'Failed to setup cardholder', endpoint)
+  }
+}
+
 export const getCardSetupStatus = async () => {
   const endpoint = '/cards/setup_status'
   try {
