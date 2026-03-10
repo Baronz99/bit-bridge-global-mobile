@@ -50,6 +50,7 @@ export type BvnVerifyResponse = {
   verified_at?: string
   reason_code?: string
   reason?: string
+  mismatch_fields?: string[]
   display?: {
     severity?: 'info' | 'success' | 'warning' | 'error'
     title?: string
@@ -229,3 +230,4 @@ export const submitTier3Liveness = async (image: string) => {
   const res = await client.post('/verification/tier3/liveness', { image })
   return res.data as Tier3LivenessResponse
 }
+

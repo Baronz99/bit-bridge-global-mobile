@@ -9,6 +9,12 @@ import { FEATURE_BVN, FEATURE_KYC_CENTER } from '@/constants/featureFlags'
 const getErrorMessage = (err: any) =>
   err?.response?.data?.message || err?.message || 'Something went wrong'
 
+const mismatchFieldLabels: Record<string, string> = {
+  first_name: 'First name',
+  last_name: 'Last name',
+  date_of_birth: 'Date of birth',
+}
+
 export default function BvnScreen() {
   const router = useRouter()
   const { loadProfile } = useAuth()
@@ -83,6 +89,17 @@ export default function BvnScreen() {
           <Text className="text-gray-300 mt-1">Status: {result.status}</Text>
           {result.display?.title ? <Text className="text-gray-200 mt-2 font-semibold">{result.display.title}</Text> : null}
           {result.display?.message ? <Text className="text-gray-400 mt-1">{result.display.message}</Text> : null}
+          {result.mismatch_fields?.length ? (
+            <View className="flex-row flex-wrap gap-2 mt-3">
+              {result.mismatch_fields.map((field) => (
+                <View key={field} className="px-3 py-1 rounded-full border border-orange-500/40 bg-orange-500/10">
+                  <Text className="text-orange-300 text-xs font-medium">
+                    {mismatchFieldLabels[field] ?? field.replace(/_/g, ' ')}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
           {!result.display?.message && result.message ? <Text className="text-gray-400 mt-1">{result.message}</Text> : null}
           {!result.display?.message && !result.message && result.reason ? (
             <Text className="text-gray-400 mt-1">Reason: {result.reason}</Text>
@@ -111,3 +128,4 @@ export default function BvnScreen() {
     </ScrollView>
   )
 }
+
