@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native'
 import React, { useEffect, useRef, useState } from 'react'
-import { userProfileUpdate } from '@/api/auth'
+import { confirmEmailChange, requestEmailChange, userProfileUpdate } from '@/api/auth'
 import { useAuth } from '@/services/useAuth'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
 import FormInput from '@/components/FormInput'
@@ -20,6 +20,9 @@ import Loader from '@/components/Loader'
 import AppAlert from '@/components/app-notification/AppAlert'
 import DateTimePicker from '@react-native-community/datetimepicker'
 import FormSelect from '@/components/FormSelect'
+import AppModal from '@/components/modal/Modal'
+import { router } from 'expo-router'
+import { setConfirmationFlow, setEmailForVerification } from '@/auth/tokenstore'
 
 const countryOptions = [
   'Nigeria',
@@ -433,9 +436,7 @@ const DateField = ({
             })
           : 'Add date of birth'}
       </Text>
-      <Text className="text-gray-500 text-lg" style={{ lineHeight: 20 }}>
-        ›
-      </Text>
+      <Text className="text-gray-500 text-lg" style={{ lineHeight: 20 }}>{'>'}</Text>
     </TouchableOpacity>
   </View>
 )
@@ -498,7 +499,90 @@ const index = () => {
   const [isEditing, setIsEditing] = useState(false)
   const [showDatePicker, setShowDatePicker] = useState(false)
   const [dateValue, setDateValue] = useState<Date | null>(null)
+  const [emailChangeOpen, setEmailChangeOpen] = useState(false)
+  const [emailChangeStep, setEmailChangeStep] = useState<'request' | 'verify'>('request')
+  const [emailChangeForm, setEmailChangeForm] = useState({
+    new_email: '',
+    current_password: '',
+    phone_otp_code: '',
+  })
+  const [emailChangeLoading, setEmailChangeLoading] = useState(false)
   const initialSnapshotRef = useRef<string>('')
+
+  const resetEmailChangeFlow = () => {
+    setEmailChangeOpen(false)
+    setEmailChangeStep('request')
+    setEmailChangeForm({
+      new_email: '',
+      current_password: '',
+      phone_otp_code: '',
+    })
+  }
+
+  const handleRequestEmailChange = async () => {
+    setEmailChangeLoading(true)
+    try {
+      const newEmail = emailChangeForm.new_email.trim().toLowerCase()
+      const currentPassword = emailChangeForm.current_password.trim()
+
+      if (!newEmail || !currentPassword) {
+        throw new Error('Enter your new email and current password.')
+      }
+
+      const result = await requestEmailChange({
+        new_email: newEmail,
+        current_password: currentPassword,
+      })
+
+      setEmailChangeStep('verify')
+      setAlertState({
+        error: false,
+        message: result?.message || 'Verification code sent to your verified phone.',
+      })
+    } catch (error: any) {
+      setAlertState({
+        error: true,
+        message: error?.message || 'Unable to request email change.',
+      })
+    } finally {
+      setEmailChangeLoading(false)
+    }
+  }
+
+  const handleConfirmEmailChange = async () => {
+    setEmailChangeLoading(true)
+    try {
+      const newEmail = emailChangeForm.new_email.trim().toLowerCase()
+      const currentPassword = emailChangeForm.current_password.trim()
+      const phoneOtpCode = emailChangeForm.phone_otp_code.trim()
+
+      if (!newEmail || !currentPassword || !phoneOtpCode) {
+        throw new Error('Enter the verification code sent to your phone.')
+      }
+
+      const result = await confirmEmailChange({
+        new_email: newEmail,
+        current_password: currentPassword,
+        phone_otp_code: phoneOtpCode,
+      })
+
+      await setEmailForVerification(newEmail)
+      await setConfirmationFlow('email-change')
+      resetEmailChangeFlow()
+      setAlertState({
+        error: false,
+        message: result?.message || 'Confirm the new email from your inbox.',
+      })
+      router.push({ pathname: '/confirmEmail', params: { flow: 'email-change', email: newEmail } })
+    } catch (error: any) {
+      setAlertState({
+        error: true,
+        message: error?.message || 'Unable to confirm email change.',
+      })
+    } finally {
+      setEmailChangeLoading(false)
+    }
+  }
 
   const handleUpdate = async () => {
     const payload = fromFormToApiPayload(formInput)
@@ -698,6 +782,18 @@ const index = () => {
                 <SectionCard title="Contact">
                   <ReadOnlyField label="Email" value={formInput.email} icon={icons.email} />
 
+                  <TouchableOpacity
+                    className={`rounded-2xl border px-4 py-3 ${phoneVerified ? 'border-app-primary/40 bg-app-primary/10' : 'border-gray-700 bg-gray-900'}`}
+                    onPress={() => setEmailChangeOpen(true)}
+                  >
+                    <Text className={`${phoneVerified ? 'text-app-primary' : 'text-gray-300'} text-sm font-semibold`}>
+                      Change email
+                    </Text>
+                    <Text className="text-gray-400 text-xs mt-1">
+                      Requires your current password and a code sent to your verified phone.
+                    </Text>
+                  </TouchableOpacity>
+
                   {isEditing ? (
                     <Field
                       label="Phone"
@@ -817,6 +913,88 @@ const index = () => {
       </View>
 
       <Loader open={loading} />
+      <Loader open={emailChangeLoading} />
+
+      <AppModal open={emailChangeOpen} onclose={resetEmailChangeFlow}>
+        <View className="bg-[#0f172a] w-full rounded-2xl px-4 py-5 border border-[rgba(255,255,255,0.08)]">
+          <Text className="text-white text-center text-xl font-semibold">
+            {emailChangeStep === 'request' ? 'Change email' : 'Verify phone code'}
+          </Text>
+          <Text className="text-gray-400 text-center text-sm mt-2 mb-5">
+            {emailChangeStep === 'request'
+              ? 'Enter your new email and current password. We will send a code to your verified phone.'
+              : 'Enter the phone verification code, then check your new email inbox to finish the change.'}
+          </Text>
+
+          <FormInput
+            label="New email"
+            icon="mail"
+            value={emailChangeForm.new_email}
+            placeHolder="name@example.com"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            onChangeText={(value: string) =>
+              setEmailChangeForm((prev) => ({ ...prev, new_email: value }))
+            }
+          />
+
+          <FormInput
+            label="Current password"
+            icon="lock"
+            value={emailChangeForm.current_password}
+            placeHolder="Enter current password"
+            secureTextEntry
+            onChangeText={(value: string) =>
+              setEmailChangeForm((prev) => ({ ...prev, current_password: value }))
+            }
+          />
+
+          {emailChangeStep === 'verify' ? (
+            <FormInput
+              label="Phone OTP"
+              icon="number"
+              value={emailChangeForm.phone_otp_code}
+              placeHolder="Enter 6-digit code"
+              keyboardType="number-pad"
+              maxLength={6}
+              onChangeText={(value: string) =>
+                setEmailChangeForm((prev) => ({ ...prev, phone_otp_code: value.replace(/[^0-9]/g, '') }))
+              }
+            />
+          ) : null}
+
+          <View className="flex-row gap-3 mt-2">
+            <TouchableOpacity
+              className="flex-1 bg-gray-900 border border-gray-700 rounded-xl py-3"
+              onPress={resetEmailChangeFlow}
+            >
+              <Text className="text-white text-center font-semibold">Cancel</Text>
+            </TouchableOpacity>
+
+            {emailChangeStep === 'request' ? (
+              <TouchableOpacity
+                className="flex-1 bg-app-primary rounded-xl py-3"
+                onPress={handleRequestEmailChange}
+              >
+                <Text className="text-black text-center font-semibold">Send code</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                className="flex-1 bg-app-primary rounded-xl py-3"
+                onPress={handleConfirmEmailChange}
+              >
+                <Text className="text-black text-center font-semibold">Confirm email</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {emailChangeStep === 'verify' ? (
+            <TouchableOpacity className="mt-4" onPress={handleRequestEmailChange}>
+              <Text className="text-app-primary text-center text-sm font-semibold">Resend phone code</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      </AppModal>
 
       <AppAlert
         message={alertState.message}
@@ -828,3 +1006,4 @@ const index = () => {
 }
 
 export default index
+

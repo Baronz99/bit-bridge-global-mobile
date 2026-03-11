@@ -4,6 +4,7 @@ export const TOKEN_KEY = 'bitglobal'
 export const REFRESH_TOKEN_KEY = 'refresh-token'
 export const EMAIL_KEY = 'email'
 export const AUTH_REDIRECT_KEY = 'auth-redirect'
+export const CONFIRMATION_FLOW_KEY = 'confirmation-flow'
 
 const normalizeToken = (raw?: string | null) => {
   if (!raw) return null
@@ -53,6 +54,21 @@ export const setEmailForVerification = async (email: string) => {
   await SecureStore.setItemAsync(EMAIL_KEY, clean)
 }
 
+export const setConfirmationFlow = async (flow: string) => {
+  const clean = String(flow || '').trim()
+  if (!clean) return
+  await SecureStore.setItemAsync(CONFIRMATION_FLOW_KEY, clean)
+}
+
+export const getConfirmationFlow = async () => {
+  const raw = await SecureStore.getItemAsync(CONFIRMATION_FLOW_KEY)
+  return raw ? String(raw) : null
+}
+
+export const clearConfirmationFlow = async () => {
+  await SecureStore.deleteItemAsync(CONFIRMATION_FLOW_KEY)
+}
+
 export const setAuthRedirect = async (path: string) => {
   const clean = String(path || '').trim()
   if (!clean) return
@@ -71,3 +87,4 @@ export const consumeAuthRedirect = async () => {
   }
   return raw ? String(raw) : null
 }
+
