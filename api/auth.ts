@@ -113,6 +113,41 @@ export const sendUserConfirmation = async (email: string) => {
   }
 }
 
+export type RequestEmailChangePayload = {
+  new_email: string
+  current_password: string
+}
+
+export type ConfirmEmailChangePayload = {
+  new_email: string
+  current_password: string
+  phone_otp_code: string
+}
+
+export const requestEmailChange = async (payload: RequestEmailChangePayload) => {
+  try {
+    const response = await client.post('/users/request_email_change', payload)
+    return response.data
+  } catch (error: any) {
+    if (error?.response) {
+      throw new Error(error.response.data?.message || 'Unable to request email change')
+    }
+    throw new Error('Unable to request email change')
+  }
+}
+
+export const confirmEmailChange = async (payload: ConfirmEmailChangePayload) => {
+  try {
+    const response = await client.post('/users/confirm_email_change', payload)
+    return response.data
+  } catch (error: any) {
+    if (error?.response) {
+      throw new Error(error.response.data?.message || 'Unable to confirm email change')
+    }
+    throw new Error('Unable to confirm email change')
+  }
+}
+
 export const confirmEmailToken = async (confirmationToken: string) => {
   try {
     const response = await client.request({
@@ -171,3 +206,4 @@ export const confirmPasswordReset = async (payload: {
     throw new Error('Something went wrong')
   }
 }
+
