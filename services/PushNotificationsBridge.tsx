@@ -1,8 +1,10 @@
 import { useEffect, useRef } from 'react'
 import { Platform } from 'react-native'
 import Constants from 'expo-constants'
+import { useRouter } from 'expo-router'
 
 import { registerNotificationDevice, unregisterNotificationDevice } from '@/api/notifications'
+import { resolveElectricityRouteFromServiceKey } from '@/api/serviceAvailability'
 import { useAuth } from '@/services/useAuth'
 import { log } from '@/utils/logger'
 
@@ -66,6 +68,7 @@ const getExpoPushToken = async (): Promise<string | null> => {
 }
 
 export default function PushNotificationsBridge() {
+  const router = useRouter()
   const { authenticated, token: accessToken, user } = useAuth()
   const registeredTokenRef = useRef<string | null>(null)
 
@@ -100,6 +103,22 @@ export default function PushNotificationsBridge() {
 
     const response = Notifications.addNotificationResponseReceivedListener((notificationResponse) => {
       log('[PUSH] tapped', { notificationResponse })
+
+      const data = (notificationResponse as any)?.notification?.request?.content?.data || {}
+      const deeplink = String(data?.deeplink || '').trim()
+      const serviceKey = String(data?.resource_id || data?.service_key || '').trim().toUpperCase()
+
+      if (serviceKey.endsWith('_ELECTRICITY')) {
+        const route = resolveElectricityRouteFromServiceKey(serviceKey)
+        if (route) {
+          router.push(route as any)
+          return
+        }
+      }
+
+      if (deeplink) {
+        router.push(deeplink as any)
+      }
     })
 
     return () => {

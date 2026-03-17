@@ -9,16 +9,18 @@ import {
   View,
 } from 'react-native'
 import Constants from 'expo-constants'
+import { LinearGradient } from 'expo-linear-gradient'
 import { Link, useRouter } from 'expo-router'
 import { AntDesign, Feather } from '@expo/vector-icons'
 
 import { getUserOrders } from '@/api/orders'
 import { getRescentPurchaseOrder, repurchaseOrder } from '@/api/billOrder'
+import { getUserCards } from '@/api/cards'
 import { getTransactions } from '@/api/transactions'
 import { listTimeline } from '@/api/timeline'
+import { getUserWallet } from '@/api/wallet'
 
 import { icons } from '@/constants/icons'
-import { images } from '@/constants/images'
 
 import { useAuth } from '@/services/useAuth'
 import { useBalancePrivacy } from '@/services/useBalancePrivacy'
@@ -34,7 +36,7 @@ import NotificationAlert from '@/components/notification'
 import useNotification from '@/hooks/useNotification'
 import ScreenContainer from '@/components/ScreenContainer'
 import ViewBox from '@/components/view-box/ViewBoxIcon'
-import { FEATURE_LEGACY_HOME } from '@/constants/featureFlags'
+import { FEATURE_CIRCLES, FEATURE_LEGACY_HOME } from '@/constants/featureFlags'
 import { getTierFromProfile, isTierEligibleForBankTransfer } from '@/utils/bankTransfer'
 import { log } from '@/utils/logger'
 import { resolveTransferLifecycle } from '@/utils/transferLifecycle'
@@ -204,7 +206,7 @@ const getHomeRowSubtitle = (t: TimelineItem) => {
 
   if (biller) return biller
   if (service) return service
-  if (bank && addr) return `${bank} - ${addr}`
+  if (bank && addr) return `${bank} â€¢ ${addr}`
   if (bank) return bank
   if (addr) return addr
   if (circle) return circle
@@ -247,7 +249,7 @@ export default function Index() {
   const [sendOpen, setSendOpen] = useState(false)
   const [loader, setLoader] = useState(false)
 
-  // Recent Activity toggle (money vs all)
+  // âœ… Recent Activity toggle (money vs all)
   const [activityMode, setActivityMode] = useState<'money' | 'all'>('money')
 
   useEffect(() => {
@@ -274,12 +276,12 @@ export default function Index() {
   const fetchRecentPurchases = useCallback(() => getRescentPurchaseOrder(), [])
   const fetchRecentOrders = useCallback(() => getUserOrders(), [])
 
-  // Old deposits-only transactions (kept, but not main "Recent Activity")
+  // Old deposits-only transactions (kept, but not main â€œRecent Activityâ€)
   const fetchRecentTransactions = useCallback(() => {
     return getTransactions({ params: { transaction_type: 'deposit' } })
   }, [])
 
-  // Recent Activity from Timeline - Home should NOT be noisy
+  // âœ… Recent Activity from Timeline â€” Home should NOT be noisy
   const fetchRecentTimeline = useCallback(() => {
     // IMPORTANT: for Home, show_alerts should be false for bank-grade signal
     return listTimeline({ limit: 25, show_alerts: false } as any)
@@ -299,15 +301,16 @@ export default function Index() {
     loading: timelineLoading,
     error: timelineError,
   } = useFetch(fetchRecentTimeline, true)
+  const { data: walletData, refetch: refetchWalletData } = useFetch(() => getUserWallet(), true)
+  const { data: cardsRaw, refetch: refetchCards } = useFetch(() => getUserCards(), true)
 
   const onRefresh = useCallback(() => {
     setRefreshing(true)
-    loadProfile({ force: true })
-      .catch(() => {})
+    Promise.allSettled([loadProfile({ force: true }), refetchWalletData(), refetchCards()])
       .finally(() => {
         setTimeout(() => setRefreshing(false), 700)
       })
-  }, [loadProfile])
+  }, [loadProfile, refetchCards, refetchWalletData])
 
   // -------- Quick services --------
   const quickItems = useMemo(
@@ -529,6 +532,31 @@ export default function Index() {
     ? maskFormattedAmount(bridgeBalanceLabel)
     : bridgeBalanceLabel
   const commissionDisplay = balancesHidden ? maskFormattedAmount(commissionLabel) : commissionLabel
+  const tunnelWallet = useMemo(() => {
+    const payload = (walletData as any)?.data ?? walletData
+    return payload?.tunnel ?? payload?.data?.tunnel ?? null
+  }, [walletData])
+  const tunnelHasLiveState = Boolean(tunnelWallet)
+  const tunnelBalanceValue = Number(tunnelWallet?.balance ?? tunnelWallet?.amount ?? NaN)
+  const tunnelBalanceLabel = moneyFormat(
+    Number.isFinite(tunnelBalanceValue) ? tunnelBalanceValue : 0,
+    'USD'
+  )
+  const tunnelBalanceDisplay = balancesHidden
+    ? maskFormattedAmount(tunnelBalanceLabel)
+    : tunnelBalanceLabel
+  const tunnelCards = useMemo(() => {
+    const payload = (cardsRaw as any)?.data ?? cardsRaw
+    if (Array.isArray(payload)) return payload
+    if (Array.isArray(payload?.cards)) return payload.cards
+    if (Array.isArray(payload?.data)) return payload.data
+    if (Array.isArray(payload?.data?.cards)) return payload.data.cards
+    if (Array.isArray(payload?.results)) return payload.results
+    if (payload?.card) return [payload.card]
+    if (payload?.card_id) return [payload]
+    return []
+  }, [cardsRaw])
+  const tunnelCardsCount = tunnelCards.length
 
   const goToTimeline = useCallback(() => {
     router.push('/(tabs)/timeline' as any)
@@ -568,14 +596,23 @@ export default function Index() {
           ),
         }}
       >
-        <Image source={images.bg} className="absolute top-0 w-full z-0" />
+        <LinearGradient
+          colors={['#05070D', '#0A0D14', '#111827']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          className="absolute inset-0"
+        />
 
         <View className="flex-1">
-          {/* Header wallet card */}
-          <View className="rounded-3xl border border-gray-800 bg-gray-900/80 p-5 overflow-hidden">
+          {/* Bridge rail card */}
+          <View
+            className="overflow-hidden rounded-[30px] border bg-[#0f131b]/92 p-5"
+            style={{ borderColor: 'rgba(47, 107, 255, 0.35)' }}
+          >
             <View className="flex-row justify-between items-start">
               <View>
-                <Text className="text-white/70 text-xs tracking-widest uppercase">Bridge Wallet</Text>
+                <Text className="text-white text-2xl font-semibold">Bridge</Text>
+                <Text className="text-white/60 text-sm mt-1">Local NGN rail.</Text>
                 <Text className="text-white text-3xl font-semibold mt-2">
                   {bridgeBalanceDisplay}
                 </Text>
@@ -595,20 +632,21 @@ export default function Index() {
                   onPress={() => {
                     void toggleBalancesVisibility()
                   }}
-                  className="gap-2 items-center rounded-full flex-row py-1.5 px-3 bg-black/30 border border-white/15"
+                  className="gap-2 items-center rounded-full flex-row py-1.5 px-3 bg-black/25 border"
+                  style={{ borderColor: 'rgba(255,255,255,0.12)' }}
                 >
                   <Feather name={balancesHidden ? 'eye-off' : 'eye'} size={12} color="white" />
                   <Text className="text-white text-xs">{balancesHidden ? 'Show balances' : 'Hide balances'}</Text>
                 </TouchableOpacity>
                 <Link href={'/history' as any} asChild>
-                  <TouchableOpacity className="gap-2 items-center rounded-full flex-row py-1 px-3 bg-gray-900/60 border border-gray-800">
+                  <TouchableOpacity className="gap-2 items-center rounded-full flex-row py-1 px-3 bg-black/20 border" style={{ borderColor: 'rgba(47, 107, 255, 0.18)' }}>
                     <Text className="text-white text-xs">History</Text>
                     <Feather name="arrow-right" size={12} color="white" />
                   </TouchableOpacity>
                 </Link>
 
                 <Link href={'/fundWallet' as any} asChild>
-                  <TouchableOpacity className="bg-app-primary rounded-full py-2 px-3">
+                  <TouchableOpacity className="rounded-full py-2 px-3" style={{ backgroundColor: '#2F6BFF' }}>
                     <Text className="text-white text-xs">Fund Wallet</Text>
                   </TouchableOpacity>
                 </Link>
@@ -618,14 +656,23 @@ export default function Index() {
             <View className="flex-row gap-2 mt-5">
               <TouchableOpacity
                 onPress={() => setSendOpen(true)}
-                className="bg-gray-900/80 border border-gray-800 rounded-full py-2 px-3 flex-1"
+                className="rounded-full py-2 px-3 flex-1 border bg-black/20"
+                style={{ borderColor: 'rgba(47, 107, 255, 0.2)' }}
               >
                 <Text className="text-white text-center text-xs">Send money</Text>
               </TouchableOpacity>
 
-              <Link href={'/convert-ngn-to-usd' as any} asChild>
-                <TouchableOpacity className="bg-gray-900/80 border border-gray-800 rounded-full py-2 px-3 flex-1">
-                  <Text className="text-white text-center text-xs">Convert</Text>
+              {FEATURE_CIRCLES ? (
+                <Link href={'/circles' as any} asChild>
+                  <TouchableOpacity className="rounded-full py-2 px-3 flex-1 border bg-black/20" style={{ borderColor: 'rgba(47, 107, 255, 0.2)' }}>
+                    <Text className="text-white text-center text-xs">Circles</Text>
+                  </TouchableOpacity>
+                </Link>
+              ) : null}
+
+              <Link href={'/anchor-account' as any} asChild>
+                <TouchableOpacity className="rounded-full py-2 px-3 flex-1 border bg-black/20" style={{ borderColor: 'rgba(47, 107, 255, 0.2)' }}>
+                  <Text className="text-white text-center text-xs">Receive NGN</Text>
                 </TouchableOpacity>
               </Link>
             </View>
@@ -633,10 +680,73 @@ export default function Index() {
             <View className="mt-3">
               <TouchableOpacity
                 onPress={() => setOpenStarted(true)}
-                className="bg-gray-900/70 border border-gray-800 py-3 rounded-xl"
+                className="py-3 rounded-xl border bg-black/20"
+                style={{ borderColor: 'rgba(47, 107, 255, 0.2)' }}
               >
-                <Text className="text-white text-center">Explore services</Text>
+                <Text className="text-white text-center">All Bridge actions</Text>
               </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Tunnel rail card */}
+          <View
+            className="mt-5 mx-2 overflow-hidden rounded-[30px] border bg-[#0f131b]/92 p-4"
+            style={{ borderColor: 'rgba(255, 154, 31, 0.34)' }}
+          >
+            <View className="flex-row items-start justify-between gap-4">
+              <View className="flex-1">
+                <Text className="text-white text-xl font-semibold">Tunnel</Text>
+                <Text className="text-white/60 text-sm mt-1">
+                  {tunnelHasLiveState ? 'Global USD access.' : 'Activation and access rail.'}
+                </Text>
+              </View>
+              <Link href={(tunnelHasLiveState ? '/(tabs)/wallet' : '/tunnel-activation') as any} asChild>
+                <TouchableOpacity className="rounded-full border bg-black/20 px-3 py-2" style={{ borderColor: 'rgba(255, 154, 31, 0.2)' }}>
+                  <Text className="text-white text-xs">
+                    {tunnelHasLiveState ? 'View wallet' : 'Start activation'}
+                  </Text>
+                </TouchableOpacity>
+              </Link>
+            </View>
+
+            {tunnelHasLiveState ? (
+              <View className="mt-4">
+                <Text className="text-white text-2xl font-semibold">{tunnelBalanceDisplay}</Text>
+                <Text className="text-white/55 text-xs mt-1">
+                  {tunnelCardsCount > 0
+                    ? `${tunnelCardsCount} active card${tunnelCardsCount === 1 ? '' : 's'} linked to Tunnel`
+                    : 'USD wallet live. Cards available when you need them.'}
+                </Text>
+              </View>
+            ) : (
+              <View className="mt-4 rounded-2xl border px-3 py-3" style={{ borderColor: 'rgba(255, 154, 31, 0.18)', backgroundColor: 'rgba(0, 0, 0, 0.18)' }}>
+                <Text className="text-white text-sm font-medium">Tunnel not active yet</Text>
+                <Text className="text-white/60 text-xs mt-1">
+                  Activate Tunnel to unlock a USD balance, conversion, and card access.
+                </Text>
+              </View>
+            )}
+
+            <View className="flex-row gap-2 mt-5">
+              <Link href={'/convert-ngn-to-usd' as any} asChild>
+                <TouchableOpacity className="rounded-full py-2 px-3 flex-1 border bg-black/20" style={{ borderColor: 'rgba(255, 154, 31, 0.2)' }}>
+                  <Text className="text-white text-center text-xs">Convert</Text>
+                </TouchableOpacity>
+              </Link>
+
+              <Link href={'/cards' as any} asChild>
+                <TouchableOpacity className="rounded-full py-2 px-3 flex-1 border bg-black/20" style={{ borderColor: 'rgba(255, 154, 31, 0.2)' }}>
+                  <Text className="text-white text-center text-xs">Cards</Text>
+                </TouchableOpacity>
+              </Link>
+
+              <Link href={(tunnelHasLiveState ? '/(tabs)/wallet' : '/tunnel-activation') as any} asChild>
+                <TouchableOpacity className="rounded-full py-2 px-3 flex-1 border bg-black/20" style={{ borderColor: 'rgba(255, 154, 31, 0.2)' }}>
+                  <Text className="text-white text-center text-xs">
+                    {tunnelHasLiveState ? 'Funding' : 'Activation'}
+                  </Text>
+                </TouchableOpacity>
+              </Link>
             </View>
           </View>
 
@@ -679,13 +789,16 @@ export default function Index() {
             </Link>
           ) : null}
 
-          {/* Quick services */}
-          <View className="mt-2">
+          {/* Bridge utilities */}
+          <View className="mt-6 rounded-[24px] border border-gray-800/70 bg-gray-950/35 p-4">
             <View className="flex-row items-center justify-between">
-              <Text className="text-white text-lg font-semibold">Quick services</Text>
-              <Link href={'/(tabs)/service' as any} asChild>
+              <View>
+                <Text className="text-white text-lg font-semibold">Bridge utilities</Text>
+                <Text className="text-gray-400 text-xs mt-1">Everyday local payments and account tools.</Text>
+              </View>
+              <Link href={'/(tabs)/bridge' as any} asChild>
                 <TouchableOpacity>
-                  <Text className="text-alt font-medium">Browse all</Text>
+                  <Text className="text-alt font-medium">All Bridge tools</Text>
                 </TouchableOpacity>
               </Link>
             </View>
@@ -762,7 +875,7 @@ export default function Index() {
             </View>
           ) : null}
 
-          {/* Recent Activity (Bank-grade Home Rows) */}
+          {/* âœ… Recent Activity (Bank-grade Home Rows) */}
           <View className="mb-8">
             <View className="flex-row items-center justify-between mb-3">
               <Text className="text-white text-lg font-semibold">Recent Activity</Text>
@@ -894,7 +1007,7 @@ export default function Index() {
             ) : null}
           </View>
 
-          {/* Existing horizontal "recent purchases" list (kept) */}
+          {/* Existing horizontal â€œrecent purchasesâ€ list (kept) */}
           <View>
             {recentPurchasesLoading ? (
               <ActivityIndicator />
@@ -971,8 +1084,8 @@ export default function Index() {
       {/* Explore services modal */}
       <AppModal open={getstarted} onclose={() => setOpenStarted(false)}>
         <View className="bg-gray-900 p-6 rounded-2xl w-full max-w-md">
-          <Text className="text-white text-xl font-semibold text-center mb-2">Explore services</Text>
-          <Text className="text-gray-300 text-center mb-5">Recommended for you</Text>
+          <Text className="text-white text-xl font-semibold text-center mb-2">Explore rails</Text>
+          <Text className="text-gray-300 text-center mb-5">Recommended actions across Bridge and Tunnel.</Text>
 
           <View className="flex-row flex-wrap -mx-2">
             {recommendedServices.map((item) => (
@@ -993,11 +1106,11 @@ export default function Index() {
           <TouchableOpacity
             onPress={() => {
               setOpenStarted(false)
-              router.push('/(tabs)/service' as any)
+              router.push('/(tabs)/bridge' as any)
             }}
             className="bg-app-primary py-3 rounded-xl items-center mt-5"
           >
-            <Text className="text-white font-medium">Browse all services</Text>
+            <Text className="text-white font-medium">Open Bridge hub</Text>
           </TouchableOpacity>
         </View>
       </AppModal>
@@ -1055,3 +1168,6 @@ const LabelText = ({ label, value }: any) => (
     <Text className="text-white text-center">{value}</Text>
   </View>
 )
+
+
+

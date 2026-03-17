@@ -30,3 +30,52 @@ export async function unregisterNotificationDevice(token: string) {
   })
   return res.data
 }
+
+type ServiceStatusSubscriptionPayload = {
+  provider?: string
+  service_key: string
+  channel?: string
+  expires_in_hours?: number
+  metadata?: Record<string, unknown>
+}
+
+export async function getServiceStatusSubscriptionStatus(params: {
+  provider?: string
+  service_key: string
+  channel?: string
+}) {
+  const res = await client.get('/notifications/service_status_subscriptions', {
+    params: {
+      provider: params.provider || 'buypower',
+      service_key: params.service_key,
+      channel: params.channel || 'push',
+    },
+  })
+  return res.data?.data
+}
+
+export async function subscribeToServiceStatusAlerts(payload: ServiceStatusSubscriptionPayload) {
+  const res = await client.post('/notifications/service_status_subscriptions', {
+    provider: payload.provider || 'buypower',
+    service_key: payload.service_key,
+    channel: payload.channel || 'push',
+    expires_in_hours: payload.expires_in_hours || 72,
+    metadata: payload.metadata || {},
+  })
+  return res.data?.data
+}
+
+export async function unsubscribeFromServiceStatusAlerts(params: {
+  provider?: string
+  service_key: string
+  channel?: string
+}) {
+  const res = await client.delete('/notifications/service_status_subscriptions', {
+    data: {
+      provider: params.provider || 'buypower',
+      service_key: params.service_key,
+      channel: params.channel || 'push',
+    },
+  })
+  return res.data?.data
+}

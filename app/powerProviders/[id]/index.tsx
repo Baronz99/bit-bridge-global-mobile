@@ -3,17 +3,24 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Switch,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native'
-import React, { useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { images } from '@/constants/images'
 import FormInput from '@/components/FormInput'
 import FormSelect from '@/components/FormSelect'
 import { useAuth } from '@/services/useAuth'
 import { createPurchaseOrder } from '@/api/billOrder'
+import {
+  getServiceStatusSubscriptionStatus,
+  subscribeToServiceStatusAlerts,
+  unsubscribeFromServiceStatusAlerts,
+} from '@/api/notifications'
+import { makeElectricityServiceKey } from '@/api/serviceAvailability'
 import powerDistribution from '../../../data/powerDistributions.json'
 import Loader from '@/components/Loader'
 import useNotification from '@/hooks/useNotification'
@@ -44,6 +51,7 @@ const ProvideDertails = () => {
   const [loader, setLoader] = useState(false)
 
   const data = powerDistribution.find((item) => String(item.id) === id)
+  const serviceKey = useMemo(() => makeElectricityServiceKey(String(data?.biller || '')), [data?.biller])
 
   const [formValue, setFormValue] = useState({
     billersCode: '',
@@ -52,6 +60,62 @@ const ProvideDertails = () => {
     phone: '',
     description: 'Electric Bills',
   })
+  const [serviceAlertEnabled, setServiceAlertEnabled] = useState(false)
+  const [serviceAlertBusy, setServiceAlertBusy] = useState(false)
+
+  useEffect(() => {
+    let active = true
+
+    const loadStatus = async () => {
+      if (!serviceKey) return
+      try {
+        const result = await getServiceStatusSubscriptionStatus({
+          provider: 'buypower',
+          service_key: serviceKey,
+        })
+        if (active) {
+          setServiceAlertEnabled(result?.subscribed === true)
+        }
+      } catch {
+        if (active) {
+          setServiceAlertEnabled(false)
+        }
+      }
+    }
+
+    void loadStatus()
+    return () => {
+      active = false
+    }
+  }, [serviceKey])
+
+  const handleServiceAlertToggle = async (nextValue: boolean) => {
+    if (!serviceKey || serviceAlertBusy) return
+
+    setServiceAlertBusy(true)
+    try {
+      if (nextValue) {
+        await subscribeToServiceStatusAlerts({
+          provider: 'buypower',
+          service_key: serviceKey,
+          metadata: {
+            source: 'electricity_provider_screen',
+            providerId: String(id || ''),
+          },
+        })
+      } else {
+        await unsubscribeFromServiceStatusAlerts({
+          provider: 'buypower',
+          service_key: serviceKey,
+        })
+      }
+      setServiceAlertEnabled(nextValue)
+    } catch (error: any) {
+      setNotification({ error: true, message: error?.message || 'Unable to update alert setting', data: null })
+    } finally {
+      setServiceAlertBusy(false)
+    }
+  }
 
   const handleFormSubmit = async () => {
     const meterNumber = String(formValue.billersCode || '').trim()
@@ -102,10 +166,13 @@ const ProvideDertails = () => {
             orderId: response?.data?.id,
           },
         })
-      } catch (error: any) {
-        setLoader(false)
-        setNotification({ error: true, message: error?.message || 'Something went wrong', data: null })
+    } catch (error: any) {
+      setLoader(false)
+      if (error?.code === 'SERVICE_UNAVAILABLE' && serviceKey) {
+        setServiceAlertEnabled(true)
       }
+      setNotification({ error: true, message: error?.message || 'Something went wrong', data: null })
+    }
   }
 
   return (
@@ -140,6 +207,19 @@ const ProvideDertails = () => {
             resizeMode="stretch"
             className="w-full h-40 rounded-2xl mt-4"
           />
+          <View className="mt-4 flex-row items-center justify-between rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
+            <View className="flex-1 pr-4">
+              <Text className="text-white font-semibold">Notify me when service is back</Text>
+              <Text className="mt-1 text-xs text-gray-400">
+                Get a push alert when {data?.biller || 'this disco'} becomes available again.
+              </Text>
+            </View>
+            <Switch
+              value={serviceAlertEnabled}
+              onValueChange={handleServiceAlertToggle}
+              disabled={serviceAlertBusy || !serviceKey}
+            />
+          </View>
         </View>
 
         <View className="mt-6 rounded-2xl border border-gray-800 bg-gray-900/70 p-4">

@@ -88,9 +88,25 @@ export const createPurchaseOrder = async (orderData: any) => {
   } catch (err: any) {
     const status = err?.response?.status
     if (status === 503 || isHtmlResponse(err) || isTimeoutError(err)) {
-      throw new Error('Provider timeout. Please retry in a few seconds.')
+      const wrapped = new Error('Provider timeout. Please retry in a few seconds.') as Error & {
+        status?: number
+        code?: string
+        details?: any
+      }
+      wrapped.status = status
+      wrapped.code = err?.response?.data?.error_code
+      wrapped.details = err?.response?.data?.details
+      throw wrapped
     }
-    throw new Error(errMsg(err))
+    const wrapped = new Error(errMsg(err)) as Error & {
+      status?: number
+      code?: string
+      details?: any
+    }
+    wrapped.status = status
+    wrapped.code = err?.response?.data?.error_code
+    wrapped.details = err?.response?.data?.details
+    throw wrapped
   }
 }
 
