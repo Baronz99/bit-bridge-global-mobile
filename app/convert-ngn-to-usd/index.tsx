@@ -6,9 +6,10 @@ import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoi
 import Loader from '@/components/Loader'
 import NotificationAlert from '@/components/notification'
 import TransactionPinModal from '@/components/TransactionPinModal'
-import { convertTunnelNgnToUsd, quoteTunnelNgnToUsd } from '@/api/wallet'
+import { convertTunnelNgnToUsd, getUserWallet, quoteTunnelNgnToUsd } from '@/api/wallet'
 import { getTransactionPinStatus } from '@/api/transactionPin'
 import { useAuth } from '@/services/useAuth'
+import useFetch from '@/services/useFetch'
 import moneyFormat from '@/utils/moneyFormat'
 import { apiErrorMessage } from '@/utils/apiErrorMessage'
 import { log } from '@/utils/logger'
@@ -31,9 +32,17 @@ const ConvertNgnToUsdScreen = () => {
     error: false,
     data: null,
   })
+  const { data: walletData } = useFetch(() => getUserWallet(), true)
 
   const amountValue = useMemo(() => Number(amountNgn), [amountNgn])
   const quote = quoteData
+  const walletPayload = (walletData as any)?.data ?? walletData
+  const bridgeWallet = walletPayload?.bridge ?? walletPayload?.data?.bridge ?? null
+  const tunnelWallet = walletPayload?.tunnel ?? walletPayload?.data?.tunnel ?? null
+  const sourceBalanceLabel = moneyFormat(Number(bridgeWallet?.balance ?? bridgeWallet?.amount ?? 0), 'NGN')
+  const destinationBalanceLabel = tunnelWallet
+    ? moneyFormat(Number(tunnelWallet?.balance ?? tunnelWallet?.amount ?? 0), 'USD')
+    : 'Tunnel not activated'
 
   const handleError = async (error: any, options?: { forPin?: boolean }) => {
     const status = error?.response?.status
@@ -141,10 +150,35 @@ const ConvertNgnToUsdScreen = () => {
             <View className="absolute left-[-24] top-10 h-24 w-24 rounded-full bg-[#FFB347]/10" />
             <View className="px-5 pb-5 pt-6">
               <Text className="text-[11px] uppercase tracking-[2px] text-[#FFB347]/80">Tunnel FX</Text>
-              <Text className="mt-2 text-[26px] font-semibold text-[#FFF7ED]">Bridge NGN to Tunnel USD</Text>
+              <Text className="mt-2 text-[26px] font-semibold text-[#FFF7ED]">Move value between Bridge and Tunnel</Text>
               <Text className="mt-2 text-[13px] leading-5 text-[#FFF4E6]/75">
-                Enter an amount and lock a live USD quote before conversion.
+                Convert from your local NGN rail into your global USD rail.
               </Text>
+
+              <View className="mt-5 flex-row rounded-[18px] border border-[#4A3012] bg-[#120B04] p-1">
+                <TouchableOpacity className="flex-1 rounded-[14px] bg-[#FF8A1F] px-3 py-3">
+                  <Text className="text-center text-[13px] font-semibold text-[#FFF7ED]">Bridge -> Tunnel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => router.replace('/convert-usd-to-ngn')}
+                  className="flex-1 rounded-[14px] px-3 py-3"
+                >
+                  <Text className="text-center text-[13px] font-medium text-[#FFF4E6]/68">Tunnel -> Bridge</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View className="mt-5 flex-row gap-3">
+                <View className="flex-1 rounded-[18px] border border-[#4A3012] bg-[#120B04] px-4 py-4">
+                  <Text className="text-[11px] uppercase tracking-[1.5px] text-[#FFB347]/75">Source rail</Text>
+                  <Text className="mt-2 text-[18px] font-semibold text-[#FFF7ED]">Bridge</Text>
+                  <Text className="mt-1 text-[13px] text-[#FFF4E6]/78">{sourceBalanceLabel}</Text>
+                </View>
+                <View className="flex-1 rounded-[18px] border border-[#4A3012] bg-[#120B04] px-4 py-4">
+                  <Text className="text-[11px] uppercase tracking-[1.5px] text-[#FFB347]/75">Destination rail</Text>
+                  <Text className="mt-2 text-[18px] font-semibold text-[#FFF7ED]">Tunnel</Text>
+                  <Text className="mt-1 text-[13px] text-[#FFF4E6]/78">{destinationBalanceLabel}</Text>
+                </View>
+              </View>
 
               <View className={`${tunnelSubCard} mt-5 px-4 py-4`}>
                 <Text className="mb-2 text-[12px] font-medium uppercase tracking-[1.5px] text-[#FFB347]/75">
@@ -158,7 +192,7 @@ const ConvertNgnToUsdScreen = () => {
                   onChangeText={(text: string) => setAmountNgn(text)}
                   placeHolder="0.00"
                 />
-                <Text className="mt-1 text-[12px] text-[#FFF4E6]/65">Source rail: Bridge NGN balance</Text>
+                <Text className="mt-1 text-[12px] text-[#FFF4E6]/65">Available in Bridge: {sourceBalanceLabel}</Text>
               </View>
             </View>
           </View>
@@ -208,14 +242,14 @@ const ConvertNgnToUsdScreen = () => {
                     ? 'Refreshing quote'
                     : quote
                       ? moneyFormat(Number(amountOut) || 0, 'USD')
-                      : 'Convert into USD'}
+                      : 'You will receive USD'}
                 </Text>
                 <Text className="mt-1 text-[13px] text-[#FFF4E6]/75">
                   {quoteLoading
                     ? 'Fetching the latest execution rate.'
                     : quote
-                      ? 'Amount you will receive in Tunnel.'
-                      : 'Enter an NGN amount to fetch a live rate.'}
+                      ? 'Live receive amount into Tunnel.'
+                      : 'Enter an NGN amount to fetch a live quote.'}
                 </Text>
               </View>
               <View className="rounded-full border border-[#5B3A14] bg-[#FF8A1F]/10 px-3 py-2">
@@ -241,6 +275,10 @@ const ConvertNgnToUsdScreen = () => {
                 <Text className="text-[13px] text-[#FFF7ED]">
                   1 USD = {Number(executionRate || 0).toFixed(2)} NGN
                 </Text>
+              </View>
+              <View className="mt-3 flex-row items-center justify-between">
+                <Text className="text-[12px] text-[#FFB347]/75">Destination rail</Text>
+                <Text className="text-[13px] text-[#FFF7ED]">Tunnel USD</Text>
               </View>
             </View>
           </View>
