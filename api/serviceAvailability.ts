@@ -1,4 +1,5 @@
 import client from '@/api/client'
+import powerDistribution from '@/data/powerDistributions.json'
 
 export type ServiceAvailabilityState = 'operational' | 'degraded' | 'outage' | 'unknown'
 
@@ -79,3 +80,25 @@ export const unknownAvailability = (fallbackLabel = 'Status unavailable'): Servi
     message: 'Status currently unavailable. You can still try.',
   },
 })
+
+export const makeElectricityServiceKey = (biller?: string) =>
+  makeServiceAvailabilityKey({
+    provider: biller,
+    serviceType: 'ELECTRICITY',
+  })
+
+export const resolveElectricityRouteFromServiceKey = (serviceKey?: string) => {
+  const rawProvider = String(serviceKey || '').trim().toUpperCase().replace(/_ELECTRICITY$/, '')
+  if (!rawProvider) return null
+
+  const provider = powerDistribution.find((item) => {
+    const normalized = normalizeProviderForStatus(item?.biller)
+    return normalized.toUpperCase() === rawProvider
+  })
+  if (!provider?.id) return null
+
+  return {
+    pathname: '/powerProviders/[id]' as const,
+    params: { id: String(provider.id) },
+  }
+}
