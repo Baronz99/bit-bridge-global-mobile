@@ -203,6 +203,9 @@ const ConvertUsdToNgnScreen = () => {
                     keyboardType="numeric"
                     onChangeText={(text: string) => setAmountUsd(text)}
                     placeHolder="0.00"
+                    placeholderTextColor="#C8A26A"
+                    selectionColor="#FFB347"
+                    style={{ color: '#FFF7ED', backgroundColor: '#0E0803', borderColor: '#7A4D19' }}
                   />
                 </View>
 
@@ -219,7 +222,7 @@ const ConvertUsdToNgnScreen = () => {
                             ? moneyFormat(Number(amountOut) || 0, 'NGN')
                             : 'You will receive NGN'}
                       </Text>
-                      <Text className="mt-1 text-[13px] leading-5 text-[#FFF4E6]/78">
+                      <Text className="mt-1 text-[13px] leading-5 text-[#E8D7C1]">
                         {quoteLoading
                           ? 'Fetching the latest execution rate.'
                           : quote
@@ -234,25 +237,25 @@ const ConvertUsdToNgnScreen = () => {
 
                   <View className={`${tunnelSoftPanel} mt-4 px-4 py-4`}>
                     <View className="flex-row items-center justify-between">
-                      <Text className="text-[12px] text-[#FFB347]/78">Fee</Text>
+                      <Text className="text-[12px] text-[#D6B17A]">Fee</Text>
                       <Text className="text-[13px] font-medium text-[#FFF7ED]">
                         {moneyFormat(Number(feeAmount) || 0, 'USD')}
                       </Text>
                     </View>
                     <View className="mt-3 flex-row items-center justify-between">
-                      <Text className="text-[12px] text-[#FFB347]/78">Amount after fee</Text>
+                      <Text className="text-[12px] text-[#D6B17A]">Amount after fee</Text>
                       <Text className="text-[13px] font-medium text-[#FFF7ED]">
                         {moneyFormat(Number(amountAfterFee) || 0, 'USD')}
                       </Text>
                     </View>
                     <View className="mt-3 flex-row items-center justify-between">
-                      <Text className="text-[12px] text-[#FFB347]/78">Rate</Text>
+                      <Text className="text-[12px] text-[#D6B17A]">Rate</Text>
                       <Text className="text-[13px] font-medium text-[#FFF7ED]">
                         1 USD = {Number(executionRate || 0).toFixed(2)} NGN
                       </Text>
                     </View>
                     <View className="mt-3 flex-row items-center justify-between">
-                      <Text className="text-[12px] text-[#FFB347]/78">Destination rail</Text>
+                      <Text className="text-[12px] text-[#D6B17A]">Destination rail</Text>
                       <Text className="text-[13px] font-medium text-[#FFF7ED]">Bridge NGN</Text>
                     </View>
                   </View>
