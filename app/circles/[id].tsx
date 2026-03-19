@@ -6,6 +6,7 @@ import { FEATURE_CIRCLES } from '@/constants/featureFlags'
 import moneyFormat from '@/utils/moneyFormat'
 import { Ionicons } from '@expo/vector-icons'
 import MemberAvatars from '@/components/circles/MemberAvatars'
+import { useAuth } from '@/services/useAuth'
 
 const getArray = (value: unknown) => (Array.isArray(value) ? value : [])
 
@@ -113,6 +114,15 @@ const formatTimestamp = (value: string) => {
   })
 }
 
+const getTierRank = (value: unknown) => {
+  const normalized = String(value || 'tier_0').toLowerCase()
+  if (normalized.includes('tier_4')) return 4
+  if (normalized.includes('tier_3')) return 3
+  if (normalized.includes('tier_2')) return 2
+  if (normalized.includes('tier_1')) return 1
+  return 0
+}
+
 const buildActionText = (actor: string, direction: string, kind: string) => {
   const normalizedDirection = direction.toLowerCase()
   const normalizedKind = kind.toLowerCase()
@@ -139,6 +149,12 @@ type CircleHeaderProps = {
   currency: string
   memberInitials: string[]
   onInvite: () => void
+  isOfficial: boolean
+  badgeLabel: string
+  isFlexibleOfficial: boolean
+  isOfficialFeatured: boolean
+  isTier1User: boolean
+  maxContributionCents: number
 }
 
 const CircleHeader = ({
@@ -153,17 +169,46 @@ const CircleHeader = ({
   currency,
   memberInitials,
   onInvite,
+  isOfficial,
+  badgeLabel,
+  isFlexibleOfficial,
+  isOfficialFeatured,
+  isTier1User,
+  maxContributionCents,
 }: CircleHeaderProps) => {
   return (
-    <View className="rounded-3xl border border-gray-800 bg-gray-900/80 p-5">
-      <View className="flex-row items-center justify-between">
-        <View className="flex-row items-center gap-3">
-          <View className="h-12 w-12 rounded-full bg-gray-800 items-center justify-center border border-gray-700">
+    <View className={`rounded-3xl border p-5 ${isOfficial ? 'border-amber-500/30 bg-[#16110a]' : 'border-gray-800 bg-gray-900/80'}`}>
+      <View className="flex-row items-start justify-between gap-3">
+        <View className="flex-row items-start gap-3 flex-1 min-w-0">
+          <View className={`h-12 w-12 rounded-full items-center justify-center border ${isOfficial ? 'bg-[#261c0c] border-amber-500/20' : 'bg-gray-800 border-gray-700'}`}>
             <Text className="text-white text-sm font-semibold">{getInitials(title || 'BB')}</Text>
           </View>
-          <View>
-            <Text className="text-white text-xl font-semibold">{title}</Text>
-            {description ? <Text className="text-gray-300 text-xs mt-1">{description}</Text> : null}
+          <View className="flex-1 min-w-0">
+            <Text className="text-white text-xl font-semibold" numberOfLines={2}>
+              {title}
+            </Text>
+            {description ? (
+              <Text className="text-gray-300 text-xs mt-1 leading-5" numberOfLines={3}>
+                {description}
+              </Text>
+            ) : null}
+            <View className="flex-row flex-wrap gap-2 mt-2">
+              {isOfficial ? (
+                <View className="rounded-full border border-amber-500/35 bg-amber-500/10 px-2 py-1">
+                  <Text className="text-[10px] text-amber-100 uppercase">Official BitBridge Circle</Text>
+                </View>
+              ) : null}
+              {isOfficial && badgeLabel ? (
+                <View className="rounded-full border border-fuchsia-500/25 bg-fuchsia-500/10 px-2 py-1">
+                  <Text className="text-[10px] text-fuchsia-100 uppercase">{badgeLabel}</Text>
+                </View>
+              ) : null}
+              {isOfficialFeatured ? (
+                <View className="rounded-full border border-amber-500/20 bg-white/5 px-2 py-1">
+                  <Text className="text-[10px] text-amber-50 uppercase">Featured</Text>
+                </View>
+              ) : null}
+            </View>
             <Text className="text-gray-400 text-[10px] mt-2">
               {memberCount} members · {role}
             </Text>
@@ -171,7 +216,7 @@ const CircleHeader = ({
         </View>
         <TouchableOpacity
           onPress={onInvite}
-          className="h-9 w-9 rounded-full border border-gray-800 bg-gray-950 items-center justify-center"
+          className="h-9 w-9 rounded-full border border-gray-800 bg-gray-950 items-center justify-center shrink-0"
         >
           <Ionicons name="share-outline" size={18} color="#e2e8f0" />
         </TouchableOpacity>
@@ -196,6 +241,17 @@ const CircleHeader = ({
           ) : null}
         </View>
       </View>
+
+      {isFlexibleOfficial && isTier1User && maxContributionCents > 0 ? (
+        <View className="mt-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-3 py-3">
+          <Text className="text-amber-100 text-xs">
+            You can contribute up to {moneyFormat(maxContributionCents / 100, currency)} with your current verification level.
+          </Text>
+          <Text className="text-gray-300 text-[10px] mt-1">
+            Complete verification to unlock higher contributions.
+          </Text>
+        </View>
+      ) : null}
 
       <View className="flex-row items-center justify-between mt-4">
         <MemberAvatars initials={memberInitials} size={32} />
@@ -356,6 +412,7 @@ const CircleDetailScreen = () => {
   const { id } = useLocalSearchParams<{ id?: string | string[] }>()
   const circleId = Array.isArray(id) ? id[0] : id
   const router = useRouter()
+  const { userProfileData } = useAuth()
   const [activeTab, setActiveTab] = useState<SegmentTab>('timeline')
 
   const [loading, setLoading] = useState(true)
@@ -387,6 +444,13 @@ const CircleDetailScreen = () => {
   const description = getDescription(circle)
   const balanceCents = Number(circle.balance_cents || 0)
   const currency = (circle.currency as string) || 'NGN'
+  const isOfficial = circle.circle_type === 'official'
+  const badgeLabel = ((circle.badge_label as string) || '').trim()
+  const isFlexibleOfficial = isOfficial && circle.kyc_mode === 'flexible'
+  const isOfficialFeatured = circle.visibility === 'official_featured'
+  const maxContributionCents = Number(circle.max_contribution_cents || 0)
+  const profileRoot = (userProfileData?.data ?? userProfileData) || {}
+  const isTier1User = getTierRank(profileRoot?.kyc_level || profileRoot?.user_kyc?.kyc_level) === 1
   const members = getArray(circle.members)
   const memberCount = members.length
   const role = (circle.current_user_role as string) || 'member'
@@ -446,6 +510,12 @@ const CircleDetailScreen = () => {
               currency={currency}
               memberInitials={memberInitials}
               onInvite={() => router.push(`/circles/${circleId}/invite`)}
+              isOfficial={isOfficial}
+              badgeLabel={badgeLabel}
+              isFlexibleOfficial={isFlexibleOfficial}
+              isOfficialFeatured={isOfficialFeatured}
+              isTier1User={isTier1User}
+              maxContributionCents={maxContributionCents}
             />
           </View>
 
@@ -473,7 +543,9 @@ const CircleDetailScreen = () => {
                 </Text>
               </View>
               <Text className="text-gray-400 text-xs mb-3">
-                Shared feed of deposits, payouts, and tagged activity goals.
+                {isOfficial
+                  ? 'Shared feed of contributions, payouts, and tagged campaign milestones.'
+                  : 'Shared feed of deposits, payouts, and tagged activity goals.'}
               </Text>
               {recentTransactions.length === 0 ? (
                 <View className="bg-gray-900 p-4 rounded-xl">
@@ -508,9 +580,13 @@ const CircleDetailScreen = () => {
           {activeTab === 'activities' ? (
             <View className="px-4 mt-4">
               <View className="bg-gray-900 border border-gray-800 rounded-2xl p-4">
-                <Text className="text-white text-base font-semibold">Group activities</Text>
+                <Text className="text-white text-base font-semibold">
+                  {isOfficial ? 'Campaign milestones' : 'Group activities'}
+                </Text>
                 <Text className="text-gray-400 text-xs mt-1">
-                  Create goals and track contributions from members.
+                  {isOfficial
+                    ? 'Track campaign milestones and supporter contributions.'
+                    : 'Create goals and track contributions from members.'}
                 </Text>
                 <TouchableOpacity
                   onPress={() => router.push(`/circles/${circleId}/activities`)}
@@ -526,6 +602,11 @@ const CircleDetailScreen = () => {
             <View className="px-4 mt-4">
               <View className="bg-gray-900 border border-gray-800 rounded-2xl p-4">
                 <Text className="text-white text-base font-semibold">About this group</Text>
+                {isOfficial ? (
+                  <Text className="text-amber-100 text-xs mt-2">
+                    Official BitBridge Circle{badgeLabel ? ` · ${badgeLabel}` : ''}
+                  </Text>
+                ) : null}
                 {ownerLabel ? (
                   <Text className="text-gray-300 text-xs mt-2">Owner: {ownerLabel}</Text>
                 ) : null}
