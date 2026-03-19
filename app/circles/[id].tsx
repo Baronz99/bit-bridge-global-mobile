@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View, TextInput } from 'react-native'
+import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { getCircle } from '@/api/circles'
 import { FEATURE_CIRCLES } from '@/constants/featureFlags'
@@ -561,17 +561,26 @@ const CircleDetailScreen = () => {
                 ))
               )}
 
-              <View className="bg-gray-900 border border-gray-800 rounded-2xl p-3 mt-4">
-                <View className="flex-row items-center gap-2">
-                  <TextInput
-                    placeholder="Add a note (coming soon)"
-                    placeholderTextColor="#64748b"
-                    className="flex-1 text-white"
-                    editable={false}
-                  />
-                  <View className="h-9 w-9 rounded-full bg-gray-800 items-center justify-center border border-gray-700">
-                    <Ionicons name="send-outline" size={16} color="#64748b" />
+              <View className="bg-gray-900 border border-gray-800 rounded-2xl p-4 mt-4">
+                <View className="flex-row items-center justify-between gap-3">
+                  <View className="flex-1">
+                    <Text className="text-white text-sm font-semibold">
+                      {isOfficial ? 'Campaign milestones' : 'Circle activities'}
+                    </Text>
+                    <Text className="text-gray-400 text-xs mt-1">
+                      {isOfficial
+                        ? 'Post and review official supporter milestones from one place.'
+                        : 'Create and track contribution goals for this circle.'}
+                    </Text>
                   </View>
+                  <TouchableOpacity
+                    onPress={() => router.push(`/circles/${circleId}/activities`)}
+                    className="px-4 py-2 rounded-full bg-theme-primary"
+                  >
+                    <Text className="text-black text-xs font-semibold">
+                      {isOfficial ? 'Open milestones' : 'Open activities'}
+                    </Text>
+                  </TouchableOpacity>
                 </View>
               </View>
             </View>
