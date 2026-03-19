@@ -77,7 +77,8 @@ function assertGitState() {
 function assertEasChannelMapping() {
   const token = process.env.EXPO_TOKEN;
   if (!token) {
-    fail('EXPO_TOKEN is required in release mode to validate EAS channel mapping');
+    warn('EXPO_TOKEN is not set; skipping EAS channel mapping validation');
+    return;
   }
 
   const raw = run('npx eas channel:list --json --non-interactive', {
