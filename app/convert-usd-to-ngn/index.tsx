@@ -14,9 +14,9 @@ import moneyFormat from '@/utils/moneyFormat'
 import { apiErrorMessage } from '@/utils/apiErrorMessage'
 import { log } from '@/utils/logger'
 
-const tunnelCard = 'rounded-[28px] border border-[#5B3A14] bg-[#1A0F05]'
-const tunnelPanel = 'rounded-[20px] border border-[#4F3414] bg-[#120B04]'
-const tunnelSoftPanel = 'rounded-[18px] border border-[#3E2A11] bg-[#160D05]'
+const tunnelCard = 'rounded-[28px] border border-[#6A4316] bg-[#1A0F05]'
+const tunnelPanel = 'rounded-[20px] border border-[#5A3914] bg-[#120B04]'
+const tunnelSoftPanel = 'rounded-[18px] border border-[#4A3012] bg-[#160D05]'
 
 const ConvertUsdToNgnScreen = () => {
   const router = useRouter()
@@ -156,7 +156,7 @@ const ConvertUsdToNgnScreen = () => {
             <View className="px-5 pb-5 pt-6">
               <Text className="text-[11px] uppercase tracking-[2px] text-[#FFB347]/85">Tunnel FX</Text>
               <Text className="mt-2 text-[26px] font-semibold text-[#FFF7ED]">Convert USD to NGN</Text>
-              <Text className="mt-2 text-[13px] leading-5 text-[#FFF4E6]/92">
+              <Text className="mt-2 text-[13px] leading-5 text-[#F6E7D2]">
                 Move value from your global Tunnel rail back into your local Bridge rail with a live quote.
               </Text>
 
@@ -165,7 +165,7 @@ const ConvertUsdToNgnScreen = () => {
                   onPress={() => router.replace('/convert-ngn-to-usd')}
                   className="flex-1 rounded-[14px] px-3 py-3"
                 >
-                  <Text className="text-center text-[13px] font-medium text-[#FFF4E6]/84">Bridge -&gt; Tunnel</Text>
+                  <Text className="text-center text-[13px] font-medium text-[#F3DFC1]">Bridge -&gt; Tunnel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity className="flex-1 rounded-[14px] bg-[#FF8A1F] px-3 py-3">
                   <Text className="text-center text-[13px] font-semibold text-[#FFF7ED]">Tunnel -&gt; Bridge</Text>
@@ -176,12 +176,12 @@ const ConvertUsdToNgnScreen = () => {
                 <View className={`${tunnelSoftPanel} flex-1 px-4 py-3`}>
                   <Text className="text-[11px] uppercase tracking-[1.4px] text-[#FFB347]/72">Source rail</Text>
                   <Text className="mt-2 text-[18px] font-semibold text-[#FFF7ED]">Tunnel</Text>
-                  <Text className="mt-1 text-[12px] text-[#D8C0A1]">{sourceBalanceLabel}</Text>
+                  <Text className="mt-1 text-[12px] text-[#E8D7C1]">{sourceBalanceLabel}</Text>
                 </View>
                 <View className={`${tunnelSoftPanel} flex-1 px-4 py-3`}>
                   <Text className="text-[11px] uppercase tracking-[1.4px] text-[#FFB347]/72">Destination rail</Text>
                   <Text className="mt-2 text-[18px] font-semibold text-[#FFF7ED]">Bridge</Text>
-                  <Text className="mt-1 text-[12px] text-[#D8C0A1]">
+                  <Text className="mt-1 text-[12px] text-[#E8D7C1]">
                     {moneyFormat(Number(bridgeWallet?.balance ?? bridgeWallet?.amount ?? 0), 'NGN')}
                   </Text>
                 </View>
@@ -191,7 +191,7 @@ const ConvertUsdToNgnScreen = () => {
                 <Text className="text-[12px] font-medium uppercase tracking-[1.5px] text-[#FFB347]/82">
                   Amount to convert
                 </Text>
-                <Text className="mt-1 text-[12px] leading-5 text-[#D8C0A1]">
+                <Text className="mt-1 text-[12px] leading-5 text-[#E8D7C1]">
                   Enter how much you want to move from Tunnel back into Bridge.
                 </Text>
 
@@ -209,7 +209,7 @@ const ConvertUsdToNgnScreen = () => {
                   />
                 </View>
 
-                <Text className="mt-2 text-[12px] text-[#FFF4E6]/90">Available in Tunnel: {sourceBalanceLabel}</Text>
+                <Text className="mt-2 text-[12px] text-[#F6E7D2]">Available in Tunnel: {sourceBalanceLabel}</Text>
 
                 <View className="mt-4 border-t border-[#3A2610] pt-4">
                   <View className="flex-row items-start justify-between gap-3">
@@ -222,7 +222,7 @@ const ConvertUsdToNgnScreen = () => {
                             ? moneyFormat(Number(amountOut) || 0, 'NGN')
                             : 'You will receive NGN'}
                       </Text>
-                      <Text className="mt-1 text-[13px] leading-5 text-[#E8D7C1]">
+                      <Text className="mt-1 text-[13px] leading-5 text-[#F3E4CF]">
                         {quoteLoading
                           ? 'Fetching the latest execution rate.'
                           : quote
@@ -237,25 +237,25 @@ const ConvertUsdToNgnScreen = () => {
 
                   <View className={`${tunnelSoftPanel} mt-4 px-4 py-4`}>
                     <View className="flex-row items-center justify-between">
-                      <Text className="text-[12px] text-[#D6B17A]">Fee</Text>
+                      <Text className="text-[12px] text-[#E0BB86]">Fee</Text>
                       <Text className="text-[13px] font-medium text-[#FFF7ED]">
                         {moneyFormat(Number(feeAmount) || 0, 'USD')}
                       </Text>
                     </View>
                     <View className="mt-3 flex-row items-center justify-between">
-                      <Text className="text-[12px] text-[#D6B17A]">Amount after fee</Text>
+                      <Text className="text-[12px] text-[#E0BB86]">Amount after fee</Text>
                       <Text className="text-[13px] font-medium text-[#FFF7ED]">
                         {moneyFormat(Number(amountAfterFee) || 0, 'USD')}
                       </Text>
                     </View>
                     <View className="mt-3 flex-row items-center justify-between">
-                      <Text className="text-[12px] text-[#D6B17A]">Rate</Text>
+                      <Text className="text-[12px] text-[#E0BB86]">Rate</Text>
                       <Text className="text-[13px] font-medium text-[#FFF7ED]">
                         1 USD = {Number(executionRate || 0).toFixed(2)} NGN
                       </Text>
                     </View>
                     <View className="mt-3 flex-row items-center justify-between">
-                      <Text className="text-[12px] text-[#D6B17A]">Destination rail</Text>
+                      <Text className="text-[12px] text-[#E0BB86]">Destination rail</Text>
                       <Text className="text-[13px] font-medium text-[#FFF7ED]">Bridge NGN</Text>
                     </View>
                   </View>
@@ -303,22 +303,22 @@ const ConvertUsdToNgnScreen = () => {
             <Text className="mt-2 text-[24px] font-semibold text-[#FFF7ED]">
               {moneyFormat(Number(successQuote?.amount_out) || 0, 'NGN')}
             </Text>
-            <Text className="mt-1 text-[13px] text-[#FFF4E6]/80">{notice.message}</Text>
+            <Text className="mt-1 text-[13px] text-[#F3E4CF]">{notice.message}</Text>
               <View className={`${tunnelSoftPanel} mt-4 px-4 py-4`}>
                 <View className="flex-row items-center justify-between">
-                  <Text className="text-[12px] text-[#FFB347]/75">Rate</Text>
+                  <Text className="text-[12px] text-[#E0BB86]">Rate</Text>
                   <Text className="text-[13px] text-[#FFF7ED]">
                     1 USD = {Number(successQuote?.execution_rate || 0).toFixed(2)} NGN
                   </Text>
                 </View>
                 <View className="mt-3 flex-row items-center justify-between">
-                  <Text className="text-[12px] text-[#FFB347]/75">Fee</Text>
+                  <Text className="text-[12px] text-[#E0BB86]">Fee</Text>
                   <Text className="text-[13px] text-[#FFF7ED]">
                     {moneyFormat(Number(successQuote?.fee_amount) || 0, 'USD')}
                   </Text>
                 </View>
                 <View className="mt-3 flex-row items-center justify-between">
-                  <Text className="text-[12px] text-[#FFB347]/75">Bridge balance</Text>
+                  <Text className="text-[12px] text-[#E0BB86]">Bridge balance</Text>
                   <Text className="text-[13px] text-[#FFF7ED]">
                     {moneyFormat(Number(successNgnWallet?.balance) || 0, 'NGN')}
                   </Text>
