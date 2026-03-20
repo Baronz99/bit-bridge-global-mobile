@@ -46,6 +46,12 @@ const detectCategory = (circle: Record<string, unknown>) => {
   return 'all'
 }
 
+const featuredRank = (circle: Record<string, unknown>) => {
+  if (circle.circle_type === 'official' && circle.visibility === 'official_featured') return 0
+  if (circle.circle_type === 'official') return 1
+  return 2
+}
+
 const CirclesScreen = () => {
   const router = useRouter()
   const { userProfileData, loadProfile, authState, authHydrated } = useAuth()
@@ -156,10 +162,18 @@ const CirclesScreen = () => {
 
   const circles = useMemo(() => extractCircles(data), [data])
   const filteredCircles = useMemo(() => {
-    if (activeFilter === 'all') return circles
-    return circles.filter((item) => {
-      const record = (item ?? {}) as Record<string, unknown>
-      return detectCategory(record) === activeFilter
+    const filtered =
+      activeFilter === 'all'
+        ? [...circles]
+        : circles.filter((item) => {
+            const record = (item ?? {}) as Record<string, unknown>
+            return detectCategory(record) === activeFilter
+          })
+
+    return filtered.sort((left, right) => {
+      const leftRecord = (left ?? {}) as Record<string, unknown>
+      const rightRecord = (right ?? {}) as Record<string, unknown>
+      return featuredRank(leftRecord) - featuredRank(rightRecord)
     })
   }, [circles, activeFilter])
 
@@ -297,6 +311,7 @@ const CirclesScreen = () => {
               const description = getCircleDescription(record)
               const purpose = (record.purpose as string) || ''
               const balanceCents = Number(record.balance_cents || 0)
+              const balanceVisible = record.balance_visible !== false
               const category = detectCategory(record)
               const categoryLabel =
                 category === 'bills'
@@ -315,6 +330,13 @@ const CirclesScreen = () => {
                 .slice(0, 2)
                 .toUpperCase()
               const members = getArray(record.members)
+              const isOfficialCircle = record.circle_type === 'official'
+              const isFeaturedOfficial =
+                isOfficialCircle && record.visibility === 'official_featured'
+              const badgeLabel =
+                typeof record.badge_label === 'string' && record.badge_label.trim().length > 0
+                  ? record.badge_label.trim()
+                  : 'Official'
               const memberInitials = members
                 .map((member) => {
                   const payload = (member ?? {}) as Record<string, unknown>
@@ -340,11 +362,31 @@ const CirclesScreen = () => {
                     <View className="flex-1">
                       <View className="flex-row items-center justify-between">
                         <Text className="text-white text-base font-semibold">{title}</Text>
-                        <Text className="text-gray-200 text-xs">
-                          {moneyFormat(balanceCents / 100)}
-                        </Text>
+                        {balanceVisible ? (
+                          <Text className="text-gray-200 text-xs">
+                            {moneyFormat(balanceCents / 100)}
+                          </Text>
+                        ) : (
+                          <View className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-1">
+                            <Text className="text-[10px] text-amber-100 uppercase">
+                              Managed campaign
+                            </Text>
+                          </View>
+                        )}
                       </View>
                       <View className="flex-row items-center gap-2 mt-1">
+                        {isFeaturedOfficial ? (
+                          <View className="bg-amber-500/10 border border-amber-400/40 rounded-full px-2 py-0.5">
+                            <Text className="text-[10px] text-amber-200 uppercase">Featured</Text>
+                          </View>
+                        ) : null}
+                        {isOfficialCircle ? (
+                          <View className="bg-sky-500/10 border border-sky-400/40 rounded-full px-2 py-0.5">
+                            <Text className="text-[10px] text-sky-200 uppercase">
+                              {badgeLabel}
+                            </Text>
+                          </View>
+                        ) : null}
                         {purpose ? (
                           <View className="bg-gray-950 border border-gray-800 rounded-full px-2 py-0.5">
                             <Text className="text-[10px] text-gray-300 uppercase">{purpose}</Text>
@@ -358,6 +400,11 @@ const CirclesScreen = () => {
                   </View>
                   {description ? (
                     <Text className="text-gray-300 text-xs mt-2">{description}</Text>
+                  ) : null}
+                  {!balanceVisible ? (
+                    <Text className="text-gray-400 text-[11px] mt-2">
+                      Campaign balance is visible to circle managers only.
+                    </Text>
                   ) : null}
                   <View className="flex-row items-center justify-between mt-3">
                     <MemberAvatars initials={memberInitials} size={26} />

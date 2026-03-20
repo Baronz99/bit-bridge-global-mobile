@@ -145,6 +145,7 @@ type CircleHeaderProps = {
   ownerLabel: string
   ownerMaskedEmail: string
   canWithdraw: boolean
+  balanceVisible: boolean
   balanceCents: number
   currency: string
   memberInitials: string[]
@@ -165,6 +166,7 @@ const CircleHeader = ({
   ownerLabel,
   ownerMaskedEmail,
   canWithdraw,
+  balanceVisible,
   balanceCents,
   currency,
   memberInitials,
@@ -224,10 +226,24 @@ const CircleHeader = ({
 
       <View className="flex-row items-center justify-between mt-4">
         <View>
-          <Text className="text-gray-400 text-[10px] uppercase tracking-widest">Group balance</Text>
-          <Text className="text-white text-2xl font-semibold mt-2">
-            {moneyFormat(balanceCents / 100, currency)}
-          </Text>
+          {balanceVisible ? (
+            <>
+              <Text className="text-gray-400 text-[10px] uppercase tracking-widest">Group balance</Text>
+              <Text className="text-white text-2xl font-semibold mt-2">
+                {moneyFormat(balanceCents / 100, currency)}
+              </Text>
+            </>
+          ) : (
+            <>
+              <Text className="text-amber-100/80 text-[10px] uppercase tracking-widest">Managed campaign</Text>
+              <Text className="text-white text-base font-semibold mt-2">
+                Campaign balance is visible to circle managers only
+              </Text>
+              <Text className="text-amber-100/70 text-[11px] mt-2 leading-5 max-w-[220px]">
+                Follow milestones, member activity, and your own contributions from here.
+              </Text>
+            </>
+          )}
         </View>
         <View className="items-end">
           {ownerLabel ? (
@@ -443,6 +459,7 @@ const CircleDetailScreen = () => {
   const title = getTitle(circle)
   const description = getDescription(circle)
   const balanceCents = Number(circle.balance_cents || 0)
+  const balanceVisible = circle.balance_visible !== false
   const currency = (circle.currency as string) || 'NGN'
   const isOfficial = circle.circle_type === 'official'
   const badgeLabel = ((circle.badge_label as string) || '').trim()
@@ -506,6 +523,7 @@ const CircleDetailScreen = () => {
               ownerLabel={ownerLabel}
               ownerMaskedEmail={ownerMaskedEmail}
               canWithdraw={canWithdraw}
+              balanceVisible={balanceVisible}
               balanceCents={balanceCents}
               currency={currency}
               memberInitials={memberInitials}
