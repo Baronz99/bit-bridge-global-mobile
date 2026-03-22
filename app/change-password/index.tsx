@@ -1,16 +1,14 @@
-import { ActivityIndicator, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
-import React, { useEffect, useState } from 'react'
+import { ActivityIndicator, Alert, Image, Text, TouchableOpacity, View } from 'react-native'
+import React, { useState } from 'react'
 import { userPasswordUpdate } from '@/api/auth'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
 import FormInput from '@/components/FormInput'
-import { icons } from '@/constants/icons'
 import { images } from '@/constants/images'
 import Loader from '@/components/Loader'
+import { router } from 'expo-router'
 
 const index = () => {
   const [errorMessage, setErrorMessage] = useState(null)
-  const [toggleModal, setToggleModal] = useState(false)
-  const [error, setError] = useState(null)
 
   const [formInput, setFormInput] = useState({
     password: '',
@@ -23,14 +21,26 @@ const index = () => {
 
   const handleUpdate = async () => {
     setLoading(true)
+    setErrorMessage(null)
     try {
       const result = await userPasswordUpdate({
         formData: formInput,
       })
 
+      setFormInput({
+        password: '',
+        confirm_password: '',
+        old_password: '',
+      })
       setLoading(false)
-    } catch (error: any) {
-      setErrorMessage(error.message)
+      Alert.alert('Password updated', result?.message || 'Your password has been changed successfully.', [
+        {
+          text: 'OK',
+          onPress: () => router.back(),
+        },
+      ])
+    } catch (error: unknown) {
+      setErrorMessage(error instanceof Error ? error.message : 'Something went wrong')
       setLoading(false)
     }
   }
@@ -98,5 +108,3 @@ const index = () => {
 }
 
 export default index
-
-const styles = StyleSheet.create({})
