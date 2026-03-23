@@ -1,12 +1,23 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native'
+import React, { useCallback, useMemo, useState } from 'react'
+import { ActivityIndicator, RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { getCircle } from '@/api/circles'
+import { useFocusEffect } from '@react-navigation/native'
+import { getCircle, reactToCircleTx, unreactToCircleTx } from '@/api/circles'
 import { FEATURE_CIRCLES } from '@/constants/featureFlags'
 import moneyFormat from '@/utils/moneyFormat'
 import { Ionicons } from '@expo/vector-icons'
 import MemberAvatars from '@/components/circles/MemberAvatars'
+import NotificationAlert from '@/components/notification'
 import { useAuth } from '@/services/useAuth'
+import { buildApiErrorMessage } from '@/utils/apiErrorMessage'
+
+const REACTION_OPTIONS = ['??', '??', '??'] as const
+
+type NoticeState = {
+  message: string | null
+  error: boolean
+  data: any | null
+}
 
 const getArray = (value: unknown) => (Array.isArray(value) ? value : [])
 
@@ -212,7 +223,7 @@ const CircleHeader = ({
               ) : null}
             </View>
             <Text className="text-gray-400 text-[10px] mt-2">
-              {memberCount} members · {role}
+              {memberCount} members � {role}
             </Text>
           </View>
         </View>
@@ -286,6 +297,7 @@ const CircleHeader = ({
 
 type ActionChipsProps = {
   canWithdraw: boolean
+  canViewAudit: boolean
   onFund: () => void
   onWithdraw: () => void
   onActivities: () => void
@@ -295,6 +307,7 @@ type ActionChipsProps = {
 
 const ActionChips = ({
   canWithdraw,
+  canViewAudit,
   onFund,
   onWithdraw,
   onActivities,
@@ -321,9 +334,11 @@ const ActionChips = ({
         <TouchableOpacity onPress={onActivities} className="bg-gray-950 border border-gray-800 px-3 py-2 rounded-full">
           <Text className="text-white text-xs">Activities</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={onAudit} className="bg-gray-950 border border-gray-800 px-3 py-2 rounded-full">
-          <Text className="text-white text-xs">Audit</Text>
-        </TouchableOpacity>
+        {canViewAudit ? (
+          <TouchableOpacity onPress={onAudit} className="bg-gray-950 border border-gray-800 px-3 py-2 rounded-full">
+            <Text className="text-white text-xs">Audit</Text>
+          </TouchableOpacity>
+        ) : null}
         <TouchableOpacity onPress={onInvite} className="bg-gray-950 border border-gray-800 px-3 py-2 rounded-full">
           <Text className="text-white text-xs">Invite</Text>
         </TouchableOpacity>
@@ -367,9 +382,11 @@ const SegmentTabs = ({
 type FeedItemProps = {
   record: Record<string, unknown>
   currency: string
+  busyReaction: string | null
+  onToggleReaction: (record: Record<string, unknown>, emoji: string) => void
 }
 
-const FeedItem = ({ record, currency }: FeedItemProps) => {
+const FeedItem = ({ record, currency, busyReaction, onToggleReaction }: FeedItemProps) => {
   const time = (record.occurred_at as string) || (record.created_at as string) || ''
   const amount = Number(record.amount_cents || 0) / 100
   const direction = (record.direction as string) || (record.kind as string) || 'movement'
@@ -381,6 +398,7 @@ const FeedItem = ({ record, currency }: FeedItemProps) => {
   const activityName = (activity?.name as string) || ''
   const reactions = record.reactions as Record<string, unknown> | undefined
   const reactionCounts = (reactions?.counts as Record<string, number> | undefined) || undefined
+  const myReactions = getArray(reactions?.mine).map((value) => String(value))
   const reactionTotal = sumReactions(reactionCounts)
   const actionText = buildActionText(actorLabel, direction, kind)
 
@@ -391,11 +409,11 @@ const FeedItem = ({ record, currency }: FeedItemProps) => {
           <Text className="text-white text-[10px] font-semibold">{actorInitials}</Text>
         </View>
         <View className="flex-1">
-          <View className="flex-row items-center justify-between">
-            <Text className="text-white text-sm font-semibold">{actionText}</Text>
+          <View className="flex-row items-center justify-between gap-3">
+            <Text className="text-white text-sm font-semibold flex-1">{actionText}</Text>
             <Text className="text-white text-sm font-semibold">{moneyFormat(amount, currency)}</Text>
           </View>
-          <View className="flex-row items-center gap-2 mt-2">
+          <View className="flex-row items-center gap-2 mt-2 flex-wrap">
             <View className={`px-2 py-0.5 rounded-full border ${directionPill(direction)}`}>
               <Text className="text-[10px] uppercase">{directionLabel(direction)}</Text>
             </View>
@@ -405,19 +423,27 @@ const FeedItem = ({ record, currency }: FeedItemProps) => {
               </View>
             ) : null}
           </View>
-          <View className="flex-row items-center gap-4 mt-3">
-            <View className="flex-row items-center gap-1">
-              <Text className="text-[12px]">👍</Text>
-              <Text className="text-[10px] text-gray-400">{reactionTotal}</Text>
-            </View>
-            <View className="flex-row items-center gap-1">
-              <Text className="text-[12px]">🎉</Text>
-              <Text className="text-[10px] text-gray-400">
-                {reactionTotal > 0 ? Math.max(0, reactionTotal - 1) : 0}
-              </Text>
-            </View>
+          <View className="flex-row items-center gap-4 mt-3 flex-wrap">
+            {REACTION_OPTIONS.map((emoji) => {
+              const active = myReactions.includes(emoji)
+              const count = Number(reactionCounts?.[emoji] || 0)
+              return (
+                <TouchableOpacity
+                  key={emoji}
+                  onPress={() => onToggleReaction(record, emoji)}
+                  disabled={busyReaction === emoji}
+                  className={`flex-row items-center gap-1 rounded-full border px-2 py-1 ${
+                    active ? 'border-app-primary bg-app-primary/15' : 'border-gray-800 bg-gray-950'
+                  }`}
+                >
+                  <Text className="text-[12px]">{emoji}</Text>
+                  <Text className={`text-[10px] ${active ? 'text-app-primary' : 'text-gray-400'}`}>{count}</Text>
+                </TouchableOpacity>
+              )
+            })}
             {time ? <Text className="text-gray-500 text-[10px]">{formatTimestamp(time)}</Text> : null}
           </View>
+          <Text className="text-gray-500 text-[10px] mt-2">{reactionTotal} total reactions</Text>
         </View>
       </View>
     </View>
@@ -430,29 +456,38 @@ const CircleDetailScreen = () => {
   const router = useRouter()
   const { userProfileData } = useAuth()
   const [activeTab, setActiveTab] = useState<SegmentTab>('timeline')
-
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [data, setData] = useState<unknown>(null)
+  const [notice, setNotice] = useState<NoticeState>({ message: null, error: false, data: null })
+  const [reactionBusyKey, setReactionBusyKey] = useState<string | null>(null)
 
-  const loadCircle = useCallback(async () => {
+  const loadCircle = useCallback(async (mode: 'initial' | 'refresh' | 'silent' = 'initial') => {
     if (!circleId) return
-    setLoading(true)
-    setError(null)
+    if (mode === 'initial') setLoading(true)
+    if (mode === 'refresh') setRefreshing(true)
+    if (mode !== 'silent') setError(null)
     try {
       const res = await getCircle(circleId)
       setData(res)
     } catch {
-      setError('Unable to load this circle right now.')
+      if (mode !== 'silent') {
+        setError('Unable to load this circle right now.')
+      }
     } finally {
-      setLoading(false)
+      if (mode === 'initial') setLoading(false)
+      if (mode === 'refresh') setRefreshing(false)
     }
   }, [circleId])
 
-  useEffect(() => {
-    if (!FEATURE_CIRCLES) return
-    loadCircle()
-  }, [loadCircle])
+  useFocusEffect(
+    useCallback(() => {
+      if (!FEATURE_CIRCLES || !circleId) return undefined
+      loadCircle(data ? 'silent' : 'initial')
+      return undefined
+    }, [circleId, data, loadCircle])
+  )
 
   const circle = useMemo(() => extractCircle(data), [data])
   const recentTransactions = useMemo(() => extractRecentTransactions(data), [data])
@@ -465,6 +500,7 @@ const CircleDetailScreen = () => {
   const badgeLabel = ((circle.badge_label as string) || '').trim()
   const isFlexibleOfficial = isOfficial && circle.kyc_mode === 'flexible'
   const isOfficialFeatured = circle.visibility === 'official_featured'
+  const isFoundersCircle = isOfficialFeatured && badgeLabel.toLowerCase().includes('founder')
   const maxContributionCents = Number(circle.max_contribution_cents || 0)
   const profileRoot = (userProfileData?.data ?? userProfileData) || {}
   const isTier1User = getTierRank(profileRoot?.kyc_level || profileRoot?.user_kyc?.kyc_level) === 1
@@ -472,6 +508,7 @@ const CircleDetailScreen = () => {
   const memberCount = members.length
   const role = (circle.current_user_role as string) || 'member'
   const canWithdraw = circle.can_withdraw === true
+  const canViewAudit = !isFoundersCircle || role === 'owner' || role === 'admin'
   const owner = circle.owner as Record<string, unknown> | undefined
   const ownerIdentity = resolveIdentity(owner)
   const ownerLabel = ownerIdentity.primary
@@ -486,6 +523,63 @@ const CircleDetailScreen = () => {
       return getInitials(displayName)
     })
     .slice(0, 3)
+
+  const mergeReactionState = useCallback((txId: string, reactions: Record<string, unknown>) => {
+    setData((previous: unknown) => {
+      if (!previous || typeof previous !== 'object') return previous
+      const container = previous as Record<string, unknown>
+      const existingCircle = extractCircle(previous)
+      const existingTransactions = extractRecentTransactions(previous)
+      const updatedTransactions = existingTransactions.map((item) => {
+        const record = (item ?? {}) as Record<string, unknown>
+        if (String(record.id ?? '') !== txId) return record
+        return { ...record, reactions }
+      })
+
+      if (container.data && typeof container.data === 'object') {
+        return {
+          ...container,
+          data: {
+            ...(container.data as Record<string, unknown>),
+            recent_transactions: updatedTransactions,
+          },
+        }
+      }
+
+      return {
+        ...container,
+        ...existingCircle,
+        recent_transactions: updatedTransactions,
+      }
+    })
+  }, [])
+
+  const handleToggleReaction = useCallback(async (record: Record<string, unknown>, emoji: string) => {
+    const txId = String(record.id || '')
+    if (!txId) return
+
+    const mine = getArray((record.reactions as Record<string, unknown> | undefined)?.mine).map((value) => String(value))
+    const active = mine.includes(emoji)
+    setReactionBusyKey(`${txId}:${emoji}`)
+    setNotice({ message: null, error: false, data: null })
+
+    try {
+      const response = active ? await unreactToCircleTx(txId, emoji) : await reactToCircleTx(txId, emoji)
+      const payload = response?.data ?? response
+      if (payload?.reactions) {
+        mergeReactionState(txId, payload.reactions as Record<string, unknown>)
+      }
+    } catch (reactionError: any) {
+      const message = buildApiErrorMessage({
+        status: reactionError?.response?.status,
+        data: reactionError?.response?.data,
+        fallback: reactionError?.message || 'Unable to update reaction right now.',
+      })
+      setNotice({ message, error: true, data: null })
+    } finally {
+      setReactionBusyKey(null)
+    }
+  }, [mergeReactionState])
 
   if (!FEATURE_CIRCLES) {
     return (
@@ -506,14 +600,17 @@ const CircleDetailScreen = () => {
         <View className="flex-1 justify-center items-center px-6">
           <Text className="text-white text-center mb-4">{error}</Text>
           <TouchableOpacity
-            onPress={loadCircle}
+            onPress={() => loadCircle('initial')}
             className="bg-orange-700 px-4 py-2 rounded-lg"
           >
             <Text className="text-white">Retry</Text>
           </TouchableOpacity>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+        <ScrollView
+          contentContainerStyle={{ paddingBottom: 40 }}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadCircle('refresh')} />}
+        >
           <View className="px-4 pt-6 pb-2">
             <CircleHeader
               title={title}
@@ -538,8 +635,13 @@ const CircleDetailScreen = () => {
           </View>
 
           <View className="px-4 mt-4">
+            <NotificationAlert message={notice.message} data={notice.data} error={notice.error} />
+          </View>
+
+          <View className="px-4 mt-4">
             <ActionChips
               canWithdraw={canWithdraw}
+              canViewAudit={canViewAudit}
               onFund={() => router.push(`/circles/${circleId}/fund`)}
               onWithdraw={() => router.push(`/circles/${circleId}/withdraw`)}
               onActivities={() => router.push(`/circles/${circleId}/activities`)}
@@ -570,13 +672,20 @@ const CircleDetailScreen = () => {
                   <Text className="text-gray-300 text-sm">No activity yet.</Text>
                 </View>
               ) : (
-                recentTransactions.map((item, index) => (
-                  <FeedItem
-                    key={String((item as Record<string, unknown>)?.id ?? `tx-${index}`)}
-                    record={(item ?? {}) as Record<string, unknown>}
-                    currency={currency}
-                  />
-                ))
+                recentTransactions.map((item, index) => {
+                  const record = (item ?? {}) as Record<string, unknown>
+                  const txId = String(record.id ?? `tx-${index}`)
+                  const busyReaction = reactionBusyKey?.startsWith(`${txId}:`) ? reactionBusyKey.split(':')[1] : null
+                  return (
+                    <FeedItem
+                      key={txId}
+                      record={record}
+                      currency={currency}
+                      busyReaction={busyReaction}
+                      onToggleReaction={handleToggleReaction}
+                    />
+                  )
+                })
               )}
 
               <View className="bg-gray-900 border border-gray-800 rounded-2xl p-4 mt-4">
@@ -631,7 +740,7 @@ const CircleDetailScreen = () => {
                 <Text className="text-white text-base font-semibold">About this group</Text>
                 {isOfficial ? (
                   <Text className="text-amber-100 text-xs mt-2">
-                    Official BitBridge Circle{badgeLabel ? ` · ${badgeLabel}` : ''}
+                    Official BitBridge Circle{badgeLabel ? ` � ${badgeLabel}` : ''}
                   </Text>
                 ) : null}
                 {ownerLabel ? (
@@ -673,3 +782,4 @@ const CircleDetailScreen = () => {
 }
 
 export default CircleDetailScreen
+
