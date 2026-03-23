@@ -167,6 +167,7 @@ type CircleHeaderProps = {
   isOfficialFeatured: boolean
   isTier1User: boolean
   maxContributionCents: number
+  showWithdrawHint: boolean
 }
 
 const CircleHeader = ({
@@ -188,6 +189,7 @@ const CircleHeader = ({
   isOfficialFeatured,
   isTier1User,
   maxContributionCents,
+  showWithdrawHint,
 }: CircleHeaderProps) => {
   return (
     <View className={`rounded-3xl border p-5 ${isOfficial ? 'border-amber-500/30 bg-[#16110a]' : 'border-gray-800 bg-gray-900/80'}`}>
@@ -235,7 +237,7 @@ const CircleHeader = ({
         </TouchableOpacity>
       </View>
 
-      <View className="flex-row items-center justify-between mt-4">
+      <View className="mt-4">
         <View>
           {balanceVisible ? (
             <>
@@ -256,14 +258,14 @@ const CircleHeader = ({
             </>
           )}
         </View>
-        <View className="items-end">
+        <View className="mt-3 items-start">
           {ownerLabel ? (
             <Text className="text-gray-500 text-[10px]">Owner: {ownerLabel}</Text>
           ) : null}
           {ownerMaskedEmail && ownerMaskedEmail !== ownerLabel ? (
             <Text className="text-gray-500 text-[10px] mt-1">Contact: {ownerMaskedEmail}</Text>
           ) : null}
-          {!canWithdraw ? (
+          {showWithdrawHint ? (
             <Text className="text-gray-500 text-[10px] mt-1">Withdrawals are for owners/admins.</Text>
           ) : null}
         </View>
@@ -296,6 +298,7 @@ const CircleHeader = ({
 }
 
 type ActionChipsProps = {
+  showWithdraw: boolean
   canWithdraw: boolean
   canViewAudit: boolean
   onFund: () => void
@@ -306,6 +309,7 @@ type ActionChipsProps = {
 }
 
 const ActionChips = ({
+  showWithdraw,
   canWithdraw,
   canViewAudit,
   onFund,
@@ -321,13 +325,15 @@ const ActionChips = ({
         <TouchableOpacity onPress={onFund} className="flex-1 bg-app-primary py-3 rounded-full items-center">
           <Text className="text-black text-xs font-semibold">Fund</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          onPress={onWithdraw}
-          className={`flex-1 py-3 rounded-full items-center ${canWithdraw ? 'bg-gray-800' : 'bg-gray-700'}`}
-          disabled={!canWithdraw}
-        >
-          <Text className="text-white text-xs font-semibold">Withdraw</Text>
-        </TouchableOpacity>
+        {showWithdraw ? (
+          <TouchableOpacity
+            onPress={onWithdraw}
+            className={`flex-1 py-3 rounded-full items-center ${canWithdraw ? 'bg-gray-800' : 'bg-gray-700'}`}
+            disabled={!canWithdraw}
+          >
+            <Text className="text-white text-xs font-semibold">Withdraw</Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
 
       <View className="flex-row flex-wrap gap-2 mt-3">
@@ -384,15 +390,16 @@ type FeedItemProps = {
   currency: string
   busyReaction: string | null
   onToggleReaction: (record: Record<string, unknown>, emoji: string) => void
+  forceAnonymousActor?: boolean
 }
 
-const FeedItem = ({ record, currency, busyReaction, onToggleReaction }: FeedItemProps) => {
+const FeedItem = ({ record, currency, busyReaction, onToggleReaction, forceAnonymousActor = false }: FeedItemProps) => {
   const time = (record.occurred_at as string) || (record.created_at as string) || ''
   const amount = Number(record.amount_cents || 0) / 100
   const direction = (record.direction as string) || (record.kind as string) || 'movement'
   const kind = (record.kind as string) || ''
   const actor = record.user as Record<string, unknown> | undefined
-  const actorLabel = resolveIdentity(actor).primary
+  const actorLabel = forceAnonymousActor ? 'Anonymous Supporter' : resolveIdentity(actor).primary
   const actorInitials = getInitials(actorLabel || 'BB')
   const activity = record.circle_activity as Record<string, unknown> | undefined
   const activityName = (activity?.name as string) || ''
@@ -507,6 +514,7 @@ const CircleDetailScreen = () => {
   const members = getArray(circle.members)
   const memberCount = members.length
   const role = (circle.current_user_role as string) || 'member'
+  const isFoundersMemberView = isFoundersCircle && role !== 'owner' && role !== 'admin'
   const canWithdraw = circle.can_withdraw === true
   const canViewAudit = !isFoundersCircle || role === 'owner' || role === 'admin'
   const owner = circle.owner as Record<string, unknown> | undefined
@@ -523,6 +531,18 @@ const CircleDetailScreen = () => {
       return getInitials(displayName)
     })
     .slice(0, 3)
+
+  const visibleRecentTransactions = useMemo(
+    () =>
+      recentTransactions.filter((item) => {
+        if (!isFoundersMemberView) return true
+        const record = (item ?? {}) as Record<string, unknown>
+        const direction = String(record.direction || '').toLowerCase()
+        const kind = String(record.kind || '').toLowerCase()
+        return !(kind === 'payout' || direction === 'debit' || direction === 'out')
+      }),
+    [isFoundersMemberView, recentTransactions]
+  )
 
   const mergeReactionState = useCallback((txId: string, reactions: Record<string, unknown>) => {
     setData((previous: unknown) => {
@@ -631,6 +651,7 @@ const CircleDetailScreen = () => {
               isOfficialFeatured={isOfficialFeatured}
               isTier1User={isTier1User}
               maxContributionCents={maxContributionCents}
+              showWithdrawHint={!canWithdraw && !isFoundersMemberView}
             />
           </View>
 
@@ -640,6 +661,7 @@ const CircleDetailScreen = () => {
 
           <View className="px-4 mt-4">
             <ActionChips
+              showWithdraw={!isFoundersMemberView}
               canWithdraw={canWithdraw}
               canViewAudit={canViewAudit}
               onFund={() => router.push(`/circles/${circleId}/fund`)}
@@ -659,20 +681,22 @@ const CircleDetailScreen = () => {
               <View className="flex-row items-center justify-between mb-2">
                 <Text className="text-white text-lg font-semibold">Timeline</Text>
                 <Text className="text-gray-500 text-xs">
-                  {recentTransactions.length} update{recentTransactions.length === 1 ? '' : 's'}
+                  {visibleRecentTransactions.length} update{visibleRecentTransactions.length === 1 ? '' : 's'}
                 </Text>
               </View>
               <Text className="text-gray-400 text-xs mb-3">
-                {isOfficial
+                {isFoundersMemberView
+                  ? 'Private feed of supporter contributions and tagged campaign milestones.'
+                  : isOfficial
                   ? 'Shared feed of contributions, payouts, and tagged campaign milestones.'
                   : 'Shared feed of deposits, payouts, and tagged activity goals.'}
               </Text>
-              {recentTransactions.length === 0 ? (
+              {visibleRecentTransactions.length === 0 ? (
                 <View className="bg-gray-900 p-4 rounded-xl">
                   <Text className="text-gray-300 text-sm">No activity yet.</Text>
                 </View>
               ) : (
-                recentTransactions.map((item, index) => {
+                visibleRecentTransactions.map((item, index) => {
                   const record = (item ?? {}) as Record<string, unknown>
                   const txId = String(record.id ?? `tx-${index}`)
                   const busyReaction = reactionBusyKey?.startsWith(`${txId}:`) ? reactionBusyKey.split(':')[1] : null
@@ -683,6 +707,7 @@ const CircleDetailScreen = () => {
                       currency={currency}
                       busyReaction={busyReaction}
                       onToggleReaction={handleToggleReaction}
+                      forceAnonymousActor={isFoundersMemberView}
                     />
                   )
                 })
