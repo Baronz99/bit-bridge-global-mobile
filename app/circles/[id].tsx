@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react'
+﻿import React, { useCallback, useMemo, useState } from 'react'
 import { ActivityIndicator, RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useFocusEffect } from '@react-navigation/native'
@@ -11,7 +11,7 @@ import NotificationAlert from '@/components/notification'
 import { useAuth } from '@/services/useAuth'
 import { buildApiErrorMessage } from '@/utils/apiErrorMessage'
 
-const REACTION_OPTIONS = ['??', '??', '??'] as const
+const REACTION_OPTIONS = ['👍', '🎉', '🙏'] as const
 
 type NoticeState = {
   message: string | null
@@ -223,7 +223,7 @@ const CircleHeader = ({
               ) : null}
             </View>
             <Text className="text-gray-400 text-[10px] mt-2">
-              {memberCount} members � {role}
+              {memberCount} members � {role}
             </Text>
           </View>
         </View>
@@ -436,8 +436,8 @@ const FeedItem = ({ record, currency, busyReaction, onToggleReaction }: FeedItem
                     active ? 'border-app-primary bg-app-primary/15' : 'border-gray-800 bg-gray-950'
                   }`}
                 >
-                  <Text className="text-[12px]">{emoji}</Text>
-                  <Text className={`text-[10px] ${active ? 'text-app-primary' : 'text-gray-400'}`}>{count}</Text>
+                  <Text className="text-white text-base">{emoji}</Text>
+                  <Text className={`text-[10px] font-semibold ${active ? 'text-app-primary' : 'text-gray-300'}`}>{count}</Text>
                 </TouchableOpacity>
               )
             })}
@@ -740,7 +740,7 @@ const CircleDetailScreen = () => {
                 <Text className="text-white text-base font-semibold">About this group</Text>
                 {isOfficial ? (
                   <Text className="text-amber-100 text-xs mt-2">
-                    Official BitBridge Circle{badgeLabel ? ` � ${badgeLabel}` : ''}
+                    Official BitBridge Circle{badgeLabel ? ` � ${badgeLabel}` : ''}
                   </Text>
                 ) : null}
                 {ownerLabel ? (
@@ -782,4 +782,5 @@ const CircleDetailScreen = () => {
 }
 
 export default CircleDetailScreen
+
 
