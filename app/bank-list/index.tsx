@@ -4,10 +4,8 @@ import FormSelect from '@/components/FormSelect'
 import Loader from '@/components/Loader'
 import NotificationAlert from '@/components/notification'
 import { getBanks } from '@/api/account'
-import { useAuth } from '@/services/useAuth'
 
 const BankListScreen = () => {
-  const { onLogout } = useAuth()
   const [loading, setLoading] = useState(false)
   const [banks, setBanks] = useState<any[]>([])
   const [selectedBank, setSelectedBank] = useState<string>('')
@@ -24,11 +22,6 @@ const BankListScreen = () => {
       const list = await getBanks()
       setBanks(list)
       } catch (error: any) {
-        const status = error?.response?.status
-        if (status === 401) {
-          await onLogout().catch(() => {})
-          return
-        }
         setNotice({
           message: error?.response?.data?.message || error?.message || 'Something went wrong',
           error: true,
@@ -39,7 +32,7 @@ const BankListScreen = () => {
     }
 
     fetchBanks()
-  }, [onLogout])
+  }, [])
 
   const options = useMemo(
     () =>

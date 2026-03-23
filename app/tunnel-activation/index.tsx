@@ -26,7 +26,6 @@ const TunnelActivationScreen = () => {
   const handleError = async (error: any) => {
     const status = error?.response?.status
     if (status === 401) {
-      await onLogout().catch(() => {})
       return
     }
 

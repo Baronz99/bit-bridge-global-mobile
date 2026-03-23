@@ -303,7 +303,6 @@ const ReviewTransferScreen = () => {
         return
       }
       if (status === 401) {
-        await onLogout().catch(() => {})
         return
       }
       if (messageLower.includes('tier') || messageLower.includes('kyc')) {

@@ -47,7 +47,6 @@ const ConvertUsdToNgnScreen = () => {
   const handleError = async (error: any, options?: { forPin?: boolean }) => {
     const status = error?.response?.status
     if (status === 401) {
-      await onLogout().catch(() => {})
       return
     }
 

@@ -52,7 +52,6 @@ const SavedCardTokensScreen = () => {
     } catch (error: any) {
       const status = error?.response?.status
       if (status === 401) {
-        await onLogout().catch(() => {})
         return
       }
       const message = buildApiErrorMessage({
@@ -91,7 +90,6 @@ const SavedCardTokensScreen = () => {
     } catch (error: any) {
       const status = error?.response?.status
       if (status === 401) {
-        await onLogout().catch(() => {})
         return
       }
       const message = buildApiErrorMessage({

@@ -22,7 +22,7 @@ import {
 const AnchorAccountScreen = () => {
   const params = useLocalSearchParams()
   const router = useRouter()
-  const { onLogout, userProfileData, loadProfile } = useAuth()
+  const { userProfileData, loadProfile } = useAuth()
   const [loading, setLoading] = useState(false)
   const [notice, setNotice] = useState<{ message: string | null; error: boolean }>({
     message: null,
@@ -82,26 +82,16 @@ const AnchorAccountScreen = () => {
     try {
       await loadProfile({ force: true }).catch(() => {})
       await anchorState.refresh({ force: true })
-    } catch (error: any) {
-      const status = error?.response?.status
-      if (status === 401) {
-        await onLogout().catch(() => {})
-        return
-      }
+    } catch {
+      // Shared auth client handles refresh/retry and clears session if needed.
     }
-  }, [anchorState.refresh, loadProfile, onLogout])
+  }, [anchorState.refresh, loadProfile])
 
   useFocusEffect(
     useCallback(() => {
       handleRefresh().catch(() => {})
     }, [handleRefresh])
   )
-
-  useEffect(() => {
-    if (anchorState.error?.response?.status === 401) {
-      onLogout().catch(() => {})
-    }
-  }, [anchorState.error, onLogout])
 
   useEffect(() => {
     if (params?.refresh === '1' && !refreshHandledRef.current) {
@@ -176,7 +166,6 @@ const AnchorAccountScreen = () => {
     setLoading(true)
     setNotice({ message: null, error: false })
     let shouldRefresh = true
-    let didLogout = false
     try {
       await setupAnchorOnboarding({ account: {} })
       const refreshed = await anchorState.refresh({ force: true })
@@ -200,11 +189,7 @@ const AnchorAccountScreen = () => {
       const status = error?.response?.status ?? error?.status
       const errorCode = String(error?.error_code || error?.error || '').trim()
       const flowState = String(error?.flow?.state || error?.meta?.flow?.state || '').trim()
-      if (status === 401) {
-        didLogout = true
-        await onLogout().catch(() => {})
-        return
-      }
+      if (status === 401) return
       if (errorCode === 'kyc_required' || flowState === 'blocked_kyc') {
         setNotice({ message: error?.message || 'Complete Tier 2 verification first.', error: true })
         return
@@ -245,7 +230,7 @@ const AnchorAccountScreen = () => {
       setNotice({ message, error: true })
     } finally {
       setLoading(false)
-      if (!didLogout && shouldRefresh) {
+      if (shouldRefresh) {
         await anchorState.refresh()
       }
     }

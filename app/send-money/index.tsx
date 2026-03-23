@@ -15,7 +15,7 @@ type NoticeState = { message: string | null; error: boolean; data: any | null }
 
 const SendMoneyScreen = () => {
   const router = useRouter()
-  const { onLogout, userProfileData, loadProfile } = useAuth()
+  const { userProfileData, loadProfile } = useAuth()
   const [loading, setLoading] = useState(false)
   const [pinModalOpen, setPinModalOpen] = useState(false)
   const [pinError, setPinError] = useState<string | null>(null)
@@ -77,11 +77,7 @@ const SendMoneyScreen = () => {
         return
       }
     } catch (error: any) {
-      const statusCode = error?.response?.status
-      if (statusCode === 401) {
-        await onLogout().catch(() => {})
-        return
-      }
+      if (error?.response?.status === 401) return
     }
 
     setPinError(null)
@@ -119,10 +115,7 @@ const SendMoneyScreen = () => {
       await loadProfile({ force: true })
     } catch (error: any) {
       const status = error?.response?.status
-      if (status === 401) {
-        await onLogout().catch(() => {})
-        return
-      }
+      if (status === 401) return
       const message = buildApiErrorMessage({
         status,
         data: error?.response?.data,

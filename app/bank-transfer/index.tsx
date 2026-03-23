@@ -71,7 +71,7 @@ const extractCounterPartyId = (payload: any): string => {
 
 const BankTransferScreen = () => {
   const router = useRouter()
-  const { userProfileData, onLogout, loadProfile } = useAuth()
+  const { userProfileData, loadProfile } = useAuth()
   const scrollRef = useRef<ScrollView | null>(null)
   const accountNumberRef = useRef<TextInput | null>(null)
   const amountRef = useRef<TextInput | null>(null)
@@ -257,10 +257,7 @@ const BankTransferScreen = () => {
         }
       } catch (error: any) {
         const status = error?.response?.status
-        if (status === 401) {
-          await onLogout().catch(() => {})
-          return
-        }
+        if (status === 401) return
         setNotice({
           message: buildApiErrorMessage({
             status,
@@ -275,7 +272,7 @@ const BankTransferScreen = () => {
       }
     }
     loadData()
-  }, [onLogout, userProfileData?.wallet?.balance])
+  }, [userProfileData?.wallet?.balance])
 
   useEffect(() => {
     const quoteAmount = amountValue > 0 ? amountValue : MIN_TRANSFER_AMOUNT
