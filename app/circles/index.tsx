@@ -360,8 +360,10 @@ const CirclesScreen = () => {
                       <Text className="text-white text-xs font-semibold">{initials}</Text>
                     </View>
                     <View className="flex-1">
-                      <View className="flex-row items-center justify-between">
-                        <Text className="text-white text-base font-semibold">{title}</Text>
+                      <View className="flex-row items-center justify-between gap-3">
+                        <Text className="text-white text-base font-semibold flex-1" numberOfLines={2}>
+                          {title}
+                        </Text>
                         {balanceVisible ? (
                           <Text className="text-gray-200 text-xs">
                             {moneyFormat(balanceCents / 100)}
@@ -374,7 +376,7 @@ const CirclesScreen = () => {
                           </View>
                         )}
                       </View>
-                      <View className="flex-row items-center gap-2 mt-1">
+                      <View className="flex-row flex-wrap items-center gap-2 mt-1">
                         {isFeaturedOfficial ? (
                           <View className="bg-amber-500/10 border border-amber-400/40 rounded-full px-2 py-0.5">
                             <Text className="text-[10px] text-amber-200 uppercase">Featured</Text>
