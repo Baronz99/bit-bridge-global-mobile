@@ -17,13 +17,13 @@ const AnchorKycVerify = () => {
       <View className="pt-10">
         <Text className="text-white text-2xl font-semibold">Anchor KYC</Text>
         <Text className="text-gray-400 mt-2">
-          KYC verification now happens inside Virtual Accounts.
+          KYC verification now happens inside Deposit Accounts.
         </Text>
         <TouchableOpacity
           onPress={() => router.replace('/accounts')}
           className="bg-app-primary py-4 rounded-xl mt-6"
         >
-          <Text className="text-white text-center font-medium">Go to Virtual Accounts</Text>
+          <Text className="text-white text-center font-medium">Go to Deposit Accounts</Text>
         </TouchableOpacity>
       </View>
     </View>

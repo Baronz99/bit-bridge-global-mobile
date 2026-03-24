@@ -521,7 +521,7 @@ const WalletScreen = () => {
                       if (!raw) {
                         Alert.alert(
                           'Account number hidden',
-                          'Open Virtual Accounts to view the full number.'
+                          'Open Deposit Accounts to view the full number.'
                         )
                         return
                       }
@@ -560,7 +560,7 @@ const WalletScreen = () => {
             ) : (
               <View className="mt-3">
                 <Text className="text-gray-300 text-xs">
-                  Set up a virtual account to receive NGN deposits.
+                  Set up a deposit account to receive NGN deposits.
                 </Text>
 
                 <TouchableOpacity

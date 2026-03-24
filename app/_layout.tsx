@@ -201,7 +201,7 @@ export default function RootLayout() {
         <Stack.Screen name="send-money/index" options={{ headerTitle: 'Send Money' }} />
         <Stack.Screen name="bank-transfer" options={{ headerShown: false }} />
         <Stack.Screen name="transfer-status/index" options={{ headerTitle: 'Transfer Status' }} />
-        <Stack.Screen name="anchor-account/index" options={{ headerTitle: 'Anchor Account' }} />
+        <Stack.Screen name="anchor-account/index" options={{ headerTitle: 'Deposit Account' }} />
 
         <Stack.Screen name="tunnel-activation/index" options={{ headerTitle: 'Tunnel Activation' }} />
         <Stack.Screen
@@ -270,7 +270,7 @@ export default function RootLayout() {
 
         <Stack.Screen name="accountProfile/index" options={{ headerTitle: 'Update Profile' }} />
         <Stack.Screen name="accountDetails/index" options={{ headerTitle: 'Account Details' }} />
-        <Stack.Screen name="accounts/index" options={{ headerTitle: 'Virtual Accounts' }} />
+        <Stack.Screen name="accounts/index" options={{ headerTitle: 'Deposit Accounts' }} />
         <Stack.Screen name="accounts/create" options={{ headerTitle: 'Create Account' }} />
         <Stack.Screen name="cards/index" options={{ headerTitle: 'Cards' }} />
         <Stack.Screen name="cards/[id]" options={{ headerTitle: 'Card Details' }} />

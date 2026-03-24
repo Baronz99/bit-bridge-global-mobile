@@ -36,8 +36,8 @@ const Utilities = () => {
       },
       {
         title: 'Accounts',
-        description: 'View and manage virtual accounts.',
-        items: [{ id: 12, label: 'Virtual Accounts', link: '/accounts', image: icons.wallet }],
+        description: 'View and manage deposit accounts.',
+        items: [{ id: 12, label: 'Deposit Accounts', link: '/accounts', image: icons.wallet }],
       },
     ],
     [canUseBankTransfer]

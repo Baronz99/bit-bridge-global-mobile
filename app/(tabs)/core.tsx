@@ -34,7 +34,7 @@ export default function CoreHub() {
             icon: <FontAwesome name="user-o" size={18} color="white" />,
           },
           {
-            label: 'Virtual Accounts',
+            label: 'Deposit Accounts',
             href: '/accounts',
             icon: <Ionicons name="card-outline" size={18} color="white" />,
           },

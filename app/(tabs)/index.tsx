@@ -316,7 +316,7 @@ export default function Index() {
   const quickItems = useMemo(
     () =>
       [
-        { id: 10, label: 'Virtual Account', link: '/anchor-account', image: icons.wallet },
+        { id: 10, label: 'Deposit Account', link: '/anchor-account', image: icons.wallet },
         { id: 0, label: 'Airtime', link: '/airtime-top-up', image: icons.call },
         { id: 2, label: 'Data', link: '/data-subscription', image: icons.data },
         { id: 1, label: 'Electricity', link: '/electricity-provider', image: icons.power },

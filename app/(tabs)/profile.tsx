@@ -70,7 +70,7 @@ const Profile = () => {
           icon: <FontAwesome name="user-o" size={18} color="white" />,
         },
         {
-          label: 'Virtual Accounts',
+          label: 'Deposit Accounts',
           href: '/accounts',
           icon: <Ionicons name="card-outline" size={18} color="white" />,
         },
@@ -268,7 +268,7 @@ const Profile = () => {
             <View className="flex-row gap-3 mt-4">
               <Link href={'/accounts' as any} asChild>
                 <TouchableOpacity className="flex-1 bg-app-primary rounded-xl py-3">
-                  <Text className="text-white text-center text-xs font-semibold">Virtual Accounts</Text>
+                  <Text className="text-white text-center text-xs font-semibold">Deposit Accounts</Text>
                 </TouchableOpacity>
               </Link>
               <Link href={'/cards' as any} asChild>

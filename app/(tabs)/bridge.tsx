@@ -46,7 +46,7 @@ export default function BridgeHub() {
           : []),
         { id: 'beneficiaries', label: 'Beneficiaries', link: '/beneficiaries', image: icons.user },
         { id: 'fund', label: 'Fund Wallet', link: '/fundWallet', image: icons.walletColor },
-        { id: 'virtual-account', label: 'Virtual Account', link: '/anchor-account', image: icons.wallet },
+        { id: 'virtual-account', label: 'Deposit Account', link: '/anchor-account', image: icons.wallet },
       ] as HubItem[],
     [canUseBankTransfer]
   )
