@@ -7,7 +7,8 @@ type Props = {
 }
 
 const ICON_CONTAINER_SIZE = 56
-const LABEL_WIDTH = 80
+const LABEL_WIDTH = 100
+const LABEL_MIN_HEIGHT = 32
 
 const ViewBox = ({ icon, label }: Props) => {
   return (
@@ -21,9 +22,8 @@ const ViewBox = ({ icon, label }: Props) => {
 
       <Text
         className="text-white text-xs mt-2 text-center"
-        style={{ width: LABEL_WIDTH }}
-        numberOfLines={1}
-        ellipsizeMode="tail"
+        style={{ width: LABEL_WIDTH, minHeight: LABEL_MIN_HEIGHT }}
+        numberOfLines={2}
       >
         {label}
       </Text>
