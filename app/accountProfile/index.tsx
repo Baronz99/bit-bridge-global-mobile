@@ -2,7 +2,6 @@ import {
   ActivityIndicator,
   Image,
   Modal,
-  Platform,
   ScrollView,
   Text,
   TextInput,
@@ -23,6 +22,23 @@ import FormSelect from '@/components/FormSelect'
 import AppModal from '@/components/modal/Modal'
 import { router } from 'expo-router'
 import { setConfirmationFlow, setEmailForVerification } from '@/auth/tokenstore'
+
+const formatLocalDate = (value: Date) => {
+  const year = value.getFullYear()
+  const month = String(value.getMonth() + 1).padStart(2, '0')
+  const day = String(value.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const parseStoredDate = (value: string) => {
+  const normalized = String(value || '').trim()
+  if (!normalized) return null
+  const [year, month, day] = normalized.split('-').map(Number)
+  if (!year || !month || !day) return null
+  return new Date(year, month - 1, day)
+}
+
+const DOB_MIN_DATE = new Date(1900, 0, 1)
 
 const countryOptions = [
   'Nigeria',
@@ -140,13 +156,13 @@ const defaultProfileFormValues: ProfileFormValues = {
 
 const normalizeDateString = (value?: string | Date | null) => {
   if (!value) return ''
-  if (value instanceof Date) return value.toISOString().split('T')[0]
+  if (value instanceof Date) return formatLocalDate(value)
   const cleaned = String(value).trim()
   if (!cleaned) return ''
   if (/^\d{4}-\d{2}-\d{2}$/.test(cleaned)) return cleaned
   const parsed = Date.parse(cleaned)
   if (Number.isNaN(parsed)) return ''
-  return new Date(parsed).toISOString().split('T')[0]
+  return formatLocalDate(new Date(parsed))
 }
 
 const normalizeOptionalString = (value?: string | null) => {
@@ -429,11 +445,11 @@ const DateField = ({
     >
       <Text className="text-white" style={{ lineHeight: 20 }}>
         {value
-          ? new Date(value).toLocaleDateString(undefined, {
+          ? parseStoredDate(value)?.toLocaleDateString(undefined, {
               day: '2-digit',
               month: 'short',
               year: 'numeric',
-            })
+            }) || 'Add date of birth'
           : 'Add date of birth'}
       </Text>
       <Text className="text-gray-500 text-lg" style={{ lineHeight: 20 }}>{'>'}</Text>
@@ -594,7 +610,7 @@ const index = () => {
 
       await loadProfile({ force: true })
       setFormInput(payload)
-      setDateValue(payload.date_of_birth ? new Date(payload.date_of_birth) : null)
+      setDateValue(payload.date_of_birth ? parseStoredDate(payload.date_of_birth) : null)
       initialSnapshotRef.current = JSON.stringify(payload)
       setIsEditing(false)
 
@@ -616,7 +632,7 @@ const index = () => {
     if (userProfileData) {
       const mapped = fromApiProfileToForm(userProfileData)
       setFormInput(mapped)
-      setDateValue(mapped.date_of_birth ? new Date(mapped.date_of_birth) : null)
+      setDateValue(mapped.date_of_birth ? parseStoredDate(mapped.date_of_birth) : null)
       initialSnapshotRef.current = JSON.stringify(mapped)
     }
   }, [userProfileData])
@@ -695,7 +711,7 @@ const index = () => {
                         if (initial) {
                           const parsed = JSON.parse(initial) as ProfileFormValues
                           setFormInput(parsed)
-                          setDateValue(parsed.date_of_birth ? new Date(parsed.date_of_birth) : null)
+                          setDateValue(parsed.date_of_birth ? parseStoredDate(parsed.date_of_birth) : null)
                         }
                         setIsEditing(false)
                       } else {
@@ -753,11 +769,11 @@ const index = () => {
                       label="Date of Birth"
                       value={
                         formInput.date_of_birth
-                          ? new Date(formInput.date_of_birth).toLocaleDateString(undefined, {
+                          ? parseStoredDate(formInput.date_of_birth)?.toLocaleDateString(undefined, {
                               day: '2-digit',
                               month: 'short',
                               year: 'numeric',
-                            })
+                            }) || ''
                           : ''
                       }
                     />
@@ -898,13 +914,14 @@ const index = () => {
           <DateTimePicker
             value={dateValue || new Date(1990, 0, 1)}
             mode="date"
-            display={Platform.OS === 'ios' ? 'inline' : 'calendar'}
+            display="spinner"
+            minimumDate={DOB_MIN_DATE}
             maximumDate={new Date()}
             onChange={(_, selected) => {
               setShowDatePicker(false)
               if (selected) {
                 setDateValue(selected)
-                const formatted = selected.toISOString().split('T')[0]
+                const formatted = formatLocalDate(selected)
                 setFormInput((prev) => ({ ...prev, date_of_birth: formatted }))
               }
             }}

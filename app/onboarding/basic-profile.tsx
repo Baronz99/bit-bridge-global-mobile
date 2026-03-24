@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { ActivityIndicator, Platform, Text, TouchableOpacity, View } from 'react-native'
+import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native'
 import FormInput from '@/components/FormInput'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
 import { updateBasicProfile, saveOnboardingStage } from '@/api/onboarding'
@@ -7,6 +7,34 @@ import { FEATURE_ONBOARDING } from '@/constants/featureFlags'
 import { buildApiErrorMessage } from '@/utils/apiErrorMessage'
 import { useAuth } from '@/services/useAuth'
 import DateTimePicker from '@react-native-community/datetimepicker'
+
+const formatLocalDate = (value: Date) => {
+  const year = value.getFullYear()
+  const month = String(value.getMonth() + 1).padStart(2, '0')
+  const day = String(value.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const parseStoredDate = (value: string) => {
+  const normalized = String(value || '').trim()
+  if (!normalized) return null
+  const [year, month, day] = normalized.split('-').map(Number)
+  if (!year || !month || !day) return null
+  return new Date(year, month - 1, day)
+}
+
+const formatDisplayDate = (value: string) => {
+  const parsed = parseStoredDate(value)
+  if (!parsed) return 'Select date of birth'
+
+  return parsed.toLocaleDateString(undefined, {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
+const DOB_MIN_DATE = new Date(1900, 0, 1)
 
 const BasicProfile = () => {
   const { userProfileData, loadProfile } = useAuth()
@@ -32,7 +60,7 @@ const BasicProfile = () => {
       date_of_birth: profile?.date_of_birth ? String(profile.date_of_birth).slice(0, 10) : prev.date_of_birth,
     }))
     if (profile?.date_of_birth) {
-      const parsed = new Date(String(profile.date_of_birth))
+      const parsed = parseStoredDate(String(profile.date_of_birth))
       if (!Number.isNaN(parsed.getTime())) setDateValue(parsed)
     }
   }, [userProfileData])
@@ -106,15 +134,7 @@ const BasicProfile = () => {
                 onPress={() => setShowDatePicker(true)}
                 className="bg-[#111827] border border-[rgba(255,255,255,0.12)] rounded-2xl px-4 py-3"
               >
-                <Text className="text-white">
-                  {form.date_of_birth
-                    ? new Date(form.date_of_birth).toLocaleDateString(undefined, {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric',
-                      })
-                    : 'Select date of birth'}
-                </Text>
+                <Text className="text-white">{formatDisplayDate(form.date_of_birth)}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -139,12 +159,13 @@ const BasicProfile = () => {
         <DateTimePicker
           value={dateValue || new Date(1990, 0, 1)}
           mode="date"
-          display={Platform.OS === 'ios' ? 'inline' : 'calendar'}
+          display="spinner"
+          minimumDate={DOB_MIN_DATE}
           maximumDate={new Date()}
           onChange={(_, selectedDate) => {
             setShowDatePicker(false)
             if (!selectedDate) return
-            const iso = selectedDate.toISOString().slice(0, 10)
+            const iso = formatLocalDate(selectedDate)
             setDateValue(selectedDate)
             setForm((prev) => ({ ...prev, date_of_birth: iso }))
           }}
