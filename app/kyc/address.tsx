@@ -23,7 +23,8 @@ const AddressVerificationScreen = () => {
   const kyc = userRoot?.user_kyc || {}
 
   const [saving, setSaving] = useState(false)
-  const [notice, setNotice] = useState<string | null>(null)
+  const [errorNotice, setErrorNotice] = useState<string | null>(null)
+  const [successNotice, setSuccessNotice] = useState<string | null>(null)
   const [proofType, setProofType] = useState('')
   const [proofDocument, setProofDocument] = useState<{
     uri: string
@@ -44,6 +45,8 @@ const AddressVerificationScreen = () => {
   )
 
   const pickProof = async () => {
+    setErrorNotice(null)
+    setSuccessNotice(null)
     const result = await DocumentPicker.getDocumentAsync({
       type: ['image/*', 'application/pdf'],
       copyToCacheDirectory: true,
@@ -57,20 +60,21 @@ const AddressVerificationScreen = () => {
 
   const handleSave = async () => {
     if (!tier3Eligible) {
-      setNotice('Complete Tier 3 live selfie verification before submitting address verification.')
+      setErrorNotice('Complete Tier 3 live selfie verification before submitting address verification.')
       return
     }
     if (!proofType) {
-      setNotice('Select a proof of address type.')
+      setErrorNotice('Select a proof of address type.')
       return
     }
     if (!proofDocument && !hasProofOnFile) {
-      setNotice('Upload a proof of address document to continue.')
+      setErrorNotice('Upload a proof of address document to continue.')
       return
     }
 
     setSaving(true)
-    setNotice(null)
+    setErrorNotice(null)
+    setSuccessNotice(null)
     try {
       const payload: KycDocumentsPayload = {
         user_profile_id: profile?.id,
@@ -79,10 +83,11 @@ const AddressVerificationScreen = () => {
       if (proofDocument) payload.proof_of_address = proofDocument
       await updateKycDocuments(payload)
       await loadProfile({ force: true })
-      setNotice('Address verification details saved successfully.')
+      setSuccessNotice('Address verification submitted successfully.')
+      setProofDocument(null)
     } catch (error: unknown) {
       const e = error as { response?: { data?: { message?: string; error?: string } }; message?: string }
-      setNotice(e?.response?.data?.message || e?.response?.data?.error || e?.message || 'Unable to save address verification.')
+      setErrorNotice(e?.response?.data?.message || e?.response?.data?.error || e?.message || 'Unable to save address verification.')
     } finally {
       setSaving(false)
     }
@@ -130,10 +135,44 @@ const AddressVerificationScreen = () => {
               {proofDocument?.name || (hasProofOnFile ? 'Document on file' : 'Choose file')}
             </Text>
           </TouchableOpacity>
+          <Text className="text-gray-500 text-[11px] mt-2">
+            Proof of address must be a JPG, PNG, or PDF file.
+          </Text>
+          {proofDocument ? (
+            <Text className="text-sky-300 text-[11px] mt-2">
+              Selected locally: {proofDocument.name || 'Proof document'}.
+            </Text>
+          ) : null}
+          {hasProofOnFile ? (
+            <Text className="text-emerald-300 text-[11px] mt-2">
+              A proof of address document is already saved on your account.
+            </Text>
+          ) : null}
         </View>
       </View>
 
-      {notice ? <Text className="text-yellow-400 text-xs mt-4">{notice}</Text> : null}
+      {saving ? (
+        <View className="mt-4 rounded-2xl border border-sky-700/40 bg-sky-900/20 p-4">
+          <Text className="text-sky-100 text-xs font-semibold">Uploading proof of address...</Text>
+          <Text className="text-sky-200 text-[11px] mt-1">
+            Keep this screen open until your address verification is saved.
+          </Text>
+        </View>
+      ) : null}
+
+      {errorNotice ? (
+        <View className="mt-4 rounded-2xl border border-yellow-700/40 bg-yellow-900/20 p-4">
+          <Text className="text-yellow-100 text-xs font-semibold">Address verification was not saved</Text>
+          <Text className="text-yellow-200 text-[11px] mt-1">{errorNotice}</Text>
+        </View>
+      ) : null}
+
+      {successNotice ? (
+        <View className="mt-4 rounded-2xl border border-emerald-700/40 bg-emerald-900/20 p-4">
+          <Text className="text-emerald-100 text-xs font-semibold">Address verification saved</Text>
+          <Text className="text-emerald-200 text-[11px] mt-1">{successNotice}</Text>
+        </View>
+      ) : null}
 
       <TouchableOpacity
         onPress={handleSave}
@@ -150,6 +189,7 @@ const AddressVerificationScreen = () => {
       <TouchableOpacity
         onPress={() => router.back()}
         className="border border-gray-800 py-3 rounded-xl mt-3"
+        disabled={saving}
       >
         <Text className="text-white text-center">Back</Text>
       </TouchableOpacity>
