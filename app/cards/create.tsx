@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
 import FormInput from '@/components/FormInput'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
-import { getCardSetupStatus, getUserCards, setupCard, setupCardholder } from '@/api/cards'
+import { getCardSetupQuote, getCardSetupStatus, getUserCards, setupCard } from '@/api/cards'
 import { uploadSelfieToCloudinary } from '@/api/uploads'
 import { useAuth } from '@/services/useAuth'
 import { resolveUserProfile } from '@/services/auth/resolveUserProfile'
@@ -116,6 +116,8 @@ const CreateCard = () => {
       currency: prev.currency || 'USD',
     }))
   }, [profileDefaults])
+
+  const setupQuote = useMemo(() => getCardSetupQuote(form.card_limit), [form.card_limit])
 
   const hasKycAccess = () => {
     const kycLevel = profileRoot?.kyc_level || profileRoot?.user_kyc?.kyc_level
@@ -310,50 +312,9 @@ const CreateCard = () => {
         setLoading(false)
         return
       }
-      const cardholderPayload: any = {
-        ...payload,
-        registration_mode: 'async',
-        id_type: 'NIGERIAN_BVN_VERIFICATION',
-      }
+      let selfieImage: string | undefined
       if (selfieLocalUri || selfieImageUrl) {
-        cardholderPayload.selfie_image = await ensureSelfieUrl()
-      }
-
-      const cardholderRes = await setupCardholder(cardholderPayload, nextIdempotencyKey())
-      const cardholderState = String(cardholderRes?.state || '').toLowerCase()
-      const cardholderData = cardholderRes?.data || {}
-
-      if (cardholderState === 'needs_selfie_upload') {
-        setNotice('Selfie is required to verify cardholder. Upload a selfie and retry.')
-        setLoading(false)
-        return
-      }
-
-      if (cardholderState === 'cardholder_profile_incomplete') {
-        const missing = Array.isArray(cardholderData?.missing_fields) ? cardholderData.missing_fields.join(', ') : ''
-        setNotice(missing ? `Complete required fields: ${missing}` : (cardholderRes?.message || 'Complete required profile fields.'))
-        setLoading(false)
-        return
-      }
-
-      if (cardholderState === 'cardholder_pending' || cardholderState === 'provider_pending') {
-        await refreshCardholderState()
-        setNotice(cardholderRes?.message || 'Cardholder verification is pending. Please refresh status shortly.')
-        setLoading(false)
-        return
-      }
-
-      if (cardholderState === 'cardholder_failed') {
-        setNotice(cardholderRes?.message || 'Cardholder verification failed. Update profile details and retry.')
-        setLoading(false)
-        return
-      }
-
-      if (cardholderState !== 'cardholder_verified' && cardholderState !== 'active') {
-        await refreshCardholderState()
-        setNotice(cardholderRes?.message || 'Cardholder setup incomplete. Please retry.')
-        setLoading(false)
-        return
+        selfieImage = await ensureSelfieUrl()
       }
 
       const setupRes = await setupCard(
@@ -361,16 +322,51 @@ const CreateCard = () => {
           ...payload,
           registration_mode: 'async',
           id_type: 'NIGERIAN_BVN_VERIFICATION',
+          selfie_image: selfieImage,
           wallet_type: 'usd',
           currency: form.currency || 'USD',
           card_limit: normalizedCardLimit,
           card_pin: cardPin,
+          requested_funding_usd: setupQuote.minimumFundingUsd,
         },
         nextIdempotencyKey()
       )
 
       const setupState = String(setupRes?.state || '').toLowerCase()
       const setupData = setupRes?.data || {}
+
+      if (setupState === 'needs_selfie_upload') {
+        setNotice('Take or upload a selfie to finish card verification and continue.')
+        setLoading(false)
+        return
+      }
+
+      if (setupState === 'cardholder_profile_incomplete') {
+        const missingFields = Array.isArray(setupData?.missing_fields)
+          ? setupData.missing_fields.join(', ')
+          : ''
+        setNotice(
+          missingFields
+            ? `Complete required fields: ${missingFields}`
+            : (setupRes?.message || 'Complete required profile fields to continue.')
+        )
+        setLoading(false)
+        return
+      }
+
+      if (setupState === 'cardholder_pending' || setupState === 'provider_pending') {
+        await refreshCardholderState()
+        setNotice(setupRes?.message || 'We are verifying your cardholder profile. Refresh status shortly.')
+        setLoading(false)
+        return
+      }
+
+      if (setupState === 'cardholder_failed') {
+        await refreshCardholderState()
+        setNotice(setupRes?.message || 'Cardholder verification failed. Update your details and retry.')
+        setLoading(false)
+        return
+      }
 
       if (setupState === 'insufficient_balance') {
         const shortfall = Number(setupData?.shortfall_usd || 0)
@@ -426,7 +422,7 @@ const CreateCard = () => {
         <View className="pt-8">
           <Text className="text-white text-2xl font-semibold">Create Card</Text>
           <Text className="text-gray-400 mt-1">
-            Enter your details to issue a virtual card.
+            Create and fund your virtual card in one flow.
           </Text>
 
           <View className="mt-6">
@@ -527,6 +523,21 @@ const CreateCard = () => {
                 <Text className="text-emerald-400 text-xs mt-2">Selfie upload ready.</Text>
               ) : null}
             </View>
+            <View className="mt-4 rounded-xl border border-emerald-700/40 bg-emerald-900/20 p-3">
+              <Text className="text-emerald-100 text-xs font-semibold">Card setup summary</Text>
+              <Text className="text-emerald-200 text-[11px] mt-1">
+                Card limit: {setupQuote.normalizedLimit === '1000000' ? '$10,000' : '$5,000'}
+              </Text>
+              <Text className="text-emerald-200 text-[11px] mt-1">
+                Minimum funding at creation: ${setupQuote.minimumFundingUsd.toFixed(2)}
+              </Text>
+              <Text className="text-emerald-200 text-[11px] mt-1">
+                Card creation fee: ${setupQuote.creationFeeUsd.toFixed(2)}
+              </Text>
+              <Text className="text-emerald-100 text-[11px] mt-2 font-semibold">
+                Required balance now: ${setupQuote.requiredTotalUsd.toFixed(2)}
+              </Text>
+            </View>
             <View className="mt-3">
               <Text className="text-gray-400 text-xs">
                 Cardholder status: {cardholderStatus.replace('_', ' ') || 'idle'}
@@ -545,8 +556,8 @@ const CreateCard = () => {
                   </Text>
                   <Text className="text-sky-200 text-[11px] mt-1">
                     {cardholderStatus === 'failed'
-                      ? 'Re-submit cardholder details to continue.'
-                      : 'Card creation unlocks automatically after provider confirmation webhook.'}
+                      ? 'Retry card creation after correcting the verification issue.'
+                      : 'Your card request is still in verification. You do not need to restart from scratch.'}
                   </Text>
                   <TouchableOpacity
                     disabled={refreshingStatus || loading}
@@ -567,7 +578,7 @@ const CreateCard = () => {
           <TouchableOpacity
             onPress={handleSubmit}
             className="bg-app-primary py-4 rounded-xl mt-6"
-            disabled={loading || uploading}
+            disabled={loading || uploading || ['pending_verification', 'manual_review'].includes(cardholderStatus)}
           >
             {loading || uploading ? (
               <ActivityIndicator />
@@ -575,9 +586,7 @@ const CreateCard = () => {
               <Text className="text-white text-center font-medium">
                 {['pending_verification', 'manual_review'].includes(cardholderStatus)
                   ? 'Verification Pending'
-                  : cardholderStatus === 'verified'
-                    ? 'Create Card'
-                    : 'Verify Cardholder'}
+                  : 'Create Card'}
               </Text>
             )}
           </TouchableOpacity>

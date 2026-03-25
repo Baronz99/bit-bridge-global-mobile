@@ -127,6 +127,25 @@ export const setupCardholder = async (
   }
 }
 
+export const getCardSetupQuote = (cardLimit?: string) => {
+  const normalized = String(cardLimit || '')
+    .replace(/[^0-9]/g, '')
+    .trim()
+
+  const normalizedLimit =
+    normalized === '10000' || normalized === '1000000' ? '1000000' : '500000'
+
+  const minimumFundingUsd = normalizedLimit === '1000000' ? 4 : 3
+  const creationFeeUsd = 4
+
+  return {
+    normalizedLimit,
+    minimumFundingUsd,
+    creationFeeUsd,
+    requiredTotalUsd: creationFeeUsd + minimumFundingUsd,
+  }
+}
+
 export const getCardSetupStatus = async () => {
   const endpoint = '/cards/setup_status'
   try {
