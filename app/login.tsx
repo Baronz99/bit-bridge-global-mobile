@@ -1,7 +1,6 @@
 import {
   ActivityIndicator,
   Image,
-  StyleSheet,
   Text,
   TouchableOpacity,
   View,
@@ -28,6 +27,15 @@ const Login = () => {
 
   const { onLogin, authState } = useAuth()
 
+  const authInputStyle = {
+    backgroundColor: '#0F172A',
+    color: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#4B5563',
+    marginBottom: 4,
+  }
+
   const handleLogin = async () => {
     try {
       setErrorMessage(null)
@@ -41,10 +49,11 @@ const Login = () => {
 
       setLoading(true)
       await onLogin({ email, password })
-      router.replace('/' as any)
-    } catch (err: any) {
-      setErrorMessage(err?.message || 'Login failed')
-      logError('Login error:', err?.message || err)
+      router.replace('/')
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Login failed'
+      setErrorMessage(message)
+      logError('Login error:', message)
     } finally {
       setLoading(false)
     }
@@ -64,22 +73,25 @@ const Login = () => {
               textContentType="emailAddress"
               keyboardType="email-address"
               onChangeText={(value: string) => setFormInput({ ...formInput, email: value })}
-
-              className="border-gray-600 border-b text-white my-0 py-4 border-b-1 text-base font-semibold px-3 "
+              style={authInputStyle}
+              className="text-white my-0 py-4 text-base font-semibold px-3"
             />
 
             <FormInput
               placeholder="Enter Password"
+              value={formInput.password}
               isPassword
               secureTextEntry={hidePassword}
               hidePassword={hidePassword}
               setHidePassword={setHidePassword}
+              textContentType="password"
+              autoComplete="password"
               onChangeText={(value: string) => setFormInput({ ...formInput, password: value })}
-
-              className="border-gray-600 text-white border-b py-4 my-0 border-b-1 text-base font-semibold px-3 "
+              style={authInputStyle}
+              className="text-white py-4 my-0 text-base font-semibold px-3"
             />
 
-            <Link href={"/forgot-password" as any} className="text-alt text-right mt-2">
+            <Link href="/forgot-password" className="text-alt text-right mt-2">
               Forgot password?
             </Link>
 
@@ -108,9 +120,9 @@ const Login = () => {
 
           <TouchableOpacity className="w-full m-auto mt-auto py-3 flex-row">
             <Text className="text-white w-full border-gray-800 border-b py-2 text-center">
-              Don't have an account?{' '}
+              Don&apos;t have an account?{' '}
               <Link
-                href={"/sign-up" as any}
+                href="/sign-up"
                 className="text-center border-gray-100 border-b text-alt py-2"
               >
                 Sign Up
@@ -124,5 +136,3 @@ const Login = () => {
 }
 
 export default Login
-
-const styles = StyleSheet.create({})
