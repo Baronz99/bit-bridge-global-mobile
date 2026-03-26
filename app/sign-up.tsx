@@ -8,7 +8,7 @@ import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoi
 
 const SignUp = () => {
   const router = useRouter()
-  const [errorMessage, setErrorMessage] = useState<null | string>(null)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   const [formInput, setFormInput] = useState({
     email: '',
@@ -17,10 +17,18 @@ const SignUp = () => {
   })
 
   const [loading, setLoading] = useState(false)
-
   const [hidePassword, setHidePassword] = useState(true)
 
   const { onRegister } = useAuth()
+
+  const authInputStyle = {
+    backgroundColor: '#0F172A',
+    color: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#4B5563',
+    marginBottom: 4,
+  }
 
   const handleSignUp = async () => {
     setLoading(true)
@@ -35,57 +43,69 @@ const SignUp = () => {
         throw new Error('Passwords do not match.')
       }
 
-      const result = await onRegister(formInput)
-
-      setLoading(false)
+      await onRegister(formInput)
       router.push('/confirmEmail')
-    } catch (error: any) {
-      // Handle errors during the login process
-      setErrorMessage(error.message)
+    } catch (error: unknown) {
+      setErrorMessage(error instanceof Error ? error.message : 'Unable to register')
+    } finally {
       setLoading(false)
     }
   }
+
   return (
-    <View className="flex-1  bg-gray-950">
+    <View className="flex-1 bg-gray-950 px-4">
       <KeyboardAvoidWrapper>
         <View>
           <Image source={icons.appLogo} className="w-full h-48 0 mt-20 mb-5 mx-auto" />
 
-          <View className="">
+          <View>
             <FormInput
               placeholder="Email Address"
+              value={formInput.email}
+              autoComplete="email"
+              textContentType="emailAddress"
+              keyboardType="email-address"
               onChangeText={(value: string) => setFormInput({ ...formInput, email: value })}
-              className="border-gray-600 border-b text-white  my-0 py-4 border-b-1 text-base font-semibold px-3 "
+              style={authInputStyle}
+              className="text-white my-0 py-4 text-base font-semibold px-3"
             />
             <FormInput
               placeholder="Enter Password"
-              isPassword={true}
+              value={formInput.password}
+              isPassword
               secureTextEntry={hidePassword}
               hidePassword={hidePassword}
               setHidePassword={setHidePassword}
+              textContentType="newPassword"
+              autoComplete="new-password"
               onChangeText={(value: string) => setFormInput({ ...formInput, password: value })}
-              className="border-gray-600 text-white border-b py-4 my-0  border-b-1 text-base font-semibold px-3 "
+              style={authInputStyle}
+              className="text-white py-4 my-0 text-base font-semibold px-3"
             />
             <FormInput
               placeholder="Confirm Password"
-              isPassword={true}
+              value={formInput.confirm_password}
+              isPassword
               secureTextEntry={hidePassword}
               hidePassword={hidePassword}
               setHidePassword={setHidePassword}
+              textContentType="newPassword"
+              autoComplete="new-password"
               onChangeText={(value: string) => setFormInput({ ...formInput, confirm_password: value })}
-              className="border-gray-600 text-white border-b py-4 my-0  border-b-1 text-base font-semibold px-3 "
+              style={authInputStyle}
+              className="text-white py-4 my-0 text-base font-semibold px-3"
             />
             <Text className="text-red-600">{errorMessage} </Text>
 
             <TouchableOpacity
-              className="py-3  flex-row items-center flex justify-center mt-10  bg-app-primary rounded-lg"
+              className="py-3 flex-row items-center flex justify-center mt-10 bg-app-primary rounded-lg"
               onPress={handleSignUp}
               disabled={loading}
             >
               {loading ? (
                 <ActivityIndicator />
               ) : (
-                <Text className=" font-semibold text-base text-gray-100">Register</Text>
+                <Text className="font-semibold text-base text-gray-100">Register</Text>
               )}
             </TouchableOpacity>
             <Text className="text-gray-400 text-xs mt-4 text-center">
