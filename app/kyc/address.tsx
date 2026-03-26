@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native'
-import * as DocumentPicker from 'expo-document-picker'
 import { useRouter } from 'expo-router'
 import ScreenContainer from '@/components/ScreenContainer'
 import FormSelect from '@/components/FormSelect'
 import { KycDocumentsPayload, updateKycDocuments } from '@/api/kycDocuments'
 import { useAuth } from '@/services/useAuth'
+import { pickKycUpload } from '@/utils/kycUploadPicker'
 
 const PROOF_OPTIONS = [
   { label: 'Select proof type', value: '' },
@@ -44,18 +44,21 @@ const AddressVerificationScreen = () => {
     [tier, tier3Status]
   )
 
+  const parseErrorMessage = (error: unknown) => {
+    const e = error as { response?: { data?: { message?: string; error?: string } }; message?: string }
+    return e?.response?.data?.message || e?.response?.data?.error || e?.message || 'Unable to save address verification.'
+  }
+
   const pickProof = async () => {
     setErrorNotice(null)
     setSuccessNotice(null)
-    const result = await DocumentPicker.getDocumentAsync({
-      type: ['image/*', 'application/pdf'],
-      copyToCacheDirectory: true,
-      multiple: false,
-    })
-    if (result.canceled) return
-    const asset = result.assets?.[0]
-    if (!asset?.uri) return
-    setProofDocument({ uri: asset.uri, name: asset.name, type: asset.mimeType || 'application/octet-stream' })
+    try {
+      const document = await pickKycUpload({ title: 'Upload proof of address' })
+      if (!document) return
+      setProofDocument(document)
+    } catch (error: unknown) {
+      setErrorNotice(parseErrorMessage(error))
+    }
   }
 
   const handleSave = async () => {
@@ -86,8 +89,7 @@ const AddressVerificationScreen = () => {
       setSuccessNotice('Address verification submitted successfully.')
       setProofDocument(null)
     } catch (error: unknown) {
-      const e = error as { response?: { data?: { message?: string; error?: string } }; message?: string }
-      setErrorNotice(e?.response?.data?.message || e?.response?.data?.error || e?.message || 'Unable to save address verification.')
+      setErrorNotice(parseErrorMessage(error))
     } finally {
       setSaving(false)
     }
@@ -132,11 +134,11 @@ const AddressVerificationScreen = () => {
             className="bg-gray-950 border border-gray-800 py-3 rounded-xl items-center"
           >
             <Text className="text-white text-sm font-semibold">
-              {proofDocument?.name || (hasProofOnFile ? 'Document on file' : 'Choose file')}
+              {proofDocument?.name || (hasProofOnFile ? 'Document on file' : 'Take photo, choose from gallery, or choose file')}
             </Text>
           </TouchableOpacity>
           <Text className="text-gray-500 text-[11px] mt-2">
-            Proof of address must be a JPG, PNG, or PDF file.
+            Use camera, gallery, or files. JPG, PNG, HEIC, and PDF are accepted.
           </Text>
           {proofDocument ? (
             <Text className="text-sky-300 text-[11px] mt-2">

@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native'
-import * as DocumentPicker from 'expo-document-picker'
 import { useRouter } from 'expo-router'
 import ScreenContainer from '@/components/ScreenContainer'
 import FormInput from '@/components/FormInput'
@@ -8,6 +7,7 @@ import FormSelect from '@/components/FormSelect'
 import { KycDocumentsPayload, updateKycDocuments } from '@/api/kycDocuments'
 import { NinVerifyResponse, verifyNin } from '@/api/kyc'
 import { useAuth } from '@/services/useAuth'
+import { pickKycUpload } from '@/utils/kycUploadPicker'
 
 const ID_TYPE_OPTIONS = [
   { label: 'Select ID type', value: '' },
@@ -106,6 +106,7 @@ const KycDocumentsScreen = () => {
     name?: string
     type?: string
   } | null>(null)
+
   useEffect(() => {
     setForm((prev) => ({
       ...prev,
@@ -150,16 +151,15 @@ const KycDocumentsScreen = () => {
     return 'NIN verification submitted.'
   }
 
-  const pickDocument = async (setter: typeof setIdDocument) => {
-    const result = await DocumentPicker.getDocumentAsync({
-      type: ['image/*', 'application/pdf'],
-      copyToCacheDirectory: true,
-      multiple: false,
-    })
-    if (result.canceled) return
-    const asset = result.assets?.[0]
-    if (!asset?.uri) return
-    setter({ uri: asset.uri, name: asset.name, type: asset.mimeType || 'application/octet-stream' })
+  const pickDocument = async () => {
+    setNotice(null)
+    try {
+      const document = await pickKycUpload({ title: 'Upload ID document' })
+      if (!document) return
+      setIdDocument(document)
+    } catch (error: unknown) {
+      setNotice(parseErrorMessage(error))
+    }
   }
 
   const validate = () => {
@@ -306,13 +306,16 @@ const KycDocumentsScreen = () => {
           <View className="mt-4">
             <Text className="text-gray-300 text-xs mb-2">Upload ID document (image or PDF)</Text>
             <TouchableOpacity
-              onPress={() => pickDocument(setIdDocument)}
+              onPress={pickDocument}
               className="bg-gray-950 border border-gray-800 py-3 rounded-xl items-center"
             >
               <Text className="text-white text-sm font-semibold">
-                {idDocument?.name || (hasIdDocOnFile ? 'Document on file' : 'Choose file')}
+                {idDocument?.name || (hasIdDocOnFile ? 'Document on file' : 'Take photo, choose from gallery, or choose file')}
               </Text>
             </TouchableOpacity>
+            <Text className="text-gray-500 text-[11px] mt-2">
+              Use camera, gallery, or files. JPG, PNG, HEIC, and PDF are accepted.
+            </Text>
           </View>
         ) : null}
       </View>
