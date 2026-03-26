@@ -138,7 +138,7 @@ const AddressVerificationScreen = () => {
             </Text>
           </TouchableOpacity>
           <Text className="text-gray-500 text-[11px] mt-2">
-            Use camera, gallery, or files. JPG, PNG, HEIC, and PDF are accepted.
+            Use camera, gallery, or files. JPG, PNG, and PDF are supported right now.
           </Text>
           {proofDocument ? (
             <Text className="text-sky-300 text-[11px] mt-2">
@@ -200,3 +200,4 @@ const AddressVerificationScreen = () => {
 }
 
 export default AddressVerificationScreen
+

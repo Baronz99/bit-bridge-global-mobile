@@ -33,6 +33,8 @@ const mimeFromExtension = (extension?: string | null) => {
       return 'application/pdf'
     case 'heic':
       return 'image/heic'
+    case 'heif':
+      return 'image/heif'
     default:
       return 'application/octet-stream'
   }
@@ -43,6 +45,18 @@ const normalizeAsset = ({ uri, name, type }: UploadAsset): UploadAsset => {
   const normalizedType = type || mimeFromExtension(extension)
   const normalizedName = name || `upload.${extension || 'bin'}`
   return { uri, name: normalizedName, type: normalizedType }
+}
+
+const ensureSupportedFormat = (asset: UploadAsset) => {
+  const extension = extensionFor(asset.name) || extensionFor(asset.uri)
+  const contentType = String(asset.type || '').toLowerCase()
+  const isHeic = extension === 'heic' || extension === 'heif' || contentType === 'image/heic' || contentType === 'image/heif'
+
+  if (isHeic) {
+    throw new Error('This file format is not supported yet. Please choose JPG, PNG, or PDF.')
+  }
+
+  return asset
 }
 
 const chooseSource = (options: PickKycUploadOptions = {}): Promise<UploadSource | null> =>
@@ -79,11 +93,13 @@ const pickFromCamera = async () => {
   const asset = result.assets?.[0]
   if (!asset?.uri) return null
 
-  return normalizeAsset({
-    uri: asset.uri,
-    name: asset.fileName || undefined,
-    type: asset.mimeType || undefined,
-  })
+  return ensureSupportedFormat(
+    normalizeAsset({
+      uri: asset.uri,
+      name: asset.fileName || undefined,
+      type: asset.mimeType || undefined,
+    })
+  )
 }
 
 const pickFromGallery = async () => {
@@ -100,11 +116,13 @@ const pickFromGallery = async () => {
   const asset = result.assets?.[0]
   if (!asset?.uri) return null
 
-  return normalizeAsset({
-    uri: asset.uri,
-    name: asset.fileName || undefined,
-    type: asset.mimeType || undefined,
-  })
+  return ensureSupportedFormat(
+    normalizeAsset({
+      uri: asset.uri,
+      name: asset.fileName || undefined,
+      type: asset.mimeType || undefined,
+    })
+  )
 }
 
 const pickFromFiles = async () => {
@@ -118,11 +136,13 @@ const pickFromFiles = async () => {
   const asset = result.assets?.[0]
   if (!asset?.uri) return null
 
-  return normalizeAsset({
-    uri: asset.uri,
-    name: asset.name,
-    type: asset.mimeType || undefined,
-  })
+  return ensureSupportedFormat(
+    normalizeAsset({
+      uri: asset.uri,
+      name: asset.name,
+      type: asset.mimeType || undefined,
+    })
+  )
 }
 
 export const pickKycUpload = async (options: PickKycUploadOptions = {}) => {

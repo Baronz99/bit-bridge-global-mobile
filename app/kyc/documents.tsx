@@ -314,7 +314,7 @@ const KycDocumentsScreen = () => {
               </Text>
             </TouchableOpacity>
             <Text className="text-gray-500 text-[11px] mt-2">
-              Use camera, gallery, or files. JPG, PNG, HEIC, and PDF are accepted.
+              Use camera, gallery, or files. JPG, PNG, and PDF are supported right now.
             </Text>
           </View>
         ) : null}
@@ -391,3 +391,4 @@ const KycDocumentsScreen = () => {
 }
 
 export default KycDocumentsScreen
+
