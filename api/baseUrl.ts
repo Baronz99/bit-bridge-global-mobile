@@ -51,7 +51,7 @@ const isPublicHttpsRoot = (url: string): boolean => {
 const explicitApiBase = normalize(process.env.EXPO_PUBLIC_API_BASE_URL)
 const rootFromApiBase = apiUrlToRoot(explicitApiBase)
 const envRoot = normalize(RAW_ROOT_URL)
-const hardFallbackRoot = 'https://bitbridgeglobal-fa54ecb89f7d.herokuapp.com'
+const hardFallbackRoot = 'https://api.bitbridgeglobal.com'
 
 const root_url = isPublicHttpsRoot(envRoot)
   ? envRoot

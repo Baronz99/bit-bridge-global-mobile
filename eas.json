@@ -10,7 +10,7 @@
       "channel": "development",
       "env": {
         "EXPO_PUBLIC_ENV": "production",
-        "EXPO_PUBLIC_API_BASE_URL": "https://bitbridgeglobal-fa54ecb89f7d.herokuapp.com/api/v1",
+        "EXPO_PUBLIC_API_BASE_URL": "https://api.bitbridgeglobal.com/api/v1",
         "EXPO_PUBLIC_FEATURE_OTP": "1",
         "EXPO_PUBLIC_FEATURE_BVN": "1",
         "EXPO_PUBLIC_FEATURE_KYC_CENTER": "1",
@@ -33,7 +33,7 @@
       "channel": "preview",
       "env": {
         "EXPO_PUBLIC_ENV": "production",
-        "EXPO_PUBLIC_API_BASE_URL": "https://bitbridgeglobal-fa54ecb89f7d.herokuapp.com/api/v1",
+        "EXPO_PUBLIC_API_BASE_URL": "https://api.bitbridgeglobal.com/api/v1",
         "EXPO_PUBLIC_FEATURE_OTP": "1",
         "EXPO_PUBLIC_FEATURE_BVN": "1",
         "EXPO_PUBLIC_FEATURE_KYC_CENTER": "1",
@@ -56,7 +56,7 @@
       "channel": "production",
       "env": {
         "EXPO_PUBLIC_ENV": "production",
-        "EXPO_PUBLIC_API_BASE_URL": "https://bitbridgeglobal-fa54ecb89f7d.herokuapp.com/api/v1",
+        "EXPO_PUBLIC_API_BASE_URL": "https://api.bitbridgeglobal.com/api/v1",
         "EXPO_PUBLIC_FEATURE_OTP": "1",
         "EXPO_PUBLIC_FEATURE_BVN": "1",
         "EXPO_PUBLIC_FEATURE_KYC_CENTER": "1",
