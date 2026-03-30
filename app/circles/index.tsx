@@ -68,13 +68,13 @@ const CirclesScreen = () => {
     purpose: '',
     description: '',
   })
+  const profileRoot = useMemo(() => userProfileData?.data ?? userProfileData ?? {}, [userProfileData])
 
   const kycLevel = useMemo(() => {
-    const payload = userProfileData?.data ?? userProfileData
-    return String(payload?.kyc_level || payload?.user_kyc?.kyc_level || 'tier_0')
+    return String(profileRoot?.kyc_level || profileRoot?.user_kyc?.kyc_level || 'tier_0')
       .trim()
       .toLowerCase()
-  }, [userProfileData])
+  }, [profileRoot])
 
   const tierRank = useMemo(() => {
     if (!kycLevel || kycLevel === 'nil') return 0
@@ -82,10 +82,16 @@ const CirclesScreen = () => {
     return match ? Number(match[1]) : 0
   }, [kycLevel])
 
-  const needsTier2 = tierRank < 2
+  const phoneVerified = Boolean(
+    profileRoot?.phone_verified ||
+    profileRoot?.phone_verified_at ||
+    profileRoot?.user_profile?.phone_verified_at
+  )
+  const canAccessCircles = tierRank >= 2 || (tierRank >= 1 && phoneVerified)
+  const canCreateCircle = tierRank >= 2
 
   const loadCircles = useCallback(async () => {
-    if (needsTier2) {
+    if (!canAccessCircles) {
       setScreenLoading(false)
       setError(null)
       return
@@ -100,14 +106,14 @@ const CirclesScreen = () => {
       if (status === 401) {
         setError('Session expired. Please log in again.')
       } else if (status === 403) {
-        setError('Complete Tier 2 verification to use shared groups.')
+        setError('Verify your phone and complete Tier 1 to use shared groups.')
       } else {
         setError('Unable to load shared groups right now.')
       }
     } finally {
       setScreenLoading(false)
     }
-  }, [needsTier2])
+  }, [canAccessCircles])
 
   useEffect(() => {
     if (!FEATURE_CIRCLES) return
@@ -126,7 +132,7 @@ const CirclesScreen = () => {
   useEffect(() => {
     if (!FEATURE_CIRCLES) return
     loadCircles()
-  }, [loadCircles, needsTier2])
+  }, [loadCircles, canAccessCircles])
 
   const handleCreate = async () => {
     if (!form.name.trim()) {
@@ -216,7 +222,7 @@ const CirclesScreen = () => {
             <TouchableOpacity
               onPress={() => setCreateOpen(true)}
               className="bg-app-primary px-4 py-2 rounded-full"
-              disabled={needsTier2}
+              disabled={!canCreateCircle}
             >
               <Text className="text-black text-xs font-semibold">Create group</Text>
             </TouchableOpacity>
@@ -224,11 +230,11 @@ const CirclesScreen = () => {
         </View>
       </View>
 
-      {needsTier2 ? (
+      {!canAccessCircles ? (
         <View className="mx-4 mt-3 rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4">
-          <Text className="text-white font-semibold">Complete Tier 2 verification</Text>
+          <Text className="text-white font-semibold">Verify your phone to join circles</Text>
           <Text className="text-gray-300 text-xs mt-1">
-            Shared groups are available on Tier 2. Finish verification to unlock this feature.
+            Shared groups now allow Tier 1 users with a verified phone. Tier 2 is still required to create a new group.
           </Text>
           <TouchableOpacity
             onPress={() => router.push('/kyc')}
@@ -239,7 +245,7 @@ const CirclesScreen = () => {
         </View>
       ) : null}
 
-      {!needsTier2 &&
+      {canAccessCircles &&
         (screenLoading ? (
           <View className="flex-1 justify-center items-center">
             <ActivityIndicator size="small" color="#ffcc00" />
@@ -264,6 +270,7 @@ const CirclesScreen = () => {
             <TouchableOpacity
               onPress={() => setCreateOpen(true)}
               className="bg-app-primary px-4 py-2 rounded-lg"
+              disabled={!canCreateCircle}
             >
               <Text className="text-black text-xs font-semibold">Create group</Text>
             </TouchableOpacity>

@@ -52,8 +52,10 @@ const CircleFundScreen = () => {
   const profileRoot = (userProfileData?.data ?? userProfileData) || {}
   const tierRank = getTierRank(profileRoot?.kyc_level || profileRoot?.user_kyc?.kyc_level)
   const isTier1User = tierRank === 1
+  const isStandardCircle = circle?.circle_type !== 'official'
   const isFlexibleOfficial = circle?.circle_type === 'official' && circle?.kyc_mode === 'flexible'
   const maxContributionCents = Number(circle?.max_contribution_cents || 0)
+  const standardDailyCapCents = 10000000
   const amountCents = useMemo(
     () => Math.round(Number(String(formData.amount).replace(/[^0-9.]/g, '')) * 100) || 0,
     [formData.amount]
@@ -199,6 +201,17 @@ const CircleFundScreen = () => {
               </Text>
               <Text className="text-gray-300 text-[10px] mt-1">
                 Complete verification to unlock higher contributions.
+              </Text>
+            </View>
+          ) : null}
+
+          {isStandardCircle && isTier1User ? (
+            <View className="mt-4 rounded-2xl border border-sky-500/30 bg-sky-500/10 px-4 py-3">
+              <Text className="text-xs text-sky-100">
+                Tier 1 users can contribute up to {moneyFormat(standardDailyCapCents / 100)} per day across standard circles.
+              </Text>
+              <Text className="text-gray-300 text-[10px] mt-1">
+                Complete Tier 2 verification to unlock higher contributions.
               </Text>
             </View>
           ) : null}
