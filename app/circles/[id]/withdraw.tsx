@@ -9,6 +9,7 @@ import TransactionPinModal from '@/components/TransactionPinModal'
 import { withdrawCircle } from '@/api/circles'
 import { getTransactionPinStatus } from '@/api/transactionPin'
 import { useAuth } from '@/services/useAuth'
+import { useTransactionBiometrics } from '@/services/useTransactionBiometrics'
 import { buildApiErrorMessage } from '@/utils/apiErrorMessage'
 
 type NoticeState = { message: string | null; error: boolean; data: any | null }
@@ -17,7 +18,9 @@ const CircleWithdrawScreen = () => {
   const { id } = useLocalSearchParams<{ id?: string | string[] }>()
   const circleId = Array.isArray(id) ? id[0] : id
   const router = useRouter()
-  const { onLogout } = useAuth()
+  const { onLogout, userProfileData } = useAuth()
+  const profilePayload = (userProfileData?.data ?? userProfileData) as any
+  const transactionBiometrics = useTransactionBiometrics(String(profilePayload?.id || ''))
   const [loading, setLoading] = useState(false)
   const [pinModalOpen, setPinModalOpen] = useState(false)
   const [pinError, setPinError] = useState<string | null>(null)
@@ -61,7 +64,6 @@ const CircleWithdrawScreen = () => {
     } catch (error: any) {
       const statusCode = error?.response?.status
       if (statusCode === 401) {
-        await onLogout().catch(() => {})
         return
       }
     }
@@ -70,7 +72,10 @@ const CircleWithdrawScreen = () => {
     setPinModalOpen(true)
   }
 
-  const handleSubmit = async (transactionPin: string) => {
+  const submitWithdrawal = async (credential: {
+    transaction_pin?: string
+    biometric_approval_token?: string
+  }) => {
     const amountValue = Number(String(formData.amount).replace(/[^0-9.]/g, ''))
     if (!circleId || !amountValue || Number.isNaN(amountValue)) {
       setNotice({ message: 'Amount is required.', error: true, data: null })
@@ -83,7 +88,7 @@ const CircleWithdrawScreen = () => {
       const response = await withdrawCircle(circleId, {
         amount_cents: Math.round(amountValue * 100),
         note: formData.description.trim() || undefined,
-        transaction_pin: transactionPin,
+        ...credential,
       })
       const payload: any = response
       setPinModalOpen(false)
@@ -93,10 +98,12 @@ const CircleWithdrawScreen = () => {
         error: false,
         data: payload?.data || null,
       })
+      if (credential.transaction_pin) {
+        await transactionBiometrics.maybeEnrollAfterPinSuccess(credential.transaction_pin).catch(() => {})
+      }
     } catch (error: any) {
       const status = error?.response?.status
       if (status === 401) {
-        await onLogout().catch(() => {})
         return
       }
 
@@ -118,6 +125,20 @@ const CircleWithdrawScreen = () => {
       Alert.alert('Withdrawal failed', message)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleSubmit = async (transactionPin: string) =>
+    submitWithdrawal({ transaction_pin: transactionPin })
+
+  const handleBiometricSubmit = async () => {
+    try {
+      const approvalToken = await transactionBiometrics.getApprovalToken()
+      await submitWithdrawal({ biometric_approval_token: approvalToken })
+    } catch (error: any) {
+      const message = error?.message || 'Biometric confirmation failed. Use your transaction PIN.'
+      setPinError(message)
+      setNotice({ message, error: true, data: null })
     }
   }
 
@@ -158,7 +179,11 @@ const CircleWithdrawScreen = () => {
         open={pinModalOpen}
         onClose={() => setPinModalOpen(false)}
         onSubmit={handleSubmit}
+        onBiometricSubmit={handleBiometricSubmit}
         loading={loading}
+        biometricLoading={transactionBiometrics.biometricLoading}
+        biometricAvailable={transactionBiometrics.biometricAvailable}
+        biometricEnabled={transactionBiometrics.biometricEnabled}
         errorMessage={pinError}
         title="Enter PIN to Withdraw"
       />

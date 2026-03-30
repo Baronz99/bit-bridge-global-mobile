@@ -9,13 +9,16 @@ import TransactionPinModal from '@/components/TransactionPinModal'
 import { sendMoneyToUser } from '@/api/wallet'
 import { getTransactionPinStatus } from '@/api/transactionPin'
 import { useAuth } from '@/services/useAuth'
+import { useTransactionBiometrics } from '@/services/useTransactionBiometrics'
 import { buildApiErrorMessage } from '@/utils/apiErrorMessage'
 
 type NoticeState = { message: string | null; error: boolean; data: any | null }
 
 const SendMoneyScreen = () => {
   const router = useRouter()
-  const { onLogout, userProfileData, loadProfile } = useAuth()
+  const { userProfileData, loadProfile } = useAuth()
+  const profilePayload = (userProfileData?.data ?? userProfileData) as any
+  const transactionBiometrics = useTransactionBiometrics(String(profilePayload?.id || ''))
   const [loading, setLoading] = useState(false)
   const [pinModalOpen, setPinModalOpen] = useState(false)
   const [pinError, setPinError] = useState<string | null>(null)
@@ -77,18 +80,17 @@ const SendMoneyScreen = () => {
         return
       }
     } catch (error: any) {
-      const statusCode = error?.response?.status
-      if (statusCode === 401) {
-        await onLogout().catch(() => {})
-        return
-      }
+      if (error?.response?.status === 401) return
     }
 
     setPinError(null)
     setPinModalOpen(true)
   }
 
-  const handleSubmit = async (transactionPin: string) => {
+  const submitTransfer = async (credential: {
+    transaction_pin?: string
+    biometric_approval_token?: string
+  }) => {
     const amountValue = Number(formData.amount)
     if (!formData.phone_number.trim() || !amountValue) {
       setNotice({
@@ -105,7 +107,7 @@ const SendMoneyScreen = () => {
       const response = await sendMoneyToUser({
         phone_number: formData.phone_number.trim(),
         amount: amountValue,
-        transaction_pin: transactionPin,
+        ...credential,
         description: formData.description.trim() || undefined,
       })
 
@@ -116,13 +118,13 @@ const SendMoneyScreen = () => {
         error: false,
         data: response?.data || null,
       })
+      if (credential.transaction_pin) {
+        await transactionBiometrics.maybeEnrollAfterPinSuccess(credential.transaction_pin).catch(() => {})
+      }
       await loadProfile({ force: true })
     } catch (error: any) {
       const status = error?.response?.status
-      if (status === 401) {
-        await onLogout().catch(() => {})
-        return
-      }
+      if (status === 401) return
       const message = buildApiErrorMessage({
         status,
         data: error?.response?.data,
@@ -132,6 +134,20 @@ const SendMoneyScreen = () => {
       setNotice({ message, error: true, data: null })
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleSubmit = async (transactionPin: string) =>
+    submitTransfer({ transaction_pin: transactionPin })
+
+  const handleBiometricSubmit = async () => {
+    try {
+      const approvalToken = await transactionBiometrics.getApprovalToken()
+      await submitTransfer({ biometric_approval_token: approvalToken })
+    } catch (error: any) {
+      const message = error?.message || 'Biometric confirmation failed. Use your transaction PIN.'
+      setPinError(message)
+      setNotice({ message, error: true, data: null })
     }
   }
 
@@ -182,7 +198,11 @@ const SendMoneyScreen = () => {
         open={pinModalOpen}
         onClose={() => setPinModalOpen(false)}
         onSubmit={handleSubmit}
+        onBiometricSubmit={handleBiometricSubmit}
         loading={loading}
+        biometricLoading={transactionBiometrics.biometricLoading}
+        biometricAvailable={transactionBiometrics.biometricAvailable}
+        biometricEnabled={transactionBiometrics.biometricEnabled}
         errorMessage={pinError}
         title="Enter PIN to Send"
       />

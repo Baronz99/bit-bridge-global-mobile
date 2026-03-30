@@ -6,7 +6,11 @@ type TransactionPinModalProps = {
   open: boolean
   onClose: () => void
   onSubmit: (pin: string) => void | Promise<void>
+  onBiometricSubmit?: () => void | Promise<void>
   loading?: boolean
+  biometricLoading?: boolean
+  biometricAvailable?: boolean
+  biometricEnabled?: boolean
   title?: string
   errorMessage?: string | null
   helperActionLabel?: string
@@ -17,7 +21,11 @@ const TransactionPinModal = ({
   open,
   onClose,
   onSubmit,
+  onBiometricSubmit,
   loading = false,
+  biometricLoading = false,
+  biometricAvailable = false,
+  biometricEnabled = false,
   title,
   errorMessage,
   helperActionLabel,
@@ -30,6 +38,7 @@ const TransactionPinModal = ({
   }, [open])
 
   const canSubmit = pin.length === 4 && !loading
+  const canUseBiometric = biometricAvailable && biometricEnabled && !loading && !biometricLoading
 
   return (
     <AppModal open={open} onclose={onClose}>
@@ -54,6 +63,26 @@ const TransactionPinModal = ({
           <TouchableOpacity onPress={onHelperAction} className="mt-3">
             <Text className="text-gray-300 text-center text-xs underline">{helperActionLabel}</Text>
           </TouchableOpacity>
+        ) : null}
+        {biometricAvailable ? (
+          <View className="mt-4 rounded-xl border border-gray-800 bg-gray-950/60 px-3 py-3">
+            <Text className="text-gray-200 text-center text-sm font-medium">
+              {biometricEnabled
+                ? 'Use Face ID / Fingerprint instead of typing your PIN.'
+                : 'Your first successful PIN confirmation on this device will enable Face ID / Fingerprint for next time.'}
+            </Text>
+            {biometricEnabled && typeof onBiometricSubmit === 'function' ? (
+              <TouchableOpacity
+                onPress={onBiometricSubmit}
+                disabled={!canUseBiometric}
+                className={`${canUseBiometric ? 'bg-gray-800' : 'bg-gray-900'} mt-3 py-3 rounded-xl`}
+              >
+                <Text className="text-white text-center">
+                  {biometricLoading ? 'Checking biometric...' : 'Use Face ID / Fingerprint'}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
         ) : null}
         <View className="flex-row gap-4 mt-6">
           <TouchableOpacity onPress={onClose} className="bg-black py-3 flex-1 rounded-xl">

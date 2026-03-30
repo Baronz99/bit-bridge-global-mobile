@@ -1,11 +1,12 @@
-import React, { useMemo, useRef, useState } from 'react'
-import { ScrollView, Text, TouchableOpacity, View } from 'react-native'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import NotificationAlert from '@/components/notification'
 import TransactionPinModal from '@/components/TransactionPinModal'
 import ReviewSummaryCard from '@/components/bankTransfer/ReviewSummaryCard'
 import { createCounterParty, initiateFundTransfer, resolveAccountName } from '@/api/account'
 import { useAuth } from '@/services/useAuth'
+import { useTransactionBiometrics } from '@/services/useTransactionBiometrics'
 import { buildApiErrorMessage } from '@/utils/apiErrorMessage'
 import {
   BANK_TRANSFER_TIER_REQUIREMENT_COPY,
@@ -68,10 +69,14 @@ const extractCounterPartyId = (payload: any): string => {
   return nested ? String(nested) : ''
 }
 
+const FORCE_REFRESH_RETRY_DELAY_MS = 1700
+
 const ReviewTransferScreen = () => {
   const router = useRouter()
   const { draft: draftParam } = useLocalSearchParams<{ draft?: string }>()
-  const { onLogout, userProfileData } = useAuth()
+  const { onLogout, userProfileData, loadProfile } = useAuth()
+  const profilePayload = (userProfileData?.data ?? userProfileData) as any
+  const transactionBiometrics = useTransactionBiometrics(String(profilePayload?.id || ''))
   const [loading, setLoading] = useState(false)
   const [pinModalOpen, setPinModalOpen] = useState(false)
   const [pinError, setPinError] = useState<string | null>(null)
@@ -89,6 +94,8 @@ const ReviewTransferScreen = () => {
     () => isTierEligibleForBankTransfer(getTierFromProfile(userProfileData)),
     [userProfileData]
   )
+  const [tierGateResolved, setTierGateResolved] = useState(false)
+  const [effectiveTierEligible, setEffectiveTierEligible] = useState(tierEligible)
   const dailyRemainingAfter = useMemo(() => {
     if (!draft) return 0
     return computeDailyRemainingAfterTransfer({
@@ -108,6 +115,38 @@ const ReviewTransferScreen = () => {
       String(draft.description || '').trim()
     )
   }, [draft])
+
+  useEffect(() => {
+    let mounted = true
+    const resolveTierGate = async () => {
+      if (tierEligible) {
+        if (mounted) {
+          setEffectiveTierEligible(true)
+          setTierGateResolved(true)
+        }
+        return
+      }
+
+      let refreshed = await loadProfile({ force: true }).catch(() => userProfileData)
+      let eligible = isTierEligibleForBankTransfer(getTierFromProfile(refreshed))
+      if (!eligible) {
+        await new Promise((resolve) => setTimeout(resolve, FORCE_REFRESH_RETRY_DELAY_MS))
+        refreshed = await loadProfile({ force: true }).catch(() => refreshed)
+        eligible = isTierEligibleForBankTransfer(getTierFromProfile(refreshed))
+      }
+
+      if (mounted) {
+        setEffectiveTierEligible(eligible)
+        setTierGateResolved(true)
+      }
+    }
+
+    setTierGateResolved(false)
+    void resolveTierGate()
+    return () => {
+      mounted = false
+    }
+  }, [tierEligible, loadProfile, userProfileData])
 
   const resolveInterBankCounterPartyId = async (payload: TransferDraft): Promise<string> => {
     const existing = String(payload?.counter_party_id || '').trim()
@@ -133,8 +172,11 @@ const ReviewTransferScreen = () => {
     return extractCounterPartyId(created)
   }
 
-  const handleSubmit = async (transactionPin: string) => {
-    if (!tierEligible) {
+  const submitTransfer = async (credential: {
+    pin?: string
+    biometric_approval_token?: string
+  }) => {
+    if (!effectiveTierEligible) {
       setNotice({ message: 'Bank transfer is available from Tier 2.', error: true, data: null })
       return
     }
@@ -148,7 +190,7 @@ const ReviewTransferScreen = () => {
     setPinError(null)
     setShowRetrySubmit(false)
     setShowUpgradeCta(false)
-    setLastEnteredPin(transactionPin)
+    setLastEnteredPin(credential.pin || null)
 
     const transferReference = transferReferenceRef.current
     try {
@@ -167,7 +209,10 @@ const ReviewTransferScreen = () => {
           account_name: draft.account_name,
           amount: Number(draft.amount || 0),
           inter_bank: !!draft.inter_bank,
-          pin: transactionPin,
+          ...(credential.pin ? { pin: credential.pin } : {}),
+          ...(credential.biometric_approval_token
+            ? { biometric_approval_token: credential.biometric_approval_token }
+            : {}),
           transfer_reference: transferReference,
           description: String(draft.description || 'Fund Transfer').trim() || 'Fund Transfer',
           counter_party_id: counterPartyId || undefined,
@@ -206,6 +251,9 @@ const ReviewTransferScreen = () => {
       })
 
       setPinModalOpen(false)
+      if (credential.pin) {
+        await transactionBiometrics.maybeEnrollAfterPinSuccess(credential.pin).catch(() => {})
+      }
       router.replace({
         pathname: '/bank-transfer/success',
         params: {
@@ -267,7 +315,6 @@ const ReviewTransferScreen = () => {
         return
       }
       if (status === 401) {
-        await onLogout().catch(() => {})
         return
       }
       if (messageLower.includes('tier') || messageLower.includes('kyc')) {
@@ -278,6 +325,20 @@ const ReviewTransferScreen = () => {
       setNotice({ message, error: true, data: null })
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleSubmit = async (transactionPin: string) =>
+    submitTransfer({ pin: transactionPin })
+
+  const handleBiometricSubmit = async () => {
+    try {
+      const approvalToken = await transactionBiometrics.getApprovalToken()
+      await submitTransfer({ biometric_approval_token: approvalToken })
+    } catch (error: any) {
+      const message = error?.message || 'Biometric confirmation failed. Use your transaction PIN.'
+      setPinError(message)
+      setNotice({ message, error: true, data: null })
     }
   }
 
@@ -297,7 +358,15 @@ const ReviewTransferScreen = () => {
     )
   }
 
-  if (!tierEligible) {
+  if (!tierGateResolved) {
+    return (
+      <View className="flex-1 bg-primary items-center justify-center">
+        <ActivityIndicator />
+      </View>
+    )
+  }
+
+  if (!effectiveTierEligible) {
     return (
       <View className="flex-1 bg-primary px-4">
         <View className="pt-10">
@@ -376,7 +445,11 @@ const ReviewTransferScreen = () => {
         open={pinModalOpen}
         onClose={() => setPinModalOpen(false)}
         onSubmit={handleSubmit}
+        onBiometricSubmit={handleBiometricSubmit}
         loading={loading}
+        biometricLoading={transactionBiometrics.biometricLoading}
+        biometricAvailable={transactionBiometrics.biometricAvailable}
+        biometricEnabled={transactionBiometrics.biometricEnabled}
         errorMessage={pinError}
         title="Enter PIN to complete transfer"
         helperActionLabel="Forgot PIN? Reset PIN"

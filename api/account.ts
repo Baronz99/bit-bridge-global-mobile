@@ -227,7 +227,8 @@ export const initiateFundTransfer = async (payload: {
     amount: number
     inter_bank: boolean
     counter_party_id?: string
-    pin: string
+    pin?: string
+    biometric_approval_token?: string
     transfer_reference: string
     description: string
     save_beneficiary?: boolean
@@ -240,6 +241,7 @@ export const initiateFundTransfer = async (payload: {
   const accountName = String(account.account_name || '').trim()
   const description = String(account.description || '').trim()
   const pin = String(account.pin || '').trim()
+  const biometricApprovalToken = String(account.biometric_approval_token || '').trim()
   const transferReference = String(account.transfer_reference || '').trim()
   const counterPartyId = String(account.counter_party_id || '').trim()
   const amount = Number(account.amount)
@@ -257,8 +259,8 @@ export const initiateFundTransfer = async (payload: {
   if (typeof account.inter_bank !== 'boolean') {
     throw new Error('inter_bank must be true or false.')
   }
-  if (!/^\d{4}$/.test(pin)) {
-    throw new Error('PIN must be exactly 4 digits.')
+  if (!/^\d{4}$/.test(pin) && !biometricApprovalToken) {
+    throw new Error('PIN or biometric approval is required.')
   }
   if (!transferReference) {
     throw new Error('transfer_reference is required.')
@@ -267,8 +269,14 @@ export const initiateFundTransfer = async (payload: {
     throw new Error('counter_party_id is required when inter_bank is true.')
   }
 
+  const accountPayload = {
+    ...account,
+    ...(pin ? { pin } : {}),
+    ...(biometricApprovalToken ? { biometric_approval_token: biometricApprovalToken } : {}),
+  }
+
   try {
-    const res = await client.post('/accounts/initiate_fund_transfer', payload, {
+    const res = await client.post('/accounts/initiate_fund_transfer', { account: accountPayload }, {
       headers: {
         Accept: 'application/json',
       },
@@ -399,6 +407,25 @@ export const createDepositAccount = async () => {
     }
     const parsed = parseAnchorApiError(err)
     warn('[createDepositAccount error]', {
+      message: parsed.message,
+      status: parsed.status,
+      data: err?.response?.data,
+      url: err?.config?.url,
+    })
+    throw parsed
+  }
+}
+
+export const setupAnchorOnboarding = async (payload?: { account?: Record<string, unknown> }) => {
+  try {
+    const accountPayload = payload?.account || {}
+    const res = await client.post('/accounts/setup_anchor_onboarding', {
+      account: accountPayload,
+    })
+    return res.data
+  } catch (err: any) {
+    const parsed = parseAnchorApiError(err)
+    warn('[setupAnchorOnboarding error]', {
       message: parsed.message,
       status: parsed.status,
       data: err?.response?.data,
