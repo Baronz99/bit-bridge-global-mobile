@@ -17,11 +17,9 @@ export default function Index() {
     profileError,
     token,
     userProfileData,
-    onLogout,
   } = useAuth()
   const { locked } = useAppLock()
   const lastRedirectRef = useRef<string | null>(null)
-  const failsafeTriggeredRef = useRef(false)
   const hasProfile = !!userProfileData
 
   const bootTrace = useCallback(
@@ -90,21 +88,6 @@ export default function Index() {
     safeReplace,
     bootTrace,
   ])
-
-  useEffect(() => {
-    if (!authHydrated || !authenticated || hasProfile) {
-      failsafeTriggeredRef.current = false
-      return
-    }
-    const timeout = setTimeout(async () => {
-      if (failsafeTriggeredRef.current) return
-      failsafeTriggeredRef.current = true
-      bootTrace('failsafe_session_clear', '/welcome', { reason: 'authed_no_profile_8s_timeout' })
-      await onLogout()
-      safeReplace('/welcome', 'failsafe_authed_no_profile_8s')
-    }, 8000)
-    return () => clearTimeout(timeout)
-  }, [authHydrated, authenticated, hasProfile, onLogout, safeReplace, bootTrace])
 
   return <View style={{ flex: 1, backgroundColor: '#05070D' }} />
 }

@@ -11,7 +11,11 @@ const LEGACY_REFRESH_TOKEN_KEY = 'bitbridge_refresh_token'
 
 // --- tiny event system (no Node EventEmitter) ---
 type AuthEventName = 'unauthorized'
-type Listener = () => void | Promise<void>
+type AuthEventPayload = {
+  reason?: string
+  status?: number | null
+}
+type Listener = (payload?: AuthEventPayload) => void | Promise<void>
 
 const listeners: Record<AuthEventName, Set<Listener>> = { unauthorized: new Set() }
 
@@ -23,10 +27,10 @@ export const authEvents = {
   off(event: AuthEventName, fn: Listener) {
     return listeners[event].delete(fn)
   },
-  emit(event: AuthEventName) {
+  emit(event: AuthEventName, payload?: AuthEventPayload) {
     for (const fn of listeners[event]) {
       try {
-        const maybePromise = fn()
+        const maybePromise = fn(payload)
         if (maybePromise && typeof (maybePromise as any).catch === 'function') {
           ;(maybePromise as Promise<void>).catch(() => {})
         }
@@ -268,12 +272,29 @@ const refreshClient = axios.create({
 // --------------------
 // Refresh flow (single-flight)
 // --------------------
-let refreshPromise: Promise<string | null> | null = null
+let refreshPromise: Promise<{
+  accessToken: string | null
+  terminal: boolean
+  reason?: string
+  status?: number | null
+}> | null = null
 
-const refreshAccessToken = async (): Promise<string | null> => {
+const refreshAccessToken = async (): Promise<{
+  accessToken: string | null
+  terminal: boolean
+  reason?: string
+  status?: number | null
+}> => {
   await bootstrapTokensOnce()
   const refreshToken = memRefreshToken
-  if (!refreshToken) return null
+  if (!refreshToken) {
+    return {
+      accessToken: null,
+      terminal: false,
+      reason: 'missing_refresh_token',
+      status: null,
+    }
+  }
 
   try {
     const res = await refreshClient.request({
@@ -297,13 +318,37 @@ const refreshAccessToken = async (): Promise<string | null> => {
       (res.headers as any)?.['bit-refresh-token'] || (res.headers as any)?.['Bit-Refresh-Token']
     const nextRefresh = headerRefresh ? cleanToken(String(headerRefresh)) : data?.refresh_token || null
 
-    if (!nextAccess) return null
+    if (!nextAccess) {
+      return {
+        accessToken: null,
+        terminal: false,
+        reason: 'refresh_missing_access_token',
+        status: res.status ?? null,
+      }
+    }
 
     // persist + update in-memory + update axios defaults
     await setTokens(nextAccess, nextRefresh || undefined)
-    return cleanToken(nextAccess)
-  } catch {
-    return null
+    return {
+      accessToken: cleanToken(nextAccess),
+      terminal: false,
+      status: res.status ?? null,
+    }
+  } catch (error: any) {
+    const status = error?.response?.status ?? null
+    const code = String(
+      error?.response?.data?.error ||
+        error?.response?.data?.message ||
+        error?.message ||
+        'refresh_failed'
+    )
+    const terminal = status === 401 && ['invalid_refresh', 'session_expired'].includes(code)
+    return {
+      accessToken: null,
+      terminal,
+      reason: code,
+      status,
+    }
   }
 }
 
@@ -381,7 +426,8 @@ client.interceptors.response.use(
           })
         }
 
-        const newAccess = await refreshPromise
+        const refreshResult = await refreshPromise
+        const newAccess = refreshResult.accessToken
 
         if (newAccess) {
           // update in-memory token immediately (extra safety)
@@ -395,11 +441,18 @@ client.interceptors.response.use(
           return client.request(originalRequest)
         }
 
-        await clearTokens()
-        authEvents.emit('unauthorized')
+        if (refreshResult.terminal) {
+          ;(error as any).authInvalid = true
+          ;(error as any).authFailureCode = refreshResult.reason
+          ;(error as any).authFailureStatus = refreshResult.status
+          await clearTokens()
+          authEvents.emit('unauthorized', {
+            reason: refreshResult.reason,
+            status: refreshResult.status,
+          })
+        }
       } catch {
-        await clearTokens()
-        authEvents.emit('unauthorized')
+        // Treat transport/unknown refresh failures as recoverable; preserve local session.
       }
     }
 

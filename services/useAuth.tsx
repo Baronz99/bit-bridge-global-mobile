@@ -195,12 +195,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         responseDataPreview: responsePreview,
       })
       const status = error?.response?.status
-      const parseFailed = error?.code === 'PROFILE_PARSE_FAILED'
-      if (status === 401 || status === 403 || parseFailed) {
+      const authInvalid = error?.authInvalid === true
+      const authFailureCode = error?.authFailureCode
+      if (authInvalid) {
         bootTrace('profile_fetch_session_clear', {
-          status: status ?? null,
-          parseFailed,
-          reason: parseFailed ? 'profile_parse_failed' : 'unauthorized',
+          status: error?.authFailureStatus ?? status ?? null,
+          reason: authFailureCode || 'confirmed_refresh_invalid',
         })
         await clearTokens()
         setToken(null)
@@ -210,7 +210,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         profileLoadedRef.current = false
         profileFetchInFlightRef.current = false
         setProfileError('Session expired. Please log in again.')
-        setProfileErrorStatus(status)
+        setProfileErrorStatus(error?.authFailureStatus ?? status ?? 401)
         return null
       }
       const message =
@@ -272,7 +272,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [bootstrap])
 
   useEffect(() => {
-    const onUnauthorized = async () => {
+    const onUnauthorized = async (payload?: { reason?: string; status?: number | null }) => {
+      bootTrace('unauthorized_event', {
+        reason: payload?.reason || null,
+        status: payload?.status ?? null,
+      })
       await clearTokens()
       setToken(null)
       setRefreshToken(null)
