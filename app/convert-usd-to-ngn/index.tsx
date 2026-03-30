@@ -9,7 +9,7 @@ import TransactionPinModal from '@/components/TransactionPinModal'
 import { convertTunnelUsdToNgn, getUserWallet, quoteTunnelUsdToNgn } from '@/api/wallet'
 import { getTransactionPinStatus } from '@/api/transactionPin'
 import { useAuth } from '@/services/useAuth'
-import { useTransactionBiometrics } from '@/services/useTransactionBiometrics'
+import { resolveTransactionBiometricUserId, useTransactionBiometrics } from '@/services/useTransactionBiometrics'
 import useFetch from '@/services/useFetch'
 import moneyFormat from '@/utils/moneyFormat'
 import { apiErrorMessage } from '@/utils/apiErrorMessage'
@@ -23,7 +23,7 @@ const ConvertUsdToNgnScreen = () => {
   const router = useRouter()
   const { onLogout, loadProfile, userProfileData } = useAuth()
   const profilePayload = (userProfileData?.data ?? userProfileData) as any
-  const transactionBiometrics = useTransactionBiometrics(String(profilePayload?.id || ''))
+  const transactionBiometrics = useTransactionBiometrics(resolveTransactionBiometricUserId(profilePayload))
 
   const [loading, setLoading] = useState(false)
   const [quoteLoading, setQuoteLoading] = useState(false)
@@ -131,7 +131,17 @@ const ConvertUsdToNgnScreen = () => {
       })
       setQuoteData(null)
       if (credential.transaction_pin) {
-        await transactionBiometrics.maybeEnrollAfterPinSuccess(credential.transaction_pin).catch(() => {})
+        try {
+          await transactionBiometrics.maybeEnrollAfterPinSuccess(credential.transaction_pin)
+        } catch (enrollmentError: any) {
+          setNotice({
+            message:
+              enrollmentError?.message ||
+              'Conversion succeeded, but biometric confirmation could not be enabled on this device yet.',
+            error: true,
+            data: null,
+          })
+        }
       }
       loadProfile({ force: true })
     } catch (error: any) {

@@ -24,6 +24,8 @@ type LocalAuthModule = {
 const BIOMETRIC_DEVICE_ID_KEY = 'transaction-biometric-device-id'
 const enrollmentKey = (userId: string) => `transaction-biometric-enrollment:${userId}`
 
+const normalizeUserId = (value: unknown) => String(value || '').trim()
+
 const loadLocalAuthentication = async (): Promise<LocalAuthModule | null> => {
   try {
     const mod = await import('expo-local-authentication')
@@ -57,7 +59,7 @@ const toErrorMessage = (error: any, fallback: string) =>
   error?.response?.data?.message || error?.message || fallback
 
 export const useTransactionBiometrics = (userId?: string | null) => {
-  const normalizedUserId = useMemo(() => String(userId || '').trim(), [userId])
+  const normalizedUserId = useMemo(() => normalizeUserId(userId), [userId])
   const [available, setAvailable] = useState(false)
   const [enabled, setEnabled] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -105,7 +107,13 @@ export const useTransactionBiometrics = (userId?: string | null) => {
   }, [normalizedUserId])
 
   const maybeEnrollAfterPinSuccess = async (pin: string) => {
-    if (!available || !normalizedUserId || !/^\d{4}$/.test(String(pin || ''))) return null
+    if (!available) return null
+    if (!normalizedUserId) {
+      throw new Error('Biometric confirmation could not be enabled because your account session is incomplete. Close and reopen the app, then try again.')
+    }
+    if (!/^\d{4}$/.test(String(pin || ''))) {
+      throw new Error('A valid 4-digit transaction PIN is required to enable biometric confirmation.')
+    }
 
     const existing = await SecureStore.getItemAsync(enrollmentKey(normalizedUserId)).catch(() => null)
     if (existing) {
@@ -121,7 +129,11 @@ export const useTransactionBiometrics = (userId?: string | null) => {
 
     if (!token) return null
 
-    await SecureStore.setItemAsync(enrollmentKey(normalizedUserId), String(token)).catch(() => {})
+    try {
+      await SecureStore.setItemAsync(enrollmentKey(normalizedUserId), String(token))
+    } catch {
+      throw new Error('Biometric confirmation could not be saved on this device. Please check device security settings and try again.')
+    }
     setEnabled(true)
     return String(token)
   }
@@ -199,3 +211,11 @@ export const useTransactionBiometrics = (userId?: string | null) => {
     clearEnrollment,
   }
 }
+
+export const resolveTransactionBiometricUserId = (payload: any) =>
+  normalizeUserId(
+    payload?.id ||
+      payload?.user_id ||
+      payload?.data?.id ||
+      payload?.data?.user_id
+  )

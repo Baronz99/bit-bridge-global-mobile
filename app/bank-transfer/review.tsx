@@ -6,7 +6,7 @@ import TransactionPinModal from '@/components/TransactionPinModal'
 import ReviewSummaryCard from '@/components/bankTransfer/ReviewSummaryCard'
 import { createCounterParty, initiateFundTransfer, resolveAccountName } from '@/api/account'
 import { useAuth } from '@/services/useAuth'
-import { useTransactionBiometrics } from '@/services/useTransactionBiometrics'
+import { resolveTransactionBiometricUserId, useTransactionBiometrics } from '@/services/useTransactionBiometrics'
 import { buildApiErrorMessage } from '@/utils/apiErrorMessage'
 import {
   BANK_TRANSFER_TIER_REQUIREMENT_COPY,
@@ -76,7 +76,7 @@ const ReviewTransferScreen = () => {
   const { draft: draftParam } = useLocalSearchParams<{ draft?: string }>()
   const { onLogout, userProfileData, loadProfile } = useAuth()
   const profilePayload = (userProfileData?.data ?? userProfileData) as any
-  const transactionBiometrics = useTransactionBiometrics(String(profilePayload?.id || ''))
+  const transactionBiometrics = useTransactionBiometrics(resolveTransactionBiometricUserId(profilePayload))
   const [loading, setLoading] = useState(false)
   const [pinModalOpen, setPinModalOpen] = useState(false)
   const [pinError, setPinError] = useState<string | null>(null)
@@ -252,7 +252,17 @@ const ReviewTransferScreen = () => {
 
       setPinModalOpen(false)
       if (credential.pin) {
-        await transactionBiometrics.maybeEnrollAfterPinSuccess(credential.pin).catch(() => {})
+        try {
+          await transactionBiometrics.maybeEnrollAfterPinSuccess(credential.pin)
+        } catch (enrollmentError: any) {
+          setNotice({
+            message:
+              enrollmentError?.message ||
+              'Transfer succeeded, but biometric confirmation could not be enabled on this device yet.',
+            error: true,
+            data: null,
+          })
+        }
       }
       router.replace({
         pathname: '/bank-transfer/success',
