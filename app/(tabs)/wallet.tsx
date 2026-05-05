@@ -10,16 +10,18 @@ import {
   View,
   ScrollView,
 } from 'react-native'
-import { LinearGradient } from 'expo-linear-gradient'
+import type { WalletTransaction } from '@/components/finance/types'
+import WalletHeader from './wallet/components/WalletHeader'
+import WalletActivityPreview from './wallet/components/WalletActivityPreview'
 import { Feather } from '@expo/vector-icons'
 import { useAuth } from '@/services/useAuth'
 import { useBalancePrivacy } from '@/services/useBalancePrivacy'
 import moneyFormat from '@/utils/moneyFormat'
 import useFetch from '@/services/useFetch'
-import { getTransactions } from '@/api/transactions'
+import { getTransactionsForAccount } from '@/api/transactions'
 import { dateFormat } from '@/utils/dateFormat'
 import { useRouter } from 'expo-router'
-import { activateTunnel, getUserWallet } from '@/api/wallet'
+import { activateTunnel, getWallet } from '@/api/wallet'
 import { normalizeAnchorOnboarding, useAnchorOnboarding } from '@/services/useAnchorOnboarding'
 import AppModal from '@/components/modal/Modal'
 import { isPrimaryTransaction as isPrimaryTransactionFromUtils } from '@/utils/timelineRefs'
@@ -27,6 +29,8 @@ import { getTierFromProfile, isTierEligibleForBankTransfer } from '@/utils/bankT
 import { warn } from '@/utils/logger'
 import { formatWalletHistoryPresentation } from '@/utils/walletHistoryPresentation'
 import { resolveTransferLifecycle } from '@/utils/transferLifecycle'
+import { useActiveAccount } from '@/services/useActiveAccount'
+import { recordDirection, recordStatusLabel, recordSubtitle, recordTitle } from '@/components/circles/rebuild'
 
 const REFRESH_TIMEOUT_MS = 15000
 const TX_PAGE_LIMIT = 30
@@ -35,6 +39,7 @@ const FORCE_REFRESH_RETRY_DELAY_MS = 1700
 const WalletScreen = () => {
   const { userProfileData, loadProfile } = useAuth()
   const { balancesHidden, toggleBalancesVisibility, maskFormattedAmount } = useBalancePrivacy()
+  const { activeAccount } = useActiveAccount()
   const router = useRouter()
 
   const [walletMode, setWalletMode] = useState<'bridge' | 'tunnel'>('bridge')
@@ -52,12 +57,18 @@ const WalletScreen = () => {
   const [listRefreshing, setListRefreshing] = useState(false)
   const [txLoading, setTxLoading] = useState(false)
   const [txError, setTxError] = useState<string | null>(null)
-  const [txRows, setTxRows] = useState<any[]>([])
+  const [txRows, setTxRows] = useState<WalletTransaction[]>([])
   const [txNextCursor, setTxNextCursor] = useState<string | null>(null)
   const [txLoadingMore, setTxLoadingMore] = useState(false)
+  const isCircleAccount = activeAccount?.type === 'circle'
+  const isBusinessAccount = activeAccount?.type === 'business'
 
-  const isTunnelMode = walletMode === 'tunnel'
+  const isTunnelMode = !isCircleAccount && walletMode === 'tunnel'
   const expectedWalletType: 'ngn' | 'usd' = isTunnelMode ? 'usd' : 'ngn'
+
+  useEffect(() => {
+    if (isBusinessAccount && walletMode === 'tunnel') setWalletMode('bridge')
+  }, [isBusinessAccount, walletMode])
 
   const heroCardClass = 'rounded-3xl border p-5 overflow-hidden'
   const heroCardStyle = isTunnelMode
@@ -80,7 +91,7 @@ const WalletScreen = () => {
     return s || fallback
   }
 
-  const getItemWalletType = (item: any): 'ngn' | 'usd' | null => {
+  const getItemWalletType = (item: WalletTransaction): 'ngn' | 'usd' | null => {
     // Try common fields first
     const explicit =
       item?.wallet_type ||
@@ -123,7 +134,7 @@ const WalletScreen = () => {
                 transaction_type: transactionFilter,
               }
 
-        const payload = await getTransactions({
+        const payload = await getTransactionsForAccount(activeAccount, {
           params: {
             ...baseParams,
             wallet_type: expectedWalletType,
@@ -160,7 +171,7 @@ const WalletScreen = () => {
         }
       }
     },
-    [expectedWalletType, parseTransactionsPayload, transactionFilter]
+    [activeAccount, expectedWalletType, parseTransactionsPayload, transactionFilter]
   )
 
   const loadMoreTransactions = useCallback(async () => {
@@ -168,7 +179,10 @@ const WalletScreen = () => {
     await fetchTransactions(txNextCursor, true)
   }, [fetchTransactions, txLoading, txLoadingMore, txNextCursor])
 
-  const { data: walletData, refetch: refetchWallet } = useFetch(() => getUserWallet(), false)
+  const { data: walletData, refetch: refetchWallet } = useFetch(() => getWallet(activeAccount), {
+    autoFetch: false,
+    queryKey: ['wallet', activeAccount],
+  })
   const canUseBankTransfer = useMemo(
     () => isTierEligibleForBankTransfer(getTierFromProfile(userProfileData)),
     [userProfileData]
@@ -204,21 +218,53 @@ const WalletScreen = () => {
       await Promise.allSettled([
         withTimeout(fetchTransactions(undefined, false), 'transactions_refresh'),
         withTimeout(refetchWallet(), 'wallet_refresh'),
-        withTimeout(anchorState.refresh({ force: true }), 'anchor_onboarding_refresh'),
+        ...(isCircleAccount
+          ? []
+          : [withTimeout(anchorState.refresh({ force: true }), 'anchor_onboarding_refresh')]),
       ])
     } finally {
       setListRefreshing(false)
     }
-  }, [anchorState.refresh, fetchTransactions, refetchWallet])
+  }, [anchorState.refresh, fetchTransactions, isCircleAccount, refetchWallet])
+
+  const walletPayload = walletData?.data ?? walletData ?? {}
+  const circleAccount = walletPayload?.circle ?? walletPayload?.data?.circle ?? null
+  const circleName = String(
+    circleAccount?.name ?? circleAccount?.title ?? circleAccount?.display_name ?? 'Circle'
+  )
+  const circleCurrency = String(circleAccount?.currency || 'NGN')
+  const circleBalanceAmount = (() => {
+    const cents = Number(circleAccount?.balance_cents ?? NaN)
+    if (Number.isFinite(cents)) return cents / 100
+    const amount = Number(circleAccount?.balance ?? circleAccount?.amount ?? 0)
+    return Number.isFinite(amount) ? amount : 0
+  })()
+  const circleBalanceLabel = moneyFormat(circleBalanceAmount, circleCurrency)
+  const circleBalanceDisplay = balancesHidden
+    ? maskFormattedAmount(circleBalanceLabel)
+    : circleBalanceLabel
+  const circleRole = String(
+    circleAccount?.current_user_role ??
+      circleAccount?.membership_role ??
+      circleAccount?.role ??
+      'member'
+  )
+  const circleRoleLabel = circleRole
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (match) => match.toUpperCase())
+  const circleMembersCount = Number(circleAccount?.member_count ?? circleAccount?.members_count ?? 0)
+  const circleDescription = String(circleAccount?.description ?? circleAccount?.summary ?? '')
+  const circlePermissions = circleAccount?.permissions ?? {}
+  const circleDuesSummary = circleAccount?.dues_summary ?? {}
 
   const walletBalance =
-    walletData?.data?.bridge?.balance ??
-    walletData?.data?.bridge?.amount ??
+    walletPayload?.bridge?.balance ??
+    walletPayload?.bridge?.amount ??
     userProfileData?.wallet?.balance
 
   const walletBalanceValue = Number(walletBalance ?? 0)
 
-  const tunnelWallet = walletData?.data?.tunnel
+  const tunnelWallet = walletPayload?.tunnel
   const tunnelBalanceValue = Number(tunnelWallet?.balance ?? tunnelWallet?.amount ?? 0)
   const bridgeBalanceLabel = moneyFormat(Number.isFinite(walletBalanceValue) ? walletBalanceValue : 0)
   const tunnelBalanceLabel = moneyFormat(
@@ -240,12 +286,13 @@ const WalletScreen = () => {
 
   // HARD FILTER by wallet type so NGN cannot leak into USD (or vice versa)
   const walletScopedTransactions = useMemo(() => {
-    return txRows.filter((item: any) => {
+    if (isCircleAccount) return txRows
+    return txRows.filter((item: WalletTransaction) => {
       const t = getItemWalletType(item)
       if (!t) return true // if backend doesn't provide type, keep (but ideally backend should)
       return t === expectedWalletType
     })
-  }, [txRows, expectedWalletType])
+  }, [txRows, expectedWalletType, isCircleAccount])
 
   const filteredTransactions = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase()
@@ -270,7 +317,7 @@ const WalletScreen = () => {
             ? now - 30 * 24 * 60 * 60 * 1000
             : null
 
-    return walletScopedTransactions.filter((item: any) => {
+    return walletScopedTransactions.filter((item: WalletTransaction) => {
       if (!isPrimaryTransactionSafe(item)) return false
 
       const filterStatus = statusFilterValue(item)
@@ -330,32 +377,16 @@ const WalletScreen = () => {
     return state
   }
 
-  const displayAmount = (item: any) =>
+  const displayAmount = (item: WalletTransaction) =>
     Number(item?.display_total ?? item?.display_amount ?? item?.amount ?? 0)
-
-  const getWalletDescription = (item: any) => {
-    const address = String(item?.address || item?.description || '').toLowerCase()
-    const txType = String(item?.transaction_type || item?.type || '').toLowerCase()
-
-    if (address.includes('tunnel conversion') || address.includes('conversion')) {
-      if (isTunnelMode) return txType === 'withdrawal' ? 'Convert USD -> NGN' : 'Convert NGN -> USD'
-      return txType === 'withdrawal' ? 'Convert NGN -> USD' : 'Convert USD -> NGN'
-    }
-
-    if (address.includes('virtual card funding')) return 'Card funding'
-    if (address.includes('virtual card withdrawal')) return 'Card withdrawal'
-    if (address.includes('transfer')) return 'Transfer'
-
-    return item?.transaction_type || item?.type || 'transaction'
-  }
 
   const transactionOptions = useMemo(
     () => [
       { label: 'All types', value: 'all' },
-      { label: 'Deposits', value: 'deposit' },
-      { label: 'Withdrawals', value: 'withdraw' },
+      { label: isCircleAccount ? 'Contributions' : 'Deposits', value: 'deposit' },
+      { label: isCircleAccount ? 'Payouts' : 'Withdrawals', value: 'withdraw' },
     ],
-    []
+    [isCircleAccount]
   )
 
   const statusOptions = useMemo(
@@ -375,35 +406,6 @@ const WalletScreen = () => {
       { label: 'Last 30 days', value: '30d' },
     ],
     []
-  )
-
-  const renderOptionGroup = (
-    label: string,
-    value: string,
-    options: { label: string; value: string }[],
-    onChange: (next: string) => void
-  ) => (
-    <View className="mt-4">
-      <Text className="text-white text-xs font-semibold mb-2">{label}</Text>
-      <View className="flex-row flex-wrap gap-2">
-        {options.map((option) => {
-          const active = value === option.value
-          return (
-            <TouchableOpacity
-              key={option.value}
-              onPress={() => onChange(option.value)}
-              className={`px-3 py-2 rounded-full border ${
-                active ? 'bg-app-primary border-app-primary' : 'bg-gray-950 border-gray-800'
-              }`}
-            >
-              <Text className={`text-xs ${active ? 'text-black' : 'text-white'}`}>
-                {option.label}
-              </Text>
-            </TouchableOpacity>
-          )
-        })}
-      </View>
-    </View>
   )
 
   const handleActivateTunnel = async () => {
@@ -432,8 +434,113 @@ const WalletScreen = () => {
     }
   }, [refreshWalletFetches])
 
+  const getCircleActivityAmount = useCallback((item: any) => {
+    const cents = Number(item?.amount_cents ?? NaN)
+    if (Number.isFinite(cents)) return cents / 100
+    const amount = Number(item?.amount ?? item?.display_amount ?? item?.display_total ?? 0)
+    return Number.isFinite(amount) ? amount : 0
+  }, [])
+
+  const getWalletDirection = useCallback((item: WalletTransaction) => {
+    const txType = String(item?.transaction_type || item?.type || '').trim().toLowerCase()
+    if (txType === 'deposit') return 'credit'
+    if (txType === 'withdrawal') return 'debit'
+    const amount = Number(item?.display_total ?? item?.display_amount ?? item?.amount ?? 0)
+    return amount < 0 ? 'debit' : 'credit'
+  }, [])
+
+  const formatWalletAmountLabel = useCallback((item: WalletTransaction) => {
+    const currency = isTunnelMode ? 'USD' : 'NGN'
+    const direction = getWalletDirection(item)
+    const amount = Math.abs(Number(item?.display_total ?? item?.display_amount ?? item?.amount ?? 0))
+    return `${direction === 'debit' ? '-' : '+'}${moneyFormat(amount, currency)}`
+  }, [getWalletDirection, isTunnelMode])
+
+  const recentPreviewItems = filteredTransactions.slice(0, 6)
   const heroContent = (
     <>
+      {isCircleAccount ? (
+        <>
+          <View className="flex-row items-center justify-between">
+            <View className="flex-1 pr-3">
+              <Text className="text-white/70 text-xs tracking-widest uppercase">Circle account</Text>
+              <Text className="text-white text-3xl font-semibold mt-2">{circleName}</Text>
+              <Text className="text-gray-400 text-xs mt-2">
+                {circleMembersCount > 0 ? `${circleMembersCount} members ï¿½ ` : ''}
+                {circleRoleLabel}
+              </Text>
+              {circleDescription ? (
+                <Text className="text-gray-500 text-xs mt-2">{circleDescription}</Text>
+              ) : null}
+            </View>
+                    <TouchableOpacity
+              onPress={() => {
+                void toggleBalancesVisibility()
+              }}
+              className="gap-2 items-center rounded-full flex-row py-1.5 px-3 bg-black/30 border border-white/15"
+            >
+              <Feather name={balancesHidden ? 'eye-off' : 'eye'} size={12} color="white" />
+              <Text className="text-white text-xs">{balancesHidden ? 'Show balance' : 'Hide balance'}</Text>
+            </TouchableOpacity>
+          </View>
+                  <Text className="text-white/50 text-[11px] uppercase tracking-[0.18em] mt-5">Circle balance</Text>
+          <Text className="text-white text-3xl font-semibold mt-5">{circleBalanceDisplay}</Text>
+          {balancesHidden ? <Text className="text-white/50 text-xs mt-1">Balances hidden</Text> : null}
+          {circleDuesSummary?.enabled ? (
+            <View className="mt-4 rounded-2xl border border-sky-500/20 bg-black/20 px-4 py-3">
+              <Text className="text-white text-xs">
+                Dues active:
+                {' '}
+                {Number(circleDuesSummary?.current_user_due_summary?.payable_months_count || 0)} open cycle(s)
+              </Text>
+            </View>
+          ) : null}
+
+          <View className="flex-row gap-2 mt-5">
+            <TouchableOpacity
+              onPress={() => router.push(`/circles/${activeAccount.circleId}/activities` as any)}
+              className="bg-app-primary rounded-xl flex-1 py-3 items-center"
+            >
+              <Text className="text-white text-xs font-semibold">Activities</Text>
+            </TouchableOpacity>
+
+            {circlePermissions?.can_contribute !== false ? (
+              <TouchableOpacity
+                onPress={() => router.push(`/circles/${activeAccount.circleId}/pay` as any)}
+                className="bg-gray-900 border border-gray-800 py-3 flex-1 rounded-xl"
+              >
+                <Text className="text-white text-center text-xs">Contribute</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+                  {circlePermissions?.can_pay_dues && circleDuesSummary?.enabled || circlePermissions?.can_manage_governance ? (
+            <View className="mt-3 flex-row gap-2">
+              {circlePermissions?.can_pay_dues && circleDuesSummary?.enabled ? (
+                <TouchableOpacity
+                  onPress={() =>
+                    router.push({
+                      pathname: '/circles/[id]/pay',
+                      params: { id: activeAccount.circleId, source: 'dues' },
+                    } as any)
+                  }
+                  className="bg-gray-900 border border-gray-800 py-3 flex-1 rounded-xl"
+                >
+                  <Text className="text-white text-center text-xs">Pay dues</Text>
+                </TouchableOpacity>
+              ) : null}
+              {circlePermissions?.can_manage_governance ? (
+                <TouchableOpacity
+                  onPress={() => router.push(`/circles/${activeAccount.circleId}/governance` as any)}
+                  className="bg-gray-900 border border-gray-800 py-3 flex-1 rounded-xl"
+                >
+                  <Text className="text-white text-center text-xs">Governance</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          ) : null}
+        </>
+      ) : (
+        <>
       <View className="flex-row items-center gap-2 rounded-2xl border p-1" style={modeSwitchStyle}>
         <TouchableOpacity
           onPress={() => setWalletMode('bridge')}
@@ -444,7 +551,10 @@ const WalletScreen = () => {
         </TouchableOpacity>
 
         <TouchableOpacity
-          onPress={() => setWalletMode('tunnel')}
+          onPress={() => {
+            if (isBusinessAccount) return
+            setWalletMode('tunnel')
+          }}
           className={`flex-1 rounded-xl px-3 py-2 ${isTunnelMode ? 'bg-orange-500' : 'bg-transparent'}`}
           style={tunnelActiveStyle}
         >
@@ -453,8 +563,7 @@ const WalletScreen = () => {
           </Text>
         </TouchableOpacity>
       </View>
-
-      <View className="mt-3 flex-row justify-end">
+              <View className="mt-3 flex-row justify-end">
         <TouchableOpacity
           onPress={() => {
             void toggleBalancesVisibility()
@@ -465,8 +574,7 @@ const WalletScreen = () => {
           <Text className="text-white text-xs">{balancesHidden ? 'Show balances' : 'Hide balances'}</Text>
         </TouchableOpacity>
       </View>
-
-      {!isTunnelMode ? (
+              {!isTunnelMode ? (
         <>
           <Text className="text-white/70 text-xs tracking-widest uppercase mt-4">Bridge Wallet</Text>
           <Text className="text-white text-3xl font-semibold mt-2">
@@ -484,8 +592,7 @@ const WalletScreen = () => {
               <Text className="text-white text-xs font-semibold">Fund Wallet</Text>
             </TouchableOpacity>
           </View>
-
-          <View className="mt-3 flex-row gap-2">
+                  <View className="mt-3 flex-row gap-2">
             <TouchableOpacity
               onPress={() => setSendOpen(true)}
               className="bg-gray-900 border border-gray-800 py-3 flex-1 rounded-xl"
@@ -494,14 +601,13 @@ const WalletScreen = () => {
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={() => router.push('/convert-ngn-to-usd')}
+              onPress={() => router.push({ pathname: '/fx', params: { direction: 'ngn-to-usd' } })}
               className="bg-gray-900 border border-gray-800 py-3 flex-1 rounded-xl"
             >
-              <Text className="text-white text-center text-xs">Convert NGN -> USD</Text>
+              <Text className="text-white text-center text-xs">Convert NGN to USD</Text>
             </TouchableOpacity>
           </View>
-
-          <View className="mt-4 rounded-2xl border border-gray-800 bg-gray-900/70 p-4">
+                  <View className="mt-4 rounded-2xl border border-gray-800 bg-gray-900/70 p-4">
             <Text className="text-white text-sm font-semibold">Bridge account (NGN)</Text>
             <Text className="text-gray-400 text-xs mt-1">Receive NGN deposits here.</Text>
 
@@ -514,8 +620,7 @@ const WalletScreen = () => {
                       {anchorNormalized.displayAccountNumber || '----'}
                     </Text>
                   </View>
-
-                  <TouchableOpacity
+                          <TouchableOpacity
                     onPress={async () => {
                       const raw = anchorNormalized.rawAccountNumber
                       if (!raw) {
@@ -538,8 +643,7 @@ const WalletScreen = () => {
                     <Text className="text-white text-xs">Copy</Text>
                   </TouchableOpacity>
                 </View>
-
-                {anchorNormalized.accountName ? (
+                        {anchorNormalized.accountName ? (
                   <Text className="text-gray-300 text-xs mt-2">
                     Account Name: {anchorNormalized.accountName}
                   </Text>
@@ -576,7 +680,6 @@ const WalletScreen = () => {
       ) : (
         <>
           <Text className={`text-xs tracking-widest uppercase mt-4 ${tunnelLabelClass}`}>Tunnel Wallet</Text>
-
           {tunnelWallet ? (
             <>
               <Text className={`text-3xl font-semibold mt-2 ${tunnelBalanceClass}`}>
@@ -588,11 +691,11 @@ const WalletScreen = () => {
 
               <View className="flex-row gap-2 mt-4">
                 <TouchableOpacity
-                  onPress={() => router.push('/convert-usd-to-ngn')}
+                  onPress={() => router.push({ pathname: '/fx', params: { direction: 'usd-to-ngn' } })}
                   className="border py-3 flex-1 rounded-xl"
                   style={{ backgroundColor: 'rgba(9, 8, 6, 0.7)', borderColor: 'rgba(245, 158, 11, 0.4)' }}
                 >
-                  <Text className="text-white text-center text-xs">Convert USD -> NGN</Text>
+                  <Text className="text-white text-center text-xs">Convert USD to NGN</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -623,6 +726,8 @@ const WalletScreen = () => {
           )}
         </>
       )}
+        </>
+      )}
     </>
   )
 
@@ -635,43 +740,28 @@ const WalletScreen = () => {
         showsVerticalScrollIndicator={false}
       >
         <View className="px-4">
-          {isTunnelMode && hasLinearGradient ? (
-            <LinearGradient
-              colors={['rgba(255, 140, 0, 0.4)', 'rgba(11, 17, 32, 0.96)']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              className={heroCardClass}
-              style={heroCardStyle}
-            >
-              {heroContent}
-            </LinearGradient>
-          ) : (
-            <View className={heroCardClass} style={heroCardStyle}>
-              {heroContent}
-            </View>
-          )}
+          <WalletHeader
+            isTunnelMode={isTunnelMode}
+            hasLinearGradient={hasLinearGradient}
+            cardClassName={heroCardClass}
+            cardStyle={heroCardStyle}
+          >
+            {heroContent}
+          </WalletHeader>
 
-          <View className="mt-6 rounded-2xl border border-gray-800 bg-gray-900/70 p-4">
-            <View className="flex-row items-center justify-between">
+          <WalletActivityPreview>
+            <View className="flex-row items-end justify-between mb-3">
               <View>
-                <Text className="text-white text-sm font-semibold">Filters</Text>
-                <Text className="text-gray-400 text-xs mt-1">
-                  {transactionFilter === 'all' ? 'All types' : transactionFilter} |{' '}
-                  {statusFilter === 'all' ? 'All status' : statusFilter} |{' '}
-                  {dateRange === 'all' ? 'All time' : dateRange}
-                </Text>
+                <Text className="text-white text-lg font-semibold">Recent activity</Text>
+                <Text className="text-[#8D94A0] text-xs mt-1">Latest movement across this wallet context.</Text>
               </View>
-
-              <TouchableOpacity
-                onPress={() => setFiltersOpen(true)}
-                className="bg-gray-950 border border-gray-800 px-3 py-2 rounded-full"
-              >
-                <Text className="text-white text-xs">Edit</Text>
-              </TouchableOpacity>
+              <View className="flex-row items-center gap-2">
+                {recentPreviewItems.length > 0 ? <Text className="text-[#8D94A0] text-xs">Showing latest {recentPreviewItems.length}</Text> : null}
+                <TouchableOpacity onPress={() => setFiltersOpen(true)} className="bg-[#171A21] px-3 py-2 rounded-full">
+                  <Text className="text-white text-xs font-semibold">Filters</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-
-          <View className="mt-6">
             {((txLoading || listRefreshing) && filteredTransactions.length < 1) ? (
               <ActivityIndicator className="mt-10" size={'large'} />
             ) : txError ? (
@@ -688,10 +778,42 @@ const WalletScreen = () => {
               </View>
             ) : filteredTransactions.length < 1 ? (
               <View className="rounded-2xl border border-gray-800 bg-gray-900/70 px-4 py-4">
-                <Text className="text-center text-white">No transaction</Text>
+                <Text className="text-center text-white">
+                  {isCircleAccount ? 'No circle activity yet.' : 'No transaction'}
+                </Text>
               </View>
             ) : (
-              filteredTransactions.map((item: any, index: number) => {
+              recentPreviewItems.map((item: any, index: number) => {
+                if (isCircleAccount) {
+                  const reference = item?.reference ?? item?.id ?? `${activeAccount.circleId}-${index}`
+                  const direction = recordDirection(item)
+                  const statusLabel = recordStatusLabel(item)
+                  const signedAmount = `${direction === 'debit' ? '-' : '+'}${moneyFormat(Math.abs(getCircleActivityAmount(item)), String(item?.currency || circleCurrency))}`
+                  return (
+                    <TouchableOpacity
+                      key={`${reference}-${index}`}
+                      onPress={() => router.push(`/circles/${activeAccount.circleId}/activities` as any)}
+                      className="mb-3 rounded-2xl border border-gray-800 bg-gray-900/70 px-4 py-4"
+                    >
+                      <View className="flex-row justify-between items-start">
+                        <View className="flex-1 pr-3">
+                          <Text className="text-white font-semibold">{recordTitle(item)}</Text>
+                          <Text className="text-gray-500 text-xs mt-1">{recordSubtitle(item)}</Text>
+                        </View>
+                        <View className="items-end">
+                          <Text className={`font-semibold ${direction === 'debit' ? 'text-amber-200' : 'text-emerald-200'}`}>
+                            {signedAmount}
+                          </Text>
+                          <Text className="text-gray-500 text-xs mt-1">{statusLabel}</Text>
+                        </View>
+                      </View>
+                      <Text className="text-gray-500 text-xs mt-2">
+                        {dateFormat(item?.created_at || item?.occurred_at || item?.updated_at)}
+                      </Text>
+                    </TouchableOpacity>
+                  )
+                }
+
                 const reference = item?.reference ?? item?.transfer_reference ?? item?.id
                 const lifecycle = resolveTransferLifecycle({
                   lifecycle_state: item?.lifecycle_state,
@@ -700,40 +822,38 @@ const WalletScreen = () => {
                 })
                 const status = lifecycle.state
                 const statusLabel = lifecycle.shortLabel
-                const currency = isTunnelMode ? 'USD' : 'NGN'
+                const direction = getWalletDirection(item)
                 const presentation = formatWalletHistoryPresentation(item)
 
-	                return (
-	                  <TouchableOpacity
-	                    key={`${item?.id ?? reference ?? item?.created_at}-${index}`}
-	                    onPress={() => {
+                return (
+                  <TouchableOpacity
+                    key={`${item?.id ?? reference ?? item?.created_at}-${index}`}
+                    onPress={() => {
                       const rawRef = String(reference ?? '').trim()
                       const canonicalReference = /^[0-9a-f-]{36}$/i.test(rawRef)
                         ? `wallet-tx-${String(item?.id ?? '').trim()}`
                         : rawRef || `wallet-tx-${String(item?.id ?? '').trim()}`
-	                      router.push({
-	                        pathname: '/transaction/receipt',
-	                        params: {
-	                          reference: canonicalReference,
-	                        },
-	                      })
-	                    }}
-	                    className="mb-3 rounded-2xl border border-gray-800 bg-gray-900/70 px-4 py-4"
-	                  >
+                      router.push({
+                        pathname: '/transaction/receipt',
+                        params: {
+                          reference: canonicalReference,
+                        },
+                      })
+                    }}
+                    className="mb-3 rounded-2xl border border-gray-800 bg-gray-900/70 px-4 py-4"
+                  >
                     <View className="flex-row justify-between items-start">
-                          <View className="flex-1 pr-3">
-                            <Text className="text-white font-semibold">{presentation.title}</Text>
-                            <Text className="text-gray-500 text-xs mt-1">{presentation.subtitle}</Text>
-                          </View>
-
-                          <View className="items-end">
-                            <Text className="text-white font-semibold">
-                              {moneyFormat(displayAmount(item), currency)}
-                            </Text>
-                            <Text className={`text-xs mt-1 ${statusTone(status)}`}>{statusLabel}</Text>
-                          </View>
+                      <View className="flex-1 pr-3">
+                        <Text className="text-white font-semibold">{presentation.title}</Text>
+                        <Text className="text-gray-500 text-xs mt-1">{presentation.subtitle}</Text>
+                      </View>
+                      <View className="items-end">
+                        <Text className={`font-semibold ${direction === 'debit' ? 'text-amber-200' : 'text-emerald-200'}`}>
+                          {formatWalletAmountLabel(item)}
+                        </Text>
+                        <Text className={`text-xs mt-1 ${statusTone(status)}`}>{statusLabel}</Text>
+                      </View>
                     </View>
-
                     <Text className="text-gray-500 text-xs mt-2">{dateFormat(item.created_at)}</Text>
                   </TouchableOpacity>
                 )
@@ -754,14 +874,16 @@ const WalletScreen = () => {
                 </TouchableOpacity>
               </View>
             ) : null}
-          </View>
+          </WalletActivityPreview>
         </View>
       </ScrollView>
 
       <AppModal open={filtersOpen} onclose={() => setFiltersOpen(false)}>
         <View className="bg-gray-900 p-6 rounded-2xl w-full max-w-md">
           <Text className="text-white text-xl font-semibold text-center mb-2">Filters</Text>
-          <Text className="text-gray-400 text-center text-xs mb-5">Refine your wallet activity.</Text>
+          <Text className="text-gray-400 text-center text-xs mb-5">
+            {isCircleAccount ? 'Refine your circle activity.' : 'Refine your wallet activity.'}
+          </Text>
 
           {/* Type */}
           <View className="mt-4">
@@ -783,8 +905,7 @@ const WalletScreen = () => {
               })}
             </View>
           </View>
-
-          {/* Status */}
+                  {/* Status */}
           <View className="mt-4">
             <Text className="text-white text-xs font-semibold mb-2">Status</Text>
             <View className="flex-row flex-wrap gap-2">
@@ -804,8 +925,7 @@ const WalletScreen = () => {
               })}
             </View>
           </View>
-
-          {/* Date range */}
+                  {/* Date range */}
           <View className="mt-4">
             <Text className="text-white text-xs font-semibold mb-2">Date range</Text>
             <View className="flex-row flex-wrap gap-2">
@@ -825,8 +945,7 @@ const WalletScreen = () => {
               })}
             </View>
           </View>
-
-          <View className="mt-3 flex-row gap-2">
+                  <View className="mt-3 flex-row gap-2">
             <TextInput
               value={startDate}
               onChangeText={setStartDate}
@@ -842,8 +961,7 @@ const WalletScreen = () => {
               className="flex-1 border border-gray-800 rounded-xl px-4 py-3 text-white bg-gray-950"
             />
           </View>
-
-          <View className="mt-3">
+                  <View className="mt-3">
             <TextInput
               value={searchTerm}
               onChangeText={setSearchTerm}
@@ -852,8 +970,7 @@ const WalletScreen = () => {
               className="border border-gray-800 rounded-xl px-4 py-3 text-white bg-gray-950"
             />
           </View>
-
-          <TouchableOpacity
+                  <TouchableOpacity
             onPress={() => setFiltersOpen(false)}
             className="bg-app-primary py-3 rounded-xl items-center mt-5"
           >
@@ -862,7 +979,8 @@ const WalletScreen = () => {
         </View>
       </AppModal>
 
-      <AppModal open={sendOpen} onclose={() => setSendOpen(false)}>
+      {!isCircleAccount ? (
+        <AppModal open={sendOpen} onclose={() => setSendOpen(false)}>
         <View className="bg-gray-900 p-6 rounded-2xl w-full max-w-md">
           <Text className="text-white text-xl font-semibold text-center mb-2">Send money</Text>
           <Text className="text-gray-400 text-center text-xs mb-5">Choose how you want to send your funds.</Text>
@@ -901,7 +1019,8 @@ const WalletScreen = () => {
             </Text>
           ) : null}
         </View>
-      </AppModal>
+        </AppModal>
+      ) : null}
     </>
   )
 }
