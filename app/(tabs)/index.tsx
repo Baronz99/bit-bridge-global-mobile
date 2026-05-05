@@ -9,18 +9,23 @@ import {
   View,
 } from 'react-native'
 import Constants from 'expo-constants'
-import { Link, useRouter } from 'expo-router'
+import { LinearGradient } from 'expo-linear-gradient'
+import { Link, Redirect, useRouter } from 'expo-router'
 import { AntDesign, Feather } from '@expo/vector-icons'
 
 import { getUserOrders } from '@/api/orders'
 import { getRescentPurchaseOrder, repurchaseOrder } from '@/api/billOrder'
-import { getTransactions } from '@/api/transactions'
+import { getCards } from '@/api/cards'
+import { getBusinessTransactions } from '@/api/business'
+import { getTransactionsForAccount } from '@/api/transactions'
 import { listTimeline } from '@/api/timeline'
+import { getWallet } from '@/api/wallet'
 
 import { icons } from '@/constants/icons'
 import { images } from '@/constants/images'
 
 import { useAuth } from '@/services/useAuth'
+import { useActiveAccount } from '@/services/useActiveAccount'
 import { useBalancePrivacy } from '@/services/useBalancePrivacy'
 import useFetch from '@/services/useFetch'
 
@@ -231,6 +236,7 @@ const getHomeRowCurrency = (t: TimelineItem) => {
 export default function Index() {
   const { authState, userProfileData, loadProfile, loading, authHydrated } = useAuth()
   const { balancesHidden, toggleBalancesVisibility, maskFormattedAmount } = useBalancePrivacy()
+  const { activeAccount } = useActiveAccount()
   const router = useRouter()
   const didKickoffProfileRef = useRef(false)
 
@@ -274,14 +280,20 @@ export default function Index() {
 
   // Old deposits-only transactions (kept, but not main "Recent Activity")
   const fetchRecentTransactions = useCallback(() => {
-    return getTransactions({ params: { transaction_type: 'deposit' } })
-  }, [])
+    return getTransactionsForAccount(activeAccount, { params: { transaction_type: 'deposit' } })
+  }, [activeAccount])
 
   // Recent Activity from Timeline - Home should NOT be noisy
   const fetchRecentTimeline = useCallback(() => {
+    if (activeAccount?.type === 'business') {
+      return getBusinessTransactions(activeAccount.businessId, { limit: 25 })
+    }
+    if (activeAccount?.type === 'circle') {
+      return getTransactionsForAccount(activeAccount, { params: { limit: 25 } })
+    }
     // IMPORTANT: for Home, show_alerts should be false for bank-grade signal
     return listTimeline({ limit: 25, show_alerts: false } as any)
-  }, [])
+  }, [activeAccount])
 
   const {
     data: recentPurchases,
@@ -290,22 +302,37 @@ export default function Index() {
   } = useFetch(fetchRecentPurchases, true)
 
   const { data: recentOrdersRaw } = useFetch(fetchRecentOrders, true)
-  const { data: recentTransactionsRaw } = useFetch(fetchRecentTransactions, true)
+  const { data: recentTransactionsRaw } = useFetch(fetchRecentTransactions, {
+    autoFetch: true,
+    queryKey: ['transactions', activeAccount, 'recent-deposits'],
+  })
 
   const {
     data: recentTimelineRaw,
     loading: timelineLoading,
     error: timelineError,
   } = useFetch(fetchRecentTimeline, true)
+  const { data: walletData, refetch: refetchWalletData } = useFetch(() => getWallet(activeAccount), {
+    autoFetch: true,
+    queryKey: ['wallet', activeAccount],
+  })
+  const { data: cardsRaw, refetch: refetchCards } = useFetch(() => {
+    if (activeAccount?.type === 'circle') return Promise.resolve(null)
+    return getCards(activeAccount)
+  }, {
+    autoFetch: true,
+    queryKey: ['cards', activeAccount],
+  })
 
   const onRefresh = useCallback(() => {
     setRefreshing(true)
-    loadProfile({ force: true })
-      .catch(() => {})
+    const jobs = [loadProfile({ force: true }), refetchWalletData()]
+    if (activeAccount?.type !== 'circle') jobs.push(refetchCards())
+    Promise.allSettled(jobs)
       .finally(() => {
         setTimeout(() => setRefreshing(false), 700)
       })
-  }, [loadProfile])
+  }, [activeAccount, loadProfile, refetchCards, refetchWalletData])
 
   // -------- Quick services --------
   const quickItems = useMemo(
@@ -519,13 +546,91 @@ export default function Index() {
     ? maskFormattedAmount(bridgeBalanceLabel)
     : bridgeBalanceLabel
   const commissionDisplay = balancesHidden ? maskFormattedAmount(commissionLabel) : commissionLabel
+  const walletPayload = useMemo(() => (walletData as any)?.data ?? walletData ?? {}, [walletData])
+  const isCircleAccount = activeAccount?.type === 'circle'
+  const circleAccount = useMemo(
+    () => walletPayload?.circle ?? walletPayload?.data?.circle ?? null,
+    [walletPayload]
+  )
+  const circleName = String(
+    circleAccount?.name ?? circleAccount?.title ?? circleAccount?.display_name ?? 'Circle'
+  )
+  const circleBalanceAmount = useMemo(() => {
+    const cents = Number(circleAccount?.balance_cents ?? NaN)
+    if (Number.isFinite(cents)) return cents / 100
+    const amount = Number(circleAccount?.balance ?? circleAccount?.amount ?? 0)
+    return Number.isFinite(amount) ? amount : 0
+  }, [circleAccount])
+  const circleBalanceLabel = moneyFormat(circleBalanceAmount, String(circleAccount?.currency || 'NGN'))
+  const circleBalanceDisplay = balancesHidden
+    ? maskFormattedAmount(circleBalanceLabel)
+    : circleBalanceLabel
+  const circleRole = String(
+    circleAccount?.current_user_role ??
+      circleAccount?.membership_role ??
+      circleAccount?.role ??
+      'member'
+  )
+  const circleRoleLabel = circleRole
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (match) => match.toUpperCase())
+  const circleMembersCount = Number(circleAccount?.member_count ?? circleAccount?.members_count ?? 0)
+  const circlePermissions = circleAccount?.permissions ?? {}
+  const circleDuesSummary = circleAccount?.dues_summary ?? {}
+  const tunnelWallet = useMemo(() => {
+    return walletPayload?.tunnel ?? walletPayload?.data?.tunnel ?? null
+  }, [walletPayload])
+  const tunnelHasLiveState = Boolean(tunnelWallet)
+  const tunnelBalanceValue = Number(tunnelWallet?.balance ?? tunnelWallet?.amount ?? NaN)
+  const tunnelBalanceLabel = moneyFormat(
+    Number.isFinite(tunnelBalanceValue) ? tunnelBalanceValue : 0,
+    'USD'
+  )
+  const tunnelBalanceDisplay = balancesHidden
+    ? maskFormattedAmount(tunnelBalanceLabel)
+    : tunnelBalanceLabel
+  const tunnelCards = useMemo(() => {
+    const payload = (cardsRaw as any)?.data ?? cardsRaw
+    if (Array.isArray(payload)) return payload
+    if (Array.isArray(payload?.cards)) return payload.cards
+    if (Array.isArray(payload?.data)) return payload.data
+    if (Array.isArray(payload?.data?.cards)) return payload.data.cards
+    if (Array.isArray(payload?.results)) return payload.results
+    if (payload?.card) return [payload.card]
+    if (payload?.card_id) return [payload]
+    return []
+  }, [cardsRaw])
+  const tunnelCardsCount = tunnelCards.length
 
   const goToTimeline = useCallback(() => {
+    if (activeAccount?.type === 'circle') {
+      router.push(`/circles/${activeAccount.circleId}/activities` as any)
+      return
+    }
+    if (activeAccount?.type === 'business') {
+      router.push('/business/transfers' as any)
+      return
+    }
     router.push('/(tabs)/timeline' as any)
-  }, [router])
+  }, [activeAccount, router])
 
   const handlePressRecentActivity = useCallback(
     (item: TimelineItem) => {
+      if (activeAccount?.type === 'business') {
+        const businessReceiptRef = extractReceiptReference(item, { allowWalletTx: true })
+        if (businessReceiptRef) {
+          router.push(`/business/receipts/${encodeURIComponent(String(businessReceiptRef))}` as any)
+          return
+        }
+        goToTimeline()
+        return
+      }
+
+      if (activeAccount?.type === 'circle') {
+        router.push(`/circles/${activeAccount.circleId}/activities` as any)
+        return
+      }
+
       const decision = decideHomeNavigation(item)
 
       if (decision.type === 'receipt') {
@@ -540,8 +645,12 @@ export default function Index() {
 
       goToTimeline()
     },
-    [router, goToTimeline]
+    [activeAccount, router, goToTimeline]
   )
+
+  if (activeAccount?.type === 'circle' && activeAccount.circleId) {
+    return <Redirect href={`/circles/${activeAccount.circleId}` as any} />
+  }
 
   return (
     <>
@@ -561,74 +670,273 @@ export default function Index() {
         <Image source={images.bg} className="absolute top-0 w-full z-0" />
 
         <View className="flex-1">
-          {/* Header wallet card */}
-          <View className="rounded-3xl border border-gray-800 bg-gray-900/80 p-5 overflow-hidden">
-            <View className="flex-row justify-between items-start">
-              <View>
-                <Text className="text-white/70 text-xs tracking-widest uppercase">Bridge Wallet</Text>
-                <Text className="text-white text-3xl font-semibold mt-2">
-                  {bridgeBalanceDisplay}
-                </Text>
-                {balancesHidden ? (
-                  <Text className="text-white/50 text-xs mt-1">Balances hidden</Text>
-                ) : null}
-                <View className="flex-row mt-3 items-center gap-2">
-                  <Image source={icons.trophy} className="w-5 h-5" />
-                  <Text className="text-white text-sm">
-                    {commissionDisplay}
+          {isCircleAccount ? (
+            <View
+              className="overflow-hidden rounded-[30px] border bg-[#0f131b]/92 p-5"
+              style={{ borderColor: 'rgba(16, 185, 129, 0.35)' }}
+            >
+              <View className="flex-row justify-between items-start gap-3">
+                <View className="flex-1">
+                  <Text className="text-white text-2xl font-semibold">{circleName}</Text>
+                  <Text className="text-white/60 text-sm mt-1">
+                    Circle account{circleMembersCount > 0 ? ` - ${circleMembersCount} members` : ''} - {circleRoleLabel}
                   </Text>
+                  <Text className="text-white/50 text-[11px] uppercase tracking-[0.18em] mt-3">
+                    Circle balance
+                  </Text>
+                  <Text className="text-white text-3xl font-semibold mt-2">
+                    {circleBalanceDisplay}
+                  </Text>
+                  {balancesHidden ? (
+                    <Text className="text-white/50 text-xs mt-1">Balances hidden</Text>
+                  ) : null}
+                  {circleDuesSummary?.enabled ? (
+                    <View className="mt-4 rounded-2xl border border-sky-500/20 bg-black/20 px-4 py-3">
+                      <Text className="text-white text-xs">
+                        Dues active:
+                        {' '}
+                        {Number(circleDuesSummary?.current_user_due_summary?.payable_months_count || 0)} open cycle(s)
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+
+                <View className="flex-col items-end gap-2">
+                  <TouchableOpacity
+                    onPress={() => {
+                      void toggleBalancesVisibility()
+                    }}
+                    className="gap-2 items-center rounded-full flex-row py-1.5 px-3 bg-black/25 border"
+                    style={{ borderColor: 'rgba(255,255,255,0.12)' }}
+                  >
+                    <Feather name={balancesHidden ? 'eye-off' : 'eye'} size={12} color="white" />
+                    <Text className="text-white text-xs">{balancesHidden ? 'Show balances' : 'Hide balances'}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={goToTimeline}
+                    className="gap-2 items-center rounded-full flex-row py-1 px-3 bg-black/20 border"
+                    style={{ borderColor: 'rgba(16, 185, 129, 0.2)' }}
+                  >
+                    <Text className="text-white text-xs">Activities</Text>
+                    <Feather name="arrow-right" size={12} color="white" />
+                  </TouchableOpacity>
                 </View>
               </View>
 
-              <View className="flex-col items-end gap-2">
-                <TouchableOpacity
-                  onPress={() => {
-                    void toggleBalancesVisibility()
-                  }}
-                  className="gap-2 items-center rounded-full flex-row py-1.5 px-3 bg-black/30 border border-white/15"
-                >
-                  <Feather name={balancesHidden ? 'eye-off' : 'eye'} size={12} color="white" />
-                  <Text className="text-white text-xs">{balancesHidden ? 'Show balances' : 'Hide balances'}</Text>
-                </TouchableOpacity>
-                <Link href={'/history' as any} asChild>
-                  <TouchableOpacity className="gap-2 items-center rounded-full flex-row py-1 px-3 bg-gray-900/60 border border-gray-800">
-                    <Text className="text-white text-xs">History</Text>
-                    <Feather name="arrow-right" size={12} color="white" />
-                  </TouchableOpacity>
-                </Link>
+              <View className="flex-row gap-2 mt-5">
+                {circlePermissions?.can_contribute !== false ? (
+                  <Link href={`/circles/${activeAccount.circleId}/pay` as any} asChild>
+                    <TouchableOpacity
+                      className="rounded-full py-2 px-3 flex-1 border bg-black/20"
+                      style={{ borderColor: 'rgba(16, 185, 129, 0.2)' }}
+                    >
+                      <Text className="text-white text-center text-xs">Contribute</Text>
+                    </TouchableOpacity>
+                  </Link>
+                ) : null}
 
-                <Link href={'/fundWallet' as any} asChild>
-                  <TouchableOpacity className="bg-app-primary rounded-full py-2 px-3">
-                    <Text className="text-white text-xs">Fund Wallet</Text>
+                {circlePermissions?.can_pay_dues && circleDuesSummary?.enabled ? (
+                  <Link
+                    href={{
+                      pathname: '/circles/[id]/pay',
+                      params: { id: activeAccount.circleId, source: 'dues' },
+                    } as any}
+                    asChild
+                  >
+                    <TouchableOpacity
+                      className="rounded-full py-2 px-3 flex-1 border bg-black/20"
+                      style={{ borderColor: 'rgba(16, 185, 129, 0.2)' }}
+                    >
+                      <Text className="text-white text-center text-xs">Pay dues</Text>
+                    </TouchableOpacity>
+                  </Link>
+                ) : null}
+
+                <Link href={`/circles/${activeAccount.circleId}` as any} asChild>
+                  <TouchableOpacity
+                    className="rounded-full py-2 px-3 flex-1 border bg-black/20"
+                    style={{ borderColor: 'rgba(16, 185, 129, 0.2)' }}
+                  >
+                    <Text className="text-white text-center text-xs">Open circle</Text>
                   </TouchableOpacity>
                 </Link>
               </View>
-            </View>
 
-            <View className="flex-row gap-2 mt-5">
-              <TouchableOpacity
-                onPress={() => setSendOpen(true)}
-                className="bg-gray-900/80 border border-gray-800 rounded-full py-2 px-3 flex-1"
+              <View className="mt-3 flex-row flex-wrap gap-2">
+                <Link href={`/circles/${activeAccount.circleId}/activities` as any} asChild>
+                  <TouchableOpacity
+                    className="py-3 rounded-xl border bg-black/20 flex-1"
+                    style={{ borderColor: 'rgba(16, 185, 129, 0.2)' }}
+                  >
+                    <Text className="text-white text-center">View circle activity</Text>
+                  </TouchableOpacity>
+                </Link>
+                {circlePermissions?.can_approve_withdrawals ? (
+                  <Link href={`/circles/${activeAccount.circleId}` as any} asChild>
+                    <TouchableOpacity
+                      className="py-3 rounded-xl border bg-black/20 flex-1"
+                      style={{ borderColor: 'rgba(245, 158, 11, 0.25)' }}
+                    >
+                      <Text className="text-white text-center">Approvals</Text>
+                    </TouchableOpacity>
+                  </Link>
+                ) : null}
+                {circlePermissions?.can_manage_governance ? (
+                  <Link href={`/circles/${activeAccount.circleId}/governance` as any} asChild>
+                    <TouchableOpacity
+                      className="py-3 rounded-xl border bg-black/20 flex-1"
+                      style={{ borderColor: 'rgba(14, 165, 233, 0.25)' }}
+                    >
+                      <Text className="text-white text-center">Governance</Text>
+                    </TouchableOpacity>
+                  </Link>
+                ) : null}
+              </View>
+            </View>
+          ) : (
+            <>
+              {/* Bridge rail card */}
+              <View
+                className="overflow-hidden rounded-[30px] border bg-[#0f131b]/92 p-5"
+                style={{ borderColor: 'rgba(47, 107, 255, 0.35)' }}
               >
-                <Text className="text-white text-center text-xs">Send money</Text>
-              </TouchableOpacity>
+                <View className="flex-row justify-between items-start">
+                  <View>
+                    <Text className="text-white text-2xl font-semibold">Bridge</Text>
+                    <Text className="text-white/60 text-sm mt-1">Local NGN rail.</Text>
+                    <Text className="text-white text-3xl font-semibold mt-2">
+                      {bridgeBalanceDisplay}
+                    </Text>
+                    {balancesHidden ? (
+                      <Text className="text-white/50 text-xs mt-1">Balances hidden</Text>
+                    ) : null}
+                    <View className="flex-row mt-3 items-center gap-2">
+                      <Image source={icons.trophy} className="w-5 h-5" />
+                      <Text className="text-white text-sm">
+                        {commissionDisplay}
+                      </Text>
+                    </View>
+                  </View>
 
-              <Link href={'/convert-ngn-to-usd' as any} asChild>
-                <TouchableOpacity className="bg-gray-900/80 border border-gray-800 rounded-full py-2 px-3 flex-1">
-                  <Text className="text-white text-center text-xs">Convert</Text>
-                </TouchableOpacity>
-              </Link>
-            </View>
+                  <View className="flex-col items-end gap-2">
+                    <TouchableOpacity
+                      onPress={() => {
+                        void toggleBalancesVisibility()
+                      }}
+                      className="gap-2 items-center rounded-full flex-row py-1.5 px-3 bg-black/25 border"
+                      style={{ borderColor: 'rgba(255,255,255,0.12)' }}
+                    >
+                      <Feather name={balancesHidden ? 'eye-off' : 'eye'} size={12} color="white" />
+                      <Text className="text-white text-xs">{balancesHidden ? 'Show balances' : 'Hide balances'}</Text>
+                    </TouchableOpacity>
+                    <Link href={'/history' as any} asChild>
+                      <TouchableOpacity className="gap-2 items-center rounded-full flex-row py-1 px-3 bg-black/20 border" style={{ borderColor: 'rgba(47, 107, 255, 0.18)' }}>
+                        <Text className="text-white text-xs">History</Text>
+                        <Feather name="arrow-right" size={12} color="white" />
+                      </TouchableOpacity>
+                    </Link>
 
-            <View className="mt-3">
-              <TouchableOpacity
-                onPress={() => setOpenStarted(true)}
-                className="bg-gray-900/70 border border-gray-800 py-3 rounded-xl"
+                    <Link href={'/fundWallet' as any} asChild>
+                      <TouchableOpacity className="rounded-full py-2 px-3" style={{ backgroundColor: '#2F6BFF' }}>
+                        <Text className="text-white text-xs">Fund Wallet</Text>
+                      </TouchableOpacity>
+                    </Link>
+                  </View>
+                </View>
+
+                <View className="flex-row gap-2 mt-5">
+                  <TouchableOpacity
+                    onPress={() => setSendOpen(true)}
+                    className="rounded-full py-2 px-3 flex-1 border bg-black/20"
+                    style={{ borderColor: 'rgba(47, 107, 255, 0.2)' }}
+                  >
+                    <Text className="text-white text-center text-xs">Send money</Text>
+                  </TouchableOpacity>
+
+
+
+                  <Link href={'/anchor-account' as any} asChild>
+                    <TouchableOpacity className="rounded-full py-2 px-3 flex-1 border bg-black/20" style={{ borderColor: 'rgba(47, 107, 255, 0.2)' }}>
+                      <Text className="text-white text-center text-xs">Receive NGN</Text>
+                    </TouchableOpacity>
+                  </Link>
+                </View>
+
+                <View className="mt-3">
+                  <TouchableOpacity
+                    onPress={() => setOpenStarted(true)}
+                    className="py-3 rounded-xl border bg-black/20"
+                    style={{ borderColor: 'rgba(47, 107, 255, 0.2)' }}
+                  >
+                    <Text className="text-white text-center">All Bridge actions</Text>
+                  </TouchableOpacity>
+                </View>
+
+              </View>
+
+              {/* Tunnel rail card */}
+              <View
+                className="mt-5 mx-2 overflow-hidden rounded-[30px] border bg-[#0f131b]/92 p-4"
+                style={{ borderColor: 'rgba(255, 154, 31, 0.34)' }}
               >
-                <Text className="text-white text-center">Explore services</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+                <View className="flex-row items-start justify-between gap-4">
+                  <View className="flex-1">
+                    <Text className="text-white text-xl font-semibold">Tunnel</Text>
+                    <Text className="text-white/60 text-sm mt-1">
+                      {tunnelHasLiveState ? 'Global USD access.' : 'Activation and access rail.'}
+                    </Text>
+                  </View>
+                  <Link href={(tunnelHasLiveState ? '/(tabs)/wallet' : '/tunnel-activation') as any} asChild>
+                    <TouchableOpacity className="rounded-full border bg-black/20 px-3 py-2" style={{ borderColor: 'rgba(255, 154, 31, 0.2)' }}>
+                      <Text className="text-white text-xs">
+                        {tunnelHasLiveState ? 'View wallet' : 'Start activation'}
+                      </Text>
+                    </TouchableOpacity>
+                  </Link>
+                </View>
+
+                {tunnelHasLiveState ? (
+                  <View className="mt-4">
+                    <Text className="text-white text-2xl font-semibold">{tunnelBalanceDisplay}</Text>
+                    <Text className="text-white/55 text-xs mt-1">
+                      {tunnelCardsCount > 0
+                        ? `${tunnelCardsCount} active card${tunnelCardsCount === 1 ? '' : 's'} linked to Tunnel`
+                        : 'USD wallet live. Cards available when you need them.'}
+                    </Text>
+                  </View>
+                ) : (
+                  <View className="mt-4 rounded-2xl border px-3 py-3" style={{ borderColor: 'rgba(255, 154, 31, 0.18)', backgroundColor: 'rgba(0, 0, 0, 0.18)' }}>
+                    <Text className="text-white text-sm font-medium">Tunnel not active yet</Text>
+                    <Text className="text-white/60 text-xs mt-1">
+                      Activate Tunnel to unlock a USD balance, conversion, and card access.
+                    </Text>
+                  </View>
+                )}
+
+                <View className="flex-row gap-2 mt-5">
+                  <Link href={{ pathname: '/fx', params: { direction: 'ngn-to-usd' } }} asChild>
+                    <TouchableOpacity className="rounded-full py-2 px-3 flex-1 border bg-black/20" style={{ borderColor: 'rgba(255, 154, 31, 0.2)' }}>
+                      <Text className="text-white text-center text-xs">Convert</Text>
+                    </TouchableOpacity>
+                  </Link>
+
+                  <Link href={'/cards' as any} asChild>
+                    <TouchableOpacity className="rounded-full py-2 px-3 flex-1 border bg-black/20" style={{ borderColor: 'rgba(255, 154, 31, 0.2)' }}>
+                      <Text className="text-white text-center text-xs">Cards</Text>
+                    </TouchableOpacity>
+                  </Link>
+
+                  <Link href={(tunnelHasLiveState ? '/(tabs)/wallet' : '/tunnel-activation') as any} asChild>
+                    <TouchableOpacity className="rounded-full py-2 px-3 flex-1 border bg-black/20" style={{ borderColor: 'rgba(255, 154, 31, 0.2)' }}>
+                      <Text className="text-white text-center text-xs">
+                        {tunnelHasLiveState ? 'Funding' : 'Activation'}
+                      </Text>
+                    </TouchableOpacity>
+                  </Link>
+                </View>
+              </View>
+            </>
+          )}
 
           {/* Onboarding banner */}
           {onboardingBanner ? (
@@ -669,52 +977,58 @@ export default function Index() {
             </Link>
           ) : null}
 
-          {/* Quick services */}
-          <View className="mt-2">
-            <View className="flex-row items-center justify-between">
-              <Text className="text-white text-lg font-semibold">Quick services</Text>
-              <Link href={'/(tabs)/service' as any} asChild>
-                <TouchableOpacity>
-                  <Text className="text-alt font-medium">Browse all</Text>
-                </TouchableOpacity>
-              </Link>
-            </View>
-
-            <View className="mt-3 flex-row flex-wrap -mx-2">
-              {quickItems.map((item) => (
-                <View key={item.id} className="w-1/2 px-2 py-2">
-                  <Link href={item.link as any} asChild>
-                    <TouchableOpacity className="bg-gray-900/80 border border-gray-800 rounded-2xl py-4 items-center">
-                      <ViewBox icon={item.image} label={item.label} />
-                    </TouchableOpacity>
-                  </Link>
+          {!isCircleAccount ? (
+            <View className="mt-6 rounded-[24px] border border-gray-800/70 bg-gray-950/35 p-4">
+              <View className="flex-row items-center justify-between">
+                <View>
+                  <Text className="text-white text-lg font-semibold">Bridge utilities</Text>
+                  <Text className="text-gray-400 text-xs mt-1">Everyday local payments and account tools.</Text>
                 </View>
-              ))}
+                <Link href={'/(tabs)/bridge' as any} asChild>
+                  <TouchableOpacity>
+                    <Text className="text-alt font-medium">All Bridge tools</Text>
+                  </TouchableOpacity>
+                </Link>
+              </View>
+
+              <View className="mt-3 flex-row flex-wrap -mx-2">
+                {quickItems.map((item) => (
+                  <View key={item.id} className="w-1/2 px-2 py-2">
+                    <Link href={item.link as any} asChild>
+                      <TouchableOpacity className="bg-gray-900/80 border border-gray-800 rounded-2xl py-4 items-center">
+                        <ViewBox icon={item.image} label={item.label} />
+                      </TouchableOpacity>
+                    </Link>
+                  </View>
+                ))}
+              </View>
             </View>
-          </View>
+          ) : null}
 
           {/* Summary chips */}
-          <View className="my-8">
-            <FlatList
-              data={prevsummary}
-              renderItem={({ item }) => (
-                <TouchableOpacity className="bg-gray-900/70 border border-gray-800 p-4 min-w-40 rounded-2xl flex-row items-center gap-3">
-                  <Image source={item.icon} className="w-6 h-6" />
-                  <View>
-                    <Text className="text-base text-white/80 font-semibold">{item.label}</Text>
-                    <Text className="text-sm text-gray-400">{moneyFormat(item.amount)}</Text>
-                  </View>
-                </TouchableOpacity>
-              )}
-              keyExtractor={(item) => String(item.id)}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              ItemSeparatorComponent={() => <View className="w-4" />}
-            />
-          </View>
+          {!isCircleAccount ? (
+            <View className="my-8">
+              <FlatList
+                data={prevsummary}
+                renderItem={({ item }) => (
+                  <TouchableOpacity className="bg-gray-900/70 border border-gray-800 p-4 min-w-40 rounded-2xl flex-row items-center gap-3">
+                    <Image source={item.icon} className="w-6 h-6" />
+                    <View>
+                      <Text className="text-base text-white/80 font-semibold">{item.label}</Text>
+                      <Text className="text-sm text-gray-400">{moneyFormat(item.amount)}</Text>
+                    </View>
+                  </TouchableOpacity>
+                )}
+                keyExtractor={(item) => String(item.id)}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                ItemSeparatorComponent={() => <View className="w-4" />}
+              />
+            </View>
+          ) : null}
 
           {/* Recent Orders */}
-          {showLegacyRecentOrders ? (
+          {!isCircleAccount && showLegacyRecentOrders ? (
             <View className="mb-8">
               <View className="flex-row items-center justify-between mb-3">
                 <Text className="text-white text-lg font-semibold">Recent Orders</Text>
@@ -755,7 +1069,9 @@ export default function Index() {
           {/* Recent Activity (Bank-grade Home Rows) */}
           <View className="mb-8">
             <View className="flex-row items-center justify-between mb-3">
-              <Text className="text-white text-lg font-semibold">Recent Activity</Text>
+              <Text className="text-white text-lg font-semibold">
+                {isCircleAccount ? 'Circle Activity' : 'Recent Activity'}
+              </Text>
 
               <TouchableOpacity onPress={goToTimeline}>
                 <Text className="text-alt font-medium">View all</Text>
@@ -857,9 +1173,13 @@ export default function Index() {
               </View>
             ) : (
               <View className="bg-gray-900/70 border border-gray-800 rounded-2xl p-4">
-                <Text className="text-gray-300 text-sm font-semibold">No recent activity yet.</Text>
+                <Text className="text-gray-300 text-sm font-semibold">
+                  {isCircleAccount ? 'No circle activity yet.' : 'No recent activity yet.'}
+                </Text>
                 <Text className="text-gray-400 text-xs mt-1">
-                  Your latest transactions will appear here.
+                  {isCircleAccount
+                    ? 'Circle funding, dues, and payouts will appear here.'
+                    : 'Your latest transactions will appear here.'}
                 </Text>
               </View>
             )}
@@ -884,8 +1204,9 @@ export default function Index() {
             ) : null}
           </View>
 
-          {/* Existing horizontal "recent purchases" list (kept) */}
-          <View>
+          {/* Existing horizontal â€œrecent purchasesâ€ list (kept) */}
+          {!isCircleAccount ? (
+            <View>
             {recentPurchasesLoading ? (
               <ActivityIndicator />
             ) : (
@@ -909,7 +1230,8 @@ export default function Index() {
                 ItemSeparatorComponent={() => <View className="w-4" />}
               />
             )}
-          </View>
+            </View>
+          ) : null}
         </View>
       </ScreenContainer>
 
@@ -1040,3 +1362,4 @@ const LabelText = ({ label, value }: any) => (
     <Text className="text-white text-center">{value}</Text>
   </View>
 )
+

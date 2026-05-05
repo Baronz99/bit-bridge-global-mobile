@@ -9,6 +9,7 @@ import { createCircleActivity, listCircleActivities } from '@/api/circles'
 import { useAuth } from '@/services/useAuth'
 import { buildApiErrorMessage } from '@/utils/apiErrorMessage'
 import moneyFormat from '@/utils/moneyFormat'
+import { getCircleTypeConfig } from '@/utils/circleTypeConfig'
 
 type NoticeState = { message: string | null; error: boolean; data: any | null }
 type ActivityRecord = Record<string, any>
@@ -31,9 +32,29 @@ const extractCreatedActivity = (payload: unknown): ActivityRecord | null => {
   return null
 }
 
+const singularLabel = (value: string) => {
+  const clean = String(value || '').trim()
+  if (!clean) return 'Activity'
+  if (clean.endsWith('ies')) return `${clean.slice(0, -3)}y`
+  if (clean.endsWith('s')) return clean.slice(0, -1)
+  return clean
+}
+
 const ActivitiesScreen = () => {
-  const { id } = useLocalSearchParams<{ id?: string | string[] }>()
+  const { id, circleType, circleName, templateName, templateFrequency } = useLocalSearchParams<{
+    id?: string | string[]
+    circleType?: string | string[]
+    circleName?: string | string[]
+    templateName?: string | string[]
+    templateFrequency?: string | string[]
+  }>()
   const circleId = Array.isArray(id) ? id[0] : id
+  const routeCircleType = Array.isArray(circleType) ? circleType[0] : circleType
+  const routeCircleName = Array.isArray(circleName) ? circleName[0] : circleName
+  const routeTemplateName = Array.isArray(templateName) ? templateName[0] : templateName
+  const routeTemplateFrequency = Array.isArray(templateFrequency) ? templateFrequency[0] : templateFrequency
+  const circleTypeConfig = getCircleTypeConfig(routeCircleType)
+  const activitySingularLabel = singularLabel(circleTypeConfig.activityLabel)
 
   const { onLogout } = useAuth()
   const [loading, setLoading] = useState(false)
@@ -75,6 +96,15 @@ const ActivitiesScreen = () => {
   useEffect(() => {
     loadActivities()
   }, [loadActivities])
+
+  useEffect(() => {
+    if (!routeTemplateName) return
+    setFormData((previous) => ({
+      ...previous,
+      name: String(routeTemplateName),
+      contribution_frequency: String(routeTemplateFrequency || previous.contribution_frequency || 'one_time'),
+    }))
+  }, [routeTemplateFrequency, routeTemplateName])
 
   const handleCreate = async () => {
     if (!circleId) return
@@ -134,15 +164,37 @@ const ActivitiesScreen = () => {
     <View className="flex-1 bg-primary px-4">
       <KeyboardAvoidWrapper>
         <View className="flex-1 pt-10">
-          <Text className="text-white text-2xl mb-2">Circle activities</Text>
+          <Text className="text-white text-2xl mb-2">{circleTypeConfig.activityLabel}</Text>
           <Text className="text-gray-300 mb-6">
-            Create group goals and track contributions.
+            {circleTypeConfig.activityHelper}
           </Text>
 
           <NotificationAlert message={notice.message} data={notice.data} error={notice.error} />
 
+          <View className="rounded-2xl border border-gray-800 bg-gray-900/70 p-4 mb-4">
+            <Text className="text-white text-xs uppercase tracking-[0.16em] mb-2">Starter templates</Text>
+            <Text className="text-gray-400 text-xs mb-3">{routeCircleName ? `${routeCircleName}: ` : ''}{circleTypeConfig.createDescription}</Text>
+            <View className="flex-row flex-wrap gap-2">
+              {circleTypeConfig.starterTemplates.map((template) => (
+                <TouchableOpacity
+                  key={template.name}
+                  onPress={() =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      name: template.name,
+                      contribution_frequency: template.contribution_frequency,
+                    }))
+                  }
+                  className="rounded-full border border-gray-700 bg-gray-950 px-3 py-2"
+                >
+                  <Text className="text-white text-xs">{template.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
           <FormInput
-            label="Activity name"
+            label={`${activitySingularLabel} name`}
             value={formData.name}
             name="name"
             onChangeText={(text: string) => setFormData({ ...formData, name: text })}
@@ -174,19 +226,19 @@ const ActivitiesScreen = () => {
             className={`${submitting ? 'bg-gray-700' : 'bg-theme-primary'} py-5 rounded-xl`}
             disabled={submitting}
           >
-            <Text className="text-alt font-medium text-center">Create activity</Text>
+            <Text className="text-alt font-medium text-center">Create {activitySingularLabel.toLowerCase()}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             onPress={loadActivities}
             className="bg-gray-900 py-4 mt-4 rounded-xl"
           >
-            <Text className="text-white text-center">Refresh Activities</Text>
+            <Text className="text-white text-center">Refresh {circleTypeConfig.activityLabel}</Text>
           </TouchableOpacity>
 
           {emptyState ? (
             <View className="bg-gray-900 p-4 rounded-xl mt-6">
-              <Text className="text-gray-300 text-center">No activities yet.</Text>
+              <Text className="text-gray-300 text-center">{circleTypeConfig.emptyActivityLabel}</Text>
             </View>
           ) : (
             <View className="mt-6">

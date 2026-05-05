@@ -1,4 +1,5 @@
 import client from '@/api/client'
+import { normalizeCircleWorkspace } from '@/utils/circleWorkspace'
 
 export type CircleRecord = Record<string, unknown>
 
@@ -12,6 +13,42 @@ export const getCircle = async (id: string | number): Promise<any> => {
   return res.data
 }
 
+export const getCircleContext = async (
+  id: string | number,
+  params?: CircleRecord
+): Promise<any> => {
+  const res = await client.get(`/circles/${id}/context`, { params })
+  return res.data
+}
+
+export const getCircleWorkspace = async (
+  id: string | number,
+  params?: CircleRecord
+): Promise<any> => {
+  const [circleResponse, contextResponse] = await Promise.all([
+    getCircle(id).catch(() => null),
+    getCircleContext(id, params).catch(() => null),
+  ])
+
+  return normalizeCircleWorkspace({
+    circlePayload: circleResponse,
+    contextPayload: contextResponse,
+  })
+}
+
+export const getCircleSettings = async (id: string | number): Promise<any> => {
+  const res = await client.get(`/circles/${id}/settings`)
+  return res.data
+}
+
+export const updateCircleSettings = async (
+  id: string | number,
+  payload: CircleRecord
+): Promise<any> => {
+  const res = await client.patch(`/circles/${id}/settings`, payload)
+  return res.data
+}
+
 export const createCircle = async (payload: CircleRecord): Promise<any> => {
   const res = await client.post('/circles', { circle: payload })
   return res.data
@@ -22,6 +59,94 @@ export const inviteCircleMember = async (
   payload: CircleRecord
 ): Promise<any> => {
   const res = await client.post(`/circles/${id}/memberships`, { membership: payload })
+  return res.data
+}
+
+export const getCircleDuePlan = async (id: string | number): Promise<any> => {
+  const res = await client.get(`/circles/${id}/due_plan`)
+  return res.data
+}
+
+export const upsertCircleDuePlan = async (
+  id: string | number,
+  payload: CircleRecord
+): Promise<any> => {
+  const res = await client.post(`/circles/${id}/due_plan`, { due_plan: payload })
+  return res.data
+}
+
+export const updateCircleDuePlan = async (
+  id: string | number,
+  payload: CircleRecord
+): Promise<any> => {
+  const res = await client.patch(`/circles/${id}/due_plan`, { due_plan: payload })
+  return res.data
+}
+
+export const listCircleDueObligations = async (
+  id: string | number,
+  params?: CircleRecord
+): Promise<any> => {
+  const res = await client.get(`/circles/${id}/due_plan/obligations`, { params })
+  return res.data
+}
+
+export const getCircleDuePlanSummary = async (
+  id: string | number
+): Promise<any> => {
+  const res = await client.get(`/circles/${id}/due_plan/summary`)
+  return res.data
+}
+
+export const quoteCircleDuePlan = async (
+  id: string | number,
+  params?: CircleRecord
+): Promise<any> => {
+  const res = await client.get(`/circles/${id}/due_plan/quote`, { params })
+  return res.data
+}
+
+export const getCirclePaymentItems = async (id: string | number): Promise<any> => {
+  const res = await client.get(`/circles/${id}/payment_items`)
+  return res.data
+}
+
+export const getCircleTreasury = async (id: string | number): Promise<any> => {
+  const res = await client.get(`/circles/${id}/treasury`)
+  return res.data
+}
+
+export const requestCircleTreasury = async (
+  id: string | number,
+  payload: CircleRecord
+): Promise<any> => {
+  const res = await client.post(`/circles/${id}/treasury/request`, payload)
+  return res.data
+}
+
+
+export const updateMyCircleMembership = async (
+  id: string | number,
+  payload: CircleRecord
+): Promise<any> => {
+  const res = await client.patch(`/circles/${id}/memberships/me`, { membership: payload })
+  return res.data
+}
+
+export const updateCircleMembership = async (
+  id: string | number,
+  membershipId: string | number,
+  payload: CircleRecord
+): Promise<any> => {
+  const res = await client.patch(`/circles/${id}/memberships/${membershipId}`, { membership: payload })
+  return res.data
+}
+
+export const removeCircleMembership = async (
+  id: string | number,
+  membershipId: string | number
+): Promise<any> => {
+  const res = await client.delete(`/circles/${id}/memberships/${membershipId}`)
   return res.data
 }
 
@@ -51,6 +176,15 @@ export const createCircleActivity = async (
   payload: CircleRecord
 ): Promise<any> => {
   const res = await client.post(`/circles/${id}/activities`, { activity: payload })
+  return res.data
+}
+
+export const updateCircleActivity = async (
+  id: string | number,
+  activityId: string | number,
+  payload: CircleRecord
+): Promise<any> => {
+  const res = await client.patch(`/circles/${id}/activities/${activityId}`, { activity: payload })
   return res.data
 }
 

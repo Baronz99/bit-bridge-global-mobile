@@ -8,6 +8,7 @@ import { useAuth } from '@/services/useAuth'
 import { FEATURE_CIRCLES } from '@/constants/featureFlags'
 import moneyFormat from '@/utils/moneyFormat'
 import MemberAvatars from '@/components/circles/MemberAvatars'
+import { CIRCLE_TYPE_CONFIG, LAUNCH_CIRCLE_TYPES, getCircleTypeConfig } from '@/utils/circleTypeConfig'
 
 const getArray = (value: unknown) => (Array.isArray(value) ? value : [])
 
@@ -38,12 +39,27 @@ const getInitials = (value: string) => {
     .toUpperCase()
 }
 
-const detectCategory = (circle: Record<string, unknown>) => {
-  const text = `${circle?.purpose || ''} ${circle?.name || ''}`.toLowerCase()
-  if (/(light|power|phcn|bill|rent|estate|service|subscription)/.test(text)) return 'bills'
-  if (/(trip|travel|vacation|holiday|flight|airbnb)/.test(text)) return 'trips'
-  if (/(project|goal|support|savings|target|contribution)/.test(text)) return 'projects'
-  return 'all'
+const bucketKeyFromCircle = (circle: Record<string, unknown>) => {
+  const profile = (circle.circle_type_profile as Record<string, unknown> | undefined) || {}
+  const productBucketKey = String(profile.product_bucket_key || '').trim()
+  if (productBucketKey) return productBucketKey
+
+  const normalizedArchetype = String(
+    profile.normalized_archetype || circle.circle_archetype || ''
+  ).trim()
+
+  switch (normalizedArchetype) {
+    case 'sports_circle':
+      return 'clubs_teams'
+    case 'estate_circle':
+      return 'estates_communities'
+    case 'savings_circle':
+      return 'cooperatives'
+    case 'family_circle':
+      return 'families'
+    default:
+      return 'associations'
+  }
 }
 
 const CirclesScreen = () => {
@@ -56,11 +72,14 @@ const CirclesScreen = () => {
   const [createOpen, setCreateOpen] = useState(false)
   const [creating, setCreating] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
-  const [activeFilter, setActiveFilter] = useState<'all' | 'bills' | 'trips' | 'projects'>('all')
+  const [activeFilter, setActiveFilter] = useState<
+    'all' | 'clubs_teams' | 'estates_communities' | 'cooperatives' | 'families' | 'associations'
+  >('all')
   const [form, setForm] = useState({
     name: '',
     purpose: '',
     description: '',
+    circle_archetype: LAUNCH_CIRCLE_TYPES[0],
   })
 
   const kycLevel = useMemo(() => {
@@ -94,9 +113,9 @@ const CirclesScreen = () => {
       if (status === 401) {
         setError('Session expired. Please log in again.')
       } else if (status === 403) {
-        setError('Complete Tier 2 verification to use shared groups.')
+        setError('Verify your phone and complete Tier 1 to use circles.')
       } else {
-        setError('Unable to load shared groups right now.')
+        setError('Unable to load circles right now.')
       }
     } finally {
       setScreenLoading(false)
@@ -124,7 +143,7 @@ const CirclesScreen = () => {
 
   const handleCreate = async () => {
     if (!form.name.trim()) {
-      setNotice('Enter a group name to continue.')
+      setNotice('Enter a circle name to continue.')
       return
     }
     setCreating(true)
@@ -134,20 +153,21 @@ const CirclesScreen = () => {
         name: form.name.trim(),
         purpose: form.purpose.trim(),
         description: form.description.trim(),
+        circle_archetype: form.circle_archetype,
       })
       const created = response?.data ?? response
       setData((prev: unknown) => {
         const list = extractCircles(prev)
         return [created, ...list]
       })
-      setForm({ name: '', purpose: '', description: '' })
+      setForm({ name: '', purpose: '', description: '', circle_archetype: LAUNCH_CIRCLE_TYPES[0] })
       setCreateOpen(false)
     } catch (err: any) {
       const message =
         err?.response?.data?.errors?.join(', ') ||
         err?.response?.data?.error ||
         err?.message ||
-        'Unable to create group.'
+        'Unable to create circle.'
       setNotice(message)
     } finally {
       setCreating(false)
@@ -155,11 +175,24 @@ const CirclesScreen = () => {
   }
 
   const circles = useMemo(() => extractCircles(data), [data])
+  const createTypeChoices = useMemo(
+    () => LAUNCH_CIRCLE_TYPES.map((key) => CIRCLE_TYPE_CONFIG[key]),
+    []
+  )
+
   const filteredCircles = useMemo(() => {
-    if (activeFilter === 'all') return circles
-    return circles.filter((item) => {
-      const record = (item ?? {}) as Record<string, unknown>
-      return detectCategory(record) === activeFilter
+    const filtered =
+      activeFilter === 'all'
+        ? [...circles]
+        : circles.filter((item) => {
+            const record = (item ?? {}) as Record<string, unknown>
+            return bucketKeyFromCircle(record) === activeFilter
+          })
+
+    return filtered.sort((left, right) => {
+      const leftRecord = (left ?? {}) as Record<string, unknown>
+      const rightRecord = (right ?? {}) as Record<string, unknown>
+      return featuredRank(leftRecord) - featuredRank(rightRecord)
     })
   }, [circles, activeFilter])
 
@@ -175,36 +208,42 @@ const CirclesScreen = () => {
     <View className="flex-1 bg-primary">
       <View className="px-4 pt-6 pb-4">
         <View className="rounded-3xl border border-gray-800 bg-gray-900/80 p-5">
-          <Text className="text-white text-xs tracking-widest uppercase">Shared groups</Text>
+          <Text className="text-white text-xs tracking-widest uppercase">BitBridge Circles</Text>
           <Text className="text-white text-2xl font-semibold mt-2">
-            Money that moves with your people
+            Run your group finances properly.
           </Text>
           <Text className="text-gray-400 text-xs mt-2">
-            Create shared balances for bills, trips, and group goals. Everyone stays in sync.
+            Collect dues, track payments, and stay accountable. Built for clubs, estates, cooperatives, families, and associations.
           </Text>
 
           <View className="flex-row flex-wrap gap-2 mt-4">
             <View className="bg-gray-950 border border-gray-800 rounded-full px-3 py-1">
-              <Text className="text-xs text-gray-300">Split bills</Text>
+              <Text className="text-xs text-gray-300">Clubs & Teams</Text>
             </View>
             <View className="bg-gray-950 border border-gray-800 rounded-full px-3 py-1">
-              <Text className="text-xs text-gray-300">Trips and events</Text>
+              <Text className="text-xs text-gray-300">Estates & Communities</Text>
             </View>
             <View className="bg-gray-950 border border-gray-800 rounded-full px-3 py-1">
-              <Text className="text-xs text-gray-300">Shared goals</Text>
+              <Text className="text-xs text-gray-300">Cooperatives</Text>
+            </View>
+            <View className="bg-gray-950 border border-gray-800 rounded-full px-3 py-1">
+              <Text className="text-xs text-gray-300">Families</Text>
+            </View>
+            <View className="bg-gray-950 border border-gray-800 rounded-full px-3 py-1">
+              <Text className="text-xs text-gray-300">Associations</Text>
             </View>
           </View>
 
           <View className="flex-row items-center justify-between mt-4">
             <Text className="text-gray-400 text-xs">
-              {circles.length} active group{circles.length === 1 ? '' : 's'}
+              {circles.length} active circle{circles.length === 1 ? '' : 's'}
             </Text>
             <TouchableOpacity
               onPress={() => setCreateOpen(true)}
               className="bg-app-primary px-4 py-2 rounded-full"
               disabled={needsTier2}
             >
-              <Text className="text-black text-xs font-semibold">Create group</Text>
+              <Text className="text-black text-xs font-semibold">Create circle</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -214,7 +253,7 @@ const CirclesScreen = () => {
         <View className="mx-4 mt-3 rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4">
           <Text className="text-white font-semibold">Complete Tier 2 verification</Text>
           <Text className="text-gray-300 text-xs mt-1">
-            Shared groups are available on Tier 2. Finish verification to unlock this feature.
+            Circles allow Tier 1 users with a verified phone. Tier 2 is still required to create a new circle.
           </Text>
           <TouchableOpacity
             onPress={() => router.push('/kyc')}
@@ -243,15 +282,15 @@ const CirclesScreen = () => {
           </View>
         ) : circles.length === 0 ? (
           <View className="flex-1 justify-center items-center px-6">
-            <Text className="text-white text-center mb-2">No shared groups yet.</Text>
+            <Text className="text-white text-center mb-2">No circles yet.</Text>
             <Text className="text-gray-400 text-center text-xs mb-4">
-              Create a group to start tracking shared contributions.
+              Create a circle to start running collections, tracking payments, and managing your group treasury properly.
             </Text>
             <TouchableOpacity
               onPress={() => setCreateOpen(true)}
               className="bg-app-primary px-4 py-2 rounded-lg"
             >
-              <Text className="text-black text-xs font-semibold">Create group</Text>
+              <Text className="text-black text-xs font-semibold">Create circle</Text>
             </TouchableOpacity>
           </View>
         ) : (
@@ -268,9 +307,11 @@ const CirclesScreen = () => {
                 <View className="flex-row flex-wrap gap-2">
                   {([
                     { id: 'all', label: 'All' },
-                    { id: 'bills', label: 'Bills' },
-                    { id: 'trips', label: 'Trips' },
-                    { id: 'projects', label: 'Goals' },
+                    { id: 'clubs_teams', label: 'Clubs & Teams' },
+                    { id: 'estates_communities', label: 'Estates & Communities' },
+                    { id: 'cooperatives', label: 'Cooperatives' },
+                    { id: 'families', label: 'Families' },
+                    { id: 'associations', label: 'Associations' },
                   ] as const).map((chip) => {
                     const active = activeFilter === chip.id
                     return (
@@ -297,15 +338,12 @@ const CirclesScreen = () => {
               const description = getCircleDescription(record)
               const purpose = (record.purpose as string) || ''
               const balanceCents = Number(record.balance_cents || 0)
-              const category = detectCategory(record)
-              const categoryLabel =
-                category === 'bills'
-                  ? 'Bills'
-                  : category === 'trips'
-                    ? 'Trips'
-                    : category === 'projects'
-                      ? 'Goals'
-                      : 'Shared'
+              const balanceVisible = record.balance_visible !== false
+              const typeProfile =
+                (record.circle_type_profile as Record<string, unknown> | undefined) || {}
+              const productBucketLabel = String(typeProfile.product_bucket_label || '').trim()
+              const profileSubtitle = String(typeProfile.subtitle || '').trim()
+              const typeConfig = getCircleTypeConfig(record.circle_type_profile?.normalized_archetype || record.circle_archetype)
               const owner = record.owner as Record<string, unknown> | undefined
               const ownerEmail = (owner?.email as string) || ''
               const initials = String(title || 'BB')
@@ -344,20 +382,37 @@ const CirclesScreen = () => {
                           {moneyFormat(balanceCents / 100)}
                         </Text>
                       </View>
-                      <View className="flex-row items-center gap-2 mt-1">
+                      <View className="flex-row flex-wrap items-center gap-2 mt-1">
+                        {isFeaturedOfficial ? (
+                          <View className="bg-amber-500/10 border border-amber-400/40 rounded-full px-2 py-0.5">
+                            <Text className="text-[10px] text-amber-200 uppercase">Featured</Text>
+                          </View>
+                        ) : null}
+                        {isOfficialCircle ? (
+                          <View className="bg-sky-500/10 border border-sky-400/40 rounded-full px-2 py-0.5">
+                            <Text className="text-[10px] text-sky-200 uppercase">
+                              {badgeLabel}
+                            </Text>
+                          </View>
+                        ) : null}
+                        <View className="bg-gray-950 border border-gray-800 rounded-full px-2 py-0.5">
+                          <Text className="text-[10px] text-gray-300 uppercase">{productBucketLabel || typeConfig.label}</Text>
+                        </View>
                         {purpose ? (
                           <View className="bg-gray-950 border border-gray-800 rounded-full px-2 py-0.5">
                             <Text className="text-[10px] text-gray-300 uppercase">{purpose}</Text>
                           </View>
                         ) : null}
                         <View className="bg-gray-950 border border-gray-800 rounded-full px-2 py-0.5">
-                          <Text className="text-[10px] text-gray-300 uppercase">{categoryLabel}</Text>
+                          <Text className="text-[10px] text-gray-300 uppercase">{typeConfig.shortLabel}</Text>
                         </View>
                       </View>
                     </View>
                   </View>
                   {description ? (
                     <Text className="text-gray-300 text-xs mt-2">{description}</Text>
+                  ) : profileSubtitle ? (
+                    <Text className="text-gray-300 text-xs mt-2">{profileSubtitle}</Text>
                   ) : null}
                   <View className="flex-row items-center justify-between mt-3">
                     <MemberAvatars initials={memberInitials} size={26} />
@@ -382,16 +437,41 @@ const CirclesScreen = () => {
       <AppModal open={createOpen} onclose={() => setCreateOpen(false)}>
         <View className="bg-gray-900 p-6 rounded-2xl w-full max-w-md">
           <Text className="text-white text-xl font-semibold text-center mb-2">
-            Create shared group
+            Create circle
           </Text>
           <Text className="text-gray-400 text-center text-xs mb-5">
-            Set a name, purpose, and optional description.
+            Select the product bucket that best matches how your group collects and manages money.
           </Text>
 
           {notice ? <Text className="text-yellow-400 text-xs mb-3">{notice}</Text> : null}
 
+          <Text className="text-white text-xs uppercase tracking-[0.16em] mb-3">Circle Type</Text>
+          <View className="gap-2 mb-4">
+            {createTypeChoices.map((typeConfig) => {
+              const active = form.circle_archetype === typeConfig.key
+              return (
+                <TouchableOpacity
+                  key={typeConfig.key}
+                  onPress={() => setForm({ ...form, circle_archetype: typeConfig.key })}
+                  className={`rounded-2xl border px-4 py-4 ${active ? 'border-app-primary bg-app-primary/10' : 'border-gray-800 bg-gray-950'}`}
+                >
+                  <View className="flex-row items-start justify-between gap-3">
+                    <View className="flex-1">
+                      <Text className="text-white text-sm font-semibold">{typeConfig.label}</Text>
+                      <Text className="text-gray-400 text-xs mt-1">{typeConfig.subtitle}</Text>
+                      <Text className="text-gray-500 text-[11px] mt-2">{typeConfig.createDescription}</Text>
+                    </View>
+                    <View className={`h-5 w-5 rounded-full border items-center justify-center ${active ? 'border-app-primary bg-app-primary' : 'border-gray-700'}`}>
+                      {active ? <Text className="text-black text-[9px] font-bold">OK</Text> : null}
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              )
+            })}
+          </View>
+
           <FormInput
-            label="Group name"
+            label="Circle name"
             value={form.name}
             onChangeText={(value: string) => setForm({ ...form, name: value })}
           />
@@ -405,6 +485,9 @@ const CirclesScreen = () => {
             value={form.description}
             onChangeText={(value: string) => setForm({ ...form, description: value })}
           />
+          <Text className="text-gray-500 text-[11px] mt-3">
+            Dues setup is optional during creation. Create the circle first, then add members, assign a treasurer, and start collections properly.
+          </Text>
 
           <TouchableOpacity
             onPress={handleCreate}
@@ -414,7 +497,7 @@ const CirclesScreen = () => {
             disabled={creating}
           >
             <Text className="text-black text-sm font-semibold">
-              {creating ? 'Creating...' : 'Create group'}
+              {creating ? 'Creating...' : 'Create circle'}
             </Text>
           </TouchableOpacity>
         </View>

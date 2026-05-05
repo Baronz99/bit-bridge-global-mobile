@@ -2,11 +2,14 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { Alert, Text, TouchableOpacity, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import FormInput from '@/components/FormInput'
+import FormSelect from '@/components/FormSelect'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
 import Loader from '@/components/Loader'
 import NotificationAlert from '@/components/notification'
 import TransactionPinModal from '@/components/TransactionPinModal'
-import { fundCircle, getCircle } from '@/api/circles'
+import CompletionPanel from '@/components/finance/CompletionPanel'
+import FinancialSummaryCard from '@/components/finance/FinancialSummaryCard'
+import { fundCircle, getCircle, getCirclePaymentItems, quoteCircleDuePlan } from '@/api/circles'
 import { getTransactionPinStatus } from '@/api/transactionPin'
 import { useAuth } from '@/services/useAuth'
 import { resolveTransactionBiometricUserId, useTransactionBiometrics } from '@/services/useTransactionBiometrics'
@@ -14,6 +17,7 @@ import { buildApiErrorMessage } from '@/utils/apiErrorMessage'
 import moneyFormat from '@/utils/moneyFormat'
 
 type NoticeState = { message: string | null; error: boolean; data: any | null }
+type PaymentItemRecord = Record<string, any>
 
 const getTierRank = (value: unknown) => {
   const normalized = String(value || 'tier_0').toLowerCase()
@@ -24,26 +28,88 @@ const getTierRank = (value: unknown) => {
   return 0
 }
 
+const formatTime = (value?: string) => {
+  if (!value) return '--'
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString()
+}
+
+const cadenceUnit = (cadence?: string) => {
+  switch (String(cadence || 'monthly').toLowerCase()) {
+    case 'weekly':
+      return 'week'
+    case 'yearly':
+      return 'year'
+    default:
+      return 'month'
+  }
+}
+
+const formatPeriodCountLabel = (count: number, cadence?: string) => {
+  const total = Math.max(Number(count || 0), 0)
+  const unit = cadenceUnit(cadence)
+  return `${total} ${unit}${total === 1 ? '' : 's'}`
+}
+
+const paymentPurposeLabel = (item?: PaymentItemRecord | null) => {
+  const title = String(item?.title || '').trim()
+  const normalizedType = String(item?.type || '').toLowerCase()
+  const checkoutMode = String(item?.payment_item_kind || item?.checkout_mode || item?.item_type || '').toLowerCase()
+
+  if (item?.linked_reference_type === 'CircleDuePlan' || normalizedType === 'dues' || checkoutMode === 'recurring') return 'dues'
+  if (normalizedType === 'treasury_topup' || item?.support_fallback) return 'treasury top-up'
+  if (/fine|penalt/i.test(title)) return 'fine'
+  if (/event/i.test(title)) return 'event contribution'
+  if (/support|special|one[- ]off|emergency|welfare|contribution/i.test(title)) return 'one-off contribution'
+  return 'contribution'
+}
+
+const paymentTypeLabel = (item?: PaymentItemRecord | null) => {
+  const purpose = paymentPurposeLabel(item)
+  if (purpose === 'dues') return 'Dues'
+  if (purpose === 'fine') return 'Fine'
+  if (purpose === 'event contribution') return 'Event contribution'
+  if (purpose === 'one-off contribution') return 'One-off contribution'
+  if (purpose === 'treasury top-up') return 'Treasury top-up'
+  return 'Contribution'
+}
+
 const CircleFundScreen = () => {
-  const { id } = useLocalSearchParams<{ id?: string | string[] }>()
+  const { id, dueId, dueAmountCents, dueMode: dueModeParam, dueMonthsOpen: dueMonthsOpenParam, paymentItemKey: paymentItemKeyParam } = useLocalSearchParams<{
+    id?: string | string[]
+    dueId?: string | string[]
+    dueAmountCents?: string | string[]
+    dueMode?: string | string[]
+    dueMonthsOpen?: string | string[]
+    paymentItemKey?: string | string[]
+  }>()
   const circleId = Array.isArray(id) ? id[0] : id
+  const dueObligationId = Array.isArray(dueId) ? dueId[0] : dueId
+  const prefetchedDueAmountCents = Number(Array.isArray(dueAmountCents) ? dueAmountCents[0] : dueAmountCents || 0)
+  const dueMode = Array.isArray(dueModeParam) ? dueModeParam[0] : dueModeParam
+  const dueMonthsOpen = Number(Array.isArray(dueMonthsOpenParam) ? dueMonthsOpenParam[0] : dueMonthsOpenParam || 1)
+  const preselectedPaymentItemKey = Array.isArray(paymentItemKeyParam) ? paymentItemKeyParam[0] : paymentItemKeyParam
+  const isMonthlyDueFlow = dueMode === 'monthly' || !!dueObligationId
   const router = useRouter()
-  const { onLogout, userProfileData } = useAuth()
+  const { userProfileData } = useAuth()
   const profilePayload = (userProfileData?.data ?? userProfileData) as any
   const transactionBiometrics = useTransactionBiometrics(resolveTransactionBiometricUserId(profilePayload))
   const [loading, setLoading] = useState(false)
   const [circle, setCircle] = useState<Record<string, any> | null>(null)
+  const [dueQuoteLoading, setDueQuoteLoading] = useState(false)
+  const [dueMonths, setDueMonths] = useState(1)
+  const [dueQuote, setDueQuote] = useState<Record<string, any> | null>(null)
+  const [paymentItems, setPaymentItems] = useState<PaymentItemRecord[]>([])
+  const [paymentItemsLoading, setPaymentItemsLoading] = useState(false)
+  const [selectedPaymentItemKey, setSelectedPaymentItemKey] = useState('')
+  const [selectedSource, setSelectedSource] = useState('personal_wallet')
   const [pinModalOpen, setPinModalOpen] = useState(false)
   const [pinError, setPinError] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     amount: '',
     description: '',
   })
-  const [notice, setNotice] = useState<NoticeState>({
-    message: null,
-    error: false,
-    data: null,
-  })
+  const [notice, setNotice] = useState<NoticeState>({ message: null, error: false, data: null })
 
   useEffect(() => {
     if (!circleId) return
@@ -52,6 +118,94 @@ const CircleFundScreen = () => {
       .catch(() => {})
   }, [circleId])
 
+  useEffect(() => {
+    if (!circleId || isMonthlyDueFlow) return
+
+    let cancelled = false
+    setPaymentItemsLoading(true)
+    getCirclePaymentItems(circleId)
+      .then((payload) => {
+        if (cancelled) return
+        const items = Array.isArray(payload?.data ?? payload) ? (payload?.data ?? payload) : []
+        setPaymentItems(items)
+        if (preselectedPaymentItemKey) {
+          const matched = items.find((item: PaymentItemRecord) => String(item?.key || item?.id || '') === String(preselectedPaymentItemKey))
+          if (matched) {
+            setSelectedPaymentItemKey(String(matched.key || matched.id || ''))
+          }
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setPaymentItems([])
+      })
+      .finally(() => {
+        if (!cancelled) setPaymentItemsLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [circleId, isMonthlyDueFlow, preselectedPaymentItemKey])
+
+  const selectedPaymentItem = useMemo(
+    () => paymentItems.find((item) => String(item.key || item.id || '') === String(selectedPaymentItemKey || '')) || null,
+    [paymentItems, selectedPaymentItemKey]
+  )
+  const selectedPaymentItemType = String(selectedPaymentItem?.type || selectedPaymentItem?.item_type || '').toLowerCase()
+  const selectedIsDueItem =
+    selectedPaymentItem?.linked_reference_type === 'CircleDuePlan' ||
+    selectedPaymentItemType === 'dues' ||
+    (selectedPaymentItem?.checkout_mode === 'recurring' && selectedPaymentItem?.linked_reference_type === 'CircleDuePlan')
+  const selectedIsQuantityItem = selectedPaymentItemType === 'quantity'
+  const activePaymentItem = isMonthlyDueFlow ? null : selectedPaymentItem
+  const activeDueMonthsOpen = isMonthlyDueFlow
+    ? Math.max(dueMonthsOpen || 1, 1)
+    : Math.max(Number(selectedPaymentItem?.payable_periods_count || 1), 1)
+  const recurringMonthChoices = [1, 3, 6, 12].filter((value) => value <= Math.max(activeDueMonthsOpen, value))
+  const activeDueLabel = String(selectedPaymentItem?.title || 'Dues').trim()
+  const activeDueCadence = String(selectedPaymentItem?.cadence || circle?.monthly_due_plan?.cadence || 'monthly').trim()
+  const itemPickerVisible = !isMonthlyDueFlow && !selectedPaymentItem
+
+  useEffect(() => {
+    if (!(isMonthlyDueFlow || selectedIsDueItem)) return
+    setDueMonths(Math.max(1, Math.min(activeDueMonthsOpen || 1, 12)))
+  }, [activeDueMonthsOpen, isMonthlyDueFlow, selectedIsDueItem])
+
+  useEffect(() => {
+    if (!circleId || !(isMonthlyDueFlow || selectedIsDueItem)) return
+
+    let cancelled = false
+    setDueQuoteLoading(true)
+    quoteCircleDuePlan(circleId, { periods_count: dueMonths })
+      .then((payload) => {
+        if (cancelled) return
+        const data = (payload?.data ?? payload) as Record<string, any>
+        setDueQuote(data)
+        const totalAmount = Number(data?.total_amount || 0)
+        setFormData((current) => ({
+          ...current,
+          amount: totalAmount > 0 ? String(totalAmount) : current.amount,
+        }))
+      })
+      .catch((error: any) => {
+        if (cancelled) return
+        setDueQuote(null)
+        const message = buildApiErrorMessage({
+          status: error?.response?.status,
+          data: error?.response?.data,
+          fallback: 'Unable to calculate the due total right now.',
+        })
+        setNotice({ message, error: true, data: null })
+      })
+      .finally(() => {
+        if (!cancelled) setDueQuoteLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [circleId, dueMonths, isMonthlyDueFlow, selectedIsDueItem])
+
   const profileRoot = (userProfileData?.data ?? userProfileData) || {}
   const tierRank = getTierRank(profileRoot?.kyc_level || profileRoot?.user_kyc?.kyc_level)
   const isTier1User = tierRank === 1
@@ -59,11 +213,104 @@ const CircleFundScreen = () => {
   const isFlexibleOfficial = circle?.circle_type === 'official' && circle?.kyc_mode === 'flexible'
   const maxContributionCents = Number(circle?.max_contribution_cents || 0)
   const standardDailyCapCents = 10000000
-  const amountCents = useMemo(
+  const selectedQuantityUnitPriceCents = Number(
+    selectedPaymentItem?.unit_price_cents || selectedPaymentItem?.amount_cents || selectedPaymentItem?.suggested_amount_cents || 0
+  )
+  const [quantity, setQuantity] = useState(1)
+  const manualAmountCents = useMemo(
     () => Math.round(Number(String(formData.amount).replace(/[^0-9.]/g, '')) * 100) || 0,
     [formData.amount]
   )
+  const quotedAmountCents = Number(dueQuote?.total_amount_cents || 0)
+  const quantityAmountCents = selectedIsQuantityItem ? selectedQuantityUnitPriceCents * Math.max(quantity, 1) : 0
+  const amountCents =
+    (isMonthlyDueFlow || selectedIsDueItem) && quotedAmountCents > 0
+      ? quotedAmountCents
+      : selectedIsQuantityItem
+        ? quantityAmountCents
+        : manualAmountCents
   const overCap = isFlexibleOfficial && isTier1User && maxContributionCents > 0 && amountCents > maxContributionCents
+  const quotedObligationIds = Array.isArray(dueQuote?.obligation_ids) ? dueQuote?.obligation_ids : []
+  const coveredPeriods = Array.isArray(dueQuote?.covered_periods) ? dueQuote?.covered_periods : []
+  const coveredPeriodKeys = Array.isArray(dueQuote?.covered_period_keys) ? dueQuote?.covered_period_keys : []
+  const coveredStart = String(dueQuote?.covered_due_range?.start || '')
+  const coveredEnd = String(dueQuote?.covered_due_range?.end || '')
+  const circleName = String(circle?.name || circle?.circle_name || 'Circle').trim()
+  const successData = (notice.data && !notice.error ? notice.data : null) as Record<string, any> | null
+  const successReference = String(successData?.reference || successData?.transaction_reference || successData?.transfer_reference || '').trim()
+  const successTimestamp = String(successData?.created_at || successData?.occurred_at || '').trim()
+  const successStatus = String(successData?.status || 'successful').trim()
+  const selectedItemTitle = isMonthlyDueFlow ? activeDueLabel : String(activePaymentItem?.title || 'General Support').trim()
+  const selectedItemTypeLabel = isMonthlyDueFlow || selectedIsDueItem ? 'Dues' : paymentTypeLabel(activePaymentItem)
+  const ctaLabel =
+    isMonthlyDueFlow || selectedIsDueItem
+      ? `Pay ${formatPeriodCountLabel(dueMonths, activeDueCadence)} dues`
+      : paymentPurposeLabel(activePaymentItem) === 'fine'
+        ? 'Pay fine'
+        : paymentPurposeLabel(activePaymentItem) === 'event contribution'
+          ? 'Pay event contribution'
+          : paymentPurposeLabel(activePaymentItem) === 'treasury top-up'
+            ? 'Top up treasury'
+            : 'Contribute'
+  const sourceWalletBalanceValue = Number(profileRoot?.wallet?.available_balance ?? profileRoot?.wallet?.balance ?? 0)
+  const sourceWalletBalanceLabel = profileRoot?.wallet
+    ? moneyFormat(Number.isFinite(sourceWalletBalanceValue) ? sourceWalletBalanceValue : 0)
+    : '--'
+  const sourceOptions = [
+    {
+      label: profileRoot?.wallet
+        ? `Personal wallet · ${sourceWalletBalanceLabel} available`
+        : 'Personal wallet',
+      value: 'personal_wallet',
+    },
+  ]
+  const selectedSourceLabel = sourceOptions.find((option) => option.value === selectedSource)?.label || 'Personal wallet'
+
+  useEffect(() => {
+    if (!selectedIsQuantityItem) return
+    setQuantity(1)
+    if (selectedQuantityUnitPriceCents > 0) {
+      setFormData((current) => ({
+        ...current,
+        amount: String(selectedQuantityUnitPriceCents / 100),
+      }))
+    }
+  }, [selectedIsQuantityItem, selectedPaymentItemKey, selectedQuantityUnitPriceCents])
+
+  useEffect(() => {
+    if (!selectedIsQuantityItem) return
+    if (quantityAmountCents > 0) {
+      setFormData((current) => ({
+        ...current,
+        amount: String(quantityAmountCents / 100),
+      }))
+    }
+  }, [quantityAmountCents, selectedIsQuantityItem])
+
+  const handleSelectPaymentItem = (item: PaymentItemRecord) => {
+    setSelectedPaymentItemKey(String(item.key || item.id || ''))
+    setNotice({ message: null, error: false, data: null })
+    if (String(item?.checkout_mode || '').toLowerCase() === 'quantity') {
+      setQuantity(1)
+      const unitPrice = Number(item?.unit_price_cents || item?.amount_cents || item?.suggested_amount_cents || 0)
+      setFormData((current) => ({
+        ...current,
+        amount: unitPrice > 0 ? String(unitPrice / 100) : '',
+      }))
+      return
+    }
+    if (Number(item?.amount_cents || 0) > 0 && item?.checkout_mode === 'fixed') {
+      setFormData((current) => ({
+        ...current,
+        amount: String(Number(item.amount_cents) / 100),
+      }))
+      return
+    }
+    setFormData((current) => ({
+      ...current,
+      amount: '',
+    }))
+  }
 
   const handleOpenPin = async () => {
     const amountValue = Number(String(formData.amount).replace(/[^0-9.]/g, ''))
@@ -71,51 +318,47 @@ const CircleFundScreen = () => {
       setNotice({ message: 'Missing circle ID.', error: true, data: null })
       return
     }
+    if (!isMonthlyDueFlow && !selectedPaymentItem) {
+      setNotice({ message: 'Select a payment item first.', error: true, data: null })
+      return
+    }
+    if ((isMonthlyDueFlow || selectedIsDueItem) && quotedObligationIds.length === 0) {
+      setNotice({ message: 'Unable to load the due total right now.', error: true, data: null })
+      return
+    }
+    if (selectedIsQuantityItem && (!quantity || quantity < 1)) {
+      setNotice({ message: 'Enter a valid quantity.', error: true, data: null })
+      return
+    }
     if (!amountValue || Number.isNaN(amountValue)) {
       setNotice({ message: 'Amount is required.', error: true, data: null })
       return
     }
     if (overCap) {
-      setNotice({
-        message: 'Complete verification to contribute above your current limit.',
-        error: true,
-        data: null,
-      })
+      setNotice({ message: 'Complete verification to contribute above your current limit.', error: true, data: null })
       return
     }
 
     try {
       const status = await getTransactionPinStatus()
       const payload = status?.data ?? status
-      const hasPin =
-        payload?.has_pin === true ||
-        payload?.status === 'set' ||
-        payload?.pin_set === true
+      const hasPin = payload?.has_pin === true || payload?.status === 'set' || payload?.pin_set === true
       if (!hasPin) {
-        setNotice({
-          message: 'Set your transaction PIN to continue.',
-          error: true,
-          data: null,
-        })
+        setNotice({ message: 'Set your transaction PIN to continue.', error: true, data: null })
         router.push('/settings/pin/set')
         return
       }
     } catch (error: any) {
       const statusCode = error?.response?.status
-      if (statusCode === 401) {
-        return
-      }
+      if (statusCode === 401) return
     }
 
     setPinError(null)
     setPinModalOpen(true)
   }
 
-  const submitFunding = async (credential: {
-    transaction_pin?: string
-    biometric_approval_token?: string
-  }) => {
-    const amountValue = Number(String(formData.amount).replace(/[^0-9.]/g, ''))
+  const submitFunding = async (credential: { transaction_pin?: string; biometric_approval_token?: string }) => {
+    const amountValue = amountCents / 100
     if (!circleId || !amountValue || Number.isNaN(amountValue)) {
       setNotice({ message: 'Amount is required.', error: true, data: null })
       return
@@ -127,16 +370,27 @@ const CircleFundScreen = () => {
       const response = await fundCircle(circleId, {
         amount_cents: Math.round(amountValue * 100),
         note: formData.description.trim() || undefined,
+        circle_due_obligation_id: !isMonthlyDueFlow && !selectedIsDueItem ? dueObligationId || undefined : undefined,
+        circle_due_obligation_ids: isMonthlyDueFlow || selectedIsDueItem ? quotedObligationIds : undefined,
+        circle_activity_id: activePaymentItem?.linked_reference_type === 'CircleActivity' ? activePaymentItem?.linked_reference_id : undefined,
+        payment_item_quantity: selectedIsQuantityItem ? quantity : undefined,
+        payment_item_unit_price_cents: selectedIsQuantityItem ? selectedQuantityUnitPriceCents : undefined,
+        payment_purpose:
+          activePaymentItem?.type === 'activity_goal'
+            ? 'activity_goal'
+            : activePaymentItem?.type === 'treasury_topup'
+              ? 'treasury_topup'
+              : (isMonthlyDueFlow || selectedIsDueItem)
+                ? 'dues'
+                : undefined,
+        payment_item_title: selectedItemTitle || undefined,
         ...credential,
       })
       const payload: any = response
       setPinModalOpen(false)
       setFormData({ amount: '', description: '' })
-      setNotice({
-        message: payload?.message || 'Circle funded successfully.',
-        error: false,
-        data: payload?.data || null,
-      })
+      setDueQuote(null)
+      setNotice({ message: payload?.message || 'Circle funded successfully.', error: false, data: payload?.data || null })
       if (credential.transaction_pin) {
         try {
           await transactionBiometrics.maybeEnrollAfterPinSuccess(credential.transaction_pin)
@@ -152,17 +406,11 @@ const CircleFundScreen = () => {
       }
     } catch (error: any) {
       const status = error?.response?.status
-      if (status === 401) {
-        return
-      }
+      if (status === 401) return
 
       const errors = error?.response?.data?.errors
       const messageFromErrors =
-        Array.isArray(errors) && errors.length > 0
-          ? errors.join('\n')
-          : typeof errors === 'string'
-            ? errors
-            : error?.response?.data?.message
+        Array.isArray(errors) && errors.length > 0 ? errors.join('\n') : typeof errors === 'string' ? errors : error?.response?.data?.message
 
       const message = buildApiErrorMessage({
         status,
@@ -172,14 +420,13 @@ const CircleFundScreen = () => {
 
       setPinError(message)
       setNotice({ message, error: true, data: null })
-      Alert.alert('Funding failed', message)
+      Alert.alert('Payment failed', message)
     } finally {
       setLoading(false)
     }
   }
 
-  const handleSubmit = async (transactionPin: string) =>
-    submitFunding({ transaction_pin: transactionPin })
+  const handleSubmit = async (transactionPin: string) => submitFunding({ transaction_pin: transactionPin })
 
   const handleBiometricSubmit = async () => {
     try {
@@ -192,69 +439,312 @@ const CircleFundScreen = () => {
     }
   }
 
+  const preflightRows = [
+    { label: 'Circle', value: circleName, emphasis: true },
+    { label: 'Payment item', value: selectedItemTitle || '--' },
+    { label: 'Source', value: selectedSourceLabel },
+    { label: 'You pay', value: amountCents > 0 ? moneyFormat(amountCents / 100) : '--' },
+    selectedIsQuantityItem ? { label: 'Quantity', value: String(quantity) } : null,
+    selectedIsQuantityItem ? { label: 'Unit price', value: moneyFormat(selectedQuantityUnitPriceCents / 100) } : null,
+    (isMonthlyDueFlow || selectedIsDueItem) ? { label: 'Covered periods', value: quotedObligationIds.length > 0 ? String(quotedObligationIds.length) : '--' } : null,
+    coveredPeriods.length > 0 ? { label: 'Coverage', value: coveredStart === coveredEnd ? coveredStart : `${coveredStart} to ${coveredEnd}` } : null,
+    formData.description.trim() ? { label: 'Note', value: formData.description.trim() } : null,
+  ].filter(Boolean) as { label: string; value: string; emphasis?: boolean }[]
+
+  const completionRows = [
+    { label: 'Circle', value: circleName, emphasis: true },
+    { label: 'Payment item', value: selectedItemTitle || '--' },
+    { label: 'Source', value: selectedSourceLabel },
+    { label: 'Amount paid', value: amountCents > 0 ? moneyFormat(amountCents / 100) : '--' },
+    selectedIsQuantityItem ? { label: 'Quantity', value: String(quantity) } : null,
+    { label: 'Payment type', value: selectedItemTypeLabel || '--' },
+    successReference ? { label: 'Transaction ID', value: successReference, mono: true } : null,
+    successTimestamp ? { label: 'Timestamp', value: formatTime(successTimestamp) } : null,
+    { label: 'Status', value: successStatus || 'successful' },
+  ].filter(Boolean) as { label: string; value: string; emphasis?: boolean; mono?: boolean }[]
+
+  const isSuccessState = Boolean(successData)
+
   return (
     <View className="flex-1 bg-primary px-4">
       <KeyboardAvoidWrapper>
-        <View className="flex-1 pt-10">
-          <Text className="text-white text-2xl mb-2">Fund Circle</Text>
-          <Text className="text-gray-300 mb-6">
-            {isFlexibleOfficial ? 'Add money to this official circle.' : 'Add money to this circle.'}
-          </Text>
+        <View className="flex-1 pt-8 gap-4">
+          {isSuccessState ? (
+            <CompletionPanel
+              eyebrow="Circle payment"
+              title="Contribution completed"
+              supportingText={notice.message || 'Your circle contribution has been recorded.'}
+              primaryLabel="Circle received"
+              primaryValue={amountCents > 0 ? moneyFormat(amountCents / 100) : '--'}
+              statusLabel="Successful"
+              statusTone="success"
+              summaryTitle="Payment receipt"
+              summaryRows={completionRows}
+              primaryActionLabel={successReference ? 'View receipt' : 'Done'}
+              onPrimaryAction={() => {
+                if (successReference) {
+                  router.push({ pathname: '/transaction/receipt', params: { reference: successReference } } as any)
+                  return
+                }
+                router.replace(`/circles/${circleId}` as any)
+              }}
+              secondaryActionLabel="Back to circle"
+              onSecondaryAction={() => router.replace(`/circles/${circleId}` as any)}
+            />
+          ) : (
+            <>
+              <View className="rounded-[30px] bg-[#0F1115] px-5 py-5 border border-white/6">
+                <Text className="text-[#D49A3A] text-[10px] uppercase tracking-[3px]">Circle payment</Text>
+                <Text className="text-white text-[28px] font-semibold mt-2">Pay {circleName}</Text>
+                {!itemPickerVisible ? (
+                  <Text className="text-[#A9AFB8] text-[13px] leading-5 mt-2">
+                    {(isMonthlyDueFlow || selectedIsDueItem)
+                      ? 'Choose periods, review the total, and confirm.'
+                      : `Review this ${selectedItemTypeLabel.toLowerCase()} and confirm.`}
+                  </Text>
+                ) : null}
+              </View>
 
-          {circle?.circle_type === 'official' ? (
-            <View className="mb-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
-              <Text className="text-amber-100 text-xs uppercase">Official BitBridge Circle</Text>
-              {circle?.badge_label ? (
-                <Text className="text-white text-sm font-semibold mt-1">{String(circle.badge_label)}</Text>
+              {itemPickerVisible ? (
+                <View className="rounded-[24px] bg-[#16181D] px-4 py-4 border border-white/6">
+                  <Text className="text-white text-base font-semibold">Payment Items</Text>
+                  {paymentItemsLoading ? (
+                    <Text className="text-[#A9AFB8] text-xs mt-3">Loading items...</Text>
+                  ) : paymentItems.length === 0 ? (
+                    <Text className="text-[#A9AFB8] text-xs mt-3">No configured payment items yet.</Text>
+                  ) : (
+                    <View className="mt-3 gap-3">
+                      {paymentItems.map((item) => (
+                        <TouchableOpacity
+                          key={String(item.key || item.id)}
+                          onPress={() => handleSelectPaymentItem(item)}
+                          className="rounded-[20px] border border-white/8 bg-[#0F1115] px-4 py-4"
+                        >
+                          <View className="flex-row items-center justify-between gap-3">
+                            <View className="flex-1">
+                              <Text className="text-white text-sm font-semibold">{String(item.title || 'Payment item')}</Text>
+                              <Text className="text-[#A9AFB8] text-[11px] mt-1">
+                                {String(item.checkout_mode === 'recurring'
+                                  ? 'Recurring'
+                                  : item.checkout_mode === 'quantity'
+                                    ? 'Quantity'
+                                    : item.checkout_mode === 'fixed'
+                                      ? 'Fixed'
+                                      : item.type === 'treasury_topup'
+                                        ? 'Optional'
+                                        : 'Open'
+                                )}{item.due_on ? ` · Next ${formatTime(String(item.due_on))}` : ''}
+                              </Text>
+                            </View>
+                            <View className="items-end">
+                              <View className="rounded-full border border-white/10 bg-white/5 px-2 py-1 mb-2">
+                                <Text className="text-[10px] text-white">
+                                  {String(
+                                    item.status === 'overdue' || item.status === 'payable_overdue'
+                                      ? 'Overdue'
+                                      : item.is_payable_now
+                                        ? 'Due now'
+                                        : item.status === 'current' || item.status === 'paid' || item.status === 'configured'
+                                          ? 'Paid up'
+                                          : item.type === 'treasury_topup' || item.required === false
+                                            ? 'Optional'
+                                            : 'Upcoming'
+                                  )}
+                                </Text>
+                              </View>
+                              <Text className="text-white text-sm font-semibold">
+                                {item.amount_cents !== null && item.amount_cents !== undefined ? moneyFormat(Number(item.amount_cents) / 100) : 'Open'}
+                              </Text>
+                              <View className="mt-2 rounded-full border border-white/10 bg-white/5 px-3 py-2">
+                                <Text className="text-white text-[11px] font-semibold">
+                                  {item.support_fallback ? 'Top up treasury' : item.is_payable_now === false ? 'Review' : 'Open'}
+                                </Text>
+                              </View>
+                            </View>
+                          </View>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                </View>
               ) : null}
-            </View>
-          ) : null}
 
-          <NotificationAlert message={notice.message} data={notice.data} error={notice.error} />
+              {!itemPickerVisible ? (
+                <>
+              {!isMonthlyDueFlow && selectedPaymentItem ? (
+                <TouchableOpacity
+                  onPress={() => setSelectedPaymentItemKey('')}
+                  className="self-start rounded-full border border-white/10 bg-white/5 px-4 py-2"
+                >
+                  <Text className="text-white text-[11px] font-semibold">Choose another item</Text>
+                </TouchableOpacity>
+              ) : null}
 
-          <FormInput
-            label="Amount"
-            value={formData.amount}
-            name="amount"
-            keyboardType="numeric"
-            onChangeText={(text: string) => setFormData({ ...formData, amount: text })}
-          />
+              {circle?.circle_type === 'official' ? (
+                <View className="rounded-[24px] bg-[#16181D] px-4 py-4 border border-amber-500/20">
+                  <Text className="text-amber-200 text-[10px] uppercase tracking-[2px]">Official BitBridge Circle</Text>
+                  {circle?.badge_label ? <Text className="text-white text-sm font-semibold mt-2">{String(circle.badge_label)}</Text> : null}
+                </View>
+              ) : null}
 
-          <FormInput
-            label="Description (optional)"
-            value={formData.description}
-            name="description"
-            onChangeText={(text: string) => setFormData({ ...formData, description: text })}
-          />
+              {(isMonthlyDueFlow || selectedIsDueItem) ? (
+                <View className="rounded-[24px] bg-[#16181D] px-4 py-4 border border-sky-500/20">
+                  <Text className="text-sky-200 text-[10px] uppercase tracking-[2px]">Dues</Text>
+                  {dueQuoteLoading ? (
+                    <Text className="text-white text-sm font-semibold mt-2">Calculating total...</Text>
+                  ) : quotedAmountCents > 0 ? (
+                  <Text className="text-white text-sm font-semibold mt-2">
+                      Pay {moneyFormat(quotedAmountCents / 100)} for {formatPeriodCountLabel(quotedObligationIds.length, activeDueCadence)}.
+                    </Text>
+                  ) : prefetchedDueAmountCents > 0 ? (
+                    <Text className="text-white text-sm font-semibold mt-2">
+                      Pay exactly {moneyFormat(prefetchedDueAmountCents / 100)} for this due period.
+                    </Text>
+                  ) : null}
+                  {coveredPeriods.length > 0 || coveredPeriodKeys.length > 0 ? (
+                    <Text className="text-sky-100 text-xs mt-2">
+                      Covers {coveredStart === coveredEnd ? coveredStart : `${coveredStart} to ${coveredEnd}`}
+                    </Text>
+                  ) : null}
+                </View>
+              ) : null}
 
-          {isFlexibleOfficial && isTier1User && maxContributionCents > 0 ? (
-            <View className={`mt-4 rounded-2xl border px-4 py-3 ${overCap ? 'border-amber-500/40 bg-amber-500/10' : 'border-sky-500/30 bg-sky-500/10'}`}>
-              <Text className={`text-xs ${overCap ? 'text-amber-100' : 'text-sky-100'}`}>
-                You can contribute up to {moneyFormat(maxContributionCents / 100)} with your current verification level.
-              </Text>
-              <Text className="text-gray-300 text-[10px] mt-1">
-                Complete verification to unlock higher contributions.
-              </Text>
-            </View>
-          ) : null}
+              <NotificationAlert message={notice.message} data={notice.data} error={notice.error} />
 
-          {isStandardCircle && isTier1User ? (
-            <View className="mt-4 rounded-2xl border border-sky-500/30 bg-sky-500/10 px-4 py-3">
-              <Text className="text-xs text-sky-100">
-                Tier 1 users can contribute up to {moneyFormat(standardDailyCapCents / 100)} per day across standard circles.
-              </Text>
-              <Text className="text-gray-300 text-[10px] mt-1">
-                Complete Tier 2 verification to unlock higher contributions.
-              </Text>
-            </View>
-          ) : null}
+              {!itemPickerVisible ? (
+                <View className="rounded-[24px] bg-[#16181D] px-4 py-4 border border-white/6">
+                  <FormSelect
+                    label="Pay from"
+                    selectedValue={selectedSource}
+                    onValueChange={(value: string) => setSelectedSource(String(value || 'personal_wallet'))}
+                    options={sourceOptions}
+                    placeholder="Personal wallet"
+                  />
+                </View>
+              ) : null}
 
-          <TouchableOpacity
-            onPress={handleOpenPin}
-            className={`py-6 mt-6 rounded-xl ${overCap ? 'bg-gray-700' : 'bg-theme-primary'}`}
-          >
-            <Text className="text-alt font-medium text-center">Continue</Text>
-          </TouchableOpacity>
+              {!itemPickerVisible ? (
+                <FinancialSummaryCard
+                  title="Payment summary"
+                  rows={preflightRows}
+                  footer="Final amount is confirmed before execution."
+                />
+              ) : null}
+
+              {(isMonthlyDueFlow || selectedIsDueItem) ? (
+                <View className="rounded-[24px] bg-[#151515] px-4 py-4">
+                  <Text className="text-white text-sm font-semibold">Pay for</Text>
+                  <Text className="text-[#A9AFB8] text-xs mt-1">Choose how many {cadenceUnit(activeDueCadence)}s to cover now.</Text>
+                  <View className="flex-row flex-wrap gap-2 mt-4">
+                    {recurringMonthChoices.map((value) => {
+                      const active = Number(dueMonths) === Number(value)
+                      return (
+                        <TouchableOpacity
+                          key={value}
+                          onPress={() => setDueMonths(value)}
+                          className={`rounded-full border px-4 py-3 ${active ? 'border-cyan-400 bg-cyan-400/15' : 'border-white/10 bg-white/5'}`}
+                        >
+                          <Text className="text-white text-sm font-semibold">
+                            {formatPeriodCountLabel(value, activeDueCadence)}
+                          </Text>
+                        </TouchableOpacity>
+                      )
+                    })}
+                  </View>
+                  <View className="mt-4 flex-row items-center justify-between">
+                    <Text className="text-[#8D94A0] text-xs">Or adjust the number of periods</Text>
+                    <View className="flex-row items-center gap-3">
+                      <TouchableOpacity
+                        onPress={() => setDueMonths((current) => Math.max(1, current - 1))}
+                        className="h-11 w-11 items-center justify-center rounded-full bg-[#1D2128]"
+                      >
+                        <Text className="text-white text-lg font-semibold">-</Text>
+                      </TouchableOpacity>
+                      <Text className="text-white text-2xl font-semibold min-w-[2.5rem] text-center">{dueMonths}</Text>
+                      <TouchableOpacity
+                        onPress={() => setDueMonths((current) => Math.min(Math.max(activeDueMonthsOpen, 1), current + 1))}
+                        className="h-11 w-11 items-center justify-center rounded-full bg-[#1D2128]"
+                      >
+                        <Text className="text-white text-lg font-semibold">+</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+              ) : null}
+
+              {selectedIsQuantityItem ? (
+                <View className="rounded-[24px] bg-[#151515] px-4 py-4">
+                  <Text className="text-white mb-3 text-sm font-semibold">Quantity</Text>
+                  <View className="flex-row items-center justify-between">
+                    <TouchableOpacity
+                      onPress={() => setQuantity((current) => Math.max(1, current - 1))}
+                      className="h-11 w-11 items-center justify-center rounded-full bg-[#1D2128]"
+                    >
+                      <Text className="text-white text-lg font-semibold">-</Text>
+                    </TouchableOpacity>
+                    <View className="items-center">
+                      <Text className="text-white text-2xl font-semibold">{quantity}</Text>
+                      <Text className="text-[#8D94A0] text-xs mt-1">
+                        {selectedQuantityUnitPriceCents > 0 ? `${moneyFormat(selectedQuantityUnitPriceCents / 100)} per unit` : 'Unit price unavailable'}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => setQuantity((current) => current + 1)}
+                      className="h-11 w-11 items-center justify-center rounded-full bg-[#1D2128]"
+                    >
+                      <Text className="text-white text-lg font-semibold">+</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : null}
+
+              <FormInput
+                label={selectedIsQuantityItem ? 'Total' : 'Amount'}
+                value={formData.amount}
+                name="amount"
+                keyboardType="numeric"
+                onChangeText={(text: string) => setFormData({ ...formData, amount: text })}
+                editable={!isMonthlyDueFlow && !selectedIsDueItem && activePaymentItem?.checkout_mode !== 'fixed' && !selectedIsQuantityItem}
+              />
+
+              <FormInput
+                label="Description (optional)"
+                value={formData.description}
+                name="description"
+                onChangeText={(text: string) => setFormData({ ...formData, description: text })}
+              />
+
+              {isFlexibleOfficial && isTier1User && maxContributionCents > 0 ? (
+                <View className={`rounded-[22px] px-4 py-3 ${overCap ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-sky-500/10 border border-sky-500/20'}`}>
+                  <Text className={`text-xs ${overCap ? 'text-amber-100' : 'text-sky-100'}`}>
+                    You can contribute up to {moneyFormat(maxContributionCents / 100)} with your current verification level.
+                  </Text>
+                  <Text className="text-[#A9AFB8] text-[10px] mt-1">Complete verification to unlock higher contributions.</Text>
+                </View>
+              ) : null}
+
+              {isStandardCircle && isTier1User ? (
+                <View className="rounded-[22px] bg-sky-500/10 border border-sky-500/20 px-4 py-3">
+                  <Text className="text-xs text-sky-100">
+                    Tier 1 users can contribute up to {moneyFormat(standardDailyCapCents / 100)} per day across standard circles.
+                  </Text>
+                  <Text className="text-[#A9AFB8] text-[10px] mt-1">Complete Tier 2 verification to unlock higher contributions.</Text>
+                </View>
+              ) : null}
+
+              <TouchableOpacity
+                onPress={handleOpenPin}
+                className={`py-5 rounded-[20px] ${overCap || dueQuoteLoading ? 'bg-gray-700' : 'bg-theme-primary'}`}
+                disabled={dueQuoteLoading || itemPickerVisible}
+              >
+                <Text className="text-alt font-semibold text-center">
+                  {dueQuoteLoading ? 'Checking total...' : ctaLabel}
+                </Text>
+              </TouchableOpacity>
+                </>
+              ) : null}
+            </>
+          )}
         </View>
       </KeyboardAvoidWrapper>
 
@@ -268,7 +758,7 @@ const CircleFundScreen = () => {
         biometricAvailable={transactionBiometrics.biometricAvailable}
         biometricEnabled={transactionBiometrics.biometricEnabled}
         errorMessage={pinError}
-        title="Enter PIN to Fund"
+        title="Enter PIN to Pay"
       />
 
       <Loader open={loading} />
@@ -277,6 +767,5 @@ const CircleFundScreen = () => {
 }
 
 export default CircleFundScreen
-
 
 
