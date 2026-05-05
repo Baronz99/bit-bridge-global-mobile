@@ -2,14 +2,19 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { ActivityIndicator, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import { useRouter } from 'expo-router'
+import { getBusinessTransactions } from '@/api/business'
 import { listTimeline, TimelineQuery } from '@/api/timeline'
+import { getTransactionsForAccount } from '@/api/transactions'
+import { getWallet } from '@/api/wallet'
 import ScreenContainer from '@/components/ScreenContainer'
 import PremiumTabs from '@/components/timeline/PremiumTabs'
 import TimelineSectionList from '@/components/timeline/TimelineSectionList'
 import SkeletonTimeline from '@/components/timeline/SkeletonTimeline'
 import FilterBottomSheet, { TimelineFilterState } from '@/components/timeline/FilterBottomSheet'
 import AppModal from '@/components/modal/Modal'
-import { extractReceiptReference, getTimelineId, isWalletTimelineId } from '@/utils/timelineRefs'
+import { useActiveAccount } from '@/services/useActiveAccount'
+import useFetch from '@/services/useFetch'
+import { extractReceiptReference, getTimelineId } from '@/utils/timelineRefs'
 import { log } from '@/utils/logger'
 
 const PRIMARY_TABS = [
@@ -130,6 +135,22 @@ const extractTimeline = (payload: unknown) => {
   return []
 }
 
+const normalizeTimelineItems = (
+  list: Record<string, unknown>[],
+  isCircleAccount: boolean
+) => {
+  if (!isCircleAccount) return list
+
+  return list.map((item) => {
+    const kind = String(item?.kind || item?.type || '').trim()
+    if (kind) return item
+    return {
+      ...item,
+      kind: 'circle_activity',
+    }
+  })
+}
+
 const logTimelineSource = (
   source: 'API' | 'EMPTY',
   list: Record<string, unknown>[],
@@ -245,6 +266,9 @@ const getCardReceiptNavParams = (item: Record<string, unknown>) => {
 
 const TimelineScreen = () => {
   const router = useRouter()
+  const { activeAccount } = useActiveAccount()
+  const isBusinessAccount = activeAccount?.type === 'business'
+  const isCircleAccount = activeAccount?.type === 'circle'
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [items, setItems] = useState<Record<string, unknown>[]>([])
@@ -255,6 +279,10 @@ const TimelineScreen = () => {
   const [searchOpen, setSearchOpen] = useState(false)
   const [filterOpen, setFilterOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
+  const { data: walletData } = useFetch(() => getWallet(activeAccount), {
+    autoFetch: isCircleAccount,
+    queryKey: ['wallet', activeAccount, 'timeline-header'],
+  })
 
   const [filters, setFilters] = useState<TimelineFilterState>({
     startDate: '',
@@ -283,44 +311,82 @@ const TimelineScreen = () => {
     }),
     [activeTab, filters, searchTerm]
   )
+  const circleAccount = useMemo(() => (walletData as any)?.data?.circle ?? (walletData as any)?.circle ?? null, [walletData])
+  const circleName = String(
+    circleAccount?.name ?? circleAccount?.title ?? circleAccount?.display_name ?? 'Circle'
+  )
+  const circleRoleLabel = String(
+    circleAccount?.current_user_role ??
+      circleAccount?.membership_role ??
+      circleAccount?.role ??
+      'member'
+  )
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (match) => match.toUpperCase())
+  const circleMembersCount = Number(circleAccount?.member_count ?? circleAccount?.members_count ?? 0)
+
+  useEffect(() => {
+    if (!isCircleAccount) return
+    if (activeTab === 'all' || activeTab === 'circles') return
+    setActiveTab('circles')
+  }, [activeTab, isCircleAccount])
 
   const loadTimeline = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const res = await listTimeline(buildQuery())
+      const res = isBusinessAccount
+        ? await getBusinessTransactions(activeAccount.businessId, { limit: 25 })
+        : isCircleAccount
+          ? await getTransactionsForAccount(activeAccount, {
+              params: {
+                limit: 25,
+              },
+            })
+        : await listTimeline(buildQuery())
       const payload = (res as any)?.data ?? res
-      const list = extractTimeline(payload)
+      const list = normalizeTimelineItems(
+        extractTimeline(payload) as Record<string, unknown>[],
+        isCircleAccount
+      )
       const cursor = (payload?.next_cursor as string) || (payload as any)?.data?.next_cursor || null
-      setItems(list as Record<string, unknown>[])
+      setItems(list)
       setNextCursor(cursor)
-      logTimelineSource('API', list as Record<string, unknown>[], {
+      logTimelineSource('API', list, {
         next_cursor: cursor || null,
+        account_type: activeAccount?.type,
       })
 
-      if ((list as any[])?.length === 0) {
+      if (list.length === 0) {
         logTimelineSource('EMPTY', [], { reason: 'api_response_empty_or_unexpected_shape' })
       }
 
       if (__DEV__) {
         const kinds = Array.from(
-          new Set((list as any[]).map((x) => String(x?.kind || x?.type || '').toLowerCase()))
+          new Set(list.map((x) => String(x?.kind || x?.type || '').toLowerCase()))
         ).slice(0, 25)
-        log('[Timeline] loaded', { count: (list as any[])?.length, kinds })
+        log('[Timeline] loaded', { count: list.length, kinds, account_type: activeAccount?.type })
       }
     } catch (error: any) {
       if (__DEV__) {
         log('[Timeline] load failed', {
           status: error?.response?.status,
           message: error?.message,
+          account_type: activeAccount?.type,
         })
       }
-      setError('Unable to load timeline right now.')
+      setError(
+        isBusinessAccount
+          ? 'Unable to load business activity right now.'
+          : isCircleAccount
+            ? 'Unable to load circle activity right now.'
+            : 'Unable to load timeline right now.'
+      )
       setItems([])
     } finally {
       setLoading(false)
     }
-  }, [buildQuery])
+  }, [activeAccount, buildQuery, isBusinessAccount, isCircleAccount])
 
   useEffect(() => {
     loadTimeline()
@@ -339,17 +405,33 @@ const TimelineScreen = () => {
   const handleNext = async () => {
     if (!nextCursor || loading) return
     try {
-      const res = await listTimeline(buildQuery(nextCursor))
+      const res = isBusinessAccount
+        ? await getBusinessTransactions(activeAccount.businessId, {
+            limit: 25,
+            cursor: nextCursor,
+          })
+        : isCircleAccount
+          ? await getTransactionsForAccount(activeAccount, {
+              params: {
+                limit: 25,
+                cursor: nextCursor,
+              },
+            })
+        : await listTimeline(buildQuery(nextCursor))
       const payload = (res as any)?.data ?? res
-      const list = extractTimeline(payload)
+      const list = normalizeTimelineItems(
+        extractTimeline(payload) as Record<string, unknown>[],
+        isCircleAccount
+      )
       const cursor = (payload?.next_cursor as string) || (payload as any)?.data?.next_cursor || null
-      setItems((prev) => [...prev, ...(list as Record<string, unknown>[])])
+      setItems((prev) => [...prev, ...list])
       setNextCursor(cursor)
     } catch (error: any) {
       if (__DEV__) {
         log('[Timeline] next page failed', {
           status: error?.response?.status,
           message: error?.message,
+          account_type: activeAccount?.type,
         })
       }
       setNextCursor(null)
@@ -432,7 +514,7 @@ const TimelineScreen = () => {
       log('[Timeline] pressed item', { id, kind, cardId, receiptRef, metaKeys })
 
       // 1) CardReceipt only when truly card-linked
-      if (cardId && isCardLinkedWalletTxn(item)) {
+      if (!isBusinessAccount && cardId && isCardLinkedWalletTxn(item)) {
         const p = getCardReceiptNavParams(item)
         router.push({
           pathname: '/transaction/card-receipt',
@@ -452,6 +534,10 @@ const TimelineScreen = () => {
 
       // 2) Receipt reference => canonical receipt screen (always fetches backend truth)
       if (receiptRef) {
+        if (isBusinessAccount) {
+          router.push(`/business/receipts/${encodeURIComponent(String(receiptRef))}` as any)
+          return
+        }
         router.push({ pathname: '/transaction/receipt', params: { reference: receiptRef } } as any)
         return
       }
@@ -464,7 +550,7 @@ const TimelineScreen = () => {
 
       router.push('/(tabs)/timeline' as any)
     },
-    [router]
+    [isBusinessAccount, router]
   )
 
   return (
@@ -472,8 +558,27 @@ const TimelineScreen = () => {
       <View className="pt-2 pb-3">
         <View className="flex-row items-center justify-between">
           <View>
-            <Text className="text-white text-2xl font-semibold">Timeline</Text>
-            <Text className="text-gray-400 text-xs mt-1">All your activity in one feed.</Text>
+            <Text className="text-white text-2xl font-semibold">
+              {isCircleAccount ? circleName : 'Timeline'}
+            </Text>
+            <Text className="text-gray-400 text-xs mt-1">
+              {isCircleAccount ? 'Circle activity for the selected account.' : 'All your activity in one feed.'}
+            </Text>
+            {isCircleAccount ? (
+              <View className="flex-row flex-wrap gap-2 mt-3">
+                <View className="rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1.5">
+                  <Text className="text-[11px] text-emerald-100">Circle activity</Text>
+                </View>
+                {circleMembersCount > 0 ? (
+                  <View className="rounded-full border border-gray-800 bg-gray-900 px-3 py-1.5">
+                    <Text className="text-[11px] text-gray-300">{circleMembersCount} members</Text>
+                  </View>
+                ) : null}
+                <View className="rounded-full border border-gray-800 bg-gray-900 px-3 py-1.5">
+                  <Text className="text-[11px] text-gray-300">{circleRoleLabel}</Text>
+                </View>
+              </View>
+            ) : null}
           </View>
           <View className="flex-row items-center gap-2">
             <TouchableOpacity
@@ -549,7 +654,11 @@ const TimelineScreen = () => {
       <AppModal open={searchOpen} onclose={() => setSearchOpen(false)}>
         <View className="bg-gray-900 p-6 rounded-2xl w-full max-w-md">
           <Text className="text-white text-lg font-semibold text-center mb-2">Search</Text>
-          <Text className="text-gray-400 text-center text-xs mb-4">Find an activity by text, status, or reference.</Text>
+          <Text className="text-gray-400 text-center text-xs mb-4">
+            {isCircleAccount
+              ? 'Find circle activity by text, status, or reference.'
+              : 'Find an activity by text, status, or reference.'}
+          </Text>
           <TextInput
             value={searchTerm}
             onChangeText={setSearchTerm}
