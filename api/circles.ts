@@ -30,10 +30,12 @@ export const getCircleWorkspace = async (
     getCircle(id).catch(() => null),
     getCircleContext(id, params).catch(() => null),
   ])
+  const treasuryResponse = await getCircleTreasury(id).catch(() => null)
 
   return normalizeCircleWorkspace({
     circlePayload: circleResponse,
     contextPayload: contextResponse,
+    treasuryPayload: treasuryResponse,
   })
 }
 

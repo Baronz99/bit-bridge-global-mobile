@@ -30,7 +30,26 @@ export const extractCircleRecentActivity = (payload: unknown): any[] => {
       ? asArray(root.recent_transactions)
       : asArray(root.transactions).length
         ? asArray(root.transactions)
-        : asArray(root.timeline)
+    : asArray(root.timeline)
+}
+
+export const normalizeTreasuryAccount = (payload: unknown): Record<string, any> => {
+  const root = extractCirclePayload(payload)
+  if (root?.treasury_account && typeof root.treasury_account === 'object' && !Array.isArray(root.treasury_account)) {
+    return asObject(root.treasury_account)
+  }
+  if (root?.account && typeof root.account === 'object' && !Array.isArray(root.account)) {
+    return asObject(root.account)
+  }
+  if (
+    root &&
+    typeof root === 'object' &&
+    !Array.isArray(root) &&
+    ('account_number' in root || 'bank_name' in root || 'bank_code' in root)
+  ) {
+    return root
+  }
+  return {}
 }
 
 const normalizeLegacyDuesSummary = (circle: Record<string, any>) => {
@@ -46,12 +65,15 @@ const normalizeLegacyDuesSummary = (circle: Record<string, any>) => {
 export const normalizeCircleWorkspace = ({
   circlePayload,
   contextPayload,
+  treasuryPayload,
 }: {
   circlePayload?: unknown
   contextPayload?: unknown
+  treasuryPayload?: unknown
 }) => {
   const circle = extractCirclePayload(circlePayload)
   const context = extractCircleContextPayload(contextPayload)
+  const treasuryAccount = normalizeTreasuryAccount(treasuryPayload)
   const balance = asObject(context.balance)
   const permissions = asObject(context.permissions)
   const approvals = asObject(context.approvals)
@@ -59,6 +81,18 @@ export const normalizeCircleWorkspace = ({
     ? context.dues_summary
     : normalizeLegacyDuesSummary(circle)
   const recentItems = extractCircleRecentActivity(contextPayload || circlePayload)
+  const treasuryBalanceCents =
+    Number.isFinite(Number(treasuryAccount.balance_cents)) ? Number(treasuryAccount.balance_cents || 0) : null
+  const contextBalanceCents =
+    balance.balance_cents != null ? Number(balance.balance_cents || 0) : null
+  const circleBalanceCents =
+    circle.balance_cents != null ? Number(circle.balance_cents || 0) : 0
+  const resolvedBalanceCents =
+    treasuryBalanceCents != null
+      ? treasuryBalanceCents
+      : contextBalanceCents != null
+        ? contextBalanceCents
+        : circleBalanceCents
 
   return {
     ...circle,
@@ -77,8 +111,9 @@ export const normalizeCircleWorkspace = ({
       'member',
     member_count:
       Number(context.circle.member_count || circle.member_count || circle.members_count || 0) || 0,
-    balance_cents:
-      balance.balance_cents != null ? Number(balance.balance_cents || 0) : Number(circle.balance_cents || 0),
+    balance_cents: resolvedBalanceCents,
+    treasury_balance_cents: treasuryBalanceCents,
+    circle_balance_cents: circleBalanceCents,
     balance_visible: balance.visible != null ? Boolean(balance.visible) : circle.balance_visible !== false,
     withdrawal_requires_approval: Boolean(
       context.circle.withdrawal_requires_approval ?? circle.withdrawal_requires_approval

@@ -72,7 +72,9 @@ const CircleHomeScreen = () => {
       const treasuryAccount =
         treasuryPayload?.treasury_account && typeof treasuryPayload.treasury_account === 'object'
           ? treasuryPayload.treasury_account
-          : null
+          : treasuryPayload?.account && typeof treasuryPayload.account === 'object'
+            ? treasuryPayload.account
+            : treasuryPayload
       const nextTreasuryBalanceCents =
         treasuryAccount && Number.isFinite(Number(treasuryAccount.balance_cents))
           ? Number(treasuryAccount.balance_cents)
@@ -127,6 +129,7 @@ const CircleHomeScreen = () => {
   const contributionActivity = useMemo(() => records.slice(0, 4), [records])
   const currentRole = String(workspace?.current_user_role || '').toLowerCase()
   const canOpenTreasury = Boolean(currentRole)
+  const workspaceBalanceCents = Number(workspace?.treasury_balance_cents ?? workspace?.balance_cents ?? 0)
 
   const handleRecordPress = useCallback(
     (record: Record<string, any>) => {
@@ -196,7 +199,7 @@ const CircleHomeScreen = () => {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadCircle(true)} />}
         >
           <TreasuryCard
-            balanceCents={treasuryBalanceCents ?? Number(workspace?.balance_cents || 0)}
+            balanceCents={treasuryBalanceCents ?? workspaceBalanceCents}
             onPay={() => router.push(`/circles/${circleId}/pay` as any)}
           />
           {canOpenTreasury ? (
