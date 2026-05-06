@@ -71,6 +71,12 @@ const isStale = (lastFetchedAt: number | null) => {
   return Date.now() - lastFetchedAt > STALE_MS
 }
 
+const extractErrorSnapshot = (error: any) => ({
+  message: error?.message,
+  status: error?.response?.status,
+  code: error?.response?.data?.error_code || error?.error_code || error?.error,
+})
+
 const setStore = (partial: Partial<AnchorOnboardingStoreState>) => {
   Object.assign(store, partial)
   listeners.forEach((listener) => listener(store))
@@ -314,11 +320,7 @@ export const normalizeAnchorOnboarding = (
     extractAccountNumberFromDetail(detailData)
   )
   const rawAccountNumber = accountNumber && accountNumber.includes('*') ? '' : accountNumber
-  const displayAccountNumber = accountNumber
-    ? accountNumber.includes('*')
-      ? accountNumber
-      : `****${accountNumber.slice(-4)}`
-    : null
+  const displayAccountNumber = accountNumber || null
 
   const accountName = pickString(
     anchorAccount?.account_name,
@@ -683,9 +685,14 @@ const fetchAnchorOnboarding = async (options?: { force?: boolean }): Promise<Ref
   setStore({ loading: true, error: null })
   inFlight = (async () => {
     try {
-      const [onboardingResponse, detailResponse, userAccountsResponse] = await Promise.all([
+      const [onboardingResponse, detailResult, userAccountsResponse] = await Promise.all([
         getAnchorOnboardingState(),
-        getUserAnchorAccountDetail(),
+        getUserAnchorAccountDetail().catch((error) => {
+          if (shouldLogDev()) {
+            log('[Anchor Onboarding] getUserAnchorAccountDetail fallback failed', extractErrorSnapshot(error))
+          }
+          return null
+        }),
         getAccounts().catch((error) => {
           if (shouldLogDev()) {
             log('[Anchor Onboarding] getAccounts fallback failed', {
@@ -696,6 +703,7 @@ const fetchAnchorOnboarding = async (options?: { force?: boolean }): Promise<Ref
           return undefined
         }),
       ])
+      const detailResponse = detailResult ?? store.detailResponse ?? null
 
       if (options?.force) {
         didLogShapes = false

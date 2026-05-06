@@ -78,9 +78,9 @@ const ActivityDetailsScreen = () => {
     <View className="flex-1 bg-primary px-4">
       <ScrollView showsVerticalScrollIndicator={false}>
         <View className="pt-6">
-          <Text className="text-white text-2xl font-semibold">Activity details</Text>
+          <Text className="text-white text-2xl font-semibold">Activity record</Text>
           <Text className="text-gray-400 text-xs mt-1">
-            Review the full timeline and participants for this activity.
+            Review the full timeline and payment details for this activity.
           </Text>
         </View>
 
@@ -107,10 +107,10 @@ const ActivityDetailsScreen = () => {
 
             <View className="mt-5 rounded-2xl border border-gray-800 bg-gray-900/70 p-4">
               <Text className="text-white text-sm font-semibold mb-3">Participants</Text>
-              <Text className="text-gray-300 text-xs">Actor: {actorName}</Text>
+              <Text className="text-gray-300 text-xs">Requested by: {actorName}</Text>
               {meta.account_name ? (
                 <Text className="text-gray-300 text-xs mt-2">
-                  Beneficiary: {meta.account_name as string}
+                  Paid to: {meta.account_name as string}
                 </Text>
               ) : null}
             </View>

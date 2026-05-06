@@ -565,7 +565,7 @@ export default function Index() {
     circleAccount?.name ?? circleAccount?.title ?? circleAccount?.display_name ?? 'Circle'
   )
   const circleBalanceAmount = useMemo(() => {
-    const cents = Number(circleAccount?.balance_cents ?? NaN)
+    const cents = Number(circleAccount?.treasury_balance_cents ?? circleAccount?.balance_cents ?? NaN)
     if (Number.isFinite(cents)) return cents / 100
     const amount = Number(circleAccount?.balance ?? circleAccount?.amount ?? 0)
     return Number.isFinite(amount) ? amount : 0

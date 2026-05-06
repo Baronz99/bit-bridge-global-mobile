@@ -2,8 +2,48 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { log } from '@/utils/logger'
 
 type AnyFn<T> = () => Promise<T>
+type QueryKey = unknown[]
+type UseFetchOptions = {
+  autoFetch?: boolean
+  queryKey?: QueryKey
+}
 
-const useFetch = <T>(fetchFunction: AnyFn<T>, autoFetch = true) => {
+const querySubscriptions = new Map<string, Set<() => Promise<void>>>()
+
+const normalizeQueryKey = (queryKey?: QueryKey) => {
+  if (!Array.isArray(queryKey)) return []
+  return queryKey
+}
+
+const serializeQueryKey = (queryKey?: QueryKey) => JSON.stringify(normalizeQueryKey(queryKey))
+
+export const invalidateFetchQueries = async (
+  predicate?: (queryKey: QueryKey) => boolean
+) => {
+  const tasks: Promise<void>[] = []
+
+  for (const [key, subscribers] of querySubscriptions.entries()) {
+    let parsed: QueryKey = []
+    try {
+      parsed = JSON.parse(key)
+    } catch {
+      parsed = []
+    }
+    if (predicate && !predicate(parsed)) continue
+    subscribers.forEach((subscriber) => {
+      tasks.push(subscriber().catch(() => undefined))
+    })
+  }
+
+  await Promise.allSettled(tasks)
+}
+
+const useFetch = <T>(fetchFunction: AnyFn<T>, autoFetchOrOptions: boolean | UseFetchOptions = true) => {
+  const autoFetch =
+    typeof autoFetchOrOptions === 'boolean' ? autoFetchOrOptions : autoFetchOrOptions?.autoFetch ?? true
+  const queryKey =
+    typeof autoFetchOrOptions === 'boolean' ? [] : normalizeQueryKey(autoFetchOrOptions?.queryKey)
+  const serializedQueryKey = serializeQueryKey(queryKey)
   const [data, setData] = useState<T | null>(null)
   const [loading, setLoading] = useState<boolean>(autoFetch)
   const [error, setError] = useState<any>(null)
@@ -16,15 +56,10 @@ const useFetch = <T>(fetchFunction: AnyFn<T>, autoFetch = true) => {
   const queuedRefetchRef = useRef(false)
   const runFetchRef = useRef<null | (() => Promise<void>)>(null)
 
-  // Ensure autoFetch runs once per mount (but can be refetched manually)
-  const didAutoFetchRef = useRef(false)
-
   // Track current fetchFunction ref to avoid stale closures
   const fetchFnRef = useRef(fetchFunction)
   useEffect(() => {
     fetchFnRef.current = fetchFunction
-    // if fetch function identity changes (token changed), allow autoFetch again
-    didAutoFetchRef.current = false
   }, [fetchFunction])
 
   useEffect(() => {
@@ -70,9 +105,19 @@ const useFetch = <T>(fetchFunction: AnyFn<T>, autoFetch = true) => {
       })
 
       if (mountedRef.current) {
-        // keep the original error object (axios) so we don't lose url/status
-        err.message = message
-        setError(err)
+        // Keep axios metadata when available, but don't assume `err` is an object.
+        const errorObject: any =
+          err && typeof err === 'object'
+            ? err
+            : { raw: err }
+
+        try {
+          errorObject.message = message
+        } catch {
+          // ignore - extremely defensive; errorObject should always be mutable
+        }
+
+        setError(errorObject)
       }
     } finally {
       inFlightRef.current = false
@@ -91,11 +136,23 @@ const useFetch = <T>(fetchFunction: AnyFn<T>, autoFetch = true) => {
   }, [fetchData])
 
   useEffect(() => {
+    if (!serializedQueryKey || serializedQueryKey === '[]') return
+    const subscribers = querySubscriptions.get(serializedQueryKey) || new Set<() => Promise<void>>()
+    subscribers.add(fetchData)
+    querySubscriptions.set(serializedQueryKey, subscribers)
+
+    return () => {
+      const existing = querySubscriptions.get(serializedQueryKey)
+      if (!existing) return
+      existing.delete(fetchData)
+      if (existing.size === 0) querySubscriptions.delete(serializedQueryKey)
+    }
+  }, [fetchData, serializedQueryKey])
+
+  useEffect(() => {
     if (!autoFetch) return
-    if (didAutoFetchRef.current) return
-    didAutoFetchRef.current = true
-    fetchData()
-  }, [autoFetch, fetchData])
+    void fetchData()
+  }, [autoFetch, fetchData, serializedQueryKey])
 
   const reset = () => {
     setData(null)

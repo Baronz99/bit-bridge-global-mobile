@@ -20,6 +20,12 @@ import { signup as signupApi } from '@/api/auth'
 import { setEmailForVerification } from '@/auth/tokenstore'
 import { clearAppLockPersisted } from '@/services/appLockStorage'
 import { log } from '@/utils/logger'
+import {
+  SECURITY_LOCK_PUBLIC_MESSAGE,
+  SECURITY_LOCK_PUBLIC_TITLE,
+  getSecurityLockSnapshot,
+  mergeSecurityLockIntoProfile,
+} from '@/utils/securityLock'
 
 type LoginPayload = { email: string; password: string }
 
@@ -39,11 +45,15 @@ export type AuthContextValue = {
   refreshToken: string | null
   user: any | null
   authenticated: boolean
+  securityLock: any | null
+  securityLockNotice: { title: string; message: string } | null
 
   login: (payload: LoginPayload) => Promise<any>
   logout: () => Promise<void>
   establishSessionFromTokens: (accessToken: string, refreshToken?: string | null) => Promise<void>
   refreshProfile: (options?: { force?: boolean }) => Promise<any>
+  dismissSecurityLockNotice: () => void
+  setSecurityLockState: (snapshot: any | null) => void
 
   // legacy
   authState: LegacyAuthState
@@ -91,6 +101,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setToken] = useState<string | null>(null)
   const [refreshToken, setRefreshToken] = useState<string | null>(null)
   const [user, setUser] = useState<any | null>(null)
+  const [securityLockNotice, setSecurityLockNotice] = useState<{ title: string; message: string } | null>(null)
 
   const userRef = useRef<any | null>(null)
   const profileLoadedRef = useRef(false)
@@ -100,6 +111,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const authenticated = !!token
   const hasProfile = !!user
+
+  const setSecurityLockState = useCallback((snapshot: any | null) => {
+    setUser((current: any) => {
+      if (!current || typeof current !== 'object') return current
+      const next = mergeSecurityLockIntoProfile(current, snapshot)
+      userRef.current = next
+      return next
+    })
+  }, [])
+
+  const dismissSecurityLockNotice = useCallback(() => {
+    setSecurityLockNotice(null)
+  }, [])
 
   const bootTrace = useCallback(
     (event: string, extra: Record<string, unknown> = {}) => {
@@ -286,6 +310,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       profileFetchInFlightRef.current = false
       setProfileError(null)
       setProfileErrorStatus(null)
+      setSecurityLockNotice(null)
     }
 
     const unsubscribe = authEvents.on('unauthorized', onUnauthorized)
@@ -293,6 +318,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       unsubscribe?.()
     }
   }, [])
+
+  useEffect(() => {
+    const unsubscribe = authEvents.on('security_lock_active', (payload) => {
+      setSecurityLockNotice({
+        title: String(payload?.title || SECURITY_LOCK_PUBLIC_TITLE).trim() || SECURITY_LOCK_PUBLIC_TITLE,
+        message: String(payload?.message || SECURITY_LOCK_PUBLIC_MESSAGE).trim() || SECURITY_LOCK_PUBLIC_MESSAGE,
+      })
+      void refreshProfile({ force: true }).catch(() => {})
+    })
+
+    return () => {
+      unsubscribe?.()
+    }
+  }, [refreshProfile])
 
   useEffect(() => {
     userRef.current = user
@@ -463,11 +502,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       refreshToken,
       user,
       authenticated,
+      securityLock: getSecurityLockSnapshot(user),
+      securityLockNotice,
 
       login,
       logout,
       establishSessionFromTokens,
       refreshProfile,
+      dismissSecurityLockNotice,
+      setSecurityLockState,
 
       authState: legacyAuthState,
       onLogin: login,
@@ -477,7 +520,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       userProfileData: user,
       loadProfile: refreshProfile,
     }
-  }, [loading, token, refreshToken, user, authenticated, login, logout, refreshProfile])
+  }, [loading, token, refreshToken, user, authenticated, securityLockNotice, login, logout, refreshProfile, dismissSecurityLockNotice, setSecurityLockState])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

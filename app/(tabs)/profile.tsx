@@ -58,6 +58,8 @@ const Profile = () => {
     const role = String(userProfileData?.role || userProfileData?.user_profile?.role || '').toLowerCase()
     return role === 'admin' || role === 'super_admin'
   }, [userProfileData])
+  const securityLockActive = Boolean(userProfileData?.security_lock?.active || userProfileData?.security_lock?.security_locked)
+
   const sections = useMemo(() => {
     const data: { title: string; items: RowItem[] }[] = []
 
@@ -140,6 +142,11 @@ const Profile = () => {
           label: 'Change Password',
           href: '/change-password',
           icon: <Feather name="shield" size={18} color="white" />,
+        },
+        {
+          label: 'Security Lock',
+          href: '/settings/security-lock',
+          icon: <Ionicons name="shield-checkmark-outline" size={18} color="white" />,
         },
         ...(FEATURE_TRANSACTION_PIN
           ? [
@@ -236,6 +243,7 @@ const Profile = () => {
     isInternalAdmin,
     FEATURE_TIMELINE,
     FEATURE_TRANSACTION_PIN,
+    securityLockActive,
   ])
 
   return (
@@ -342,4 +350,3 @@ const Profile = () => {
 }
 
 export default Profile
-

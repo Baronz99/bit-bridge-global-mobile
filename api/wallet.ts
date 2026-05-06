@@ -1,4 +1,7 @@
 import client from '@/api/client'
+import { getBusinessWallet } from '@/api/business'
+import { getCircleWorkspace } from '@/api/circles'
+import type { ActiveAccount } from '@/services/useActiveAccount'
 
 export const userWallet = async () => {
   try {
@@ -24,6 +27,37 @@ export const getUserWallet = async () => {
   }
 }
 
+export const getWallet = async (activeAccount: ActiveAccount) => {
+  if (activeAccount?.type === 'business') {
+    const response = await getBusinessWallet(activeAccount.businessId)
+    const payload = response?.data?.data || response?.data || {}
+    const wallet = payload?.wallet || payload
+
+    return {
+      data: {
+        bridge: wallet || null,
+        tunnel: null,
+      },
+      account_context: activeAccount,
+    }
+  }
+
+  if (activeAccount?.type === 'circle') {
+    const circle = await getCircleWorkspace(activeAccount.circleId)
+
+    return {
+      data: {
+        bridge: null,
+        tunnel: null,
+        circle: circle || null,
+      },
+      account_context: activeAccount,
+    }
+  }
+
+  return getUserWallet()
+}
+
 export const activateTunnel = async () => {
   try {
     const response = await client.post('/wallets/tunnel/activate')
@@ -46,13 +80,16 @@ export const quoteTunnelNgnToUsd = async (amountNgn: number) => {
 
 export const convertTunnelNgnToUsd = async (
   amountNgn: number,
-  transactionPin: string,
+  transactionPinOrApprovalToken: string,
   quoteToken?: string
 ) => {
   try {
+    const credential = String(transactionPinOrApprovalToken || '').trim()
     const response = await client.post('/wallets/tunnel/convert', {
       amount_ngn: amountNgn,
-      transaction_pin: transactionPin,
+      ...(credential.length === 4
+        ? { transaction_pin: credential }
+        : { biometric_approval_token: credential }),
       quote_token: quoteToken,
     })
     return response.data
@@ -74,13 +111,16 @@ export const quoteTunnelUsdToNgn = async (amountUsd: number) => {
 
 export const convertTunnelUsdToNgn = async (
   amountUsd: number,
-  transactionPin: string,
+  transactionPinOrApprovalToken: string,
   quoteToken?: string
 ) => {
   try {
+    const credential = String(transactionPinOrApprovalToken || '').trim()
     const response = await client.post('/wallets/tunnel/convert-back', {
       amount_usd: amountUsd,
-      transaction_pin: transactionPin,
+      ...(credential.length === 4
+        ? { transaction_pin: credential }
+        : { biometric_approval_token: credential }),
       quote_token: quoteToken,
     })
     return response.data
@@ -92,7 +132,8 @@ export const convertTunnelUsdToNgn = async (
 export const sendMoneyToUser = async (payload: {
   phone_number: string
   amount: number
-  transaction_pin: string
+  transaction_pin?: string
+  biometric_approval_token?: string
   description?: string
 }) => {
   try {

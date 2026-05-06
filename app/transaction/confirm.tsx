@@ -16,7 +16,7 @@ import { resolveElectricityIdentity } from '@/utils/electricityIdentity'
 const Row = ({ label, value }: { label: string; value?: string | number }) => (
   <View className="flex-row justify-between items-start py-2">
     <Text className="text-slate-400 text-sm">{label}</Text>
-    <Text className="text-slate-200 text-right font-medium">{String(value ?? '—')}</Text>
+    <Text className="text-slate-200 text-right font-medium">{String(value ?? '--')}</Text>
   </View>
 )
 
@@ -364,21 +364,21 @@ export default function TransactionSuccessScreen() {
   // ---- Share helpers ----
   const handleCopyToken = async () => {
     try {
+      const Clipboard = await import('expo-clipboard')
+      await Clipboard.setStringAsync(String((data as any)?.token || ''))
       Alert.alert('Copied', 'Token copied to clipboard.')
     } catch {
       Alert.alert('Copy failed', 'Please try again.')
     }
   }
-
   const handleShare = async () => {
     try {
-      const ref = pickFirst((data as any)?.reference, (data as any)?.id, reference, '—')
+      const ref = pickFirst((data as any)?.reference, (data as any)?.id, reference, '--')
       await Share.share({
         message:
-          `Payment Successful\n` +
           `Amount: ${moneyFormat(Number((data as any)?.amount ?? 0))}\n` +
           `Ref: ${ref}\n` +
-          `Date: ${(data as any)?.created_at ?? '—'}`,
+          `Date: ${(data as any)?.created_at ?? '--'}`,
       })
     } catch {
       /* canceled */
@@ -388,9 +388,9 @@ export default function TransactionSuccessScreen() {
   const handleShareReceipt = async () => {
     try {
       const amount = moneyFormat(Number((data as any)?.total_amount ?? (data as any)?.amount ?? 0))
-      const ref = pickFirst((data as any)?.reference, (data as any)?.id, reference, '—')
+      const ref = pickFirst((data as any)?.reference, (data as any)?.id, reference, '--')
       const status = (data as any)?.status ?? 'pending'
-      const created = (data as any)?.created_at ?? '—'
+      const created = (data as any)?.created_at ?? '--'
       await Share.share({
         message:
           `BitBridge Receipt\n` +
@@ -405,8 +405,8 @@ export default function TransactionSuccessScreen() {
   }
 
   /**
-   * ✅ Clean receipt flow:
-   * Always pass the REAL reference (fbg-/bbg-), never UUID id.
+   * Clean receipt flow:
+   * Always pass the real reference (fbg-/bbg-), never a UUID id.
    */
   const handleViewReceipt = useCallback(() => {
     const finalReceiptRef = String(fallbackReceiptRef || '').trim()
@@ -471,16 +471,16 @@ export default function TransactionSuccessScreen() {
           <Text className="text-gray-400 mt-1">
             {isElectricity((data as any)?.service_type) && isSuccessfulStatus((data as any)?.status)
               ? 'Payment succeeded. Finalizing electricity token...'
-              : 'If this stays pending, please wait a moment — it may be confirming.'}
+              : 'If this stays pending, please wait a moment - it may be confirming.'}
           </Text>
         </View>
       )}
 
       <View className="mx-4 rounded-2xl p-4 bg-slate-900 mb-4">
         <Text className="text-slate-200 font-semibold mb-2">Receipt Summary</Text>
-        <Row label="Service" value={(data as any)?.service_type || '—'} />
-        <Row label="Recipient" value={(data as any)?.meter_number || (data as any)?.phone_number || '—'} />
-        <Row label="Reference" value={pickFirst((data as any)?.reference, (data as any)?.id, reference, '—')} />
+        <Row label="Service" value={(data as any)?.service_type || '--'} />
+        <Row label="Recipient" value={(data as any)?.meter_number || (data as any)?.phone_number || '--'} />
+        <Row label="Reference" value={pickFirst((data as any)?.reference, (data as any)?.id, reference, '--')} />
         <Row label="Status" value={(data as any)?.status ?? 'pending'} />
       </View>
 
@@ -488,7 +488,7 @@ export default function TransactionSuccessScreen() {
         <View className="items-center mb-4">
           <Text className="text-slate-200">Amount</Text>
           <Text className="text-3xl font-extrabold text-slate-100 mt-1">
-            ₦{Number((data as any)?.total_amount ?? 0).toLocaleString()}
+            {moneyFormat(Number((data as any)?.total_amount ?? 0))}
           </Text>
         </View>
 
@@ -532,8 +532,8 @@ export default function TransactionSuccessScreen() {
         {(data as any)?.total_amount && (
           <Row label="Total Debited" value={moneyFormat(Number((data as any)?.total_amount || 0))} />
         )}
-        <Row label="Payment Method" value={(data as any)?.payment_method ?? '—'} />
-        <Row label="Reference" value={pickFirst((data as any)?.reference, (data as any)?.id, reference, '—')} />
+        <Row label="Payment Method" value={(data as any)?.payment_method ?? '--'} />
+        <Row label="Reference" value={pickFirst((data as any)?.reference, (data as any)?.id, reference, '--')} />
         <Row label="Date" value={(data as any)?.created_at} />
 
         {canOpenReceipt ? (
@@ -634,7 +634,7 @@ export default function TransactionSuccessScreen() {
             {(data as any)?.status ? `Status: ${(data as any)?.status}` : 'Processing...'}
           </Text>
           <Text className="text-gray-400 mt-1">
-            Deposits can take a moment to reflect. Please wait — we’ll refresh automatically.
+            Deposits can take a moment to reflect. Please wait - we will refresh automatically.
           </Text>
         </View>
       )}
@@ -643,13 +643,13 @@ export default function TransactionSuccessScreen() {
         <View className="items-center mb-4">
           <Text className="text-gray-400">Amount</Text>
           <Text className="text-3xl font-extrabold text-white mt-1">
-            ₦{Number((data as any)?.amount ?? 0).toLocaleString()}
+            {moneyFormat(Number((data as any)?.amount ?? 0))}
           </Text>
         </View>
 
-        <Row label="Reference" value={pickFirst((data as any)?.reference, (data as any)?.id, reference, '—')} />
+        <Row label="Reference" value={pickFirst((data as any)?.reference, (data as any)?.id, reference, '--')} />
         <Row label="Date" value={(data as any)?.created_at} />
-        <Row label="Payment Method" value={(data as any)?.payment_method ?? '—'} />
+        <Row label="Payment Method" value={(data as any)?.payment_method ?? '--'} />
 
         {canOpenReceipt ? (
           <Pressable

@@ -174,6 +174,12 @@ const CirclesScreen = () => {
       })
       setForm({ name: '', purpose: '', description: '', circle_archetype: LAUNCH_CIRCLE_TYPES[0] })
       setCreateOpen(false)
+      if (created?.id) {
+        router.push({
+          pathname: `/circles/${created.id}/governance`,
+          params: { fromCreate: '1' },
+        } as any)
+      }
     } catch (err: any) {
       const message =
         err?.response?.data?.errors?.join(', ') ||
@@ -350,7 +356,9 @@ const CirclesScreen = () => {
               const title = getCircleTitle(record)
               const description = getCircleDescription(record)
               const purpose = (record.purpose as string) || ''
-              const balanceCents = Number(record.balance_cents || 0)
+              const balanceCents = Number(
+                record.treasury_balance_cents ?? record.balance_cents ?? record.balance ?? 0
+              )
               const balanceVisible = record.balance_visible !== false
               const typeProfile =
                 (record.circle_type_profile as Record<string, unknown> | undefined) || {}
@@ -452,7 +460,7 @@ const CirclesScreen = () => {
                   <View className="flex-row items-center justify-between mt-3">
                     <MemberAvatars initials={memberInitials} size={26} />
                     {ownerEmail ? (
-                      <Text className="text-gray-500 text-[10px]">Owner: {ownerEmail}</Text>
+                      <Text className="text-gray-500 text-[10px]">Creator: {ownerEmail}</Text>
                     ) : null}
                   </View>
                 </TouchableOpacity>

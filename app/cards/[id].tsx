@@ -18,7 +18,7 @@ import {
   getCardDetails,
   getCardFundingStatus,
   getCardHistory,
-  getUserCards,
+  getCards,
   revealCard,
   unfreezeCard,
   unloadCard,
@@ -26,8 +26,10 @@ import {
 import moneyFormat from '@/utils/moneyFormat'
 import FormInput from '@/components/FormInput'
 import TransactionPinModal from '@/components/TransactionPinModal'
+import CompletionPanel from '@/components/finance/CompletionPanel'
 import { getTransactionPinStatus } from '@/api/transactionPin'
 import { useAuth } from '@/services/useAuth'
+import { useActiveAccount } from '@/services/useActiveAccount'
 import { DEBUG_ENABLED } from '@/utils/logger'
 import {
   extractRouteCardId,
@@ -40,6 +42,16 @@ const DEBUG_CARDS = DEBUG_ENABLED
 
 type CardAction = 'fund' | 'unload' | 'reveal'
 type Id = string | number
+
+type CardActionReceipt = {
+  title: string
+  primaryLabel: string
+  primaryValue: string
+  statusLabel: string
+  statusTone: 'success' | 'pending' | 'failed' | 'info'
+  summaryRows: { label: string; value: string; emphasis?: boolean; mono?: boolean }[]
+  reference?: string | null
+}
 
 const safeStr = (v: any, fallback = '') => {
   const s = String(v ?? '').trim()
@@ -197,23 +209,27 @@ const CardDetail = () => {
   const cardsApiId = routeCardId
   const router = useRouter()
   const { userProfileData } = useAuth()
+  const { activeAccount } = useActiveAccount()
 
   // ----------------------------
   // Fetchers
   // ----------------------------
   const fetchDetails = useCallback(() => {
+    if (activeAccount.type === 'business') return Promise.resolve({ data: {} } as any)
     if (!cardsApiId) return Promise.resolve({ data: {} } as any)
     return getCardDetails(cardsApiId)
-  }, [cardsApiId, id, routeCardId])
+  }, [activeAccount.type, cardsApiId, id, routeCardId])
   const fetchBalance = useCallback(() => {
+    if (activeAccount.type === 'business') return Promise.resolve({ data: {} } as any)
     if (!cardsApiId) return Promise.resolve({ data: {} } as any)
     return getCardBalance(cardsApiId)
-  }, [cardsApiId, id, routeCardId])
+  }, [activeAccount.type, cardsApiId, id, routeCardId])
   const fetchHistory = useCallback(() => {
+    if (activeAccount.type === 'business') return Promise.resolve({ data: [] } as any)
     if (!cardsApiId) return Promise.resolve({ data: [] } as any)
     return getCardHistory(cardsApiId)
-  }, [cardsApiId, id, routeCardId])
-  const fetchCardMeta = useCallback(() => getUserCards(), [])
+  }, [activeAccount.type, cardsApiId, id, routeCardId])
+  const fetchCardMeta = useCallback(() => getCards(activeAccount), [activeAccount])
 
   const details = useFetch(fetchDetails)
   const balance = useFetch(fetchBalance)
@@ -362,6 +378,7 @@ const CardDetail = () => {
   // ----------------------------
   const [amount, setAmount] = useState('')
   const [notice, setNotice] = useState<string | null>(null)
+  const [lastActionReceipt, setLastActionReceipt] = useState<CardActionReceipt | null>(null)
   const [pinModalOpen, setPinModalOpen] = useState(false)
   const [pinError, setPinError] = useState<string | null>(null)
   const [action, setAction] = useState<CardAction>('fund')
@@ -384,12 +401,13 @@ const CardDetail = () => {
   const clearTransientMessages = () => {
     setNotice(null)
     setPinError(null)
+    setLastActionReceipt(null)
   }
 
   const recoverFromInvalidCard = useCallback(async () => {
     setRecoveringMissingCard(true)
     try {
-      const raw = await getUserCards()
+      const raw = await getCards(activeAccount)
       const cards = parseUserCardsList(raw)
       if (cards.length === 0) {
         router.replace('/cards/create')
@@ -493,6 +511,21 @@ const CardDetail = () => {
 
             if (fundingState === 'successful') {
               setNotice('Card funded successfully.')
+              setLastActionReceipt({
+                title: 'Card funded',
+                primaryLabel: 'Card balance received',
+                primaryValue: moneyFormat(parseAmount(amount), 'USD'),
+                statusLabel: 'Successful',
+                statusTone: 'success',
+                reference,
+                summaryRows: [
+                  { label: 'Action', value: 'Card funding', emphasis: true },
+                  { label: 'Amount', value: moneyFormat(parseAmount(amount), 'USD') },
+                  { label: 'Card', value: (detailPayload as any)?.card_brand || (detailPayload as any)?.brand || 'Virtual Card' },
+                  { label: 'Reference', value: reference || '--', mono: true },
+                  { label: 'Timestamp', value: new Date().toLocaleString() },
+                ],
+              })
             } else if (fundingState === 'failed') {
               setNotice('Card funding failed. Provider rejected the transaction.')
             } else {
@@ -504,6 +537,19 @@ const CardDetail = () => {
         } else {
           await unloadCard({ card_id: bridgeCardId, amount: parseAmount(amount) })
           setNotice('Card unloaded successfully.')
+          setLastActionReceipt({
+            title: 'Card unloaded',
+            primaryLabel: 'Returned to Tunnel wallet',
+            primaryValue: moneyFormat(parseAmount(amount), 'USD'),
+            statusLabel: 'Successful',
+            statusTone: 'success',
+            summaryRows: [
+              { label: 'Action', value: 'Card unload', emphasis: true },
+              { label: 'Amount', value: moneyFormat(parseAmount(amount), 'USD') },
+              { label: 'Destination', value: 'Tunnel wallet' },
+              { label: 'Timestamp', value: new Date().toLocaleString() },
+            ],
+          })
         }
         setAmount('')
         await Promise.allSettled([balance.refetch(), history.refetch(), details.refetch(), cardMetaFetch.refetch()])
@@ -872,6 +918,26 @@ const CardDetail = () => {
             </View>
           </View>
         </View>
+
+        {lastActionReceipt ? (
+          <View className="mt-4">
+            <CompletionPanel
+              eyebrow="Card action"
+              title={lastActionReceipt.title}
+              supportingText="Final card action details are confirmed below."
+              primaryLabel={lastActionReceipt.primaryLabel}
+              primaryValue={lastActionReceipt.primaryValue}
+              statusLabel={lastActionReceipt.statusLabel}
+              statusTone={lastActionReceipt.statusTone}
+              summaryTitle="Action receipt"
+              summaryRows={lastActionReceipt.summaryRows}
+              primaryActionLabel="Done"
+              onPrimaryAction={() => setLastActionReceipt(null)}
+              secondaryActionLabel="Dismiss"
+              onSecondaryAction={() => setLastActionReceipt(null)}
+            />
+          </View>
+        ) : null}
 
         <View className="bg-gray-900 border border-gray-800 rounded-2xl p-4 mt-4">
           <Text className="text-white font-semibold">Available Balance</Text>

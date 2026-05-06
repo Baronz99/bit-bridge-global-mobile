@@ -6,24 +6,45 @@ import SearchablePicker from '@/components/bankTransfer/SearchablePicker'
 import BankPickerSheet from '@/components/bankTransfer/BankPickerSheet'
 import RecipientVerificationState from '@/components/bankTransfer/RecipientVerificationState'
 import TierGateCard from '@/components/bankTransfer/TierGateCard'
-import { getBanks, getBeneficiaries, resolveAccountName } from '@/api/account'
-import { getUserWallet } from '@/api/wallet'
+import TransactionPinModal from '@/components/TransactionPinModal'
+import ReviewSummaryCard from '@/components/bankTransfer/ReviewSummaryCard'
+import { createCounterParty, getBanks, getBeneficiaries, initiateFundTransfer, resolveAccountName } from '@/api/account'
+import { getWallet } from '@/api/wallet'
 import { getTodayTransferSpent, getTransferQuoteSnapshot } from '@/services/bankTransfer'
 import { useAuth } from '@/services/useAuth'
+import { useActiveAccount } from '@/services/useActiveAccount'
+import { resolveTransactionBiometricUserId, useTransactionBiometrics } from '@/services/useTransactionBiometrics'
+import { buildApiErrorMessage } from '@/utils/apiErrorMessage'
+import { log, warn } from '@/utils/logger'
 import {
   BANK_TRANSFER_TIER_REQUIREMENT_COPY,
+  buildPinLockoutMessage,
   buildTransferReference,
   computeDailyRemainingAfterTransfer,
   formatNaira,
   getTierDailyLimit,
   getTierFromProfile,
+  isLikelyNetworkTimeout,
   isTierEligibleForBankTransfer,
   parseAmountInput,
   validateTransferAmount,
 } from '@/utils/bankTransfer'
-import { buildApiErrorMessage } from '@/utils/apiErrorMessage'
+import { resolveTransferLifecycle } from '@/utils/transferLifecycle'
 
 type NoticeState = { message: string | null; error: boolean; data: any | null }
+type ProcessingStage =
+  | null
+  | {
+      badge: string
+      title: string
+      message: string
+    }
+type EnrollmentSummary = {
+  status: 'not_attempted' | 'eligible_not_enabled' | 'enabling' | 'enabled' | 'skipped' | 'failed'
+  reason?: string
+  message?: string
+  code?: string
+}
 
 type TransferDraft = {
   bank_code: string
@@ -53,6 +74,7 @@ type TransferDraft = {
 const QUICK_AMOUNTS = [5000, 10000, 20000, 50000]
 const MIN_TRANSFER_AMOUNT = 150
 const FORCE_REFRESH_RETRY_DELAY_MS = 1700
+const DEFAULT_TRANSFER_DESCRIPTION = 'Fund Transfer'
 
 const sanitizeDigits = (value: string) => String(value || '').replace(/\D/g, '')
 
@@ -72,6 +94,10 @@ const extractCounterPartyId = (payload: any): string => {
 const BankTransferScreen = () => {
   const router = useRouter()
   const { userProfileData, loadProfile } = useAuth()
+  const profilePayload = (userProfileData?.data ?? userProfileData) as any
+  const transactionBiometrics = useTransactionBiometrics(resolveTransactionBiometricUserId(profilePayload))
+  const { activeAccount } = useActiveAccount()
+  const isCircleAccount = activeAccount?.type === 'circle'
   const scrollRef = useRef<ScrollView | null>(null)
   const accountNumberRef = useRef<TextInput | null>(null)
   const amountRef = useRef<TextInput | null>(null)
@@ -79,8 +105,16 @@ const BankTransferScreen = () => {
   const quoteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastLookupKeyRef = useRef('')
   const lastQuoteAmountRef = useRef<number | null>(null)
+  const transferReferenceRef = useRef<string>(buildTransferReference())
 
   const [loading, setLoading] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [pinModalOpen, setPinModalOpen] = useState(false)
+  const [pinError, setPinError] = useState<string | null>(null)
+  const [lastEnteredPin, setLastEnteredPin] = useState<string | null>(null)
+  const [showRetrySubmit, setShowRetrySubmit] = useState(false)
+  const [showUpgradeCta, setShowUpgradeCta] = useState(false)
+  const [processingStage, setProcessingStage] = useState<ProcessingStage>(null)
   const [notice, setNotice] = useState<NoticeState>({ message: null, error: false, data: null })
   const [banks, setBanks] = useState<any[]>([])
   const [beneficiaries, setBeneficiaries] = useState<any[]>([])
@@ -157,6 +191,7 @@ const BankTransferScreen = () => {
   })
 
   const narrationValue = formData.description.trim()
+  const resolvedNarration = narrationValue || DEFAULT_TRANSFER_DESCRIPTION
   const dailyRemainingAfterTransfer = computeDailyRemainingAfterTransfer({
     dailyLimitRemaining,
     totalDebit: amountValidation.totalDebit,
@@ -174,14 +209,47 @@ const BankTransferScreen = () => {
     effectiveTierEligible &&
     !!formData.bank_code &&
     sanitizeDigits(formData.account_number).length === 10 &&
-    narrationValue.length > 0 &&
     accountLookupStatus === 'success' &&
     amountValidation.valid
-  const canContinueRecipient =
-    effectiveTierEligible &&
-    !!formData.bank_code &&
-    sanitizeDigits(formData.account_number).length === 10 &&
-    accountLookupStatus === 'success'
+  const draft = useMemo<TransferDraft>(() => ({
+    bank_code: formData.bank_code,
+    bank_name: selectedBankLabel || formData.bank_name,
+    account_number: sanitizeDigits(formData.account_number),
+    account_name: formData.account_name,
+    amount: amountValue,
+    fee,
+    fee_breakdown: quotedFeeBreakdown || undefined,
+    fee_estimated: feeEstimated,
+    total_debit: amountValidation.totalDebit,
+    inter_bank: formData.inter_bank,
+    counter_party_id: formData.counter_party_id || undefined,
+    beneficiary_id: selectedBeneficiary || undefined,
+    save_beneficiary: saveBeneficiary,
+    description: resolvedNarration,
+    daily_limit: dailyLimit,
+    today_spent: effectiveTodaySpent,
+    daily_remaining_before: dailyLimitRemaining,
+    transfer_reference: transferReferenceRef.current,
+  }), [
+    amountValidation.totalDebit,
+    amountValue,
+    dailyLimit,
+    dailyLimitRemaining,
+    effectiveTodaySpent,
+    fee,
+    feeEstimated,
+    formData.account_name,
+    formData.account_number,
+    formData.bank_code,
+    formData.bank_name,
+    formData.counter_party_id,
+    formData.inter_bank,
+    quotedFeeBreakdown,
+    resolvedNarration,
+    saveBeneficiary,
+    selectedBankLabel,
+    selectedBeneficiary,
+  ])
 
   useEffect(() => {
     let mounted = true
@@ -223,7 +291,7 @@ const BankTransferScreen = () => {
         const [bankList, beneficiaryList, walletResult, todaySpentResult] = await Promise.all([
           getBanks(),
           getBeneficiaries().catch(() => []),
-          getUserWallet().catch(() => ({})),
+          getWallet(activeAccount).catch(() => ({})),
           getTodayTransferSpent().catch(() => 0),
         ])
         setBanks(Array.isArray(bankList) ? bankList : [])
@@ -272,7 +340,7 @@ const BankTransferScreen = () => {
       }
     }
     loadData()
-  }, [userProfileData?.wallet?.balance])
+  }, [activeAccount, userProfileData?.wallet?.balance])
 
   useEffect(() => {
     const quoteAmount = amountValue > 0 ? amountValue : MIN_TRANSFER_AMOUNT
@@ -356,37 +424,254 @@ const BankTransferScreen = () => {
     }
   }, [formData.bank_code, formData.account_number, canResolve])
 
-  const handleContinue = () => {
-    if (!canContinue) return
-    const draft: TransferDraft = {
-      bank_code: formData.bank_code,
-      bank_name: selectedBankLabel || formData.bank_name,
-      account_number: sanitizeDigits(formData.account_number),
-      account_name: formData.account_name,
-      amount: amountValue,
-      fee,
-      fee_breakdown: quotedFeeBreakdown || undefined,
-      fee_estimated: feeEstimated,
-      total_debit: amountValidation.totalDebit,
-      inter_bank: formData.inter_bank,
-      counter_party_id: formData.counter_party_id || undefined,
-      beneficiary_id: selectedBeneficiary || undefined,
-      save_beneficiary: saveBeneficiary,
-      description: narrationValue,
-      daily_limit: dailyLimit,
-      today_spent: effectiveTodaySpent,
-      daily_remaining_before: dailyLimitRemaining,
-      transfer_reference: buildTransferReference(),
-    }
-    router.push({
-      pathname: '/bank-transfer/review',
-      params: { draft: JSON.stringify(draft) },
+  const resolveInterBankCounterPartyId = async (payload: TransferDraft): Promise<string> => {
+    const existing = String(payload?.counter_party_id || '').trim()
+    if (existing) return existing
+
+    const resolved = await resolveAccountName({
+      account: {
+        account_number: payload.account_number,
+        bank_code: payload.bank_code,
+      },
     })
+    const resolvedName = String(resolved?.account_name || '').trim()
+    const resolvedCounterPartyId = extractCounterPartyId(resolved)
+    if (resolvedCounterPartyId) return resolvedCounterPartyId
+
+    const created = await createCounterParty({
+      account: {
+        bank_code: payload.bank_code,
+        account_number: payload.account_number,
+        account_name: resolvedName || payload.account_name,
+      },
+    })
+    return extractCounterPartyId(created)
   }
 
-  const handleRecipientContinue = () => {
-    if (!canContinueRecipient) return
+  const submitTransfer = async (credential: {
+    pin?: string
+    biometric_approval_token?: string
+  }) => {
+    if (!effectiveTierEligible) {
+      setNotice({ message: 'Bank transfer is available from Tier 2.', error: true, data: null })
+      return
+    }
+    if (!canContinue) {
+      setNotice({ message: 'Complete the transfer details and wait for recipient verification before confirming.', error: true, data: null })
+      return
+    }
+    if (submitting) return
+
+    const stage: ProcessingStage = credential.biometric_approval_token
+      ? {
+          badge: 'Face ID / Fingerprint confirmed',
+          title: 'Submitting transfer',
+          message: 'Your biometric confirmation was approved. Sending this transfer securely now.',
+        }
+      : {
+          badge: 'PIN confirmed',
+          title: 'Authorizing transfer',
+          message: 'Your transaction PIN was received. Submitting this transfer securely now.',
+        }
+
+    setSubmitting(true)
+    setProcessingStage(stage)
+    setNotice({ message: null, error: false, data: null })
+    setPinError(null)
+    setShowRetrySubmit(false)
+    setShowUpgradeCta(false)
+    setLastEnteredPin(credential.pin || null)
+
+    const transferReference = transferReferenceRef.current
+    let navigated = false
+    try {
+      const counterPartyId = draft.inter_bank
+        ? await resolveInterBankCounterPartyId(draft)
+        : String(draft.counter_party_id || '').trim()
+      if (draft.inter_bank && !counterPartyId) {
+        throw new Error('Inter-bank transfer requires a resolved beneficiary.')
+      }
+
+      const response = await initiateFundTransfer({
+        account: {
+          account_number: draft.account_number,
+          bank_code: draft.bank_code,
+          bank: draft.bank_name,
+          account_name: draft.account_name,
+          amount: Number(draft.amount || 0),
+          inter_bank: !!draft.inter_bank,
+          ...(credential.pin ? { pin: credential.pin } : {}),
+          ...(credential.biometric_approval_token
+            ? { biometric_approval_token: credential.biometric_approval_token }
+            : {}),
+          transfer_reference: transferReference,
+          description: String(draft.description || DEFAULT_TRANSFER_DESCRIPTION).trim() || DEFAULT_TRANSFER_DESCRIPTION,
+          counter_party_id: counterPartyId || undefined,
+          save_beneficiary: draft.save_beneficiary ? true : undefined,
+        },
+      })
+
+      const responseData =
+        ((response as any)?.data && typeof (response as any).data === 'object' ? (response as any).data : null) ||
+        (response && typeof response === 'object' ? response : {})
+      const backendFee = Number(
+        responseData?.fee ??
+          responseData?.fees ??
+          responseData?.transfer_fee ??
+          responseData?.charges ??
+          responseData?.fee_breakdown?.total_fee ??
+          draft.fee ??
+          0
+      )
+      const backendFeeBreakdown = responseData?.fee_breakdown || draft.fee_breakdown || {}
+      const backendTotalDebit = Number(
+        responseData?.total_debit ??
+          responseData?.amount_debited ??
+          responseData?.wallet_amount_charged ??
+          draft.total_debit ??
+          Number(draft.amount || 0) + backendFee
+      )
+      const nextDailyRemaining = computeDailyRemainingAfterTransfer({
+        dailyLimitRemaining: Number(draft.daily_remaining_before || 0),
+        totalDebit: backendTotalDebit,
+      })
+      const lifecycle = resolveTransferLifecycle({
+        lifecycle_state: responseData?.lifecycle_state,
+        status: responseData?.status,
+        display_message: responseData?.display_message || responseData?.message || (response as any)?.message,
+      })
+      let enrollmentSummary: EnrollmentSummary = { status: 'not_attempted' }
+
+      setPinModalOpen(false)
+      if (credential.pin) {
+        log('[BANK_TRANSFER][BIOMETRIC] enrollment:begin_after_success', {
+          transferReference,
+        })
+        const enrollmentResult = await transactionBiometrics.prepareEnrollmentAfterPinSuccess(credential.pin)
+        enrollmentSummary = {
+          status: enrollmentResult.state,
+          code: enrollmentResult.code || '',
+          message: enrollmentResult.message || '',
+        }
+        log('[BANK_TRANSFER][BIOMETRIC] enrollment:completed_after_success', {
+          transferReference,
+          status: enrollmentResult.state,
+          code: enrollmentResult.code || null,
+        })
+      } else {
+        warn('[BANK_TRANSFER][BIOMETRIC] enrollment:not_attempted_after_success', {
+          transferReference,
+          reason: 'pin_not_used_for_this_submission',
+        })
+      }
+
+      log('[BANK_TRANSFER][BIOMETRIC] navigation_to_success', {
+        transferReference,
+        enrollmentStatus: enrollmentSummary.status,
+        enrollmentReason: enrollmentSummary.reason || null,
+      })
+      navigated = true
+      setFlowStep(1)
+      transferReferenceRef.current = buildTransferReference()
+      router.replace({
+        pathname: '/bank-transfer/success',
+        params: {
+          summary: JSON.stringify({
+            ...draft,
+            fee: backendFee,
+            fee_breakdown: backendFeeBreakdown,
+            total_debit: backendTotalDebit,
+            transfer_reference: transferReference,
+            transfer_id:
+              responseData?.transfer_id ||
+              responseData?.id ||
+              (response as any)?.transfer_id ||
+              (response as any)?.id ||
+              '',
+            daily_remaining_after: nextDailyRemaining,
+            lifecycle_state: lifecycle.state,
+            status: responseData?.status || lifecycle.state,
+            display_message: lifecycle.message,
+            biometric_enrollment_status: enrollmentSummary.status,
+            biometric_enrollment_reason: enrollmentSummary.reason || '',
+            biometric_enrollment_message: enrollmentSummary.message || '',
+            biometric_enrollment_code: enrollmentSummary.code || '',
+          }),
+        },
+      })
+    } catch (error: any) {
+      const status = error?.response?.status || error?.status
+      const responseData = error?.response?.data || {}
+      if (isLikelyNetworkTimeout(error)) {
+        const timeoutMessage =
+          'Network timeout. Retry safely. If charged, this transfer will appear in timeline.'
+        setPinError(timeoutMessage)
+        setNotice({ message: timeoutMessage, error: true, data: null })
+        setShowRetrySubmit(true)
+        return
+      }
+      const messageBase = buildApiErrorMessage({
+        status,
+        data: responseData,
+        fallback: error?.message || 'Transfer failed',
+      })
+
+      const attemptsRemaining =
+        typeof error?.attempts_remaining === 'number'
+          ? error.attempts_remaining
+          : responseData?.attempts_remaining
+      const retryAfterSeconds =
+        typeof error?.retry_after_seconds === 'number'
+          ? error?.retry_after_seconds
+          : responseData?.retry_after_seconds
+
+      const message = buildPinLockoutMessage({
+        baseMessage: messageBase,
+        attemptsRemaining,
+        retryAfterSeconds,
+      })
+
+      const messageLower = String(message).toLowerCase()
+      if (status === 403 && messageLower.includes('set transaction pin')) {
+        setPinModalOpen(false)
+        router.push('/settings/pin/set')
+        return
+      }
+      if (status === 401) {
+        return
+      }
+      if (messageLower.includes('tier') || messageLower.includes('kyc')) {
+        setShowUpgradeCta(true)
+      }
+
+      setPinError(message)
+      setNotice({ message, error: true, data: null })
+      setProcessingStage(null)
+    } finally {
+      setSubmitting(false)
+      if (!navigated) {
+        setProcessingStage(null)
+      }
+    }
+  }
+
+  const handleContinue = () => {
+    if (!canContinue) return
     setFlowStep(2)
+  }
+
+  const handleSubmit = async (transactionPin: string) =>
+    submitTransfer({ pin: transactionPin })
+
+  const handleBiometricSubmit = async () => {
+    try {
+      const approvalToken = await transactionBiometrics.getApprovalToken()
+      await submitTransfer({ biometric_approval_token: approvalToken })
+    } catch (error: any) {
+      const message = error?.message || 'Biometric confirmation failed. Use your transaction PIN.'
+      setPinError(message)
+      setNotice({ message, error: true, data: null })
+    }
   }
 
   const focusField = (ref: React.RefObject<TextInput | null>, y: number) => {
@@ -400,6 +685,35 @@ const BankTransferScreen = () => {
     return (
       <View className="flex-1 bg-primary items-center justify-center">
         <ActivityIndicator />
+      </View>
+    )
+  }
+
+  if (isCircleAccount) {
+    return (
+      <View className="flex-1 bg-primary px-4">
+        <View className="pt-10">
+          <View className="bg-gray-900 border border-emerald-500/30 rounded-2xl p-5">
+            <Text className="text-white text-xl font-semibold">Bank transfer is unavailable in circle context</Text>
+            <Text className="text-gray-300 text-sm mt-3">
+              Bank transfer is still a wallet feature for personal and business accounts. Use the current circle account for contributions, dues, and activity.
+            </Text>
+
+            <TouchableOpacity
+              onPress={() => router.replace(`/circles/${activeAccount.circleId}` as any)}
+              className="bg-app-primary py-4 rounded-xl mt-5"
+            >
+              <Text className="text-alt font-semibold text-center">Open circle</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => router.push(`/circles/${activeAccount.circleId}/pay` as any)}
+              className="border border-gray-700 py-4 rounded-xl mt-3"
+            >
+              <Text className="text-white font-semibold text-center">Contribute to circle</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
     )
   }
@@ -431,38 +745,37 @@ const BankTransferScreen = () => {
           <View className="pt-10">
             <Text className="text-white text-xl font-semibold">Transfer setup</Text>
             <Text className="text-gray-400 text-xs mt-1 mb-4">
-              {flowStep === 1 ? 'Step 1 of 3: Recipient details' : 'Step 2 of 3: Amount and narration'}
+              {flowStep === 1 ? 'Step 1 of 2: Transfer details' : 'Step 2 of 2: Confirm details'}
             </Text>
             <View className="flex-row items-center mb-4">
-            {[
-              { id: 1, label: 'Recipient' },
-              { id: 2, label: 'Details' },
-              { id: 3, label: 'Review' },
-            ].map((item, index, arr) => {
-              const completed = flowStep > item.id
-              const current = flowStep === item.id
-              return (
-                <View key={item.label} className={`flex-1 ${index === arr.length - 1 ? '' : 'mr-2'}`}>
-                  <View
-                    className={`rounded-lg border px-2 py-2 ${
-                      current
-                        ? 'border-app-primary bg-app-primary/15'
-                        : completed
-                        ? 'border-emerald-600/50 bg-emerald-900/15'
-                        : 'border-gray-800 bg-gray-900'
-                    }`}
-                  >
-                    <Text
-                      className={`text-[11px] text-center font-semibold ${
-                        current ? 'text-app-primary' : completed ? 'text-emerald-300' : 'text-gray-500'
+              {[
+                { id: 1, label: 'Details' },
+                { id: 2, label: 'Review' },
+              ].map((item, index, arr) => {
+                const completed = flowStep > item.id
+                const current = flowStep === item.id
+                return (
+                  <View key={item.label} className={`flex-1 ${index === arr.length - 1 ? '' : 'mr-2'}`}>
+                    <View
+                      className={`rounded-lg border px-2 py-2 ${
+                        current
+                          ? 'border-app-primary bg-app-primary/15'
+                          : completed
+                          ? 'border-emerald-600/50 bg-emerald-900/15'
+                          : 'border-gray-800 bg-gray-900'
                       }`}
                     >
-                      {item.id}. {item.label}
-                    </Text>
+                      <Text
+                        className={`text-[11px] text-center font-semibold ${
+                          current ? 'text-app-primary' : completed ? 'text-emerald-300' : 'text-gray-500'
+                        }`}
+                      >
+                        {item.id}. {item.label}
+                      </Text>
+                    </View>
                   </View>
-                </View>
-              )
-            })}
+                )
+              })}
             </View>
 
             <NotificationAlert message={notice.message} error={notice.error} data={notice.data} />
@@ -479,275 +792,347 @@ const BankTransferScreen = () => {
               </Text>
             </View>
 
-            {flowStep === 1 && (
-              <View className="bg-gray-900 border border-gray-800 rounded-2xl p-4 mb-4">
-                <View className="flex-row items-center justify-between mb-3">
-                  <View>
-                    <Text className="text-white text-base font-semibold">Recipient</Text>
-                    <Text className="text-gray-500 text-xs mt-1">Enter account details and verify recipient.</Text>
+            {flowStep === 1 ? (
+              <>
+                <View className="bg-gray-900 border border-gray-800 rounded-2xl p-4 mb-4">
+                  <View className="flex-row items-center justify-between mb-3">
+                    <View>
+                      <Text className="text-white text-base font-semibold">Recipient</Text>
+                      <Text className="text-gray-500 text-xs mt-1">Enter account details and verify recipient.</Text>
+                    </View>
+                    {beneficiaryLocked ? (
+                      <TouchableOpacity
+                        onPress={() => {
+                          setSelectedBeneficiary('')
+                          setFormData((prev) => ({ ...prev, counter_party_id: '', beneficiary_name: '' }))
+                          setAccountLookupStatus('idle')
+                        }}
+                      >
+                        <Text className="text-app-primary text-xs">Edit</Text>
+                      </TouchableOpacity>
+                    ) : null}
                   </View>
-                  {beneficiaryLocked ? (
-                    <TouchableOpacity
-                      onPress={() => {
-                        setSelectedBeneficiary('')
-                        setFormData((prev) => ({ ...prev, counter_party_id: '', beneficiary_name: '' }))
-                        setAccountLookupStatus('idle')
-                      }}
-                    >
-                      <Text className="text-app-primary text-xs">Edit</Text>
-                    </TouchableOpacity>
-                  ) : null}
-                </View>
 
-            <Text className="text-white mb-2">Account Number</Text>
-            <TextInput
-              ref={accountNumberRef}
-              value={formData.account_number}
-              onChangeText={(text) => {
-                const next = sanitizeDigits(text).slice(0, 10)
-                setFormData((prev) => ({
-                  ...prev,
-                  account_number: next,
-                  beneficiary_name: '',
-                  account_name: '',
-                  counter_party_id: '',
-                }))
-                setAccountLookupStatus('idle')
-                setAccountLookupError(null)
-                lastLookupKeyRef.current = ''
-              }}
-              keyboardType="numeric"
-              maxLength={10}
-              editable={!beneficiaryLocked}
-              placeholder="Enter or paste 10-digit account number"
-              placeholderTextColor="gray"
-              onFocus={() => scrollRef.current?.scrollTo({ y: 240, animated: true })}
-              className={`${beneficiaryLocked ? 'bg-gray-900' : 'bg-gray-950'} border border-gray-800 rounded-xl px-4 py-4 text-white`}
-            />
-            <Text className="text-gray-500 text-[11px] mt-2">
-              Enter account number, choose bank, then we verify recipient before you continue.
-            </Text>
-
-            <View className="mt-4">
-              <BankPickerSheet
-                selectedValue={formData.bank_code}
-                options={bankOptions}
-                recentValues={recentBankCodes}
-                disabled={beneficiaryLocked}
-                onSelect={(option) => {
-                  setFormData((prev) => ({
-                    ...prev,
-                    bank_code: option.value,
-                    bank_name: option.label,
-                    account_name: '',
-                    counter_party_id: '',
-                  }))
-                  setRecentBankCodes((prev) => [option.value, ...prev.filter((item) => item !== option.value)].slice(0, 6))
-                  setAccountLookupStatus('idle')
-                  setAccountLookupError(null)
-                  lastLookupKeyRef.current = ''
-                  focusField(accountNumberRef, 240)
-                }}
-              />
-            </View>
-
-            <View className="mt-4 border border-gray-800 rounded-xl bg-gray-950/40">
-              <TouchableOpacity
-                onPress={() => setShowBeneficiaryPicker((prev) => !prev)}
-                className="flex-row items-center justify-between px-4 py-3"
-              >
-                <View>
-                  <Text className="text-white text-sm font-semibold">Use saved beneficiary (optional)</Text>
-                  <Text className="text-gray-500 text-[11px] mt-1">
-                    Quick-fill recipient details from your saved list.
-                  </Text>
-                </View>
-                <Text className="text-gray-400 text-lg">{showBeneficiaryPicker ? '−' : '+'}</Text>
-              </TouchableOpacity>
-              {showBeneficiaryPicker ? (
-                <View className="px-4 pb-4">
-                  <SearchablePicker
-                    label="Saved beneficiary"
-                    selectedValue={selectedBeneficiary}
-                    options={beneficiaryOptions}
-                    placeholder="Select beneficiary"
-                    onSelect={(option) => {
-                      const data = option.data || {}
-                      const bankCode = String(data?.bank_code || data?.bankCode || '').trim()
-                      const bankName = String(data?.bank_name || data?.bankName || data?.bank || '').trim()
-                      const accountNumber = sanitizeDigits(String(data?.account_number || data?.accountNumber || '')).slice(0, 10)
-                      const beneficiaryName = String(data?.account_name || data?.beneficiary_name || data?.name || '').trim()
-                      const selectedValue = String(
-                        option.value ||
-                          data?.id ||
-                          data?.beneficiary_id ||
-                          data?.counter_party_id ||
-                          `${bankCode}:${accountNumber}`
-                      )
-                      setSelectedBeneficiary(selectedValue)
+                  <Text className="text-white mb-2">Account Number</Text>
+                  <TextInput
+                    ref={accountNumberRef}
+                    value={formData.account_number}
+                    onChangeText={(text) => {
+                      const next = sanitizeDigits(text).slice(0, 10)
                       setFormData((prev) => ({
                         ...prev,
-                        bank_code: bankCode || prev.bank_code,
-                        bank_name: bankName || prev.bank_name,
-                        account_number: accountNumber || prev.account_number,
-                        account_name: beneficiaryName || '',
-                        beneficiary_name: beneficiaryName || '',
-                        counter_party_id: extractCounterPartyId(data),
+                        account_number: next,
+                        beneficiary_name: '',
+                        account_name: '',
+                        counter_party_id: '',
                       }))
-                      if (bankCode) {
-                        setRecentBankCodes((prev) => [bankCode, ...prev.filter((item) => item !== bankCode)].slice(0, 6))
-                      }
                       setAccountLookupStatus('idle')
                       setAccountLookupError(null)
                       lastLookupKeyRef.current = ''
                     }}
-                  />
-                </View>
-              ) : null}
-            </View>
-
-            {accountLookupStatus === 'loading' ? (
-              <Text className="text-gray-400 text-xs mt-2">Verifying recipient...</Text>
-            ) : null}
-            {accountLookupStatus === 'error' ? (
-              <View className="flex-row items-center justify-between mt-2">
-                <Text className="text-red-300 text-xs flex-1 pr-3">
-                  Verification failed. Confirm bank and account, then retry.
-                </Text>
-                <TouchableOpacity onPress={() => runResolveAccount(true)}>
-                  <Text className="text-app-primary text-xs">Retry</Text>
-                </TouchableOpacity>
-              </View>
-            ) : null}
-
-            <RecipientVerificationState
-              status={accountLookupStatus}
-              accountName={formData.account_name}
-              bankName={selectedBankLabel}
-              accountNumber={formData.account_number}
-              error={accountLookupError}
-            />
-
-            <View className="flex-row items-center justify-between mt-4">
-              <Text className="text-white text-sm">Save beneficiary</Text>
-              <Switch value={saveBeneficiary} onValueChange={setSaveBeneficiary} />
-            </View>
-              </View>
-            )}
-
-            {flowStep === 2 && (
-              <View className="bg-gray-900 border border-gray-800 rounded-2xl p-4 mb-4">
-                <Text className="text-white text-base font-semibold mb-3">Recipient summary</Text>
-                <View className="bg-gray-950 border border-gray-800 rounded-xl p-3 mb-4">
-                  <Text className="text-gray-400 text-xs">Bank</Text>
-                  <Text className="text-white text-sm mt-1">{selectedBankLabel || '-'}</Text>
-                  <Text className="text-gray-400 text-xs mt-3">Account number</Text>
-                  <Text className="text-white text-sm mt-1">{formData.account_number || '-'}</Text>
-                  <Text className="text-gray-400 text-xs mt-3">Account name</Text>
-                  <Text className="text-white text-sm mt-1">{formData.account_name || '-'}</Text>
-                </View>
-                <Text className="text-white text-base font-semibold mb-3">Amount</Text>
-                <Text className="text-white mb-2">Amount (NGN)</Text>
-                <View className="flex-row items-center border border-gray-800 rounded-xl bg-gray-950 px-4">
-                  <Text className="text-gray-300 mr-2">N</Text>
-                  <TextInput
-                    ref={amountRef}
-                    value={formData.amount}
-                    onChangeText={(text) => setFormData((prev) => ({ ...prev, amount: text.replace(/[^0-9.]/g, '') }))}
                     keyboardType="numeric"
-                    placeholder="0.00"
+                    maxLength={10}
+                    editable={!beneficiaryLocked}
+                    placeholder="Enter or paste 10-digit account number"
                     placeholderTextColor="gray"
-                    onFocus={() => scrollRef.current?.scrollTo({ y: 520, animated: true })}
-                    className="flex-1 py-4 text-white"
+                    onFocus={() => scrollRef.current?.scrollTo({ y: 240, animated: true })}
+                    className={`${beneficiaryLocked ? 'bg-gray-900' : 'bg-gray-950'} border border-gray-800 rounded-xl px-4 py-4 text-white`}
                   />
-                </View>
-
-            <View className="flex-row flex-wrap mt-3 gap-2">
-              {QUICK_AMOUNTS.map((quick) => (
-                <TouchableOpacity
-                  key={`quick-${quick}`}
-                  onPress={() => setFormData((prev) => ({ ...prev, amount: String(quick) }))}
-                  className="bg-gray-950 border border-gray-800 rounded-full px-3 py-2"
-                >
-                  <Text className="text-white text-xs">{formatNaira(quick)}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {!amountValidation.valid && formData.amount ? (
-              <Text className="text-red-300 text-xs mt-3">{amountValidation.message}</Text>
-            ) : null}
-
-            {quoteVisible ? (
-              <View className="mt-4 bg-gray-950 border border-gray-800 rounded-xl p-3">
-                <View className="flex-row items-center justify-between">
-                  <Text className="text-gray-400 text-xs">
-                    Fee ({feeEstimated ? 'Estimated' : 'Confirmed'})
+                  <Text className="text-gray-500 text-[11px] mt-2">
+                    Enter account number, choose bank, then we verify recipient before you continue.
                   </Text>
-                  <Text className="text-white text-xs">{formatNaira(fee)}</Text>
+
+                  <View className="mt-4">
+                    <BankPickerSheet
+                      selectedValue={formData.bank_code}
+                      options={bankOptions}
+                      recentValues={recentBankCodes}
+                      disabled={beneficiaryLocked}
+                      onSelect={(option) => {
+                        setFormData((prev) => ({
+                          ...prev,
+                          bank_code: option.value,
+                          bank_name: option.label,
+                          account_name: '',
+                          counter_party_id: '',
+                        }))
+                        setRecentBankCodes((prev) => [option.value, ...prev.filter((item) => item !== option.value)].slice(0, 6))
+                        setAccountLookupStatus('idle')
+                        setAccountLookupError(null)
+                        lastLookupKeyRef.current = ''
+                        focusField(accountNumberRef, 240)
+                      }}
+                    />
+                  </View>
+
+                  <View className="mt-4 border border-gray-800 rounded-xl bg-gray-950/40">
+                    <TouchableOpacity
+                      onPress={() => setShowBeneficiaryPicker((prev) => !prev)}
+                      className="flex-row items-center justify-between px-4 py-3"
+                    >
+                      <View>
+                        <Text className="text-white text-sm font-semibold">Use saved beneficiary (optional)</Text>
+                        <Text className="text-gray-500 text-[11px] mt-1">
+                          Quick-fill recipient details from your saved list.
+                        </Text>
+                      </View>
+                      <Text className="text-gray-400 text-lg">{showBeneficiaryPicker ? '-' : '+'}</Text>
+                    </TouchableOpacity>
+                    {showBeneficiaryPicker ? (
+                      <View className="px-4 pb-4">
+                        <SearchablePicker
+                          label="Saved beneficiary"
+                          selectedValue={selectedBeneficiary}
+                          options={beneficiaryOptions}
+                          placeholder="Select beneficiary"
+                          onSelect={(option) => {
+                            const data = option.data || {}
+                            const bankCode = String(data?.bank_code || data?.bankCode || '').trim()
+                            const bankName = String(data?.bank_name || data?.bankName || data?.bank || '').trim()
+                            const accountNumber = sanitizeDigits(String(data?.account_number || data?.accountNumber || '')).slice(0, 10)
+                            const beneficiaryName = String(data?.account_name || data?.beneficiary_name || data?.name || '').trim()
+                            const selectedValue = String(
+                              option.value ||
+                                data?.id ||
+                                data?.beneficiary_id ||
+                                data?.counter_party_id ||
+                                `${bankCode}:${accountNumber}`
+                            )
+                            setSelectedBeneficiary(selectedValue)
+                            setFormData((prev) => ({
+                              ...prev,
+                              bank_code: bankCode || prev.bank_code,
+                              bank_name: bankName || prev.bank_name,
+                              account_number: accountNumber || prev.account_number,
+                              account_name: beneficiaryName || '',
+                              beneficiary_name: beneficiaryName || '',
+                              counter_party_id: extractCounterPartyId(data),
+                            }))
+                            if (bankCode) {
+                              setRecentBankCodes((prev) => [bankCode, ...prev.filter((item) => item !== bankCode)].slice(0, 6))
+                            }
+                            setAccountLookupStatus('idle')
+                            setAccountLookupError(null)
+                            lastLookupKeyRef.current = ''
+                          }}
+                        />
+                      </View>
+                    ) : null}
+                  </View>
+
+                  {accountLookupStatus === 'loading' ? (
+                    <Text className="text-gray-400 text-xs mt-2">Verifying recipient...</Text>
+                  ) : null}
+                  {accountLookupStatus === 'error' ? (
+                    <View className="flex-row items-center justify-between mt-2">
+                      <Text className="text-red-300 text-xs flex-1 pr-3">
+                        Verification failed. Confirm bank and account, then retry.
+                      </Text>
+                      <TouchableOpacity onPress={() => runResolveAccount(true)}>
+                        <Text className="text-app-primary text-xs">Retry</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : null}
+
+                  <RecipientVerificationState
+                    status={accountLookupStatus}
+                    accountName={formData.account_name}
+                    bankName={selectedBankLabel}
+                    accountNumber={formData.account_number}
+                    error={accountLookupError}
+                  />
+
+                  <View className="flex-row items-center justify-between mt-4">
+                    <Text className="text-white text-sm">Save beneficiary</Text>
+                    <Switch value={saveBeneficiary} onValueChange={setSaveBeneficiary} />
+                  </View>
+
+                  <View className="mt-5 border-t border-gray-800 pt-5">
+                    <Text className="text-white text-base font-semibold mb-3">Transfer details</Text>
+                  </View>
+                  <Text className="text-white mb-2">Amount (NGN)</Text>
+                  <View className="flex-row items-center border border-gray-800 rounded-xl bg-gray-950 px-4">
+                    <Text className="text-gray-300 mr-2">N</Text>
+                    <TextInput
+                      ref={amountRef}
+                      value={formData.amount}
+                      onChangeText={(text) => setFormData((prev) => ({ ...prev, amount: text.replace(/[^0-9.]/g, '') }))}
+                      keyboardType="numeric"
+                      placeholder="0.00"
+                      placeholderTextColor="gray"
+                      onFocus={() => scrollRef.current?.scrollTo({ y: 520, animated: true })}
+                      className="flex-1 py-4 text-white"
+                    />
+                  </View>
+
+                  <View className="flex-row flex-wrap mt-3 gap-2">
+                    {QUICK_AMOUNTS.map((quick) => (
+                      <TouchableOpacity
+                        key={`quick-${quick}`}
+                        onPress={() => setFormData((prev) => ({ ...prev, amount: String(quick) }))}
+                        className="bg-gray-950 border border-gray-800 rounded-full px-3 py-2"
+                      >
+                        <Text className="text-white text-xs">{formatNaira(quick)}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  {!amountValidation.valid && formData.amount ? (
+                    <Text className="text-red-300 text-xs mt-3">{amountValidation.message}</Text>
+                  ) : null}
+
+                  {quoteVisible ? (
+                    <View className="mt-4 bg-gray-950 border border-gray-800 rounded-xl p-3">
+                      <View className="flex-row items-center justify-between">
+                        <Text className="text-gray-400 text-xs">
+                          Fee ({feeEstimated ? 'Estimated' : 'Confirmed'})
+                        </Text>
+                        <Text className="text-white text-xs">{formatNaira(fee)}</Text>
+                      </View>
+                      <Text className="text-gray-500 text-[10px] mt-1">
+                        {feeEstimated ? 'Final fee is confirmed on review.' : 'Fee sourced from transfer quote.'}
+                      </Text>
+                      <View className="flex-row items-center justify-between mt-2">
+                        <Text className="text-gray-400 text-xs">Total debit</Text>
+                        <Text className="text-white text-sm font-semibold">{formatNaira(amountValidation.totalDebit)}</Text>
+                      </View>
+                      <View className="flex-row items-center justify-between mt-2">
+                        <Text className="text-gray-400 text-xs">Daily remaining after transfer</Text>
+                        <Text className="text-white text-sm">{formatNaira(dailyRemainingAfterTransfer)}</Text>
+                      </View>
+                      {quoteLoading ? <Text className="text-gray-600 text-[10px] mt-2">Refreshing quote...</Text> : null}
+                    </View>
+                  ) : null}
+
+                  <View className="flex-row items-center justify-between mt-5">
+                    <Text className="text-white text-base font-semibold">Narration</Text>
+                    <Text className="text-gray-400 text-xs">{formData.description.length}/50</Text>
+                  </View>
+                  <TextInput
+                    value={formData.description}
+                    onChangeText={(text) => setFormData((prev) => ({ ...prev, description: text.slice(0, 50) }))}
+                    placeholder="Narration for this transfer (optional)"
+                    placeholderTextColor="gray"
+                    onFocus={() => scrollRef.current?.scrollTo({ y: 760, animated: true })}
+                    className="border border-gray-800 rounded-xl px-4 py-4 text-white bg-gray-950 mt-3"
+                    maxLength={50}
+                  />
+                  <Text className="text-gray-500 text-xs mt-2">
+                    If left blank, we&apos;ll use &quot;{DEFAULT_TRANSFER_DESCRIPTION}&quot;.
+                  </Text>
                 </View>
-                <Text className="text-gray-500 text-[10px] mt-1">
-                  {feeEstimated ? 'Final fee is confirmed on review.' : 'Fee sourced from transfer quote.'}
+              </>
+            ) : null}
+
+            {flowStep === 2 ? (
+              <View className="bg-gray-900 border border-gray-800 rounded-2xl p-4 mb-4">
+                <Text className="text-gray-500 text-xs mb-3">
+                  If charged, transfer completion will be reflected in timeline automatically.
                 </Text>
-                <View className="flex-row items-center justify-between mt-2">
-                  <Text className="text-gray-400 text-xs">Total debit</Text>
-                  <Text className="text-white text-sm font-semibold">{formatNaira(amountValidation.totalDebit)}</Text>
-                </View>
-                <View className="flex-row items-center justify-between mt-2">
-                  <Text className="text-gray-400 text-xs">Daily remaining after transfer</Text>
-                  <Text className="text-white text-sm">{formatNaira(dailyRemainingAfterTransfer)}</Text>
-                </View>
-                {quoteLoading ? <Text className="text-gray-600 text-[10px] mt-2">Refreshing quote...</Text> : null}
+
+                <ReviewSummaryCard
+                  recipientName={draft.account_name}
+                  bankName={draft.bank_name}
+                  accountNumber={draft.account_number}
+                  amount={Number(draft.amount || 0)}
+                  fee={Number(draft.fee || 0)}
+                  feeBreakdown={draft.fee_breakdown}
+                  totalDebit={Number(draft.total_debit || 0)}
+                  description={draft.description}
+                  dailyRemainingAfter={dailyRemainingAfterTransfer}
+                />
+                <Text className="text-gray-500 text-xs mt-2">
+                  {draft.fee_estimated
+                    ? 'Estimated fee shown. Final fee is confirmed by backend at submission.'
+                    : 'Fee confirmed from transfer quote.'}
+                </Text>
               </View>
             ) : null}
-              </View>
-            )}
-
-            {flowStep === 2 && (
-              <View className="bg-gray-900 border border-gray-800 rounded-2xl p-4 mb-4">
-                <View className="flex-row items-center justify-between">
-                  <Text className="text-white text-base font-semibold">Narration</Text>
-                  <Text className="text-gray-400 text-xs">{formData.description.length}/50</Text>
-                </View>
-                <TextInput
-                  value={formData.description}
-                  onChangeText={(text) => setFormData((prev) => ({ ...prev, description: text.slice(0, 50) }))}
-                  placeholder="Narration for this transfer"
-                  placeholderTextColor="gray"
-                  onFocus={() => scrollRef.current?.scrollTo({ y: 760, animated: true })}
-                  className="border border-gray-800 rounded-xl px-4 py-4 text-white bg-gray-950 mt-3"
-                  maxLength={50}
-                />
-                {!narrationValue ? <Text className="text-red-300 text-xs mt-2">Narration is required.</Text> : null}
-              </View>
-            )}
 
             <Text className="text-gray-500 text-xs mb-3">{BANK_TRANSFER_TIER_REQUIREMENT_COPY}</Text>
-          {flowStep === 1 ? (
-            <TouchableOpacity
-              onPress={handleRecipientContinue}
-              disabled={!canContinueRecipient || loading}
-              className={`${canContinueRecipient ? 'bg-theme-primary' : 'bg-gray-700'} py-5 rounded-xl`}
-            >
-              <Text className="text-alt font-semibold text-center">Continue to amount</Text>
-            </TouchableOpacity>
-          ) : (
-            <View>
+            {flowStep === 1 ? (
               <TouchableOpacity
                 onPress={handleContinue}
-                disabled={!canContinue || loading}
+                disabled={!canContinue || loading || submitting}
                 className={`${canContinue ? 'bg-theme-primary' : 'bg-gray-700'} py-5 rounded-xl`}
               >
                 <Text className="text-alt font-semibold text-center">Continue to review</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => setFlowStep(1)} className="py-4">
-                <Text className="text-app-primary text-center">Back to recipient</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+            ) : null}
+
+            {flowStep === 2 ? (
+              <View>
+                {showUpgradeCta ? (
+                  <TouchableOpacity
+                    onPress={() => router.push('/kyc')}
+                    className="bg-gray-900 border border-gray-700 rounded-xl py-4 mb-3"
+                  >
+                    <Text className="text-white text-center">Upgrade KYC</Text>
+                  </TouchableOpacity>
+                ) : null}
+                <TouchableOpacity
+                  onPress={() => setPinModalOpen(true)}
+                  disabled={submitting || !canContinue}
+                  className={`${submitting || !canContinue ? 'bg-gray-700' : 'bg-theme-primary'} py-5 rounded-xl`}
+                >
+                  <Text className="text-alt font-semibold text-center">
+                    {submitting ? 'Processing...' : 'Confirm & enter PIN'}
+                  </Text>
+                </TouchableOpacity>
+                {showRetrySubmit && lastEnteredPin ? (
+                  <TouchableOpacity
+                    onPress={() => handleSubmit(lastEnteredPin)}
+                    disabled={submitting}
+                    className="bg-gray-900 border border-gray-700 py-4 rounded-xl mt-3"
+                  >
+                    <Text className="text-white text-center">Retry transfer</Text>
+                  </TouchableOpacity>
+                ) : null}
+                <TouchableOpacity onPress={() => setFlowStep(1)} className="py-4">
+                  <Text className="text-app-primary text-center">Back to transfer form</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
           </View>
         </ScrollView>
+      </View>
+
+      <TransactionPinModal
+        open={pinModalOpen}
+        onClose={() => setPinModalOpen(false)}
+        onSubmit={handleSubmit}
+        onBiometricSubmit={handleBiometricSubmit}
+        loading={submitting}
+        biometricLoading={transactionBiometrics.biometricLoading}
+        biometricAvailable={transactionBiometrics.biometricAvailable}
+        biometricEnabled={transactionBiometrics.biometricEnabled}
+        errorMessage={pinError}
+        title="Enter PIN to complete transfer"
+        helperActionLabel="Forgot PIN? Reset PIN"
+        onHelperAction={() => {
+          setPinModalOpen(false)
+          router.push('/settings/pin/reset')
+        }}
+      />
+      {submitting && processingStage ? (
+        <View className="absolute inset-0 bg-primary/85 items-center justify-center px-6">
+          <View className="w-full max-w-md rounded-3xl border border-amber-500/30 bg-gray-950 px-5 py-6">
+            <View className="self-center rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 mb-4">
+              <Text className="text-amber-200 text-[11px] font-semibold">{processingStage.badge}</Text>
+            </View>
+            <ActivityIndicator size="large" color="#f59e0b" />
+            <Text className="text-white text-center text-xl font-semibold mt-4">
+              {processingStage.title}
+            </Text>
+            <Text className="text-gray-300 text-center text-sm mt-2">
+              {processingStage.message}
+            </Text>
+            <Text className="text-gray-500 text-center text-xs mt-4">
+              This usually takes only a few seconds.
+            </Text>
+          </View>
         </View>
+      ) : null}
     </KeyboardAvoidingView>
   )
 }

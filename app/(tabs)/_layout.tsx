@@ -1,6 +1,6 @@
 // app/(tabs)/_layout.tsx
-import React, { useCallback, useEffect, useState } from 'react'
-import { Redirect, Tabs } from 'expo-router'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { Redirect, Tabs, useRouter } from 'expo-router'
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs'
 import { Ionicons } from '@expo/vector-icons'
 import { Image, Platform, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native'
@@ -12,6 +12,13 @@ import { useAppLock } from '../../services/useAppLock'
 import LoaderScreen from '../LoaderScreen'
 import AppModal from '@/components/modal/Modal'
 import { log } from '@/utils/logger'
+import { useActiveAccount } from '@/services/useActiveAccount'
+import { getBusinessEntities } from '@/api/business'
+import { listCircles } from '@/api/circles'
+import WorkspaceSwitcherModal, {
+  WorkspaceBusiness,
+  WorkspaceCircle,
+} from '@/components/workspace/WorkspaceSwitcherModal'
 
 const TabIcon = ({ focused, icon, activeTint = '#f4b000', activeBg, activeBorder }: any) => (
   <View className="items-center justify-center" style={{ height: 28 }}>
@@ -78,6 +85,11 @@ const getTabAccent = (routeName: string) => {
 
 const VISIBLE_TAB_ROUTES = new Set(['index', 'bridge', 'tunnel', 'timeline', 'core'])
 
+const formatLabel = (value: string, fallback = 'Member') =>
+  String(value || fallback)
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (match) => match.toUpperCase())
+
 const CustomTabBar = ({ state, descriptors, navigation }: BottomTabBarProps) => {
   const insets = useSafeAreaInsets()
   const { width } = useWindowDimensions()
@@ -121,7 +133,6 @@ const CustomTabBar = ({ state, descriptors, navigation }: BottomTabBarProps) => 
         {visibleRoutes.map((route) => {
           const isFocused = state.routes[state.index]?.key === route.key
           const { options } = descriptors[route.key]
-          const accent = getTabAccent(route.name)
           const label =
             options.tabBarLabel !== undefined
               ? options.tabBarLabel
@@ -204,7 +215,15 @@ const CustomTabBar = ({ state, descriptors, navigation }: BottomTabBarProps) => 
 export default function TabsLayout() {
   const { loading, authHydrated, authState, token, profileLoading, profileError, userProfileData, onLogout } = useAuth()
   const { locked } = useAppLock()
+  const router = useRouter()
+  const { activeAccount, hydrated: accountHydrated, selectPersonalAccount, selectBusinessAccount, selectCircleAccount } =
+    useActiveAccount()
   const [toggleModal, setToggleModal] = useState(false)
+  const [switchAccountOpen, setSwitchAccountOpen] = useState(false)
+  const [businessLoading, setBusinessLoading] = useState(false)
+  const [circlesLoading, setCirclesLoading] = useState(false)
+  const [businessAccounts, setBusinessAccounts] = useState<WorkspaceBusiness[]>([])
+  const [circleAccounts, setCircleAccounts] = useState<WorkspaceCircle[]>([])
   const insets = useSafeAreaInsets()
   const hasProfile = !!userProfileData
 
@@ -227,6 +246,134 @@ export default function TabsLayout() {
   useEffect(() => {
     bootTrace('state_change')
   }, [bootTrace])
+
+  const loadBusinessAccounts = useCallback(async () => {
+    setBusinessLoading(true)
+    try {
+      const response = await getBusinessEntities()
+      const entities = Array.isArray(response?.data?.data)
+        ? response.data.data
+        : Array.isArray(response?.data)
+          ? response.data
+          : []
+      setBusinessAccounts(
+        entities.map((item: any) => ({
+          id: String(item?.id),
+          name: String(item?.name || 'Business account'),
+          status: String(item?.status || ''),
+          current_user_role: String(item?.current_user_role || item?.role || ''),
+        }))
+      )
+    } catch {
+      setBusinessAccounts([])
+    } finally {
+      setBusinessLoading(false)
+    }
+  }, [])
+
+  const loadCircleAccounts = useCallback(async () => {
+    setCirclesLoading(true)
+    try {
+      const response = await listCircles()
+      const payload = response?.data ?? response
+      const items = Array.isArray(payload?.data)
+        ? payload.data
+        : Array.isArray(payload?.circles)
+          ? payload.circles
+          : Array.isArray(payload?.items)
+            ? payload.items
+            : Array.isArray(payload?.results)
+              ? payload.results
+              : Array.isArray(payload)
+                ? payload
+                : []
+      setCircleAccounts(
+        items
+          .map((item: any) => ({
+            id: String(item?.id || item?.circle_id || item?.uuid || '').trim(),
+            name: String(item?.name || item?.title || 'Circle'),
+            role: String(item?.current_user_role || item?.role || 'member'),
+            circle_type: String(item?.circle_type || 'standard'),
+            member_count: Number(item?.member_count ?? item?.members_count ?? 0),
+          }))
+          .filter((item: WorkspaceCircle) => item.id)
+      )
+    } catch {
+      setCircleAccounts([])
+    } finally {
+      setCirclesLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!accountHydrated) return
+    void loadBusinessAccounts()
+    void loadCircleAccounts()
+  }, [accountHydrated, loadBusinessAccounts, loadCircleAccounts])
+
+  const openSwitchAccountModal = useCallback(() => {
+    setSwitchAccountOpen(true)
+    void loadBusinessAccounts()
+    void loadCircleAccounts()
+  }, [loadBusinessAccounts, loadCircleAccounts])
+
+  const selectedBusiness = useMemo(
+    () =>
+      activeAccount.type === 'business'
+        ? businessAccounts.find((item) => String(item.id) === String(activeAccount.businessId)) || null
+        : null,
+    [activeAccount, businessAccounts]
+  )
+
+  const selectedCircle = useMemo(
+    () =>
+      activeAccount.type === 'circle'
+        ? circleAccounts.find((item) => String(item.id) === String(activeAccount.circleId)) || null
+        : null,
+    [activeAccount, circleAccounts]
+  )
+
+  const activeIdentityName =
+    activeAccount.type === 'business'
+      ? selectedBusiness?.name || 'Business account'
+      : activeAccount.type === 'circle'
+        ? selectedCircle?.name || 'Circle account'
+        : userProfileData?.user_profile?.first_name || userProfileData?.email || 'Personal account'
+
+  const activeIdentityBadge =
+    activeAccount.type === 'business'
+      ? 'Business'
+      : activeAccount.type === 'circle'
+        ? 'Circle'
+        : 'Personal'
+
+  const activeIdentityMeta =
+    activeAccount.type === 'business'
+      ? [
+          selectedBusiness?.current_user_role
+            ? formatLabel(String(selectedBusiness.current_user_role), 'Member')
+            : null,
+          selectedBusiness?.status
+            ? formatLabel(String(selectedBusiness.status), 'Setup')
+            : null,
+        ]
+          .filter(Boolean)
+          .join(' / ')
+      : activeAccount.type === 'circle'
+        ? [
+            selectedCircle?.member_count && selectedCircle.member_count > 0
+              ? `${selectedCircle.member_count} members`
+              : null,
+            selectedCircle?.role
+              ? formatLabel(String(selectedCircle.role), 'Member')
+              : null,
+          ]
+            .filter(Boolean)
+            .join(' / ')
+        : 'Your personal wallet and direct activity'
+
+  const personalFirstName =
+    userProfileData?.user_profile?.first_name || userProfileData?.first_name || userProfileData?.email || 'there'
 
   if (loading || !authHydrated) return <LoaderScreen />
   if (!authState?.authenticated) {
@@ -256,18 +403,47 @@ export default function TabsLayout() {
               headerShown: true,
               header: () => (
                 <View className="bg-[#05070D]" style={{ paddingTop: insets.top }}>
-                  <View className="px-4 pb-3 flex-row justify-between items-center">
-                    <View>
-                      <Text className="text-slate-400 text-xs uppercase tracking-[0.2em]">Welcome</Text>
-                      <Text className="text-white font-semibold text-base">
-                        Hello, {userProfileData?.user_profile?.first_name ?? userProfileData?.email}
-                      </Text>
-                    </View>
-                    <TouchableOpacity onPress={() => setToggleModal(true)}>
-                      <View className="h-9 w-9 items-center justify-center rounded-2xl border border-gray-800 bg-gray-900/70">
-                        <Image source={icons.logout} tintColor={'#f4b000'} className="w-5 h-5" />
+                  <View className="px-4 pb-1">
+                    <View className="flex-row items-center">
+                      <View className="mr-3 h-9 w-9 items-center justify-center rounded-full border border-white/8 bg-[#111827]/52">
+                        <Image
+                          source={icons.appLogoClear}
+                          className="h-5 w-5"
+                          resizeMode="contain"
+                        />
                       </View>
-                    </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={openSwitchAccountModal}
+                        activeOpacity={0.85}
+                        className="max-w-[76%] rounded-full border border-white/8 bg-[#111827]/72 px-3 py-2"
+                      >
+                        <View className="flex-row items-center gap-3">
+                          <View className="max-w-[84%]">
+                            <Text className="text-white font-semibold text-[15px]" numberOfLines={1}>
+                              {activeAccount.type === 'personal' ? personalFirstName : activeIdentityName}
+                            </Text>
+                            <View className="mt-0.5 flex-row items-center">
+                              <View
+                                className="h-1.5 w-1.5 rounded-full"
+                                style={{
+                                  backgroundColor:
+                                    activeAccount.type === 'circle'
+                                      ? '#7DD3FC'
+                                      : activeAccount.type === 'business'
+                                        ? '#FFB05A'
+                                        : '#CBD5E1',
+                                }}
+                              />
+                              <View className="w-2.5" />
+                              <Text className="text-[10px] uppercase tracking-[0.16em] text-slate-400" numberOfLines={1}>
+                                {activeAccount.type === 'personal' ? 'Personal' : activeIdentityBadge || activeIdentityMeta}
+                              </Text>
+                            </View>
+                          </View>
+                          <Ionicons name="chevron-down" size={15} color="#94A3B8" />
+                        </View>
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 </View>
               ),
@@ -279,6 +455,12 @@ export default function TabsLayout() {
             name="bridge"
             options={{
               title: 'Bridge',
+              headerTitle:
+                activeAccount.type === 'circle'
+                  ? selectedCircle?.name || 'Circle'
+                  : activeAccount.type === 'business'
+                    ? selectedBusiness?.name || 'Business'
+                    : 'Bridge',
               headerShown: true,
               tabBarIcon: ({ focused }) => (
                 <TabVectorIcon
@@ -314,6 +496,12 @@ export default function TabsLayout() {
             options={{
               title: 'Activity',
               headerShown: true,
+              headerTitle:
+                activeAccount.type === 'circle'
+                  ? selectedCircle?.name || 'Circle Activity'
+                  : activeAccount.type === 'business'
+                    ? selectedBusiness?.name || 'Business Activity'
+                    : 'Activity',
               href: FEATURE_TIMELINE ? undefined : null,
               tabBarIcon: ({ focused }) => <TabIcon focused={focused} icon={icons.transaction} />,
             }}
@@ -373,6 +561,52 @@ export default function TabsLayout() {
           </View>
         </View>
       </AppModal>
+
+      <WorkspaceSwitcherModal
+        open={switchAccountOpen}
+        onClose={() => setSwitchAccountOpen(false)}
+        activeAccount={activeAccount}
+        activeIdentityName={activeIdentityName}
+        activeIdentityMeta={activeIdentityMeta}
+        activeIdentityBadge={activeIdentityBadge}
+        accountHydrated={accountHydrated}
+        businessLoading={businessLoading}
+        circlesLoading={circlesLoading}
+        businessAccounts={businessAccounts}
+        circleAccounts={circleAccounts}
+        selectedBusinessName={selectedBusiness?.name || null}
+        selectedCircleName={selectedCircle?.name || null}
+        onSelectPersonal={async () => {
+          await selectPersonalAccount()
+          router.replace('/(tabs)' as any)
+        }}
+        onSelectBusiness={async (businessId) => {
+          await selectBusinessAccount(businessId)
+          router.push('/business' as any)
+        }}
+        onSelectCircle={async (circleId) => {
+          const selectedCircle = circleAccounts.find((item) => String(item.id) === String(circleId))
+          await selectCircleAccount(circleId)
+          router.push({
+            pathname: `/circles/${circleId}` as any,
+            params: {
+              name: selectedCircle?.name || 'Circle',
+              role: selectedCircle?.role || 'member',
+              memberCount: String(selectedCircle?.member_count || 0),
+              circleType: selectedCircle?.circle_type || 'standard',
+            },
+          } as any)
+        }}
+        onOpenBusinessCreate={() => {
+          router.push('/business/activate' as any)
+        }}
+        onOpenCircles={() => {
+          router.push('/circles' as any)
+        }}
+        onLogout={() => {
+          setToggleModal(true)
+        }}
+      />
     </>
   )
 }

@@ -30,6 +30,7 @@ const getImageByKey = (key: string) => {
 const ProvideDertails = () => {
   const { id } = useLocalSearchParams()
   const [loader, setLoader] = useState(false)
+  const [submitError, setSubmitError] = useState('')
 
   const router = useRouter()
   const { userProfileData } = useAuth()
@@ -78,7 +79,34 @@ const ProvideDertails = () => {
     description: null,
   })
 
+  const phoneDigits = useMemo(() => String(formValue.billersCode || '').replace(/\D/g, ''), [formValue.billersCode])
+  const realPlanSelected = useMemo(() => {
+    if (serviceType !== 'DATA') return true
+    const picked = safePriceList.find((price: any) => String(price?.value) === String(formValue.tariff_class))
+    return Boolean(picked && picked.value != null && !String(picked?.label ?? '').toLowerCase().includes('select data plan'))
+  }, [formValue.tariff_class, safePriceList, serviceType])
+  const canProceed = useMemo(() => {
+    if (serviceType === 'DATA') {
+      return phoneDigits.length === 11 && realPlanSelected && Number(formValue.amount) > 0
+    }
+    return phoneDigits.length === 11 && Number(formValue.amount) > 0
+  }, [formValue.amount, phoneDigits.length, realPlanSelected, serviceType])
+
   const handleFormSubmit = async () => {
+    setSubmitError('')
+    if (phoneDigits.length !== 11) {
+      setSubmitError('Enter a valid 11-digit phone number.')
+      return
+    }
+    if (serviceType === 'DATA' && !realPlanSelected) {
+      setSubmitError('Select a valid data plan to continue.')
+      return
+    }
+    if (!(Number(formValue.amount) > 0)) {
+      setSubmitError(serviceType === 'DATA' ? 'Unable to resolve the selected plan amount. Choose the plan again.' : 'Enter a valid amount to continue.')
+      return
+    }
+
     setLoader(true)
 
     try {
@@ -113,6 +141,8 @@ const ProvideDertails = () => {
           },
         })
     } catch (error: any) {
+      setSubmitError(String(error?.message || 'Unable to start this purchase right now.'))
+    } finally {
       setLoader(false)
     }
   }
@@ -196,9 +226,16 @@ const ProvideDertails = () => {
                 />
               )}
 
+              {submitError ? (
+                <View className="mt-3 rounded-xl border border-red-500/30 bg-red-500/10 p-3">
+                  <Text className="text-white text-xs">{submitError}</Text>
+                </View>
+              ) : null}
+
               <TouchableOpacity
                 onPress={handleFormSubmit}
-                className="bg-app-primary rounded-xl mt-4 py-4"
+                disabled={!canProceed || loader}
+                className={`rounded-xl mt-4 py-4 ${!canProceed || loader ? 'bg-app-primary/40' : 'bg-app-primary'}`}
               >
                 <Text className="text-white text-center font-semibold">Proceed</Text>
               </TouchableOpacity>

@@ -22,6 +22,7 @@ export default function CoreHub() {
 
   const kycLabel = (userProfileData?.kyc_level || 'unverified').toString().replace('_', ' ')
   const profileName = userProfileData?.user_profile?.first_name || 'Member'
+  const securityLockActive = Boolean(userProfileData?.security_lock?.active || userProfileData?.security_lock?.security_locked)
 
   const sections = useMemo(() => {
     const rows: { title: string; items: RowItem[] }[] = [
@@ -54,13 +55,18 @@ export default function CoreHub() {
             : []),
         ],
       },
-      {
+            {
         title: 'Security',
         items: [
           {
             label: 'Change Password',
             href: '/change-password',
             icon: <Feather name="shield" size={18} color="white" />,
+          },
+          {
+            label: 'Security Lock',
+            href: '/settings/security-lock',
+            icon: <Ionicons name="shield-checkmark-outline" size={18} color="white" />,
           },
           ...(FEATURE_TRANSACTION_PIN
             ? [
@@ -124,7 +130,7 @@ export default function CoreHub() {
           </View>
           <View className="flex-1 rounded-2xl border border-gray-800 bg-gray-950/70 p-3">
             <Text className="text-gray-400 text-[11px] uppercase tracking-[0.16em]">Security</Text>
-            <Text className="text-white text-sm font-semibold mt-2">Active</Text>
+            <Text className="text-white text-sm font-semibold mt-2">{securityLockActive ? 'Protected' : 'Ready'}</Text>
           </View>
         </View>
       </View>

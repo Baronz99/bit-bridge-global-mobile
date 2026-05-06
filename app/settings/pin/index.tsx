@@ -7,6 +7,8 @@ import {
   enableTransactionPinAppLock,
   getTransactionPinStatus,
 } from '@/api/transactionPin'
+import { useAuth } from '@/services/useAuth'
+import { getTransferBiometricFailureMessage, resolveTransactionBiometricUserId, useTransactionBiometrics } from '@/services/useTransactionBiometrics'
 import { buildApiErrorMessage } from '@/utils/apiErrorMessage'
 import { useAppLock } from '@/services/useAppLock'
 
@@ -16,6 +18,11 @@ const PinSettings = () => {
   const [error, setError] = useState<string | null>(null)
   const [toggleBusy, setToggleBusy] = useState(false)
   const { refreshStatus } = useAppLock()
+  const { userProfileData } = useAuth()
+  const profilePayload = (userProfileData?.data ?? userProfileData) as any
+  const transactionBiometrics = useTransactionBiometrics(resolveTransactionBiometricUserId(profilePayload))
+  const [transferBiometricBusy, setTransferBiometricBusy] = useState(false)
+  const [transferBiometricNotice, setTransferBiometricNotice] = useState<string | null>(null)
 
   const fetchStatus = useCallback(async () => {
     setLoading(true)
@@ -129,6 +136,65 @@ const PinSettings = () => {
       {!hasPin ? (
         <Text className="text-gray-500 text-xs mt-2">Set a PIN before enabling app lock.</Text>
       ) : null}
+
+      <View className="bg-gray-900 rounded-2xl p-4 mt-4">
+        <Text className="text-white font-semibold">Transfer biometrics</Text>
+        <Text className="text-gray-400 mt-1 text-xs">
+          Face ID / Fingerprint for future transfer confirmations on this device.
+        </Text>
+        <Text className="text-gray-400 mt-3 text-xs">
+          {!hasPin
+            ? 'Set a PIN first.'
+            : !transactionBiometrics.biometricAvailable
+              ? 'Device biometrics are not available yet.'
+              : transactionBiometrics.biometricEnabled
+                ? 'Enabled on this device.'
+                : transactionBiometrics.hasPreparedEnrollment
+                  ? 'Ready to enable from your most recent successful PIN-confirmed bank transfer.'
+                  : 'Complete one successful PIN-confirmed bank transfer, then enable it from the success screen.'}
+        </Text>
+        {transferBiometricNotice ? (
+          <Text className="text-gray-300 text-xs mt-3">{transferBiometricNotice}</Text>
+        ) : null}
+        <View className="flex-row gap-3 mt-4">
+          {transactionBiometrics.biometricEnabled ? (
+            <TouchableOpacity
+              disabled={transferBiometricBusy}
+              onPress={async () => {
+                setTransferBiometricBusy(true)
+                setTransferBiometricNotice(null)
+                await transactionBiometrics.clearEnrollment()
+                setTransferBiometricNotice('Transfer biometrics disabled on this device.')
+                setTransferBiometricBusy(false)
+              }}
+              className="flex-1 bg-black border border-gray-700 py-3 rounded-xl"
+            >
+              <Text className="text-white text-center font-medium">Disable</Text>
+            </TouchableOpacity>
+          ) : null}
+          {!transactionBiometrics.biometricEnabled && transactionBiometrics.hasPreparedEnrollment ? (
+            <TouchableOpacity
+              disabled={transferBiometricBusy}
+              onPress={async () => {
+                setTransferBiometricBusy(true)
+                setTransferBiometricNotice(null)
+                const result = await transactionBiometrics.enablePreparedEnrollment()
+                setTransferBiometricNotice(
+                  result.state === 'enabled'
+                    ? 'Transfer biometrics enabled on this device.'
+                    : getTransferBiometricFailureMessage(result.code, result.message)
+                )
+                setTransferBiometricBusy(false)
+              }}
+              className="flex-1 bg-theme-primary py-3 rounded-xl"
+            >
+              <Text className="text-alt text-center font-medium">
+                {transferBiometricBusy ? 'Working...' : 'Enable now'}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      </View>
 
       <View className="mt-6 gap-4">
         <Link href="/settings/pin/set" asChild>

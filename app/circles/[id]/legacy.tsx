@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useMemo, useState } from 'react'
+import React, { useCallback, useMemo, useState } from 'react'
 import { ActivityIndicator, RefreshControl, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
 import { useFocusEffect } from '@react-navigation/native'
@@ -1128,7 +1128,7 @@ const CircleDetailScreen = () => {
   const recentTransactions = useMemo(() => extractRecentTransactions(data), [data])
   const title = getTitle(circle)
   const description = getDescription(circle)
-  const balanceCents = Number(circle.balance_cents || 0)
+  const balanceCents = Number(circle.treasury_balance_cents ?? circle.balance_cents ?? 0)
   const balanceVisible = circle.balance_visible !== false
   const currency = (circle.currency as string) || 'NGN'
   const isOfficial = circle.circle_type === 'official'

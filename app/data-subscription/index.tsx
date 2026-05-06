@@ -48,6 +48,7 @@ const DataSubscriptionScreen = () => {
   const { userProfileData } = useAuth()
 
   const [loader, setLoader] = useState(false)
+  const [submitError, setSubmitError] = useState('')
   const [selectProvider, setSelectedProvider] = useState<any | null>(null)
   const { getStatus } = useServiceAvailability()
 
@@ -113,7 +114,35 @@ const DataSubscriptionScreen = () => {
 
   const handleProviderSelect = (item: any) => setSelectedProvider(item)
 
+  const phoneDigits = useMemo(() => String(formValue.billersCode || '').replace(/\D/g, ''), [formValue.billersCode])
+  const canProceed = useMemo(() => {
+    return Boolean(
+      selectedProviderName &&
+        phoneDigits.length === 11 &&
+        isRealPlanOption(planOptions.find((p: any) => String(p?.value) === String(formValue.tariff_class))) &&
+        Number(formValue.amount) > 0
+    )
+  }, [formValue.amount, formValue.tariff_class, phoneDigits.length, planOptions, selectedProviderName])
+
   const handleProceed = async () => {
+    setSubmitError('')
+    if (!selectedProviderName) {
+      setSubmitError('Select a network to continue.')
+      return
+    }
+    if (phoneDigits.length !== 11) {
+      setSubmitError('Enter a valid 11-digit phone number.')
+      return
+    }
+    if (!isRealPlanOption(planOptions.find((p: any) => String(p?.value) === String(formValue.tariff_class)))) {
+      setSubmitError('Select a valid data plan to continue.')
+      return
+    }
+    if (!(Number(formValue.amount) > 0)) {
+      setSubmitError('Unable to resolve the selected plan amount. Choose the plan again.')
+      return
+    }
+
     setLoader(true)
     try {
       const response = await createPurchaseOrder({
@@ -141,6 +170,8 @@ const DataSubscriptionScreen = () => {
           params: { orderId: response?.data?.id },
         })
       }
+    } catch (error: any) {
+      setSubmitError(String(error?.message || 'Unable to start this data purchase right now.'))
     } finally {
       setLoader(false)
     }
@@ -230,12 +261,24 @@ const DataSubscriptionScreen = () => {
                 ) : (
                   <View className="mt-3 rounded-xl border border-gray-800 bg-gray-950/40 p-3">
                     <Text className="text-gray-300 text-xs">
-                      {selectedProviderName ? 'Loading data plans...' : 'Select a network to load data plans.'}
+                      {selectedProviderName
+                        ? 'Loading data plans. If this does not complete, switch network or try again shortly.'
+                        : 'Select a network to load data plans.'}
                     </Text>
                   </View>
                 )}
 
-                <TouchableOpacity onPress={handleProceed} className="bg-app-primary rounded-xl mt-4 py-4">
+                {submitError ? (
+                  <View className="mt-3 rounded-xl border border-red-500/30 bg-red-500/10 p-3">
+                    <Text className="text-white text-xs">{submitError}</Text>
+                  </View>
+                ) : null}
+
+                <TouchableOpacity
+                  onPress={handleProceed}
+                  disabled={!canProceed || loader}
+                  className={`rounded-xl mt-4 py-4 ${!canProceed || loader ? 'bg-app-primary/40' : 'bg-app-primary'}`}
+                >
                   <Text className="text-white text-center font-semibold">Proceed</Text>
                 </TouchableOpacity>
               </View>

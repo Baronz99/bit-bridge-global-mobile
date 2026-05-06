@@ -1,5 +1,6 @@
 // src/api/cards.ts (MOBILE) - aligned with Web + Backend PCI reveal endpoint
 import client from '@/api/client'
+import type { ActiveAccount } from '@/services/useActiveAccount'
 
 type Id = string | number
 type ApiError = Error & {
@@ -47,6 +48,17 @@ export const getUserCards = async () => {
   } catch (err: any) {
     throw new Error(errMsg(err, 'Failed to fetch cards'))
   }
+}
+
+export const getCards = async (activeAccount: ActiveAccount) => {
+  if (activeAccount?.type === 'business') {
+    return {
+      data: [],
+      account_context: activeAccount,
+    }
+  }
+
+  return getUserCards()
 }
 
 /**

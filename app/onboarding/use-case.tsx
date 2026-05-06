@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native'
 import { usePathname, useRouter } from 'expo-router'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import FormInput from '@/components/FormInput'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
 import { saveOnboardingUseCase, updateBasicProfile } from '@/api/onboarding'
@@ -88,6 +89,7 @@ const KYC_REQUIRED_NOW = ['send_receive', 'virtual_cards', 'taxes']
 const UseCaseScreen = () => {
   const router = useRouter()
   const pathname = usePathname()
+  const insets = useSafeAreaInsets()
   const { userProfileData, loadProfile, authState, authHydrated } = useAuth()
   const [submitting, setSubmitting] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
@@ -208,7 +210,7 @@ const UseCaseScreen = () => {
   return (
     <View className="flex-1 bg-primary px-4">
       <KeyboardAvoidWrapper>
-        <View className="pt-6">
+        <View className="pt-6" style={{ paddingBottom: Math.max(insets.bottom + 32, 48) }}>
           <Text className="text-gray-400 text-xs tracking-widest uppercase">Step 2 of 3</Text>
           <Text className="text-white text-2xl font-semibold mt-2">Tell us about you</Text>
           <Text className="text-gray-400 mt-1">

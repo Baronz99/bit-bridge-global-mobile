@@ -1,18 +1,20 @@
-import React, { useEffect, useMemo, useState } from 'react'
+﻿import React, { useEffect, useMemo, useState } from 'react'
 import { Stack } from 'expo-router'
-import { StatusBar, Text, View } from 'react-native'
+import { StatusBar, Text, TouchableOpacity, View } from 'react-native'
 import * as SplashScreen from 'expo-splash-screen'
 import './globals.css'
 
 import { AuthProvider } from '@/services/useAuth'
 import { AppLockProvider } from '../services/useAppLock'
 import { BalancePrivacyProvider } from '@/services/useBalancePrivacy'
+import { ActiveAccountProvider } from '@/services/useActiveAccount'
 import { useAuth } from '@/services/useAuth'
 import { setLastFatalError } from '@/services/fatalError'
 import { FEATURE_TIMELINE } from '@/constants/featureFlags'
 import { log } from '@/utils/logger'
 import BootScreen from '@/src/components/BootScreen'
 import PushNotificationsBridge from '@/services/PushNotificationsBridge'
+import AppModal from '@/components/modal/Modal'
 
 void SplashScreen.preventAutoHideAsync().catch(() => {})
 
@@ -53,6 +55,26 @@ class RootErrorBoundary extends React.Component<{ children: React.ReactNode }, E
     }
     return this.props.children
   }
+}
+
+function SecurityLockNoticeOverlay() {
+  const { securityLockNotice, dismissSecurityLockNotice } = useAuth()
+
+  return (
+    <AppModal open={!!securityLockNotice} onclose={dismissSecurityLockNotice}>
+      <View className="w-full rounded-[24px] border border-gray-800 bg-gray-900 px-5 py-6">
+        <Text className="text-white text-center text-xl font-semibold">
+          {securityLockNotice?.title || 'Transaction temporarily unavailable'}
+        </Text>
+        <Text className="mt-3 text-center text-sm leading-6 text-gray-300">
+          {securityLockNotice?.message || 'This transaction cant be completed right now. Please try again later.'}
+        </Text>
+        <TouchableOpacity onPress={dismissSecurityLockNotice} className="mt-6 rounded-2xl bg-app-primary px-4 py-4">
+          <Text className="text-center font-semibold text-white">Okay</Text>
+        </TouchableOpacity>
+      </View>
+    </AppModal>
+  )
 }
 
 function StartupGate({ children }: { children: React.ReactNode }) {
@@ -152,8 +174,8 @@ export default function RootLayout() {
     <RootErrorBoundary>
       <AuthProvider>
         <BalancePrivacyProvider>
-          <AppLockProvider>
-            <PushNotificationsBridge />
+          <ActiveAccountProvider>
+            <AppLockProvider>
             <StartupGate>
               <StatusBar hidden={false} barStyle="light-content" backgroundColor="black" />
 
@@ -164,7 +186,7 @@ export default function RootLayout() {
                 headerTintColor: 'white',
               }}
             >
-        {/* ✅ IMPORTANT:
+        {/* âœ… IMPORTANT:
             Let app/index.tsx decide whether we land in (tabs) or login.
             So we keep both screens, but we do NOT assume (tabs) is the start. */}
         <Stack.Screen name="index" options={{ headerShown: false }} />
@@ -202,16 +224,20 @@ export default function RootLayout() {
         <Stack.Screen name="bank-transfer" options={{ headerShown: false }} />
         <Stack.Screen name="transfer-status/index" options={{ headerTitle: 'Transfer Status' }} />
         <Stack.Screen name="anchor-account/index" options={{ headerTitle: 'Deposit Account' }} />
+        <Stack.Screen name="business/index" options={{ headerShown: false }} />
+        <Stack.Screen name="business/activate" options={{ headerTitle: 'Activate Business Account' }} />
+        <Stack.Screen name="business/onboarding" options={{ headerTitle: 'Business Profile' }} />
+        <Stack.Screen name="business/kyb" options={{ headerTitle: 'Business KYB' }} />
+        <Stack.Screen name="business/team" options={{ headerTitle: 'Business Team' }} />
+        <Stack.Screen name="business/approvals" options={{ headerTitle: 'Business Approvals' }} />
+        <Stack.Screen name="business/transfers" options={{ headerTitle: 'Business Transfers' }} />
+        <Stack.Screen name="business/transfer-status/[reference]" options={{ headerTitle: 'Business Transfer Status' }} />
+        <Stack.Screen name="business/payouts" options={{ headerTitle: 'Business Payroll' }} />
+        <Stack.Screen name="business/payroll-run/[id]" options={{ headerTitle: 'Payroll Run' }} />
+        <Stack.Screen name="business/receipts/[reference]" options={{ headerTitle: 'Business Receipt' }} />
 
         <Stack.Screen name="tunnel-activation/index" options={{ headerTitle: 'Tunnel Activation' }} />
-        <Stack.Screen
-          name="convert-ngn-to-usd/index"
-          options={{ headerTitle: 'Convert NGN to USD' }}
-        />
-        <Stack.Screen
-          name="convert-usd-to-ngn/index"
-          options={{ headerTitle: 'Convert USD to NGN' }}
-        />
+        <Stack.Screen name="fx/index" options={{ headerTitle: 'Convert' }} />
 
         <Stack.Screen name="transaction/confirm" options={{ headerTitle: 'Status' }} />
         <Stack.Screen name="transaction/details" options={{ headerTitle: 'Transaction Details' }} />
@@ -259,6 +285,8 @@ export default function RootLayout() {
         <Stack.Screen name="settings/pin/set" options={{ headerTitle: 'Set PIN' }} />
         <Stack.Screen name="settings/pin/change" options={{ headerTitle: 'Change PIN' }} />
         <Stack.Screen name="settings/pin/reset" options={{ headerTitle: 'Reset PIN' }} />
+        <Stack.Screen name="settings/security-lock/index" options={{ headerTitle: 'Security Lock' }} />
+        <Stack.Screen name="settings/security-lock/unlock" options={{ headerTitle: 'Unlock Security Lock' }} />
         <Stack.Screen name="settings/card-tokens/index" options={{ headerTitle: 'Saved Cards' }} />
         <Stack.Screen name="payment-tools/index" options={{ headerTitle: 'Payment Tools' }} />
         <Stack.Screen name="payment-tools/query" options={{ headerTitle: 'Query Transaction' }} />
@@ -275,16 +303,14 @@ export default function RootLayout() {
         <Stack.Screen name="cards/index" options={{ headerTitle: 'Cards' }} />
         <Stack.Screen name="cards/[id]" options={{ headerTitle: 'Card Details' }} />
         <Stack.Screen name="cards/create" options={{ headerTitle: 'Create Card' }} />
-        <Stack.Screen name="circles/[id]/fund" options={{ headerTitle: 'Fund Circle' }} />
-        <Stack.Screen name="circles/[id]/withdraw" options={{ headerTitle: 'Withdraw' }} />
-        <Stack.Screen name="circles/[id]/activities" options={{ headerTitle: 'Activities' }} />
-        <Stack.Screen name="circles/[id]/audit" options={{ headerTitle: 'Audit Summary' }} />
-        <Stack.Screen name="circles/[id]/invite" options={{ headerTitle: 'Invite Member' }} />
         <Stack.Screen name="confirmEmail" options={{ headerTitle: 'Email Confirmation' }} />
         <Stack.Screen name="confirmation" options={{ headerTitle: 'Confirm Email' }} />
             </Stack>
+            <PushNotificationsBridge />
+            <SecurityLockNoticeOverlay />
             </StartupGate>
           </AppLockProvider>
+          </ActiveAccountProvider>
         </BalancePrivacyProvider>
       </AuthProvider>
     </RootErrorBoundary>

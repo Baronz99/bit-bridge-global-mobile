@@ -1,9 +1,10 @@
 import React, { useMemo } from 'react'
 import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native'
-import { Link } from 'expo-router'
+import { Link, useRouter } from 'expo-router'
 import useFetch from '@/services/useFetch'
-import { getUserCards } from '@/api/cards'
+import { getCards } from '@/api/cards'
 import { useAuth } from '@/services/useAuth'
+import { useActiveAccount } from '@/services/useActiveAccount'
 import { resolveUserProfile } from '@/services/auth/resolveUserProfile'
 import ScreenContainer from '@/components/ScreenContainer'
 import moneyFormat from '@/utils/moneyFormat'
@@ -17,7 +18,13 @@ const normalizeLast4 = (value: any) => {
 }
 
 const CardsScreen = () => {
-  const { data, loading, error, refetch } = useFetch(() => getUserCards())
+  const { activeAccount } = useActiveAccount()
+  const router = useRouter()
+  const isCircleAccount = activeAccount?.type === 'circle'
+  const { data, loading, error, refetch } = useFetch(() => getCards(activeAccount), {
+    autoFetch: true,
+    queryKey: ['cards', activeAccount],
+  })
   const {
     userProfileData,
     authHydrated,
@@ -114,6 +121,33 @@ const CardsScreen = () => {
               </TouchableOpacity>
             </Link>
           ) : null}
+        </View>
+      </ScreenContainer>
+    )
+  }
+
+  if (isCircleAccount) {
+    return (
+      <ScreenContainer>
+        <View className="bg-gray-900/80 border border-emerald-500/30 rounded-3xl px-5 py-6 mt-6">
+          <Text className="text-white text-2xl font-semibold">Cards are unavailable in circle context</Text>
+          <Text className="text-gray-300 mt-3 text-sm">
+            Virtual cards are funded from Tunnel and remain personal or business wallet features. The selected circle keeps its own balance and activity flows.
+          </Text>
+          <View className="mt-5 gap-3">
+            <TouchableOpacity
+              onPress={() => router.replace(`/circles/${activeAccount.circleId}` as any)}
+              className="bg-app-primary py-3 rounded-xl"
+            >
+              <Text className="text-white text-center font-medium">Open circle</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => router.push(`/circles/${activeAccount.circleId}/pay` as any)}
+              className="border border-gray-700 py-3 rounded-xl"
+            >
+              <Text className="text-white text-center font-medium">Contribute to circle</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </ScreenContainer>
     )

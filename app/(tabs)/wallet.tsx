@@ -234,7 +234,7 @@ const WalletScreen = () => {
   )
   const circleCurrency = String(circleAccount?.currency || 'NGN')
   const circleBalanceAmount = (() => {
-    const cents = Number(circleAccount?.balance_cents ?? NaN)
+    const cents = Number(circleAccount?.treasury_balance_cents ?? circleAccount?.balance_cents ?? NaN)
     if (Number.isFinite(cents)) return cents / 100
     const amount = Number(circleAccount?.balance ?? circleAccount?.amount ?? 0)
     return Number.isFinite(amount) ? amount : 0

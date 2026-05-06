@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useFocusEffect } from '@react-navigation/native'
-import { ActivityIndicator, ScrollView, Text, View } from 'react-native'
+import { ActivityIndicator, ScrollView, Share, Text, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
+import * as Haptics from 'expo-haptics'
 import NotificationAlert from '@/components/notification'
 import DepositAccountSection from '@/components/DepositAccountSection'
 import AnchorAccountView from '@/components/AnchorAccountView'
@@ -80,8 +81,10 @@ const AnchorAccountScreen = () => {
 
   const handleRefresh = useCallback(async () => {
     try {
-      await loadProfile({ force: true }).catch(() => {})
-      await anchorState.refresh({ force: true })
+      await Promise.allSettled([
+        loadProfile({ force: true }).catch(() => {}),
+        anchorState.refresh({ force: true }),
+      ])
     } catch {
       // Shared auth client handles refresh/retry and clears session if needed.
     }
@@ -236,23 +239,60 @@ const AnchorAccountScreen = () => {
     }
   }
 
+  const accountDetailsText = useMemo(() => {
+    const number = String(normalized.rawAccountNumber || normalized.displayAccountNumber || '').trim()
+    if (!number) return ''
+    return [
+      'BitBridge Deposit Account',
+      `Bank: ${normalized.bankName || '--'}`,
+      `Account Number: ${number}`,
+      `Account Name: ${normalized.accountName || '--'}`,
+      '',
+      'Use this account for NGN deposits only.',
+    ].join('\n')
+  }, [normalized.accountName, normalized.bankName, normalized.displayAccountNumber, normalized.rawAccountNumber])
+
+  const handleCopyAccount = useCallback(async () => {
+    const copyValue = String(normalized.rawAccountNumber || normalized.displayAccountNumber || '').trim()
+    if (!copyValue) {
+      setNotice({ message: 'Full account number is not available yet.', error: true })
+      return
+    }
+
+    try {
+      const Clipboard = await import('expo-clipboard')
+      await Clipboard.setStringAsync(copyValue)
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
+      setNotice({ message: 'Account number copied.', error: false })
+    } catch {
+      setNotice({ message: 'Unable to copy account number.', error: true })
+    }
+  }, [normalized.displayAccountNumber, normalized.rawAccountNumber])
+
+  const handleShareDetails = useCallback(async () => {
+    if (!accountDetailsText) return
+    try {
+      await Share.share({ message: accountDetailsText, title: 'Deposit account details' })
+    } catch {
+      // User cancelled share sheet.
+    }
+  }, [accountDetailsText])
+
   return (
     <View className="flex-1 bg-primary px-4">
       <ScrollView ref={scrollRef} contentContainerStyle={{ paddingBottom: 40 }}>
-        <View className="mt-6 rounded-3xl border border-gray-800 bg-gray-900/80 p-5">
-          <Text className="text-white/70 text-xs tracking-widest uppercase">Deposit account</Text>
-          <Text className="text-white text-2xl font-semibold mt-2">Deposit account</Text>
-          {normalized.depositReady ? (
-            <Text className="text-gray-400 mt-2 text-sm">Account details (NGN)</Text>
-          ) : (
+        {!normalized.depositReady ? (
+          <View className="mt-6 rounded-3xl border border-gray-800 bg-gray-900/80 p-5">
+            <Text className="text-white/70 text-xs tracking-widest uppercase">Deposit account</Text>
+            <Text className="text-white text-2xl font-semibold mt-2">Deposit account</Text>
             <Text className="text-gray-400 mt-2 text-sm">
               Complete the steps below to enable NGN deposits.
             </Text>
-          )}
-          {profileFreshnessLabel ? (
-            <Text className="text-gray-500 mt-2 text-xs">{profileFreshnessLabel}</Text>
-          ) : null}
-        </View>
+            {profileFreshnessLabel ? (
+              <Text className="text-gray-500 mt-2 text-xs">{profileFreshnessLabel}</Text>
+            ) : null}
+          </View>
+        ) : null}
 
         {loading || anchorState.loading ? (
           <View className="py-6">
@@ -268,11 +308,13 @@ const AnchorAccountScreen = () => {
 
         {normalized.depositReady ? (
           <AnchorAccountView
-            statusLabel="Deposit account ready"
+            statusLabel="Ready"
             displayAccountNumber={normalized.displayAccountNumber || null}
             rawAccountNumber={normalized.rawAccountNumber || null}
             accountName={normalized.accountName || null}
             bankName={normalized.bankName || null}
+            onCopyAccount={handleCopyAccount}
+            onShareDetails={handleShareDetails}
           />
         ) : (
           <DepositAccountSection

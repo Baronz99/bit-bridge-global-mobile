@@ -31,6 +31,22 @@ export const verifyTransactionPin = async (pin: string) => {
   }
 }
 
+export const createBiometricEnrollment = async (pin: string, deviceId: string) => {
+  const res = await client.post('/transaction_pin/biometric_enrollment', {
+    pin,
+    device_id: deviceId,
+  })
+  return res.data
+}
+
+export const createBiometricSession = async (enrollmentToken: string, deviceId: string) => {
+  const res = await client.post('/transaction_pin/biometric_session', {
+    biometric_enrollment_token: enrollmentToken,
+    device_id: deviceId,
+  })
+  return res.data
+}
+
 export const changeTransactionPin = async (payload: {
   current_pin: string
   new_pin: string

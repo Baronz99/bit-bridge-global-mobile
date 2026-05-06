@@ -6,10 +6,11 @@ import { Ionicons } from '@expo/vector-icons'
 
 import ScreenContainer from '@/components/ScreenContainer'
 import useFetch from '@/services/useFetch'
-import { getUserCards } from '@/api/cards'
-import { getUserWallet } from '@/api/wallet'
+import { getCards } from '@/api/cards'
+import { getWallet } from '@/api/wallet'
 import { icons } from '@/constants/icons'
 import moneyFormat from '@/utils/moneyFormat'
+import { useActiveAccount } from '@/services/useActiveAccount'
 
 type HubItem = {
   id: string
@@ -178,8 +179,17 @@ const styles = {
 
 export default function TunnelHub() {
   const router = useRouter()
-  const { data: walletRaw, loading: walletLoading, refetch: refetchWallet } = useFetch(() => getUserWallet(), true)
-  const { data: cardsRaw, loading: cardsLoading, refetch: refetchCards } = useFetch(() => getUserCards(), true)
+  const { activeAccount } = useActiveAccount()
+  const isCircleAccount = activeAccount?.type === 'circle'
+  const isBusinessAccount = activeAccount?.type === 'business'
+  const { data: walletRaw, loading: walletLoading, refetch: refetchWallet } = useFetch(() => getWallet(activeAccount), {
+    autoFetch: true,
+    queryKey: ['wallet', activeAccount],
+  })
+  const { data: cardsRaw, loading: cardsLoading, refetch: refetchCards } = useFetch(() => getCards(activeAccount), {
+    autoFetch: true,
+    queryKey: ['cards', activeAccount],
+  })
 
   const palette = {
     primary: '#FF8A1F',
@@ -206,8 +216,8 @@ export default function TunnelHub() {
   const convertActions = useMemo(
     () =>
       [
-        { id: 'ngn-usd', label: 'NGN to USD', link: '/convert-ngn-to-usd', image: icons.transfer },
-        { id: 'usd-ngn', label: 'USD to NGN', link: '/convert-usd-to-ngn', image: icons.withdrawal },
+        { id: 'ngn-usd', label: 'NGN to USD', link: { pathname: '/fx', params: { direction: 'ngn-to-usd' } }, image: icons.transfer },
+        { id: 'usd-ngn', label: 'USD to NGN', link: { pathname: '/fx', params: { direction: 'usd-to-ngn' } }, image: icons.withdrawal },
       ] as HubItem[],
     []
   )
@@ -320,6 +330,102 @@ export default function TunnelHub() {
         ),
       }}
     >
+      {isCircleAccount ? (
+        <View
+          style={{
+            ...styles.secondarySection,
+            marginTop: 16,
+            borderWidth: 1,
+            borderColor: 'rgba(16, 185, 129, 0.18)',
+            backgroundColor: '#08130F',
+          }}
+        >
+          <Text style={[styles.sectionTitle, { color: '#ECFDF5' }]}>Tunnel is not available in circle context</Text>
+          <Text style={[styles.sectionBody, { color: 'rgba(209, 250, 229, 0.82)' }]}>
+            Tunnel, USD conversion, and cards remain personal or business wallet features. Open the selected circle for contributions and activity instead.
+          </Text>
+
+          <View style={styles.actionRow}>
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={() => router.push(`/circles/${activeAccount.circleId}` as any)}
+              style={{
+                ...styles.actionButton,
+                borderColor: 'rgba(16, 185, 129, 0.25)',
+                backgroundColor: 'rgba(16, 185, 129, 0.12)',
+              }}
+            >
+              <Text style={[styles.buttonTitle, { color: '#ECFDF5' }]}>Open circle</Text>
+              <Text style={[styles.buttonBody, { color: 'rgba(209, 250, 229, 0.82)' }]}>
+                Return to the circle account.
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={() => router.push(`/circles/${activeAccount.circleId}/pay` as any)}
+              style={{
+                ...styles.actionButton,
+                borderColor: 'rgba(16, 185, 129, 0.25)',
+                backgroundColor: 'rgba(16, 185, 129, 0.08)',
+              }}
+            >
+              <Text style={[styles.buttonTitle, { color: '#ECFDF5' }]}>Contribute</Text>
+              <Text style={[styles.buttonBody, { color: 'rgba(209, 250, 229, 0.82)' }]}>
+                Add funds using the existing circle flow.
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : null}
+
+      {isBusinessAccount ? (
+        <View
+          style={{
+            ...styles.secondarySection,
+            marginTop: 16,
+            borderWidth: 1,
+            borderColor: 'rgba(59, 130, 246, 0.20)',
+            backgroundColor: '#08101E',
+          }}
+        >
+          <Text style={[styles.sectionTitle, { color: '#EFF6FF' }]}>Tunnel is currently available in personal context</Text>
+          <Text style={[styles.sectionBody, { color: 'rgba(219, 234, 254, 0.82)' }]}>
+            Your business account keeps Bridge, payroll, approvals, and payouts separate. Switch to your personal account to use Tunnel, USD conversion, and cards.
+          </Text>
+          <View style={styles.actionRow}>
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={() => router.push('/business')}
+              style={{
+                ...styles.actionButton,
+                borderColor: 'rgba(59, 130, 246, 0.25)',
+                backgroundColor: 'rgba(59, 130, 246, 0.12)',
+              }}
+            >
+              <Text style={[styles.buttonTitle, { color: '#EFF6FF' }]}>Open business home</Text>
+              <Text style={[styles.buttonBody, { color: 'rgba(219, 234, 254, 0.82)' }]}>
+                Return to your business account.
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={() => router.push('/(tabs)/wallet')}
+              style={{
+                ...styles.actionButton,
+                borderColor: 'rgba(59, 130, 246, 0.25)',
+                backgroundColor: 'rgba(59, 130, 246, 0.08)',
+              }}
+            >
+              <Text style={[styles.buttonTitle, { color: '#EFF6FF' }]}>Bridge wallet</Text>
+              <Text style={[styles.buttonBody, { color: 'rgba(219, 234, 254, 0.82)' }]}>
+                Keep using your business Bridge balance here.
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : null}
+      {!isCircleAccount && !isBusinessAccount ? (      <>
       <View
         style={{
           ...styles.hero,
@@ -566,6 +672,8 @@ export default function TunnelHub() {
           </View>
         ) : null}
       </View>
+      </>
+      ) : null}
     </ScreenContainer>
   )
 }

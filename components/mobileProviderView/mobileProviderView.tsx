@@ -59,7 +59,7 @@ const MobileProviderView = ({ data }: any) => {
             horizontal
             showsHorizontalScrollIndicator={false}
             renderItem={({ item }: any) => (
-              <Link href={`/mobileProviders/${item.id}`} asChild>
+              <Link href={'/data-subscription'} asChild>
                 <TouchableOpacity className="w-40 h-32 bg-gray-200 rounded overflow-hidden">
                   <Image source={getImageByKey(String(splitString(item.name)))} className="w-full h-full" />
                 </TouchableOpacity>

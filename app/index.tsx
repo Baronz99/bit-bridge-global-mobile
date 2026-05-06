@@ -3,6 +3,7 @@ import { View } from 'react-native'
 import { useRootNavigationState, useRouter } from 'expo-router'
 import { useAuth } from '../services/useAuth'
 import { useAppLock } from '../services/useAppLock'
+import { useActiveAccount } from '@/services/useActiveAccount'
 import { log } from '@/utils/logger'
 
 export default function Index() {
@@ -19,6 +20,7 @@ export default function Index() {
     userProfileData,
   } = useAuth()
   const { locked } = useAppLock()
+  const { activeAccount, hydrated: accountHydrated, selectPersonalAccount } = useActiveAccount()
   const lastRedirectRef = useRef<string | null>(null)
   const hasProfile = !!userProfileData
 
@@ -31,13 +33,15 @@ export default function Index() {
         tokenPresent: !!token,
         profileLoading,
         hasProfile,
+        activeAccountType: activeAccount?.type,
+        accountHydrated,
         lastProfileError: profileError,
         redirect,
         navigationReady,
         ...extra,
       })
     },
-    [authHydrated, authenticated, token, profileLoading, hasProfile, profileError, navigationReady]
+    [authHydrated, authenticated, token, profileLoading, hasProfile, activeAccount?.type, accountHydrated, profileError, navigationReady]
   )
 
   const safeReplace = useCallback(
@@ -77,6 +81,19 @@ export default function Index() {
       return
     }
 
+    if (!accountHydrated) {
+      bootTrace('waiting_for_account_context')
+      return
+    }
+
+    if (activeAccount?.type !== 'personal') {
+      bootTrace('resetting_workspace_to_personal', null, { previousWorkspace: activeAccount?.type })
+      void selectPersonalAccount().then(() => {
+        safeReplace('/(tabs)', 'authed_profile_ready_after_workspace_reset')
+      })
+      return
+    }
+
     safeReplace('/(tabs)', 'authed_profile_ready')
   }, [
     authHydrated,
@@ -85,6 +102,9 @@ export default function Index() {
     locked,
     profileLoading,
     hasProfile,
+    accountHydrated,
+    activeAccount,
+    selectPersonalAccount,
     safeReplace,
     bootTrace,
   ])

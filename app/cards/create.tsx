@@ -4,16 +4,31 @@ import { useRouter } from 'expo-router'
 import * as ImagePicker from 'expo-image-picker'
 import FormInput from '@/components/FormInput'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
-import { getCardSetupQuote, getCardSetupStatus, getUserCards, setupCard } from '@/api/cards'
+import { getCardSetupQuote, getCardSetupStatus, getCards, setupCard } from '@/api/cards'
 import { uploadSelfieToCloudinary } from '@/api/uploads'
 import { useAuth } from '@/services/useAuth'
+import { useActiveAccount } from '@/services/useActiveAccount'
 import { resolveUserProfile } from '@/services/auth/resolveUserProfile'
 import { buildApiErrorMessage } from '@/utils/apiErrorMessage'
 import { pickCardRouteId } from '@/utils/cardIdentifier'
 import AppModal from '@/components/modal/Modal'
 import { warn } from '@/utils/logger'
 
-const resolveCardRouteId = (payload: any): string | null => {
+type CardRoutePayload = {
+  data?: unknown
+  card?: unknown
+  card_id?: string | number | null
+  cardholder_id?: string | number | null
+  id?: string | number | null
+}
+
+type CreateCardApiError = {
+  message?: string
+  code?: string
+  response?: { status?: number; data?: { message?: string } }
+}
+
+const resolveCardRouteId = (payload: unknown): string | null => {
   const root = payload?.data ?? payload
   if (Array.isArray(root)) {
     const first = root[0] || {}
@@ -23,7 +38,7 @@ const resolveCardRouteId = (payload: any): string | null => {
   return pickCardRouteId(root) || null
 }
 
-const isLikelyNetworkCreateError = (error: any) => {
+const isLikelyNetworkCreateError = (error: CreateCardApiError | null | undefined) => {
   const message = String(error?.message || '').toLowerCase()
   const code = String(error?.code || '').toLowerCase()
   return (
@@ -34,11 +49,60 @@ const isLikelyNetworkCreateError = (error: any) => {
   )
 }
 
+const isLikelyInFlightCreateError = (error: CreateCardApiError | null | undefined) => {
+  const status = Number(error?.response?.status || 0)
+  const message = String(error?.response?.data?.message || error?.message || '').toLowerCase()
+  return (
+    status === 503 ||
+    status === 504 ||
+    message.includes('application error') ||
+    message.includes('service unavailable')
+  )
+}
+
 const nextIdempotencyKey = () => `card-setup-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+
+const CARD_SETUP_FIELD_LABELS: Record<string, string> = {
+  first_name: 'First name',
+  last_name: 'Last name',
+  email: 'Email',
+  phone_number: 'Phone number',
+  address_line1: 'Address line 1',
+  city: 'City',
+  state: 'State',
+  postal_code: 'Postal code',
+  country: 'Country',
+  selfie_image: 'Selfie',
+}
+
+const normalizeCountryName = (value: unknown) => {
+  const raw = String(value || '').trim()
+  if (!raw) return 'Nigeria'
+  if (raw.toUpperCase() === 'NG') return 'Nigeria'
+  return raw
+}
+
+const resolveMissingFieldLabels = (
+  data: { missing_field_labels?: unknown[]; missing_fields?: unknown[] } | null | undefined
+) => {
+  if (Array.isArray(data?.missing_field_labels) && data.missing_field_labels.length) {
+    return data.missing_field_labels.map((label) => String(label || '').trim()).filter(Boolean)
+  }
+
+  if (Array.isArray(data?.missing_fields) && data.missing_fields.length) {
+    return data.missing_fields
+      .map((field) => CARD_SETUP_FIELD_LABELS[String(field || '').trim()] || String(field || '').replace(/_/g, ' '))
+      .filter(Boolean)
+  }
+
+  return []
+}
 
 const CreateCard = () => {
   const router = useRouter()
   const { userProfileData } = useAuth()
+  const { activeAccount } = useActiveAccount()
+  const isCircleAccount = activeAccount?.type === 'circle'
   const [loading, setLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
@@ -47,7 +111,8 @@ const CreateCard = () => {
   const [selfieLocalUri, setSelfieLocalUri] = useState<string | null>(null)
   const [selfieImageUrl, setSelfieImageUrl] = useState<string | null>(null)
   const [cardholderStatus, setCardholderStatus] = useState<string>('idle')
-  const [cardholderStatusUpdatedAt, setCardholderStatusUpdatedAt] = useState<string | null>(null)
+  const [cardholderStatusUpdatedAt, setCardholderStatusUpdatedAt] = useState<string | null>(null)
+  const [setupState, setSetupState] = useState<string>('loading')
   const [refreshingStatus, setRefreshingStatus] = useState(false)
   const [form, setForm] = useState({
     first_name: '',
@@ -58,7 +123,7 @@ const CreateCard = () => {
     city: '',
     state: '',
     postal_code: '',
-    country: 'NG',
+    country: 'Nigeria',
     currency: 'USD',
     card_limit: '500000',
     card_pin: '',
@@ -85,7 +150,7 @@ const CreateCard = () => {
     const city = String(profileRoot?.city || '').trim()
     const state = String(profileRoot?.state || '').trim()
     const postal = String(profileRoot?.postal_code || profileRoot?.zip || '').trim()
-    const country = String(profileRoot?.country || 'NG').trim().toUpperCase()
+    const country = normalizeCountryName(profileRoot?.country || 'Nigeria')
 
     return {
       first_name: first,
@@ -96,7 +161,7 @@ const CreateCard = () => {
       city,
       state,
       postal_code: postal,
-      country: country || 'NG',
+      country: country || 'Nigeria',
       currency: 'USD',
     }
   }, [profileRoot, userProfileData?.email])
@@ -117,7 +182,39 @@ const CreateCard = () => {
     }))
   }, [profileDefaults])
 
+  if (isCircleAccount) {
+    return (
+      <KeyboardAvoidWrapper>
+        <View className="flex-1 bg-primary px-4 pt-10">
+          <View className="bg-gray-900 border border-emerald-500/30 rounded-2xl p-5">
+            <Text className="text-white text-xl font-semibold">Card creation is unavailable in circle context</Text>
+            <Text className="text-gray-300 text-sm mt-3">
+              Virtual cards are tied to Tunnel funding and remain personal or business wallet features. Return to the selected circle to continue group activity.
+            </Text>
+
+            <TouchableOpacity
+              onPress={() => router.replace(`/circles/${activeAccount.circleId}`)}
+              className="bg-app-primary py-4 rounded-xl mt-5"
+            >
+              <Text className="text-white text-center font-medium">Open circle</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => router.push(`/circles/${activeAccount.circleId}/activities`)}
+              className="border border-gray-700 py-4 rounded-xl mt-3"
+            >
+              <Text className="text-white text-center font-medium">View circle activity</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </KeyboardAvoidWrapper>
+    )
+  }
+
   const setupQuote = useMemo(() => getCardSetupQuote(form.card_limit), [form.card_limit])
+  const cardholderReadyForCreate = ['ready_for_funding', 'active'].includes(setupState)
+  const cardholderVerificationBlocked = ['cardholder_pending', 'provider_pending'].includes(setupState)
+  const cardholderNeedsProfile = ['not_started', 'cardholder_failed', 'loading', 'needs_selfie_upload', 'cardholder_profile_incomplete'].includes(setupState)
 
   const hasKycAccess = () => {
     const kycLevel = profileRoot?.kyc_level || profileRoot?.user_kyc?.kyc_level
@@ -133,6 +230,7 @@ const CreateCard = () => {
       const data = setup?.data || {}
       const state = String(setup?.state || '').toLowerCase()
       const providerStatus = String(data?.cardholder_status || '').toLowerCase()
+      setSetupState(state || 'not_started')
 
       if (state === 'active' || String(data?.provider_card_id || '').trim()) setCardholderStatus('verified')
       else if (state === 'cardholder_failed') setCardholderStatus('failed')
@@ -148,15 +246,16 @@ const CreateCard = () => {
     }
 
     try {
-      const raw = await getUserCards()
+      const raw = await getCards(activeAccount)
       const payload = raw?.data ?? raw
-      let card: any = null
+      let card: CardRoutePayload | null = null
       if (Array.isArray(payload)) card = payload[0] || null
       else if (payload?.card) card = payload.card
       else if (payload?.data) card = payload.data
       else if (payload?.card_id || payload?.cardholder_id || payload?.id) card = payload
 
       if (!card) {
+        setSetupState('not_started')
         setCardholderStatus('idle')
         setCardholderStatusUpdatedAt(null)
         return
@@ -165,6 +264,17 @@ const CreateCard = () => {
       const meta = card?.meta_data || {}
       const kycStatus = String(meta?.cardholder_kyc_status || '').toLowerCase()
       const status = kycStatus || (card?.card_id ? 'verified' : 'idle')
+      const fallbackState =
+        card?.card_id
+          ? 'active'
+          : kycStatus === 'verified'
+            ? 'ready_for_funding'
+            : kycStatus === 'failed'
+              ? 'cardholder_failed'
+              : ['pending_verification', 'manual_review'].includes(kycStatus)
+                ? 'cardholder_pending'
+                : 'not_started'
+      setSetupState(fallbackState)
       setCardholderStatus(status)
       setCardholderStatusUpdatedAt(
         String(meta?.cardholder_status_updated_at || card?.updated_at || '').trim() || null
@@ -290,30 +400,32 @@ const CreateCard = () => {
         city: String(form.city || profileDefaults.city || '').trim(),
         state: String(form.state || profileDefaults.state || '').trim(),
         postal_code: String(form.postal_code || profileDefaults.postal_code || '').trim(),
-        country: String(form.country || profileDefaults.country || 'NG').trim().toUpperCase(),
+        country: normalizeCountryName(form.country || profileDefaults.country || 'Nigeria'),
       }
 
-      const missing = Object.entries({
-        first_name: payload.first_name,
-        last_name: payload.last_name,
-        email: payload.email,
-        phone_number: payload.phone_number,
-        address_line1: payload.address_line1,
-        city: payload.city,
-        state: payload.state,
-        postal_code: payload.postal_code,
-        country: payload.country,
-      })
-        .filter(([, value]) => !String(value || '').trim())
-        .map(([key]) => key.replace('_', ' '))
+      if (cardholderNeedsProfile) {
+        const missing = Object.entries({
+          first_name: payload.first_name,
+          last_name: payload.last_name,
+          email: payload.email,
+          phone_number: payload.phone_number,
+          address_line1: payload.address_line1,
+          city: payload.city,
+          state: payload.state,
+          postal_code: payload.postal_code,
+          country: payload.country,
+        })
+          .filter(([, value]) => !String(value || '').trim())
+          .map(([key]) => CARD_SETUP_FIELD_LABELS[key] || key.replace('_', ' '))
 
-      if (missing.length) {
-        setNotice(`Complete profile fields: ${missing.join(', ')}`)
-        setLoading(false)
-        return
+        if (missing.length) {
+          setNotice(`Complete profile fields: ${missing.join(', ')}`)
+          setLoading(false)
+          return
+        }
       }
       let selfieImage: string | undefined
-      if (selfieLocalUri || selfieImageUrl) {
+      if (cardholderNeedsProfile && (selfieLocalUri || selfieImageUrl)) {
         selfieImage = await ensureSelfieUrl()
       }
 
@@ -336,19 +448,17 @@ const CreateCard = () => {
       const setupData = setupRes?.data || {}
 
       if (setupState === 'needs_selfie_upload') {
-        setNotice('Take or upload a selfie to finish card verification and continue.')
+        setNotice(setupRes?.message || 'Upload a selfie to continue card setup.')
         setLoading(false)
         return
       }
 
       if (setupState === 'cardholder_profile_incomplete') {
-        const missingFields = Array.isArray(setupData?.missing_fields)
-          ? setupData.missing_fields.join(', ')
-          : ''
+        const missingLabels = resolveMissingFieldLabels(setupData)
         setNotice(
-          missingFields
-            ? `Complete required fields: ${missingFields}`
-            : (setupRes?.message || 'Complete required profile fields to continue.')
+          missingLabels.length
+            ? `${setupRes?.message || 'Complete your profile details to continue card setup.'} Missing: ${missingLabels.join(', ')}`
+            : (setupRes?.message || 'Complete your profile details to continue card setup.')
         )
         setLoading(false)
         return
@@ -386,15 +496,32 @@ const CreateCard = () => {
       setNotice(setupRes?.message || 'Card setup submitted. Please refresh status shortly.')
       const cardId = String(setupData?.card_id || '').trim()
       if (cardId) setCreatedCardId(cardId)
-    } catch (error: any) {
-      if (isLikelyNetworkCreateError(error)) {
+    } catch (error: unknown) {
+      if (isLikelyNetworkCreateError(error) || isLikelyInFlightCreateError(error)) {
+        setNotice('We are confirming whether your card was created. Please wait and do not retry yet.')
         for (let attempt = 0; attempt < 6; attempt += 1) {
           try {
-            const existing = await getUserCards()
-            const existingCardId = resolveCardRouteId(existing as any)
+            await refreshCardholderState()
+
+            const statusCheck = await getCardSetupStatus().catch(() => null)
+            const statusState = String(statusCheck?.state || '').toLowerCase()
+            const statusData = statusCheck?.data || {}
+            const statusCardId = String(statusData?.card_id || '').trim()
+            const providerCardId = String(statusData?.provider_card_id || '').trim()
+
+            if (statusState === 'active' || providerCardId || statusCardId) {
+              const resolvedCardId = statusCardId || resolveCardRouteId(statusCheck)
+              if (resolvedCardId) setCreatedCardId(String(resolvedCardId))
+              setSuccess('Card request completed successfully. We confirmed the result after a temporary provider delay.')
+              setNotice(null)
+              return
+            }
+
+            const existing = await getCards(activeAccount)
+            const existingCardId = resolveCardRouteId(existing)
             if (existingCardId) {
               setCreatedCardId(String(existingCardId))
-              setSuccess('Card request completed. Your active card was detected after a network timeout.')
+              setSuccess('Card request completed successfully. We confirmed the result after a temporary provider delay.')
               setNotice(null)
               return
             }
@@ -422,62 +549,97 @@ const CreateCard = () => {
         <View className="pt-8">
           <Text className="text-white text-2xl font-semibold">Create Card</Text>
           <Text className="text-gray-400 mt-1">
-            Create and fund your virtual card in one flow.
+            {cardholderReadyForCreate
+              ? 'Your cardholder profile is verified. Set your card PIN and create your card.'
+              : cardholderVerificationBlocked
+                ? 'Your cardholder verification is in progress. Refresh status when ready.'
+                : 'Complete cardholder verification and create your card in one flow.'}
           </Text>
 
           <View className="mt-6">
-            <FormInput
-              label="First Name"
-              value={form.first_name}
-              onChangeText={(value: string) => setForm({ ...form, first_name: value })}
-            />
-            <FormInput
-              label="Last Name"
-              value={form.last_name}
-              onChangeText={(value: string) => setForm({ ...form, last_name: value })}
-            />
-            <FormInput
-              label="Email"
-              value={form.email}
-              keyboardType="email-address"
-              onChangeText={(value: string) => setForm({ ...form, email: value })}
-            />
-            <FormInput
-              label="Phone Number"
-              value={form.phone_number}
-              keyboardType="phone-pad"
-              onChangeText={(value: string) => setForm({ ...form, phone_number: value })}
-            />
-            <FormInput
-              label="Address Line 1"
-              value={form.address_line1}
-              onChangeText={(value: string) => setForm({ ...form, address_line1: value })}
-            />
-            <FormInput
-              label="City"
-              value={form.city}
-              onChangeText={(value: string) => setForm({ ...form, city: value })}
-            />
-            <FormInput
-              label="State"
-              value={form.state}
-              onChangeText={(value: string) => setForm({ ...form, state: value })}
-            />
-            <FormInput
-              label="Postal Code"
-              value={form.postal_code}
-              onChangeText={(value: string) => setForm({ ...form, postal_code: value })}
-            />
-            <FormInput
-              label="Country"
-              value={form.country}
-              onChangeText={(value: string) => setForm({ ...form, country: value })}
-            />
-            <FormInput
-              label="Currency"
-              value={form.currency}
-              onChangeText={(value: string) => setForm({ ...form, currency: value })}
-            />
+            {setupState === 'loading' ? (
+              <View className="rounded-xl border border-slate-700/40 bg-slate-900/30 p-4 mb-4">
+                <Text className="text-white text-sm font-semibold">Checking card setup status...</Text>
+                <Text className="text-gray-400 text-xs mt-1">
+                  Please wait while we load your cardholder state.
+                </Text>
+              </View>
+            ) : cardholderReadyForCreate ? (
+              <View className="rounded-xl border border-emerald-700/40 bg-emerald-900/20 p-3 mb-4">
+                <Text className="text-emerald-100 text-xs font-semibold">Cardholder verified</Text>
+                <Text className="text-emerald-200 text-[11px] mt-1">
+                  Identity details are already on file for this card. You only need to set your card options below.
+                </Text>
+                {formatStatusTime(cardholderStatusUpdatedAt) ? (
+                  <Text className="text-emerald-200 text-[11px] mt-2">
+                    Verified update: {formatStatusTime(cardholderStatusUpdatedAt)}
+                  </Text>
+                ) : null}
+              </View>
+            ) : cardholderNeedsProfile ? (
+              <>
+                <FormInput
+                  label="First Name"
+                  value={form.first_name}
+                  onChangeText={(value: string) => setForm({ ...form, first_name: value })}
+                />
+                <FormInput
+                  label="Last Name"
+                  value={form.last_name}
+                  onChangeText={(value: string) => setForm({ ...form, last_name: value })}
+                />
+                <FormInput
+                  label="Email"
+                  value={form.email}
+                  keyboardType="email-address"
+                  onChangeText={(value: string) => setForm({ ...form, email: value })}
+                />
+                <FormInput
+                  label="Phone Number"
+                  value={form.phone_number}
+                  keyboardType="phone-pad"
+                  onChangeText={(value: string) => setForm({ ...form, phone_number: value })}
+                />
+                <FormInput
+                  label="Address Line 1"
+                  value={form.address_line1}
+                  onChangeText={(value: string) => setForm({ ...form, address_line1: value })}
+                />
+                <FormInput
+                  label="City"
+                  value={form.city}
+                  onChangeText={(value: string) => setForm({ ...form, city: value })}
+                />
+                <FormInput
+                  label="State"
+                  value={form.state}
+                  onChangeText={(value: string) => setForm({ ...form, state: value })}
+                />
+                <FormInput
+                  label="Postal Code"
+                  value={form.postal_code}
+                  onChangeText={(value: string) => setForm({ ...form, postal_code: value })}
+                />
+                <FormInput
+                  label="Country"
+                  value={form.country}
+                  onChangeText={(value: string) => setForm({ ...form, country: value })}
+                />
+                <FormInput
+                  label="Currency"
+                  value={form.currency}
+                  onChangeText={(value: string) => setForm({ ...form, currency: value })}
+                />
+              </>
+            ) : null}
+            {cardholderVerificationBlocked ? (
+              <View className="rounded-xl border border-sky-700/40 bg-sky-900/20 p-3 mb-4">
+                <Text className="text-sky-100 text-xs font-semibold">Cardholder verification in progress</Text>
+                <Text className="text-sky-200 text-[11px] mt-1">
+                  Your identity has already been submitted. Refresh the status below before creating the card.
+                </Text>
+              </View>
+            ) : null}
             <FormInput
               label="Card Limit (5000 or 10000)"
               value={form.card_limit}
@@ -498,31 +660,33 @@ const CreateCard = () => {
               keyboardType="number-pad"
               onChangeText={(value: string) => setForm({ ...form, card_pin_confirm: value.replace(/[^0-9]/g, '').slice(0, 4) })}
             />
-            <View className="mt-3">
-              <Text className="text-gray-300 text-xs mb-2">Selfie (required for cardholder verification)</Text>
-              {selfieLocalUri ? (
-                <Image source={{ uri: selfieLocalUri }} className="w-full h-40 rounded-xl mb-2" />
-              ) : null}
-              <View className="flex-row gap-2">
-                <TouchableOpacity
-                  disabled={loading || uploading}
-                  onPress={() => chooseSelfie(true)}
-                  className="bg-gray-800 py-3 rounded-xl flex-1"
-                >
-                  <Text className="text-white text-center">Capture Selfie</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  disabled={loading || uploading}
-                  onPress={() => chooseSelfie(false)}
-                  className="bg-gray-800 py-3 rounded-xl flex-1"
-                >
-                  <Text className="text-white text-center">Upload from Gallery</Text>
-                </TouchableOpacity>
+            {cardholderNeedsProfile ? (
+              <View className="mt-3">
+                <Text className="text-gray-300 text-xs mb-2">Selfie (required for cardholder verification)</Text>
+                {selfieLocalUri ? (
+                  <Image source={{ uri: selfieLocalUri }} className="w-full h-40 rounded-xl mb-2" />
+                ) : null}
+                <View className="flex-row gap-2">
+                  <TouchableOpacity
+                    disabled={loading || uploading}
+                    onPress={() => chooseSelfie(true)}
+                    className="bg-gray-800 py-3 rounded-xl flex-1"
+                  >
+                    <Text className="text-white text-center">Capture Selfie</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    disabled={loading || uploading}
+                    onPress={() => chooseSelfie(false)}
+                    className="bg-gray-800 py-3 rounded-xl flex-1"
+                  >
+                    <Text className="text-white text-center">Upload from Gallery</Text>
+                  </TouchableOpacity>
+                </View>
+                {selfieImageUrl ? (
+                  <Text className="text-emerald-400 text-xs mt-2">Selfie upload ready.</Text>
+                ) : null}
               </View>
-              {selfieImageUrl ? (
-                <Text className="text-emerald-400 text-xs mt-2">Selfie upload ready.</Text>
-              ) : null}
-            </View>
+            ) : null}
             <View className="mt-4 rounded-xl border border-emerald-700/40 bg-emerald-900/20 p-3">
               <Text className="text-emerald-100 text-xs font-semibold">Card setup summary</Text>
               <Text className="text-emerald-200 text-[11px] mt-1">
@@ -547,7 +711,7 @@ const CreateCard = () => {
                   Last update: {formatStatusTime(cardholderStatusUpdatedAt)}
                 </Text>
               ) : null}
-              {['pending_verification', 'manual_review', 'failed'].includes(cardholderStatus) ? (
+              {cardholderVerificationBlocked || cardholderStatus === 'failed' ? (
                 <View className="mt-2 rounded-xl border border-sky-700/40 bg-sky-900/20 p-3">
                   <Text className="text-sky-100 text-xs font-semibold">
                     {cardholderStatus === 'failed'
@@ -578,15 +742,17 @@ const CreateCard = () => {
           <TouchableOpacity
             onPress={handleSubmit}
             className="bg-app-primary py-4 rounded-xl mt-6"
-            disabled={loading || uploading || ['pending_verification', 'manual_review'].includes(cardholderStatus)}
+            disabled={loading || uploading || setupState === 'loading' || cardholderVerificationBlocked}
           >
             {loading || uploading ? (
               <ActivityIndicator />
             ) : (
               <Text className="text-white text-center font-medium">
-                {['pending_verification', 'manual_review'].includes(cardholderStatus)
+                {cardholderVerificationBlocked
                   ? 'Verification Pending'
-                  : 'Create Card'}
+                  : cardholderReadyForCreate
+                    ? 'Create Card'
+                    : 'Verify and Create Card'}
               </Text>
             )}
           </TouchableOpacity>

@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useMemo, useState } from 'react'
+import React, { useCallback, useMemo, useState } from 'react'
 import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native'
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
 import { useFocusEffect } from '@react-navigation/native'
@@ -162,7 +162,7 @@ const CircleTimelineEventDetailScreen = () => {
                   {recordAmountLabel(record)}
                 </Text>
                 <Text className="mt-2 text-sm text-gray-400">
-                  {[recordStatusLabel(record), recordTimeLabel(record)].filter(Boolean).join(' ï¿½ ')}
+                  {[recordStatusLabel(record), recordTimeLabel(record)].filter(Boolean).join(' � ')}
                 </Text>
               </View>
 

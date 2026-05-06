@@ -10,14 +10,20 @@ const LEGACY_TOKEN_KEY = 'bitbridge_token'
 const LEGACY_REFRESH_TOKEN_KEY = 'bitbridge_refresh_token'
 
 // --- tiny event system (no Node EventEmitter) ---
-type AuthEventName = 'unauthorized'
+type AuthEventName = 'unauthorized' | 'security_lock_active'
 type AuthEventPayload = {
   reason?: string
   status?: number | null
+  code?: string
+  title?: string
+  message?: string
 }
 type Listener = (payload?: AuthEventPayload) => void | Promise<void>
 
-const listeners: Record<AuthEventName, Set<Listener>> = { unauthorized: new Set() }
+const listeners: Record<AuthEventName, Set<Listener>> = {
+  unauthorized: new Set(),
+  security_lock_active: new Set(),
+}
 
 export const authEvents = {
   on(event: AuthEventName, fn: Listener) {
@@ -454,6 +460,21 @@ client.interceptors.response.use(
       } catch {
         // Treat transport/unknown refresh failures as recoverable; preserve local session.
       }
+    }    const securityLockPayload = (error?.response?.data ?? {}) as {
+      error_code?: string
+      code?: string
+      title?: string
+      public_message?: string
+      message?: string
+    }
+    const securityLockCode = String(securityLockPayload.error_code || securityLockPayload.code || '').trim()
+    if (status === 403 && securityLockCode === 'security_lock_active') {
+      authEvents.emit('security_lock_active', {
+        code: securityLockCode,
+        status,
+        title: String(securityLockPayload.title || '').trim() || undefined,
+        message: String(securityLockPayload.public_message || securityLockPayload.message || '').trim() || undefined,
+      })
     }
 
     logResponse(cfg, status, error?.response?.data)
@@ -472,5 +493,3 @@ export const getApiClientDebugSnapshot = () => {
 }
 
 export default client
-
-

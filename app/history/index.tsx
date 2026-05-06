@@ -1,14 +1,18 @@
 import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View, TextInput } from 'react-native'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'expo-router'
+import { Link, useRouter } from 'expo-router'
 import useFetch from '@/services/useFetch'
 import moneyFormat from '@/utils/moneyFormat'
 import { getUserOrders } from '@/api/billOrder'
-import { getTransactions } from '@/api/transactions'
+import { getTransactionsForAccount } from '@/api/transactions'
 import { resolveTransferLifecycle } from '@/utils/transferLifecycle'
 import { formatWalletHistoryPresentation } from '@/utils/walletHistoryPresentation'
+import { useActiveAccount } from '@/services/useActiveAccount'
 
 const index = () => {
+  const { activeAccount } = useActiveAccount()
+  const router = useRouter()
+  const isCircleAccount = activeAccount?.type === 'circle'
   const [activeTab, setActiveTab] = useState<'orders' | 'wallet'>('orders')
   const [orderStatus, setOrderStatus] = useState<'all' | 'completed' | 'pending' | 'failed'>(
     'all'
@@ -33,7 +37,7 @@ const index = () => {
   } = useFetch(fetchOrders, activeTab === 'orders')
 
   const fetchTransactions = useCallback(() => {
-    return getTransactions({
+    return getTransactionsForAccount(activeAccount, {
       params:
         walletFilter === 'all'
           ? {}
@@ -41,12 +45,15 @@ const index = () => {
               transaction_type: walletFilter,
             },
     })
-  }, [walletFilter])
+  }, [activeAccount, walletFilter])
   const {
     data: walletData,
     loading: walletLoading,
     refetch: refetchWallet,
-  } = useFetch(fetchTransactions, activeTab === 'wallet')
+  } = useFetch(fetchTransactions, {
+    autoFetch: activeTab === 'wallet',
+    queryKey: ['transactions', activeAccount, { walletFilter }],
+  })
 
   useEffect(() => {
     if (activeTab === 'orders') {
@@ -228,38 +235,52 @@ const index = () => {
   const displayAmount = (item: any) =>
     Number(item?.display_total ?? item?.display_amount ?? item?.amount ?? 0)
 
+  useEffect(() => {
+    if (isCircleAccount && activeTab === 'orders') {
+      setActiveTab('wallet')
+    }
+  }, [activeTab, isCircleAccount])
+
   return (
     <View className="flex-1 bg-primary">
       <View className="flex-1">
         <View className="mx-4 mt-4 mb-3 rounded-2xl border border-gray-800 bg-gray-900 p-4">
           <Text className="text-white text-lg font-semibold">History</Text>
           <Text className="text-gray-400 text-xs mt-1">
-            Track orders and wallet activity in one place.
+            {isCircleAccount
+              ? 'Track circle activity in one place.'
+              : 'Track orders and wallet activity in one place.'}
           </Text>
           <View className="flex-row mt-4 gap-3">
+            {!isCircleAccount ? (
+              <View className="flex-1 rounded-xl border border-gray-800 bg-gray-950 p-3">
+                <Text className="text-gray-400 text-xs">Orders</Text>
+                <Text className="text-white text-lg font-semibold">{ordersCount}</Text>
+              </View>
+            ) : null}
             <View className="flex-1 rounded-xl border border-gray-800 bg-gray-950 p-3">
-              <Text className="text-gray-400 text-xs">Orders</Text>
-              <Text className="text-white text-lg font-semibold">{ordersCount}</Text>
-            </View>
-            <View className="flex-1 rounded-xl border border-gray-800 bg-gray-950 p-3">
-              <Text className="text-gray-400 text-xs">Wallet</Text>
+              <Text className="text-gray-400 text-xs">{isCircleAccount ? 'Circle' : 'Wallet'}</Text>
               <Text className="text-white text-lg font-semibold">{walletCount}</Text>
             </View>
           </View>
         </View>
 
         <View className="mx-4 mb-4 rounded-full bg-gray-900 p-1 flex-row">
-          <TouchableOpacity
-            onPress={() => setActiveTab('orders')}
-            className={`flex-1 ${activeTab === 'orders' ? 'bg-app-primary' : 'bg-transparent'} py-2 rounded-full`}
-          >
-            <Text className="text-white text-xs text-center font-semibold">Orders</Text>
-          </TouchableOpacity>
+          {!isCircleAccount ? (
+            <TouchableOpacity
+              onPress={() => setActiveTab('orders')}
+              className={`flex-1 ${activeTab === 'orders' ? 'bg-app-primary' : 'bg-transparent'} py-2 rounded-full`}
+            >
+              <Text className="text-white text-xs text-center font-semibold">Orders</Text>
+            </TouchableOpacity>
+          ) : null}
           <TouchableOpacity
             onPress={() => setActiveTab('wallet')}
             className={`flex-1 ${activeTab === 'wallet' ? 'bg-app-primary' : 'bg-transparent'} py-2 rounded-full`}
           >
-            <Text className="text-white text-xs text-center font-semibold">Wallet</Text>
+            <Text className="text-white text-xs text-center font-semibold">
+              {isCircleAccount ? 'Circle' : 'Wallet'}
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -297,8 +318,12 @@ const index = () => {
                       {filter === 'all'
                         ? 'All'
                         : filter === 'deposit'
-                          ? 'Deposits'
-                          : 'Withdrawals'}
+                          ? isCircleAccount
+                            ? 'Contributions'
+                            : 'Deposits'
+                          : isCircleAccount
+                            ? 'Payouts'
+                            : 'Withdrawals'}
                     </Text>
                   </TouchableOpacity>
                 )
@@ -439,10 +464,54 @@ const index = () => {
             {activeTab === 'wallet' && !walletLoading ? (
               filteredTransactions.length < 1 ? (
                 <View className="rounded-2xl border border-gray-800 bg-gray-900 px-4 py-4">
-                  <Text className="text-center text-gray-300">No transactions</Text>
+                  <Text className="text-center text-gray-300">
+                    {isCircleAccount ? 'No circle activity yet.' : 'No transactions'}
+                  </Text>
                 </View>
               ) : (
                 filteredTransactions.map((item: any, index: number) => {
+                  if (isCircleAccount) {
+                    const reference = item?.reference ?? item?.id ?? `circle-${index}`
+                    const title =
+                      item?.label ||
+                      item?.title ||
+                      item?.description ||
+                      item?.activity_type ||
+                      item?.kind ||
+                      'Circle activity'
+                    const subtitle =
+                      item?.summary ||
+                      item?.display_message ||
+                      item?.note ||
+                      item?.status ||
+                      item?.reference ||
+                      ''
+                    return (
+                      <TouchableOpacity
+                        key={`${reference}-${index}`}
+                        onPress={() => router.push(`/circles/${activeAccount.circleId}/activities` as any)}
+                        className="mb-3 rounded-2xl border border-gray-800 bg-gray-900 px-4 py-4"
+                      >
+                        <View className="flex-row justify-between items-start">
+                          <View className="flex-1 pr-3">
+                            <Text className="text-white font-semibold">{title}</Text>
+                            {subtitle ? (
+                              <Text className="text-gray-500 text-xs mt-1">{subtitle}</Text>
+                            ) : null}
+                          </View>
+                          <View className="items-end">
+                            <Text className="text-white font-semibold">
+                              {moneyFormat(displayAmount(item), String(item?.currency || 'NGN'))}
+                            </Text>
+                            <Text className={`text-xs mt-1 ${statusTone(statusFilterValue(item))}`}>
+                              {String(item?.status || item?.state || item?.direction || 'posted')}
+                            </Text>
+                          </View>
+                        </View>
+                      </TouchableOpacity>
+                    )
+                  }
+
                   const reference = item?.reference ?? item?.transfer_reference ?? item?.id
                   const lifecycle = resolveTransferLifecycle({
                     lifecycle_state: item?.lifecycle_state,

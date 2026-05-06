@@ -7,6 +7,7 @@ type WalletHistoryPresentation = {
 
 const safe = (value: unknown) => String(value ?? '').trim()
 const lower = (value: unknown) => safe(value).toLowerCase()
+const SAFE_SEPARATOR = ' � '
 
 const pick = (item: WalletHistoryInput, keys: string[]) => {
   if (!item) return ''
@@ -81,7 +82,7 @@ const pickCounterparty = (item: WalletHistoryInput) => {
   const bank = pick(item, ['bank_name', 'bank'])
   const account = maskAccount(pick(item, ['account_number', 'account']))
   const chunks = [name, bank, account].filter(Boolean)
-  return chunks.join(' • ')
+  return chunks.join(SAFE_SEPARATOR)
 }
 
 const pickDetail = (item: WalletHistoryInput, title: string) => {
@@ -104,10 +105,10 @@ export const formatWalletHistoryPresentation = (item: WalletHistoryInput): Walle
   const refText = compactReference(reference)
 
   if (detail && refText) {
-    const prefix = txType === 'deposit' ? 'From' : txType === 'withdrawal' ? 'To' : 'Party'
-    return { title, subtitle: `${prefix} ${detail} • Ref ${refText}` }
+    const prefix = txType === 'deposit' ? 'From' : txType === 'withdrawal' ? 'To' : 'Details'
+    return { title, subtitle: `${prefix} ${detail}${SAFE_SEPARATOR}Ref ${refText}` }
   }
   if (detail) return { title, subtitle: detail }
   if (refText) return { title, subtitle: `Ref ${refText}` }
-  return { title, subtitle: 'Reference pending' }
+  return { title, subtitle: 'Reference unavailable' }
 }

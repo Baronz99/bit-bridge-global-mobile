@@ -6,7 +6,9 @@ import TransactionPinModal from '@/components/TransactionPinModal'
 import ReviewSummaryCard from '@/components/bankTransfer/ReviewSummaryCard'
 import { createCounterParty, initiateFundTransfer, resolveAccountName } from '@/api/account'
 import { useAuth } from '@/services/useAuth'
+import { resolveTransactionBiometricUserId, useTransactionBiometrics } from '@/services/useTransactionBiometrics'
 import { buildApiErrorMessage } from '@/utils/apiErrorMessage'
+import { log, warn } from '@/utils/logger'
 import {
   BANK_TRANSFER_TIER_REQUIREMENT_COPY,
   buildPinLockoutMessage,
@@ -18,7 +20,22 @@ import {
 } from '@/utils/bankTransfer'
 import { resolveTransferLifecycle } from '@/utils/transferLifecycle'
 
+const DEFAULT_TRANSFER_DESCRIPTION = 'Fund Transfer'
+
 type NoticeState = { message: string | null; error: boolean; data: any | null }
+type ProcessingStage =
+  | null
+  | {
+      badge: string
+      title: string
+      message: string
+    }
+type EnrollmentSummary = {
+  status: 'not_attempted' | 'eligible_not_enabled' | 'enabling' | 'enabled' | 'skipped' | 'failed'
+  reason?: string
+  message?: string
+  code?: string
+}
 
 type TransferDraft = {
   bank_code: string
@@ -48,8 +65,11 @@ const parseDraft = (raw: any): TransferDraft | null => {
   if (!input) return null
   try {
     const parsed = JSON.parse(String(input))
-    if (!parsed?.bank_code || !parsed?.account_number || !parsed?.account_name || !parsed?.description) return null
-    return parsed
+    if (!parsed?.bank_code || !parsed?.account_number || !parsed?.account_name) return null
+    return {
+      ...parsed,
+      description: String(parsed?.description || '').trim() || DEFAULT_TRANSFER_DESCRIPTION,
+    }
   } catch {
     return null
   }
@@ -74,6 +94,8 @@ const ReviewTransferScreen = () => {
   const router = useRouter()
   const { draft: draftParam } = useLocalSearchParams<{ draft?: string }>()
   const { onLogout, userProfileData, loadProfile } = useAuth()
+  const profilePayload = (userProfileData?.data ?? userProfileData) as any
+  const transactionBiometrics = useTransactionBiometrics(resolveTransactionBiometricUserId(profilePayload))
   const [loading, setLoading] = useState(false)
   const [pinModalOpen, setPinModalOpen] = useState(false)
   const [pinError, setPinError] = useState<string | null>(null)
@@ -81,6 +103,7 @@ const ReviewTransferScreen = () => {
   const [showRetrySubmit, setShowRetrySubmit] = useState(false)
   const [showUpgradeCta, setShowUpgradeCta] = useState(false)
   const [notice, setNotice] = useState<NoticeState>({ message: null, error: false, data: null })
+  const [processingStage, setProcessingStage] = useState<ProcessingStage>(null)
 
   const draft = useMemo(() => parseDraft(draftParam), [draftParam])
   const transferReferenceRef = useRef<string>('')
@@ -108,8 +131,7 @@ const ReviewTransferScreen = () => {
       String(draft.account_number || '').trim().length === 10 &&
       String(draft.account_name || '').trim() &&
       Number(draft.amount || 0) > 0 &&
-      Number(draft.total_debit || 0) >= Number(draft.amount || 0) &&
-      String(draft.description || '').trim()
+      Number(draft.total_debit || 0) >= Number(draft.amount || 0)
     )
   }, [draft])
 
@@ -169,7 +191,10 @@ const ReviewTransferScreen = () => {
     return extractCounterPartyId(created)
   }
 
-  const handleSubmit = async (transactionPin: string) => {
+  const submitTransfer = async (credential: {
+    pin?: string
+    biometric_approval_token?: string
+  }) => {
     if (!effectiveTierEligible) {
       setNotice({ message: 'Bank transfer is available from Tier 2.', error: true, data: null })
       return
@@ -179,14 +204,27 @@ const ReviewTransferScreen = () => {
       return
     }
     if (loading) return
+    const stage: ProcessingStage = credential.biometric_approval_token
+      ? {
+          badge: 'Face ID / Fingerprint confirmed',
+          title: 'Submitting transfer',
+          message: 'Your biometric confirmation was approved. Sending this transfer securely now.',
+        }
+      : {
+          badge: 'PIN confirmed',
+          title: 'Authorizing transfer',
+          message: 'Your transaction PIN was received. Submitting this transfer securely now.',
+        }
     setLoading(true)
+    setProcessingStage(stage)
     setNotice({ message: null, error: false, data: null })
     setPinError(null)
     setShowRetrySubmit(false)
     setShowUpgradeCta(false)
-    setLastEnteredPin(transactionPin)
+    setLastEnteredPin(credential.pin || null)
 
     const transferReference = transferReferenceRef.current
+    let navigated = false
     try {
       const counterPartyId = draft.inter_bank
         ? await resolveInterBankCounterPartyId(draft)
@@ -203,9 +241,12 @@ const ReviewTransferScreen = () => {
           account_name: draft.account_name,
           amount: Number(draft.amount || 0),
           inter_bank: !!draft.inter_bank,
-          pin: transactionPin,
+          ...(credential.pin ? { pin: credential.pin } : {}),
+          ...(credential.biometric_approval_token
+            ? { biometric_approval_token: credential.biometric_approval_token }
+            : {}),
           transfer_reference: transferReference,
-          description: String(draft.description || 'Fund Transfer').trim() || 'Fund Transfer',
+          description: String(draft.description || DEFAULT_TRANSFER_DESCRIPTION).trim() || DEFAULT_TRANSFER_DESCRIPTION,
           counter_party_id: counterPartyId || undefined,
           save_beneficiary: draft.save_beneficiary ? true : undefined,
         },
@@ -240,8 +281,37 @@ const ReviewTransferScreen = () => {
         status: responseData?.status,
         display_message: responseData?.display_message || responseData?.message || response?.message,
       })
+      let enrollmentSummary: EnrollmentSummary = { status: 'not_attempted' }
 
       setPinModalOpen(false)
+      if (credential.pin) {
+        log('[BANK_TRANSFER][BIOMETRIC] enrollment:begin_after_success', {
+          transferReference,
+        })
+        const enrollmentResult = await transactionBiometrics.prepareEnrollmentAfterPinSuccess(credential.pin)
+        enrollmentSummary = {
+          status: enrollmentResult.state,
+          code: enrollmentResult.code || '',
+          message: enrollmentResult.message || '',
+        }
+        log('[BANK_TRANSFER][BIOMETRIC] enrollment:completed_after_success', {
+          transferReference,
+          status: enrollmentResult.state,
+          code: enrollmentResult.code || null,
+        })
+      } else {
+        warn('[BANK_TRANSFER][BIOMETRIC] enrollment:not_attempted_after_success', {
+          transferReference,
+          reason: 'pin_not_used_for_this_submission',
+        })
+      }
+
+      log('[BANK_TRANSFER][BIOMETRIC] navigation_to_success', {
+        transferReference,
+        enrollmentStatus: enrollmentSummary.status,
+        enrollmentReason: enrollmentSummary.reason || null,
+      })
+      navigated = true
       router.replace({
         pathname: '/bank-transfer/success',
         params: {
@@ -261,6 +331,10 @@ const ReviewTransferScreen = () => {
             lifecycle_state: lifecycle.state,
             status: responseData?.status || lifecycle.state,
             display_message: lifecycle.message,
+            biometric_enrollment_status: enrollmentSummary.status,
+            biometric_enrollment_reason: enrollmentSummary.reason || '',
+            biometric_enrollment_message: enrollmentSummary.message || '',
+            biometric_enrollment_code: enrollmentSummary.code || '',
           }),
         },
       })
@@ -311,8 +385,26 @@ const ReviewTransferScreen = () => {
 
       setPinError(message)
       setNotice({ message, error: true, data: null })
+      setProcessingStage(null)
     } finally {
       setLoading(false)
+      if (!navigated) {
+        setProcessingStage(null)
+      }
+    }
+  }
+
+  const handleSubmit = async (transactionPin: string) =>
+    submitTransfer({ pin: transactionPin })
+
+  const handleBiometricSubmit = async () => {
+    try {
+      const approvalToken = await transactionBiometrics.getApprovalToken()
+      await submitTransfer({ biometric_approval_token: approvalToken })
+    } catch (error: any) {
+      const message = error?.message || 'Biometric confirmation failed. Use your transaction PIN.'
+      setPinError(message)
+      setNotice({ message, error: true, data: null })
     }
   }
 
@@ -419,7 +511,11 @@ const ReviewTransferScreen = () => {
         open={pinModalOpen}
         onClose={() => setPinModalOpen(false)}
         onSubmit={handleSubmit}
+        onBiometricSubmit={handleBiometricSubmit}
         loading={loading}
+        biometricLoading={transactionBiometrics.biometricLoading}
+        biometricAvailable={transactionBiometrics.biometricAvailable}
+        biometricEnabled={transactionBiometrics.biometricEnabled}
         errorMessage={pinError}
         title="Enter PIN to complete transfer"
         helperActionLabel="Forgot PIN? Reset PIN"
@@ -428,6 +524,25 @@ const ReviewTransferScreen = () => {
           router.push('/settings/pin/reset')
         }}
       />
+      {loading && processingStage ? (
+        <View className="absolute inset-0 bg-primary/85 items-center justify-center px-6">
+          <View className="w-full max-w-md rounded-3xl border border-amber-500/30 bg-gray-950 px-5 py-6">
+            <View className="self-center rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 mb-4">
+              <Text className="text-amber-200 text-[11px] font-semibold">{processingStage.badge}</Text>
+            </View>
+            <ActivityIndicator size="large" color="#f59e0b" />
+            <Text className="text-white text-center text-xl font-semibold mt-4">
+              {processingStage.title}
+            </Text>
+            <Text className="text-gray-300 text-center text-sm mt-2">
+              {processingStage.message}
+            </Text>
+            <Text className="text-gray-500 text-center text-xs mt-4">
+              This usually takes only a few seconds.
+            </Text>
+          </View>
+        </View>
+      ) : null}
     </View>
   )
 }

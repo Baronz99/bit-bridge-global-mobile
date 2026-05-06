@@ -7,13 +7,8 @@ import moneyFormat from '@/utils/moneyFormat'
 import PerfTrace from '@/utils/perfTrace'
 import { resolveTransferLifecycle } from '@/utils/transferLifecycle'
 import { FEATURE_DISPUTES } from '@/constants/featureFlags'
-
-const Row = ({ label, value }: { label: string; value?: string | number }) => (
-  <View className="flex-row justify-between py-2">
-    <Text className="text-gray-400 text-sm">{label}</Text>
-    <Text className="text-gray-200 text-sm text-right">{String(value ?? '-')}</Text>
-  </View>
-)
+import CompletionPanel from '@/components/finance/CompletionPanel'
+import type { FinanceSummaryRow, TransactionRecordDTO, TransactionStatusTone } from '@/components/finance/types'
 
 const TransactionRecordScreen = () => {
   const router = useRouter()
@@ -21,7 +16,7 @@ const TransactionRecordScreen = () => {
   const ref = Array.isArray(reference) ? reference[0] : reference
   const uiAfterDataTraceRef = useRef<string | null>(null)
 
-  const fetchRecord = useCallback(async () => {
+  const fetchRecord = useCallback(async (): Promise<TransactionRecordDTO | null> => {
     if (!ref) return Promise.resolve(null)
     const traceLabel = `tx_record:api:${ref}`
     PerfTrace.start(traceLabel, { reference: ref })
@@ -30,20 +25,18 @@ const TransactionRecordScreen = () => {
       PerfTrace.end(traceLabel, { ok: true })
       uiAfterDataTraceRef.current = `tx_record:ui_after_data:${ref}`
       PerfTrace.start(uiAfterDataTraceRef.current)
-      return result
-    } catch (error: any) {
+      return result as TransactionRecordDTO
+    } catch (error: unknown) {
+      const err = error as { response?: { status?: number }; message?: string }
       PerfTrace.end(traceLabel, {
         ok: false,
-        status: error?.response?.status ?? null,
-        message: error?.message || 'request_failed',
+        status: err?.response?.status ?? null,
+        message: err?.message || 'request_failed',
       })
       throw error
     }
   }, [ref])
 
-  // IMPORTANT:
-  // - Do NOT manually logout on 401 here.
-  // - client.ts already handles refresh/retry and emits unauthorized → AuthProvider clears session.
   const { data, loading, error, refetch } = useFetch(fetchRecord)
 
   useEffect(() => {
@@ -64,13 +57,15 @@ const TransactionRecordScreen = () => {
     )
   }
 
+  const record = data as TransactionRecordDTO | null
+
   const handleShareReceipt = async () => {
-    if (!data) return
+    if (!record) return
     try {
-      const amount = moneyFormat(Number((data as any)?.amount ?? 0))
-      const status = (data as any)?.status ?? 'pending'
-      const referenceText = (data as any)?.reference || (data as any)?.id || ref
-      const created = (data as any)?.created_at ?? '-'
+      const amount = moneyFormat(Number(record.amount ?? 0))
+      const status = record.status ?? 'pending'
+      const referenceText = record.reference || record.id || ref
+      const created = record.created_at ?? '-'
       await Share.share({
         message:
           `BitBridge Wallet Receipt\n` +
@@ -85,7 +80,7 @@ const TransactionRecordScreen = () => {
   }
 
   const handleCopyReference = async () => {
-    const referenceText = (data as any)?.reference || (data as any)?.id || ref
+    const referenceText = record?.reference || record?.id || ref
     try {
       const Clipboard = await import('expo-clipboard')
       await Clipboard.setStringAsync(String(referenceText))
@@ -95,132 +90,106 @@ const TransactionRecordScreen = () => {
     }
   }
 
+  const handleViewReceipt = useCallback(() => {
+    const receiptReference = String(record?.reference || record?.id || ref || '').trim()
+    if (!receiptReference) return
+    router.push({
+      pathname: '/transaction/receipt',
+      params: { reference: receiptReference },
+    })
+  }, [record?.id, record?.reference, ref, router])
+
   const lifecycle = resolveTransferLifecycle({
-    lifecycle_state: (data as any)?.lifecycle_state,
-    status: (data as any)?.status,
-    display_message: (data as any)?.display_message,
+    lifecycle_state: record?.lifecycle_state,
+    status: record?.status,
+    display_message: record?.display_message,
   })
-  const statusLabel = lifecycle.shortLabel.toLowerCase()
-  const statusClass = lifecycle.isSuccess
-    ? 'bg-green-700'
-    : lifecycle.isFailure
-      ? 'bg-red-700'
-      : 'bg-yellow-700'
+  const statusLabel = lifecycle.shortLabel
+  const statusTone: TransactionStatusTone = lifecycle.isSuccess ? 'success' : lifecycle.isFailure ? 'failed' : 'pending'
+  const summaryRows: FinanceSummaryRow[] = [
+    { label: 'Status', value: lifecycle.message, emphasis: true },
+    { label: 'Amount', value: moneyFormat(record?.amount ?? 0) },
+    { label: 'Transaction', value: record?.transaction_type || record?.type || '--' },
+    { label: 'Transaction ID', value: String(record?.reference || record?.id || ref), mono: true },
+    { label: 'Note', value: record?.description || '--' },
+    { label: 'Payment method', value: record?.payment_method || '--' },
+    { label: 'Timestamp', value: record?.created_at || '--' },
+  ]
 
   return (
     <View className="flex-1 bg-primary px-4">
       <ScrollView contentContainerStyle={{ paddingBottom: 32 }} showsVerticalScrollIndicator={false}>
-      <View className="pt-10">
-        <Text className="text-white text-2xl mb-2">Wallet Transaction</Text>
-        <Text className="text-gray-300 mb-6">Review your wallet transaction details.</Text>
-
-        {loading ? (
-          <ActivityIndicator size="large" />
-        ) : error ? (
-          <View className="bg-gray-900 p-4 rounded-xl">
-            <Text className="text-white font-semibold">Unable to load</Text>
-            <Text className="text-gray-300 text-sm mt-1">
-              {(error as any)?.response?.data?.message ||
-                (error as any)?.response?.data?.error ||
-                (error as any)?.message ||
-                'Something went wrong.'}
-            </Text>
-
-            <TouchableOpacity
-              onPress={() => refetch?.()}
-              className="mt-4 bg-theme-primary py-3 rounded-xl"
-            >
-              <Text className="text-white text-center font-medium">Try Again</Text>
-            </TouchableOpacity>
-          </View>
-        ) : data ? (
-          <View className="bg-gray-900 p-4 rounded-xl">
-            <View className="flex-row items-center justify-between mb-3">
-              <Text className="text-white font-semibold">Summary</Text>
-              <View className={`${statusClass} px-3 py-1 rounded-full`}>
-                <Text className="text-white text-xs font-semibold">{statusLabel}</Text>
-              </View>
+        <View className="pt-8 gap-4">
+          {loading ? (
+            <View className="py-16 items-center justify-center">
+              <ActivityIndicator size="large" color="#f59e0b" />
             </View>
+          ) : error ? (
+            <View className="rounded-[28px] bg-[#151515] px-5 py-5">
+              <Text className="text-white font-semibold">Unable to load</Text>
+              <Text className="text-[#A9AFB8] text-sm mt-2 leading-5">
+                {((error as { response?: { data?: { message?: string; error?: string } }; message?: string })?.response?.data?.message) ||
+                  ((error as { response?: { data?: { message?: string; error?: string } }; message?: string })?.response?.data?.error) ||
+                  ((error as { message?: string })?.message) ||
+                  'Something went wrong.'}
+              </Text>
+              <TouchableOpacity onPress={() => refetch?.()} className="mt-4 bg-theme-primary py-4 rounded-[18px]">
+                <Text className="text-alt text-center font-semibold">Try again</Text>
+              </TouchableOpacity>
+            </View>
+          ) : record ? (
+            <>
+              <CompletionPanel
+                eyebrow="Wallet transaction"
+                title="Transaction record"
+                supportingText="Status, timing, and identifiers confirmed below."
+                primaryLabel="Amount"
+                primaryValue={moneyFormat(record.amount ?? 0)}
+                statusLabel={statusLabel}
+                statusTone={statusTone}
+                summaryTitle="Details"
+                summaryRows={summaryRows}
+                primaryActionLabel="View receipt"
+                onPrimaryAction={handleViewReceipt}
+                secondaryActionLabel="Refresh status"
+                onSecondaryAction={() => refetch?.()}
+              />
 
-            <Row label="Status" value={lifecycle.message} />
-            <Row label="Amount" value={moneyFormat((data as any)?.amount ?? 0)} />
-            <Row label="Type" value={(data as any)?.transaction_type || (data as any)?.type} />
-            <Row label="Reference" value={(data as any)?.reference || (data as any)?.id} />
-            <Row label="Description" value={(data as any)?.description} />
-            <Row label="Payment Method" value={(data as any)?.payment_method} />
-            <Row label="Date" value={(data as any)?.created_at} />
-          </View>
-        ) : (
-          <View className="bg-gray-900 p-4 rounded-xl">
-            <Text className="text-gray-300 text-center">No transaction record found.</Text>
-
-            <TouchableOpacity
-              onPress={() => refetch?.()}
-              className="mt-4 bg-theme-primary py-3 rounded-xl"
-            >
-              <Text className="text-white text-center font-medium">Refresh</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        <View className="mt-5">
-          <Text className="text-gray-400 text-xs mb-2">Actions</Text>
-
-          <TouchableOpacity
-            onPress={() =>
-              router.push({
-                pathname: '/transaction/confirm',
-                params: { reference: String(ref) },
-              })
-            }
-            className="bg-theme-primary py-4 rounded-xl"
-          >
-            <Text className="text-white text-center font-medium">View Receipt</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => refetch?.()}
-            className="bg-gray-900 py-4 mt-3 rounded-xl"
-          >
-            <Text className="text-white text-center">Refresh Status</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={handleShareReceipt}
-            className="bg-gray-900 py-4 mt-3 rounded-xl"
-            disabled={!data}
-          >
-            <Text className="text-white text-center">Share Receipt</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={handleCopyReference}
-            className="bg-gray-900 py-4 mt-3 rounded-xl"
-            disabled={!data}
-          >
-            <Text className="text-white text-center">Copy Reference</Text>
-          </TouchableOpacity>
-
-          {FEATURE_DISPUTES && String((data as any)?.meta?.circle_transaction_id || '').trim() ? (
-            <TouchableOpacity
-              onPress={() =>
-                router.push({
-                  pathname: '/orders/[id]/dispute',
-                  params: { id: String((data as any)?.meta?.circle_transaction_id) },
-                })
-              }
-              className="bg-gray-900 py-4 mt-3 rounded-xl"
-            >
-              <Text className="text-red-300 text-center">Raise Dispute</Text>
-            </TouchableOpacity>
-          ) : null}
+              <View className="gap-3">
+                <TouchableOpacity onPress={handleShareReceipt} className="bg-[#171A21] py-4 rounded-[18px] items-center">
+                  <Text className="text-white text-sm font-semibold">Share receipt</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={handleCopyReference} className="bg-[#171A21] py-4 rounded-[18px] items-center">
+                  <Text className="text-white text-sm font-semibold">Copy transaction ID</Text>
+                </TouchableOpacity>
+                {FEATURE_DISPUTES && String((record.meta as Record<string, unknown> | undefined)?.circle_transaction_id || '').trim() ? (
+                  <TouchableOpacity
+                    onPress={() =>
+                      router.push({
+                        pathname: '/orders/[id]/dispute',
+                        params: { id: String((record.meta as Record<string, unknown>)?.circle_transaction_id) },
+                      })
+                    }
+                    className="bg-[#171A21] py-4 rounded-[18px] items-center"
+                  >
+                    <Text className="text-red-300 text-center font-semibold">Raise dispute</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            </>
+          ) : (
+            <View className="rounded-[28px] bg-[#151515] px-5 py-5">
+              <Text className="text-gray-300 text-center">No transaction record found.</Text>
+              <TouchableOpacity onPress={() => refetch?.()} className="mt-4 bg-theme-primary py-4 rounded-[18px]">
+                <Text className="text-alt text-center font-semibold">Refresh</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
-      </View>
       </ScrollView>
     </View>
   )
 }
 
 export default TransactionRecordScreen
-
 

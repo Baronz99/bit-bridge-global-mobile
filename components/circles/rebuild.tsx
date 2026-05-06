@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useMemo, useState } from 'react'
+import React, { useCallback, useMemo, useState } from 'react'
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import { Text, TouchableOpacity, View } from 'react-native'
@@ -160,14 +160,14 @@ export const recordSubtitle = (record: Record<string, any>) => {
 
   if (activityType === 'approval') {
     const destination = `To ${actor} wallet`
-    if (status === 'approved') return `Requested by ${actor} â€¢ ${destination}`
-    if (status === 'failed') return `Requested by ${actor} â€¢ ${destination}`
-    if (status === 'rejected') return `Requested by ${actor} â€¢ ${destination}`
-    return `Requested by ${actor} â€¢ ${destination}`
+    if (status === 'approved') return `Requested by ${actor} • ${destination}`
+    if (status === 'failed') return `Requested by ${actor} • ${destination}`
+    if (status === 'rejected') return `Requested by ${actor} • ${destination}`
+    return `Requested by ${actor} • ${destination}`
   }
 
   if (quantity > 1) {
-    return `Paid by ${actor} â€¢ Qty ${quantity}`
+    return `Paid by ${actor} • Qty ${quantity}`
   }
 
   if (activityType === 'withdrawal') {
@@ -308,7 +308,7 @@ export const CircleShell = ({
 
   const activeIdentityMeta = useMemo(() => {
     if (activeAccount.type === 'circle') {
-      return [bucketLabel, roleLabel].filter(Boolean).join(' Ã‚Â· ')
+      return [bucketLabel, roleLabel].filter(Boolean).join(' Â· ')
     }
     if (activeAccount.type === 'business') return 'Business workspace'
     return 'Personal'
@@ -474,7 +474,7 @@ export const RecentRecords = ({
                 <Text className="text-sm font-semibold text-white">{paymentEventLabel(record)}</Text>
                 <Text className="mt-1 text-xs text-gray-400">{recordSubtitle(record)}</Text>
                 <Text className="mt-2 text-[11px] text-gray-500">
-                  {[recordStatusLabel(record), recordTimeLabel(record)].filter(Boolean).join(' â€¢ ')}
+                  {[recordStatusLabel(record), recordTimeLabel(record)].filter(Boolean).join(' • ')}
                 </Text>
               </View>
               <Text className={`text-sm font-semibold ${recordDirection(record) === 'debit' ? 'text-amber-200' : 'text-emerald-200'}`}>
@@ -512,7 +512,7 @@ export const TimelineFeed = ({
           >
             <Text className="text-sm font-medium text-white">{paymentEventLabel(record)}</Text>
             <Text className="mt-1 text-xs text-gray-500">
-              {[recordStatusLabel(record), recordTimeLabel(record)].filter(Boolean).join(' â€¢ ')}
+              {[recordStatusLabel(record), recordTimeLabel(record)].filter(Boolean).join(' • ')}
             </Text>
           </TouchableOpacity>
         ))

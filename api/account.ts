@@ -6,6 +6,8 @@ import { log, warn } from '@/utils/log'
 const errMsg = (err: any, fallback = 'Something went wrong') =>
   err?.response?.data?.message || err?.message || fallback
 
+const DEFAULT_TRANSFER_DESCRIPTION = 'Fund Transfer'
+
 export interface CreateAccountPayload {
   account: {
     bvn: string
@@ -227,7 +229,8 @@ export const initiateFundTransfer = async (payload: {
     amount: number
     inter_bank: boolean
     counter_party_id?: string
-    pin: string
+    pin?: string
+    biometric_approval_token?: string
     transfer_reference: string
     description: string
     save_beneficiary?: boolean
@@ -238,8 +241,9 @@ export const initiateFundTransfer = async (payload: {
   const bankCode = String(account.bank_code || '').trim()
   const bank = String(account.bank || '').trim()
   const accountName = String(account.account_name || '').trim()
-  const description = String(account.description || '').trim()
+  const description = String(account.description || '').trim() || DEFAULT_TRANSFER_DESCRIPTION
   const pin = String(account.pin || '').trim()
+  const biometricApprovalToken = String(account.biometric_approval_token || '').trim()
   const transferReference = String(account.transfer_reference || '').trim()
   const counterPartyId = String(account.counter_party_id || '').trim()
   const amount = Number(account.amount)
@@ -250,15 +254,14 @@ export const initiateFundTransfer = async (payload: {
   if (!bankCode) throw new Error('Bank code is required.')
   if (!bank) throw new Error('Bank is required.')
   if (!accountName) throw new Error('Account name is required.')
-  if (!description) throw new Error('Description is required.')
   if (!Number.isFinite(amount) || amount <= 0) {
     throw new Error('Amount must be greater than 0 (in Naira).')
   }
   if (typeof account.inter_bank !== 'boolean') {
     throw new Error('inter_bank must be true or false.')
   }
-  if (!/^\d{4}$/.test(pin)) {
-    throw new Error('PIN must be exactly 4 digits.')
+  if (!/^\d{4}$/.test(pin) && !biometricApprovalToken) {
+    throw new Error('PIN or biometric approval is required.')
   }
   if (!transferReference) {
     throw new Error('transfer_reference is required.')
@@ -267,8 +270,15 @@ export const initiateFundTransfer = async (payload: {
     throw new Error('counter_party_id is required when inter_bank is true.')
   }
 
+  const accountPayload = {
+    ...account,
+    description,
+    ...(pin ? { pin } : {}),
+    ...(biometricApprovalToken ? { biometric_approval_token: biometricApprovalToken } : {}),
+  }
+
   try {
-    const res = await client.post('/accounts/initiate_fund_transfer', payload, {
+    const res = await client.post('/accounts/initiate_fund_transfer', { account: accountPayload }, {
       headers: {
         Accept: 'application/json',
       },
