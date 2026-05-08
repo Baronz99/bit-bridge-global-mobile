@@ -1052,8 +1052,11 @@ const CircleManageScreen = () => {
                   )}
                 </View>
               </View>
-              <TouchableOpacity onPress={() => router.push(`/circles/${circleId}/legacy` as any)} className="rounded-2xl border border-gray-800 px-4 py-4">
-                <Text className="text-center text-sm font-medium text-gray-300">Open legacy governance</Text>
+              <TouchableOpacity
+                onPress={() => router.push(`/circles/${circleId}/members` as any)}
+                className="rounded-2xl border border-cyan-400/30 bg-cyan-500/10 px-4 py-4"
+              >
+                <Text className="text-center text-sm font-semibold text-cyan-100">Open member roster</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => router.push(`/circles/${circleId}/treasury` as any)} className="rounded-2xl border border-cyan-400/30 bg-cyan-500/10 px-4 py-4">
                 <Text className="text-center text-sm font-semibold text-cyan-100">Open Circle Treasury</Text>

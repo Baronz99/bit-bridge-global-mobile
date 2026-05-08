@@ -22,6 +22,11 @@ const CircleGovernanceScreen = () => {
   const [threshold, setThreshold] = useState(1)
   const [notice, setNotice] = useState<NoticeState>({ message: null, error: false, data: null })
 
+  const openMemberRoster = () => {
+    if (!circleId) return
+    router.replace(`/circles/${circleId}/members` as any)
+  }
+
   const loadGovernance = useCallback(async () => {
     if (!circleId) return
     setLoading(true)
@@ -111,6 +116,9 @@ const CircleGovernanceScreen = () => {
             <Text className="text-gray-400 text-sm mt-2">
               Choose the people who can help run this circle and how many approvals a withdrawal needs.
             </Text>
+            <TouchableOpacity onPress={openMemberRoster} className="mt-4 rounded-2xl border border-cyan-400/30 bg-cyan-500/10 px-4 py-4">
+              <Text className="text-center text-sm font-semibold text-cyan-100">Open member roster</Text>
+            </TouchableOpacity>
           </View>
 
           <View className="px-4 mt-4">

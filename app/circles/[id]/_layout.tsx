@@ -8,6 +8,7 @@ export default function CircleWorkspaceLayout() {
       <Stack.Screen name="manage" options={{ animation: 'none' }} />
       <Stack.Screen name="timeline" options={{ animation: 'none' }} />
       <Stack.Screen name="treasury" options={{ animation: 'none' }} />
+      <Stack.Screen name="treasury/payouts" options={{ animation: 'default' }} />
       <Stack.Screen name="timeline/[eventId]" options={{ animation: 'default' }} />
       <Stack.Screen name="fund" options={{ animation: 'default' }} />
       <Stack.Screen name="withdraw" options={{ animation: 'default' }} />

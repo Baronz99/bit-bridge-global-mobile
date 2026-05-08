@@ -2,7 +2,7 @@ import React, { useCallback, useMemo, useState } from 'react'
 import { ActivityIndicator, Alert, RefreshControl, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
 import { useFocusEffect } from '@react-navigation/native'
-import { getCircleTreasury, getCircleWorkspace, requestCircleTreasury } from '@/api/circles'
+import { getCircleTreasury, getCircleWorkspace, listCircleTreasuryPayoutRequests, requestCircleTreasury } from '@/api/circles'
 import {
   CircleShell,
   circleBucketLabel,
@@ -120,6 +120,7 @@ const CircleTreasuryScreen = () => {
   const router = useRouter()
   const [workspace, setWorkspace] = useState<Record<string, any> | null>(null)
   const [treasury, setTreasury] = useState<Record<string, any> | null>(null)
+  const [pendingPayoutCount, setPendingPayoutCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -140,13 +141,22 @@ const CircleTreasuryScreen = () => {
     else setLoading(true)
     setError('')
     try {
-      const [workspaceResponse, treasuryResponse] = await Promise.all([
+      const [workspaceResponse, treasuryResponse, payoutsResponse] = await Promise.all([
         getCircleWorkspace(circleId),
         getCircleTreasury(circleId).catch(() => null),
+        listCircleTreasuryPayoutRequests(circleId).catch(() => ({ data: [] })),
       ])
       const workspaceData = workspaceResponse || {}
       setWorkspace(workspaceData)
       setTreasury(treasuryResponse?.data || treasuryResponse || null)
+      const payoutItems = Array.isArray(payoutsResponse?.data)
+        ? payoutsResponse.data
+        : Array.isArray(payoutsResponse)
+          ? payoutsResponse
+          : []
+      setPendingPayoutCount(
+        payoutItems.filter((item: any) => String(item?.status || '').toLowerCase() === 'pending').length
+      )
       setForm((prev) => ({
         ...prev,
         requested_purpose:
@@ -176,6 +186,7 @@ const CircleTreasuryScreen = () => {
   const canRequest = currentRole === 'owner' || currentRole === 'admin'
   const canView = canRequest || currentRole === 'treasurer'
   const treasuryAccount = treasury?.treasury_account && typeof treasury.treasury_account === 'object' ? treasury.treasury_account : null
+  const transferSourceReady = treasuryAccount?.transfer_source_ready !== false
   const latestRequest = treasury?.latest_request && typeof treasury.latest_request === 'object' ? treasury.latest_request : null
 
   const handleCopyValue = useCallback(async (value: unknown, label: string) => {
@@ -298,6 +309,18 @@ const CircleTreasuryScreen = () => {
                   <Text className="text-xs uppercase tracking-[1.5px] text-gray-500">Status</Text>
                   <Text className="mt-2 text-lg font-semibold text-white">{statusLabel(currentStatus)}</Text>
                   <Text className="mt-2 text-sm text-gray-400">{statusDetail(currentStatus)}</Text>
+                  {canView && treasuryAccount ? (
+                    <Text className={`mt-3 text-xs font-medium ${transferSourceReady ? 'text-emerald-300' : 'text-amber-300'}`}>
+                  {transferSourceReady
+                        ? 'Treasury payout source is ready.'
+                        : 'Treasury payout source is not ready yet. Payout requests will be blocked until Anchor source mapping is fixed.'}
+                    </Text>
+                  ) : null}
+                  {pendingPayoutCount > 0 ? (
+                    <Text className="mt-2 text-xs font-medium text-cyan-300">
+                      {pendingPayoutCount} pending payout{pendingPayoutCount === 1 ? '' : 's'} waiting for approval.
+                    </Text>
+                  ) : null}
                 </View>
                 <View className={`rounded-full border px-3 py-1 ${toneClass(currentStatus)}`}>
                   <Text className={`text-[10px] font-semibold uppercase tracking-[1.5px] ${toneTextClass(currentStatus)}`}>
@@ -306,6 +329,21 @@ const CircleTreasuryScreen = () => {
                 </View>
               </View>
             </View>
+            {canView ? (
+              <TouchableOpacity
+                onPress={() => router.push(`/circles/${circleId}/treasury/payouts` as any)}
+                disabled={!transferSourceReady}
+                className={`mt-4 rounded-2xl border px-4 py-4 ${transferSourceReady ? 'border-cyan-400/30 bg-cyan-500/10' : 'border-gray-700 bg-gray-900'}`}
+              >
+                <Text className={`text-center text-sm font-semibold ${transferSourceReady ? 'text-cyan-100' : 'text-gray-400'}`}>
+                  {transferSourceReady
+                    ? pendingPayoutCount > 0
+                      ? `Review payout queue (${pendingPayoutCount} pending)`
+                      : 'Open treasury payouts'
+                    : 'Treasury payouts unavailable'}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
             {currentStatus === 'not_requested' && canRequest ? (
               <View className="mt-4 gap-4">
                 <View className="rounded-2xl border border-gray-900 bg-gray-950 px-4 py-4">
@@ -483,6 +521,15 @@ const CircleTreasuryScreen = () => {
                       </TouchableOpacity>
                     ) : null}
                   </View>
+                </View>
+                <View className="rounded-2xl border border-gray-900 bg-gray-950 px-4 py-4">
+                  <Text className="text-xs uppercase tracking-[1.5px] text-gray-500">Payout rail</Text>
+                  <Text className={`mt-2 text-sm font-medium ${transferSourceReady ? 'text-emerald-300' : 'text-amber-300'}`}>
+                    {transferSourceReady ? 'Ready for treasury payouts' : 'Source mapping missing or stale'}
+                  </Text>
+                  <Text className="mt-2 text-xs text-gray-400">
+                    Treasury payouts require an Anchor DepositAccount source id before approval.
+                  </Text>
                 </View>
               </View>
             </View>

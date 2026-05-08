@@ -127,6 +127,44 @@ export const requestCircleTreasury = async (
   return res.data
 }
 
+export const listCircleTreasuryPayoutRequests = async (id: string | number): Promise<any> => {
+  const res = await client.get(`/circles/${id}/treasury/payouts`)
+  return res.data
+}
+
+export const getCircleTreasuryPayoutRequest = async (
+  id: string | number,
+  payoutRequestId: string | number
+): Promise<any> => {
+  const res = await client.get(`/circles/${id}/treasury/payouts/${payoutRequestId}`)
+  return res.data
+}
+
+export const createCircleTreasuryPayoutRequest = async (
+  id: string | number,
+  payload: CircleRecord
+): Promise<any> => {
+  const res = await client.post(`/circles/${id}/treasury/payouts`, payload)
+  return res.data
+}
+
+export const approveCircleTreasuryPayoutRequest = async (
+  id: string | number,
+  payoutRequestId: string | number,
+  payload?: CircleRecord
+): Promise<any> => {
+  const res = await client.post(`/circles/${id}/treasury/payouts/${payoutRequestId}/approve`, payload || {})
+  return res.data
+}
+
+export const rejectCircleTreasuryPayoutRequest = async (
+  id: string | number,
+  payoutRequestId: string | number
+): Promise<any> => {
+  const res = await client.post(`/circles/${id}/treasury/payouts/${payoutRequestId}/reject`)
+  return res.data
+}
+
 
 export const updateMyCircleMembership = async (
   id: string | number,
