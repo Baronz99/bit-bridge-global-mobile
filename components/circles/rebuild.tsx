@@ -135,6 +135,8 @@ export const recordTitle = (record: Record<string, any>) => {
   const activityType = String(record?.activity_type || '').toLowerCase()
   const paymentItemTitle = String(record?.payment_item_title || '').trim()
   const paymentPurposeLabel = String(record?.payment_purpose_label || '').trim()
+  const receiptCategory = String(record?.meta?.receipt_category || record?.receipt_category || '').toLowerCase()
+  if (receiptCategory === 'treasury_payout') return 'Treasury payout'
   if (activityType === 'approval') return 'Treasury withdrawal'
   if (paymentItemTitle) return paymentItemTitle
   if (paymentPurposeLabel) return paymentPurposeLabel
@@ -156,6 +158,7 @@ export const recordSubtitle = (record: Record<string, any>) => {
   const activityType = String(record?.activity_type || '').toLowerCase()
   const status = String(record?.status || '').toLowerCase()
   const quantity = Number(record?.meta?.payment_item_quantity || record?.payment_item_quantity || 0)
+  const receiptCategory = String(record?.meta?.receipt_category || record?.receipt_category || '').toLowerCase()
   const title = recordTitle(record)
 
   if (activityType === 'approval') {
@@ -168,6 +171,21 @@ export const recordSubtitle = (record: Record<string, any>) => {
 
   if (quantity > 1) {
     return `Paid by ${actor} • Qty ${quantity}`
+  }
+
+  if (receiptCategory === 'treasury_payout') {
+    const bank = String(record?.meta?.beneficiary_bank_name || record?.destination?.bank_name || '').trim()
+    const account = String(
+      record?.meta?.beneficiary_account_number_masked ||
+        record?.destination?.account_number ||
+        record?.beneficiary_account_number ||
+        ''
+    ).trim()
+    const narration = String(record?.meta?.narration || record?.narration || '').trim()
+    const destination = [bank, account].filter(Boolean).join(' • ')
+    const parts = [`Paid to ${destination || 'beneficiary bank account'}`]
+    if (narration) parts.push(`Narration: ${narration}`)
+    return parts.join(' • ')
   }
 
   if (activityType === 'withdrawal') {
