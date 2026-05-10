@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, ActivityIndicator, ScrollView, Share, Text, View } from 'react-native'
+import { Alert, ActivityIndicator, ScrollView, Share, Text, TouchableOpacity, View } from 'react-native'
 import { useLocalSearchParams } from 'expo-router'
 import moneyFormat from '@/utils/moneyFormat'
 import CompletionPanel from '@/components/finance/CompletionPanel'
@@ -137,6 +137,24 @@ const getSources = (receipt: ReceiptDTO | null): ReceiptFieldSources => {
   ]
 }
 
+const getCanonicalFeeBreakdown = (receipt: ReceiptDTO | null) => {
+  if (!receipt) return undefined
+
+  for (const source of getSources(receipt)) {
+    const breakdown = asRecord(source?.fee_breakdown)
+    if (breakdown && Object.keys(breakdown).length > 0) {
+      return breakdown
+    }
+  }
+
+  return undefined
+}
+
+const positiveNumber = (value: unknown) => {
+  const parsed = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined
+}
+
 const getNumberField = (receipt: ReceiptDTO | null, keys: string[]) => {
   for (const source of getSources(receipt)) {
     if (!source) continue
@@ -199,6 +217,42 @@ const splitFeeRows = (receipt: ReceiptDTO | null): FinanceSummaryRow[] => {
     .filter((row) => cleanText(row.value))
 }
 
+const getTreasuryPayoutFeeRows = (receipt: ReceiptDTO | null): FinanceSummaryRow[] => {
+  if (!receipt) return []
+  if (resolveReceiptSemantics(receipt).kind !== 'treasury_payout') return []
+
+  const feeBreakdown = getCanonicalFeeBreakdown(receipt)
+  const { amountSent, totalDebited } = getTransferDisplayAmounts(receipt)
+
+  const feeFromBreakdown =
+    positiveNumber(feeBreakdown?.total_fee) ??
+    positiveNumber(feeBreakdown?.company_charge) ??
+    positiveNumber(feeBreakdown?.platform_fee)
+
+  const feeFromCents =
+    positiveNumber(feeBreakdown?.total_fee_cents) ??
+    positiveNumber(feeBreakdown?.company_charge_cents) ??
+    positiveNumber(feeBreakdown?.platform_fee_cents) ??
+    positiveNumber(feeBreakdown?.fee_cents)
+
+  const derivedFee =
+    typeof totalDebited === 'number' && typeof amountSent === 'number' && totalDebited > amountSent
+      ? totalDebited - amountSent
+      : undefined
+
+  const feeAmount = feeFromBreakdown ?? (feeFromCents ? feeFromCents / 100 : undefined) ?? derivedFee
+  const canonicalFeeAmount = feeAmount && feeAmount >= 10 ? feeAmount : 100
+
+  if (!(canonicalFeeAmount && canonicalFeeAmount > 0)) return []
+
+  return [
+    {
+      label: 'Company charge',
+      value: moneyFormat(canonicalFeeAmount, receipt.currency),
+    },
+  ]
+}
+
 const getServiceDetailRows = (receipt: ReceiptDTO | null): FinanceSummaryRow[] => {
   if (!receipt) return []
 
@@ -242,7 +296,8 @@ const getServiceDetailRows = (receipt: ReceiptDTO | null): FinanceSummaryRow[] =
 const getTransferBreakdownRows = (receipt: ReceiptDTO | null): FinanceSummaryRow[] => {
   if (!receipt) return []
 
-  const feeRows = splitFeeRows(receipt)
+  const treasuryFeeRows = getTreasuryPayoutFeeRows(receipt)
+  const feeRows = treasuryFeeRows.length ? treasuryFeeRows : splitFeeRows(receipt)
   const transferFee = getNumberField(receipt, ['transfer_fee', 'platform_fee'])
   const stampDuty = getNumberField(receipt, ['stamp_duty', 'stamp_duty_fee'])
   const { amountSent, totalDebited } = getTransferDisplayAmounts(receipt)
@@ -419,6 +474,28 @@ const ReceiptScreen = () => {
     const explicitTotalDisplay = Number(raw.total_display)
     const explicitTotalAmount = Number(raw.total_amount)
     const explicitWalletCharged = Number(raw.wallet_amount_charged)
+    const rawMeta = asRecord(raw.meta)
+    const rawLegacy = asRecord(raw.legacy)
+    const rawLegacyMeta = asRecord(rawLegacy?.meta)
+    const rawReceiptKind = cleanText(
+      raw.receipt_kind ||
+        raw.receipt_category ||
+        rawMeta?.receipt_category ||
+        rawLegacyMeta?.receipt_category ||
+        rawLegacyMeta?.receipt_kind
+    )
+    const rawEventType = cleanText(raw.event || rawMeta?.event_type || rawLegacyMeta?.event_type)
+    const rawDestinationType = cleanText(
+      (raw as Record<string, unknown>).destination_type ||
+        rawMeta?.destination_type ||
+        (raw.parties as Record<string, unknown> | undefined)?.destination_type ||
+        (raw.beneficiary as Record<string, unknown> | undefined)?.destination_type ||
+        rawLegacyMeta?.destination_type
+    )
+    const isTreasuryPayoutPayload =
+      rawReceiptKind === 'treasury_payout' ||
+      rawEventType === 'circle.treasury.payout' ||
+      (rawDestinationType === 'bank_account' && cleanText(raw.transaction_type) === 'circle_treasury_payout')
 
     const computedValue = Number.isFinite(explicitValueAmount)
       ? explicitValueAmount
@@ -454,18 +531,18 @@ const ReceiptScreen = () => {
       .toUpperCase()
     const serviceChargeFromMeta = Number((raw.meta as Record<string, unknown> | undefined)?.service_charge ?? 0)
     const derivedFees =
-      feeArray.length > 0
+      isTreasuryPayoutPayload
+        ? [{ label: 'company charge', amount: 100, currency: raw.currency || 'NGN' }]
+        : feeArray.length > 0
         ? feeArray
         : serviceType === 'ELECTRICITY' && Number.isFinite(serviceChargeFromMeta) && serviceChargeFromMeta > 0
           ? [{ label: 'service charge', amount: serviceChargeFromMeta, currency: raw.currency || 'NGN' }]
           : []
 
-    const rawLegacy = asRecord(raw.legacy)
-
     const normalized: ReceiptDTO = {
       reference: raw.reference || String(reference || timelineId || '--'),
       kind: raw.kind,
-      receipt_kind: raw.receipt_kind,
+      receipt_kind: raw.receipt_kind || raw.receipt_category || (raw.meta as Record<string, unknown> | undefined)?.receipt_category,
       event: raw.event,
       transaction_type: raw.transaction_type,
       status: raw.status || 'pending',
@@ -519,7 +596,15 @@ const ReceiptScreen = () => {
 
   const semantics = useMemo(() => getReceiptSemantics(receipt), [receipt])
   const resolvedSemantics = useMemo(() => resolveReceiptSemantics(receipt), [receipt])
-  const isOutboundTransferReceipt = resolvedSemantics.kind === 'transfer' || resolvedSemantics.kind === 'transfer_outbound'
+  const isTreasuryPayoutReceipt = resolvedSemantics.kind === 'treasury_payout'
+  const isBankPayoutReceipt = resolvedSemantics.kind === 'bank_payout'
+  const isMemberRefundReceipt = resolvedSemantics.kind === 'member_refund'
+  const isOutboundTransferReceipt =
+    resolvedSemantics.kind === 'transfer' ||
+    resolvedSemantics.kind === 'transfer_outbound' ||
+    isTreasuryPayoutReceipt ||
+    isBankPayoutReceipt ||
+    isMemberRefundReceipt
   const isInboundTransferReceipt = resolvedSemantics.kind === 'transfer_inbound'
   const isTransferReceipt = isOutboundTransferReceipt
   const statusLabel = useMemo(() => formatStatusLabel(receipt?.status), [receipt?.status])
@@ -529,7 +614,10 @@ const ReceiptScreen = () => {
   const bankName = useMemo(() => getField(receipt, ['beneficiary_bank_name', 'bank_name', 'bankName', 'bank']), [receipt])
   const accountNumber = useMemo(() => maskAccountNumber(getField(receipt, ['beneficiary_account_number', 'account_number', 'accountNumber', 'account'])), [receipt])
   const transferReference = useMemo(() => getField(receipt, ['transfer_reference', 'provider_reference']), [receipt])
-  const transferNarration = useMemo(() => cleanText(receipt?.description || getField(receipt, ['description'])), [receipt])
+  const transferNarration = useMemo(
+    () => cleanText(receipt?.description || getField(receipt, ['description', 'narration', 'purpose', 'reason'])),
+    [receipt]
+  )
   const senderName = useMemo(() => getField(receipt, ['sender_name', 'name']), [receipt])
   const senderBankName = useMemo(() => getField(receipt, ['sender_bank_name', 'bank_name', 'bank']), [receipt])
   const senderAccountNumber = useMemo(() => maskAccountNumber(getField(receipt, ['sender_account_number', 'account_number', 'account'])), [receipt])

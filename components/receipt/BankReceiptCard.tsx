@@ -227,6 +227,7 @@ const BankReceiptCard = ({
       ? (meta.incoming_transfer as Record<string, any>)
       : null
   const isIncomingTransfer = receiptCategory === 'incoming_transfer' || transactionDirection === 'inbound'
+  const isTreasuryPayout = receiptCategory === 'treasury_payout'
   const isCreditReceipt =
     isIncomingTransfer ||
     transactionType === 'deposit' ||
@@ -361,11 +362,15 @@ const BankReceiptCard = ({
 
   const displayTitle = isIncomingTransfer
     ? 'Incoming bank transfer'
+    : isTreasuryPayout
+      ? 'Treasury payout'
     : isMonnifyDeposit
       ? 'Wallet Funding'
       : clean(title) || 'Receipt'
   const displaySubtitle = isIncomingTransfer
     ? (incomingProviderName ? `via ${incomingProviderName}` : clean(subtitle))
+    : isTreasuryPayout
+      ? [bankName, accountNumberMasked, narration].filter(Boolean).join(' • ') || clean(subtitle)
     : isMonnifyDeposit
       ? 'via Monnify'
       : clean(subtitle)
@@ -461,7 +466,7 @@ const BankReceiptCard = ({
             {isSuccess ? (
               <Row label={totalAmountLabel} value={moneyFormat(safeAmount, safeCurrency)} mono />
             ) : null}
-            {safeWalletAmount > 0 ? (
+            {safeWalletAmount > 0 && !isTreasuryPayout ? (
               <Row label="Paid from wallet" value={moneyFormat(safeWalletAmount, safeCurrency)} mono />
             ) : null}
             {safeRewardAmount > 0 ? (
@@ -581,13 +586,24 @@ const BankReceiptCard = ({
         </>
       ) : null}
 
-      {(beneficiary || bankName || accountNumberMasked) ? (
+      {(beneficiary || bankName || accountNumberMasked) && !isTreasuryPayout ? (
         <>
           <Divider />
           <Text className="text-gray-400 text-[11px] uppercase tracking-widest mb-2">Beneficiary</Text>
           <Row label="Name" value={beneficiary} />
           <Row label="Bank" value={bankName} />
           <Row label="Account" value={accountNumberMasked} mono />
+        </>
+      ) : null}
+
+      {isTreasuryPayout && (beneficiary || bankName || accountNumberMasked) ? (
+        <>
+          <Divider />
+          <Text className="text-gray-400 text-[11px] uppercase tracking-widest mb-2">Treasury payout</Text>
+          <Row label="Beneficiary" value={beneficiary} />
+          <Row label="Bank" value={bankName} />
+          <Row label="Account" value={accountNumberMasked} mono />
+          {narration ? <Row label="Narration" value={narration} wrap /> : null}
         </>
       ) : null}
 

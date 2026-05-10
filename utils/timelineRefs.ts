@@ -6,7 +6,7 @@ export type TimelineLike = {
   show_in_primary_feed?: boolean
 }
 
-const RECEIPT_PREFIXES = ['bbg-', 'fbg-', 'trx-', 'txn-', 'bill-', 'trf-', 'wallet-tx-', 'card-evt-']
+const RECEIPT_PREFIXES = ['bbg-', 'fbg-', 'trx-', 'txn-', 'bill-', 'trf-', 'wallet-tx-', 'card-evt-', 'circle-treasury-payout-']
 
 const clean = (value: unknown) => String(value ?? '').trim()
 

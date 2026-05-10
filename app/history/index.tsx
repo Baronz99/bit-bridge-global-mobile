@@ -545,31 +545,41 @@ const index = () => {
                     )
                   }
                   return (
-                    <Link
+                    <TouchableOpacity
                       key={`${reference}-${index}`}
-                      href={{
-                        pathname: '/transaction/record/[reference]',
-                        params: { reference: String(reference) },
+                      onPress={() => {
+                        const rawRef = String(reference ?? '').trim()
+                        const canonicalReference = /^[0-9a-f-]{36}$/i.test(rawRef)
+                          ? `wallet-tx-${String(item?.id ?? '').trim()}`
+                          : rawRef || `wallet-tx-${String(item?.id ?? '').trim()}`
+
+                        if (lifecycle.isTerminal) {
+                          router.push({
+                            pathname: '/transaction/receipt',
+                            params: { reference: canonicalReference },
+                          })
+                          return
+                        }
+
+                        router.push('/(tabs)/timeline')
                       }}
-                      asChild
+                      className="mb-3 rounded-2xl border border-gray-800 bg-gray-900 px-4 py-4"
                     >
-                      <TouchableOpacity className="mb-3 rounded-2xl border border-gray-800 bg-gray-900 px-4 py-4">
-                        <View className="flex-row justify-between items-start">
-                          <View className="flex-1 pr-3">
-                            <Text className="text-white font-semibold">{presentation.title}</Text>
-                            <Text className="text-gray-500 text-xs mt-1">{presentation.subtitle}</Text>
-                          </View>
-                          <View className="items-end">
-                            <Text className="text-white font-semibold">
-                              {moneyFormat(displayAmount(item))}
-                            </Text>
-                            <Text className={`text-xs mt-1 ${statusTone(status)}`}>
-                              {statusLabel}
-                            </Text>
-                          </View>
+                      <View className="flex-row justify-between items-start">
+                        <View className="flex-1 pr-3">
+                          <Text className="text-white font-semibold">{presentation.title}</Text>
+                          <Text className="text-gray-500 text-xs mt-1">{presentation.subtitle}</Text>
                         </View>
-                      </TouchableOpacity>
-                    </Link>
+                        <View className="items-end">
+                          <Text className="text-white font-semibold">
+                            {moneyFormat(displayAmount(item))}
+                          </Text>
+                          <Text className={`text-xs mt-1 ${statusTone(status)}`}>
+                            {statusLabel}
+                          </Text>
+                        </View>
+                      </View>
+                    </TouchableOpacity>
                   )
                 })
               )

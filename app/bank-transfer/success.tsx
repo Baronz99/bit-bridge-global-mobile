@@ -237,10 +237,6 @@ const SuccessScreen = () => {
                 router.replace({ pathname: '/transaction/receipt', params: { reference: String(payload.transfer_reference || '') } })
                 return
               }
-              if (hasTransferReference) {
-                router.replace({ pathname: '/transaction/record/[reference]', params: { reference: String(payload.transfer_reference || '') } })
-                return
-              }
               router.replace('/(tabs)/timeline')
             }}
             secondaryActionLabel="Done"

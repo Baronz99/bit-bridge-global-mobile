@@ -135,7 +135,7 @@ const CircleHomeScreen = () => {
       const decision = decideHomeNavigation(record)
       if (decision.type === 'receipt') {
         router.push({
-          pathname: '/transaction/record/[reference]',
+          pathname: '/transaction/receipt',
           params: { reference: decision.reference },
         } as any)
         return

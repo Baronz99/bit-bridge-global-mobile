@@ -17,7 +17,7 @@ type Props = {
 }
 
 const FinancialSummaryCard = ({ title, rows, footer, variant = 'card' }: Props) => {
-  const visibleRows = rows.filter((row) => String(row.value ?? '').trim().length > 0)
+  const visibleRows = rows.filter((row): row is SummaryRow => Boolean(row) && String(row.value ?? '').trim().length > 0)
   if (!visibleRows.length && !footer && !title) return null
 
   const containerClass =
