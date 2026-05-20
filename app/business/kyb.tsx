@@ -3,6 +3,8 @@ import { useRouter } from 'expo-router'
 import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native'
 import ScreenContainer from '@/components/ScreenContainer'
 import {
+  createBusinessProvisioning,
+  getBusinessOnboarding,
   getBusinessKyb,
   getBusinessKybDocuments,
   getBusinessKybStatus,
@@ -28,6 +30,11 @@ const formatLabel = (value: any) =>
     .replace(/_/g, ' ')
     .replace(/\b\w/g, (match) => match.toUpperCase())
 
+const summarizeItem = (label: string, value: any) => ({
+  label,
+  value: String(value || '').trim() || 'Not provided yet',
+})
+
 const statusTone = (value: any) => {
   const status = String(value || '').toLowerCase()
   if (['approved', 'verified', 'active', 'successful'].includes(status)) return 'text-emerald-300'
@@ -51,6 +58,9 @@ const BusinessKybScreen = () => {
   const [requirements, setRequirements] = useState<Record<string, any> | null>(null)
   const [gate, setGate] = useState<Record<string, any> | null>(null)
   const [provider, setProvider] = useState<Record<string, any> | null>(null)
+  const [onboardingProfile, setOnboardingProfile] = useState<Record<string, any> | null>(null)
+  const [onboardingSignatories, setOnboardingSignatories] = useState<Record<string, any>[]>([])
+  const [activating, setActivating] = useState(false)
   const businessId = activeAccount.type === 'business' ? activeAccount.businessId : null
   const fallbackRole = activeAccount.type === 'business' ? String((activeAccount as Record<string, any>)?.current_user_role || '') : ''
 
@@ -64,15 +74,17 @@ const BusinessKybScreen = () => {
     if (!silent) setLoading(true)
     setErrorMessage(null)
     try {
-      const [kybRes, docsRes, statusRes] = await Promise.all([
+      const [kybRes, docsRes, statusRes, onboardingRes] = await Promise.all([
         getBusinessKyb(businessId),
         getBusinessKybDocuments(businessId),
         getBusinessKybStatus(businessId),
+        getBusinessOnboarding(businessId).catch(() => null),
       ])
 
       const kybData = kybRes?.data?.data || {}
       const docsData = docsRes?.data?.data || {}
       const statusData = statusRes?.data?.data || {}
+      const onboardingData = onboardingRes?.data?.data || {}
 
       setBusinessEntity(kybData.business_entity || statusData.business_entity || null)
       setDocuments(Array.isArray(docsData.documents) ? docsData.documents : Array.isArray(kybData.documents) ? kybData.documents : [])
@@ -81,6 +93,8 @@ const BusinessKybScreen = () => {
       setRequirements(kybData.requirements || docsData.requirements || statusData.requirements || null)
       setGate(kybData.gate || statusData.gate || null)
       setProvider(statusData.provider || docsData.provider || null)
+      setOnboardingProfile(onboardingData.profile || null)
+      setOnboardingSignatories(Array.isArray(onboardingData.signatories) ? onboardingData.signatories : [])
     } catch (error: any) {
       const message = buildApiErrorMessage({
         status: error?.response?.status,
@@ -100,12 +114,15 @@ const BusinessKybScreen = () => {
   const currentRole = String(businessEntity?.current_user_role || fallbackRole || '').toLowerCase()
   const canSubmit = ['owner', 'admin'].includes(currentRole)
   const canUpload = ['owner', 'admin'].includes(currentRole)
+  const canActivate = Boolean(gate?.approved_for_provisioning)
+  const missingProfileFields = Array.isArray(readiness?.missing_profile_fields) ? readiness.missing_profile_fields : []
+  const missingSignatoryRequirements = Array.isArray(readiness?.missing_signatory_requirements) ? readiness.missing_signatory_requirements : []
   const readyFlags = useMemo(() => [
     { label: 'Business details complete', value: Boolean(readiness?.profile_ready) },
     { label: 'Required documents uploaded', value: Boolean(readiness?.documents_ready) },
     { label: 'Ready for review', value: Boolean(readiness?.ready_for_kyb_submission) },
-    { label: 'Ready to activate', value: Boolean(gate?.approved_for_provisioning) },
-  ], [gate?.approved_for_provisioning, readiness?.documents_ready, readiness?.profile_ready, readiness?.ready_for_kyb_submission])
+    { label: 'Ready to activate', value: canActivate },
+  ], [canActivate, readiness?.documents_ready, readiness?.profile_ready, readiness?.ready_for_kyb_submission])
 
   const documentKinds = useMemo(() => {
     const existing = documents.map((item) => String(item.document_kind || '')).filter(Boolean)
@@ -132,6 +149,89 @@ const BusinessKybScreen = () => {
     }
     return []
   }, [requirements?.documents?.provider_requested])
+  const reviewSections = useMemo(
+    () => [
+      {
+        key: 'business',
+        title: 'Business details',
+        route: '/business/onboarding?section=business',
+        items: [
+          summarizeItem('Business name', onboardingProfile?.legal_name || businessEntity?.name),
+          summarizeItem('Business type', formatLabel(onboardingProfile?.business_type)),
+          summarizeItem('Registration number', onboardingProfile?.registration_number),
+          summarizeItem('Business BVN', onboardingProfile?.business_bvn),
+        ],
+      },
+      {
+        key: 'contact',
+        title: 'Contact and address',
+        route: '/business/onboarding?section=contact',
+        items: [
+          summarizeItem('Contact email', onboardingProfile?.contact_email),
+          summarizeItem('Contact phone', onboardingProfile?.contact_phone),
+          summarizeItem('Operating address', onboardingProfile?.address_line_1),
+          summarizeItem(
+            'Location',
+            [onboardingProfile?.city, onboardingProfile?.state, onboardingProfile?.country].filter(Boolean).join(', ')
+          ),
+        ],
+      },
+      {
+        key: 'signatory',
+        title: 'Authorized signatory',
+        route: '/business/onboarding?section=signatory',
+        items:
+          onboardingSignatories.length > 0
+            ? onboardingSignatories.slice(0, 2).map((item, index) =>
+                summarizeItem(
+                  onboardingSignatories.length > 1 ? `Signatory ${index + 1}` : 'Primary signatory',
+                  [
+                    item?.full_name || [item?.first_name, item?.last_name].filter(Boolean).join(' '),
+                    item?.director === false ? 'Owner' : 'Director',
+                    item?.title,
+                    item?.email,
+                    item?.phone,
+                  ]
+                    .filter(Boolean)
+                    .join(' • ')
+                )
+              )
+            : [summarizeItem('Primary signatory', '')],
+      },
+    ],
+    [businessEntity?.name, onboardingProfile, onboardingSignatories]
+  )
+  const nextRecoveryAction = useMemo(() => {
+    if (missingProfileFields.some((field: any) => ['contact_email', 'contact_phone', 'address_line_1', 'city', 'state', 'country', 'registered_address_line_1', 'registered_city', 'registered_state', 'registered_country'].includes(String(field)))) {
+      return {
+        label: 'Finish contact details',
+        route: '/business/onboarding?section=contact',
+        body: `Still needed: ${missingProfileFields.map((field: any) => formatLabel(field)).join(', ')}.`,
+      }
+    }
+    if (missingSignatoryRequirements.length > 0) {
+      return {
+        label: 'Finish signatory details',
+        route: '/business/onboarding?section=signatory',
+        body: `Still needed: ${missingSignatoryRequirements.map((field: any) => formatLabel(field)).join(', ')}.`,
+      }
+    }
+    if (missingProfileFields.length > 0) {
+      return {
+        label: 'Finish business details',
+        route: '/business/onboarding?section=business',
+        body: `Still needed: ${missingProfileFields.map((field: any) => formatLabel(field)).join(', ')}.`,
+      }
+    }
+    if (!readiness?.documents_ready || !readiness?.ready_for_kyb_submission) {
+      return {
+        label: 'Upload required documents',
+        route: '/business/kyb',
+        body: 'Upload the minimum pre-submission documents before sending this business for review.',
+      }
+    }
+    return null
+  }, [missingProfileFields, missingSignatoryRequirements, readiness?.documents_ready, readiness?.ready_for_kyb_submission])
 
   const handleUpload = async (documentKind: string) => {
     if (!businessId) return
@@ -168,7 +268,6 @@ const BusinessKybScreen = () => {
       const response = await submitBusinessKyb(businessId)
       setSuccessMessage(response?.data?.message || 'Business submitted for review.')
       await loadKybState({ silent: true })
-      router.replace('/business' as any)
     } catch (error: any) {
       const message = buildApiErrorMessage({
         status: error?.response?.status,
@@ -178,6 +277,28 @@ const BusinessKybScreen = () => {
       setErrorMessage(message)
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  const handleActivate = async () => {
+    if (!businessId) return
+    setActivating(true)
+    setErrorMessage(null)
+    setSuccessMessage(null)
+    try {
+      const response = await createBusinessProvisioning(businessId)
+      setSuccessMessage(response?.data?.message || 'Business account activation started.')
+      await loadKybState({ silent: true })
+      router.replace('/business' as any)
+    } catch (error: any) {
+      const message = buildApiErrorMessage({
+        status: error?.response?.status,
+        data: error?.response?.data,
+        fallback: 'Unable to activate the business account right now.',
+      })
+      setErrorMessage(message)
+    } finally {
+      setActivating(false)
     }
   }
 
@@ -229,9 +350,6 @@ const BusinessKybScreen = () => {
       {successMessage ? (
         <View className="mt-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-4">
           <Text className="text-emerald-100 text-sm">{successMessage}</Text>
-          <Text className="text-emerald-50/90 text-xs mt-2">
-            Return to the setup hub after this step to see the next required action.
-          </Text>
         </View>
       ) : null}
 
@@ -311,10 +429,47 @@ const BusinessKybScreen = () => {
                 <View className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-4">
                   <Text className="text-emerald-100 text-sm font-semibold">Ready to activate</Text>
                   <Text className="text-emerald-50/90 text-xs mt-2">
-                    Verification is complete. Return to the setup hub to activate the business account.
+                    Verification is complete. You can activate business banking directly from this screen.
                   </Text>
                 </View>
               ) : null}
+            </View>
+          </View>
+
+          {!canActivate && nextRecoveryAction ? (
+            <View className="mt-4 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4">
+              <Text className="text-amber-100 text-sm font-semibold">Next required action</Text>
+              <Text className="text-amber-50/90 text-xs mt-2">{nextRecoveryAction.body}</Text>
+              <TouchableOpacity onPress={() => router.push(nextRecoveryAction.route as any)} className="mt-3 rounded-2xl border border-amber-300/30 px-4 py-3 items-center">
+                <Text className="text-amber-50 text-sm font-semibold">{nextRecoveryAction.label}</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
+
+          <View className="mt-4 rounded-2xl border border-gray-800 bg-gray-900/80 p-4">
+            <Text className="text-white text-base font-semibold">Review saved details</Text>
+            <Text className="text-gray-400 text-xs mt-2">
+              Check the saved business profile here before submission. Edit only the section that still needs work.
+            </Text>
+            <View className="mt-4 gap-3">
+              {reviewSections.map((section) => (
+                <View key={section.key} className="rounded-2xl border border-gray-800 bg-gray-950/45 px-4 py-4">
+                  <View className="flex-row items-center justify-between gap-3">
+                    <Text className="text-white text-sm font-semibold">{section.title}</Text>
+                    <TouchableOpacity onPress={() => router.push(section.route as any)}>
+                      <Text className="text-[#FFD7A6] text-xs font-semibold">Edit</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <View className="mt-3 gap-2">
+                    {section.items.map((item) => (
+                      <Text key={`${section.key}-${item.label}`} className="text-slate-300 text-xs">
+                        <Text className="text-slate-500">{item.label}: </Text>
+                        {item.value}
+                      </Text>
+                    ))}
+                  </View>
+                </View>
+              ))}
             </View>
           </View>
 
@@ -387,7 +542,11 @@ const BusinessKybScreen = () => {
           </View>
 
           <View className="mt-4 gap-3">
-            {canSubmit ? (
+            {canActivate ? (
+              <TouchableOpacity onPress={handleActivate} disabled={activating} className="rounded-2xl bg-[#FFB05A] px-4 py-4 items-center">
+                {activating ? <ActivityIndicator size="small" color="#111827" /> : <Text className="text-black text-sm font-semibold">Activate business banking</Text>}
+              </TouchableOpacity>
+            ) : canSubmit ? (
               <TouchableOpacity onPress={handleSubmit} disabled={submitting} className="rounded-2xl bg-[#FFB05A] px-4 py-4 items-center">
                 {submitting ? <ActivityIndicator size="small" color="#111827" /> : <Text className="text-black text-sm font-semibold">Submit business for verification</Text>}
               </TouchableOpacity>
@@ -396,7 +555,7 @@ const BusinessKybScreen = () => {
               {resyncing ? <ActivityIndicator size="small" color="#FFB05A" /> : <Text className="text-white text-sm font-semibold">Refresh verification status</Text>}
             </TouchableOpacity>
             <TouchableOpacity onPress={() => router.replace('/business' as any)} className="rounded-2xl border border-gray-700 px-4 py-4 items-center">
-              <Text className="text-white text-sm font-semibold">Back to business setup</Text>
+              <Text className="text-white text-sm font-semibold">Back to business overview</Text>
             </TouchableOpacity>
           </View>
         </>

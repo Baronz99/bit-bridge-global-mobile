@@ -247,11 +247,11 @@ const nextActionLabel = (action: string, fallback: string) => {
 const setupStageCopy = ({ isLive, canActivate, businessStatus, missingProfileFields, missingSignatoryRequirements, readiness, journey }: any) => {
   const stage = String(journey?.stage || '')
   if (journey?.title || journey?.body) {
-    return { stage: String(journey?.title || (isLive ? 'Business banking is live' : 'Business setup')), nextTitle: String(journey?.title || 'Business setup'), nextBody: String(journey?.body || 'Complete the current requirement, then return here for the next action.'), tone: journeyTone(stage) }
+    return { stage: String(journey?.title || (isLive ? 'Business banking is live' : 'Business setup')), nextTitle: String(journey?.title || 'Business setup'), nextBody: String(journey?.body || 'Complete the current requirement and continue directly into the next step.'), tone: journeyTone(stage) }
   }
   if (isLive) return { stage: 'Business banking is live', nextTitle: 'Start operating the account', nextBody: 'Fund the account, configure team access, and begin company payments.', tone: 'emerald' }
-  if (canActivate) return { stage: 'Business verified', nextTitle: 'Activate business current account', nextBody: 'Verification is complete. The final step is to activate the business current account.', tone: 'amber' }
-  if (String(businessStatus || '').toLowerCase() === 'under_review') return { stage: 'Verification in progress', nextTitle: 'Wait for provider review', nextBody: 'Your business has already been submitted. Return here only if we ask for more documents or when approval is complete.', tone: 'sky' }
+  if (canActivate) return { stage: 'Business verified', nextTitle: 'Activate business current account', nextBody: 'Verification is complete. Activate the business current account when you are ready.', tone: 'amber' }
+  if (String(businessStatus || '').toLowerCase() === 'under_review') return { stage: 'Verification in progress', nextTitle: 'Track provider review', nextBody: 'Your business has already been submitted. Open the verification screen only when you need to refresh status or respond to a request.', tone: 'sky' }
   if (missingProfileFields.some((field: string) => ['legal_name', 'business_type', 'registration_number', 'date_of_registration', 'category'].includes(String(field)))) return { stage: 'Business profile incomplete', nextTitle: 'Complete company details', nextBody: 'Add the registered company information required before verification can start.', tone: 'amber' }
   if (missingProfileFields.some((field: string) => ['contact_email', 'contact_phone', 'address_line_1', 'city', 'state', 'country', 'registered_address_line_1', 'registered_city', 'registered_state', 'registered_country'].includes(String(field)))) return { stage: 'Contact information incomplete', nextTitle: 'Add contact and registered address details', nextBody: 'Add the business contact and registered address used during verification.', tone: 'amber' }
   if (missingSignatoryRequirements.length > 0) return { stage: 'Signatory information required', nextTitle: 'Add authorized signatory', nextBody: 'Add the officer who will be used for verification and business account control.', tone: 'amber' }
@@ -352,7 +352,9 @@ const BusinessIndexScreen = () => {
         const normalized = entities.map((item: any) => ({ id: String(item?.id), name: String(item?.name || 'Business account'), status: String(item?.status || ''), current_user_role: String(item?.current_user_role || item?.role || '') }))
         setBusinessAccounts(normalized)
 
-        const activeBusiness = normalized.find((item) => String(item.id) === String(activeBusinessId)) || { id: String(activeBusinessId), name: 'Business account', status: '', current_user_role: '' }
+        const activeBusiness =
+          normalized.find((item: any) => String(item.id) === String(activeBusinessId)) ||
+          { id: String(activeBusinessId), name: 'Business account', status: '', current_user_role: '' }
 
         setBusinessEntity(entityRes?.data?.data || entityRes?.data || null)
         setReadiness(onboardingRes?.data?.data?.readiness || null)
@@ -490,7 +492,7 @@ const BusinessIndexScreen = () => {
     setSuccessMessage(null)
     try {
       const response = await createBusinessProvisioning(selectedBusiness.id)
-      setSuccessMessage(response?.data?.message || response?.message || 'Business account activation started.')
+      setSuccessMessage(response?.data?.message || 'Business account activation started.')
       await loadBusinessState({ silent: true })
     } catch (error: any) {
       const message = buildApiErrorMessage({ status: error?.response?.status, data: error?.response?.data, fallback: 'Unable to activate the business account right now.' })
@@ -507,7 +509,7 @@ const BusinessIndexScreen = () => {
     if (nextAction === 'activate_business_account' || canActivate) return { label: activating ? 'Activating business banking...' : 'Activate business banking', action: handleActivate, loading: activating }
     if (nextRoute) return { label: nextActionLabel(nextAction, setupStage.nextTitle), action: () => router.push(nextRoute as any), loading: false }
     if (businessStatus === 'under_review') return { label: 'Review business verification', action: () => router.push('/business/kyb' as any), loading: false }
-    if (missingProfileFields.some((field) => ['contact_email', 'contact_phone', 'address_line_1', 'city', 'state', 'country', 'registered_address_line_1', 'registered_city', 'registered_state', 'registered_country'].includes(String(field)))) return { label: 'Add contact details', action: () => router.push('/business/onboarding?section=contact' as any), loading: false }
+    if (missingProfileFields.some((field: any) => ['contact_email', 'contact_phone', 'address_line_1', 'city', 'state', 'country', 'registered_address_line_1', 'registered_city', 'registered_state', 'registered_country'].includes(String(field)))) return { label: 'Add contact details', action: () => router.push('/business/onboarding?section=contact' as any), loading: false }
     if (missingSignatoryRequirements.length > 0) return { label: 'Add signatory', action: () => router.push('/business/onboarding?section=signatory' as any), loading: false }
     if (!readiness?.documents_ready || !readiness?.ready_for_kyb_submission) return { label: 'Upload required documents', action: () => router.push('/business/kyb' as any), loading: false }
     return { label: 'Complete business details', action: () => router.push('/business/onboarding?section=business' as any), loading: false }

@@ -254,6 +254,12 @@ const formatDisplayDate = (value: string) => {
   })
 }
 
+const formatMissingItems = (items: string[]) =>
+  items
+    .map((item) => formatLabel(item))
+    .filter(Boolean)
+    .join(', ')
+
 const BusinessOnboardingScreen = () => {
   const router = useRouter()
   const params = useLocalSearchParams<{ section?: string }>()
@@ -308,6 +314,8 @@ const BusinessOnboardingScreen = () => {
   const sectionIndex = SECTION_ORDER.indexOf(section) + 1
   const sectionMeta = SECTION_META[section]
   const progressLabel = `${sectionIndex} of ${SECTION_ORDER.length}`
+  const nextSection = sectionIndex < SECTION_ORDER.length ? SECTION_ORDER[sectionIndex] : null
+  const previousSection = sectionIndex > 1 ? SECTION_ORDER[sectionIndex - 2] : null
 
   const loadOnboarding = useCallback(async () => {
     if (!businessId) {
@@ -476,6 +484,26 @@ const BusinessOnboardingScreen = () => {
     if (!shouldShowSectionFeedback || !currentSectionMissing.length) return null
     return `Still needed: ${currentSectionMissing.map(formatLabel).join(', ')}.`
   }, [shouldShowSectionFeedback, currentSectionMissing])
+  const stepSummary = useMemo(() => {
+    if (currentSectionMissing.length > 0) {
+      return {
+        title: 'Finish the remaining blockers in this step',
+        body: `Still needed here: ${formatMissingItems(currentSectionMissing)}.`,
+      }
+    }
+
+    if (nextSection) {
+      return {
+        title: `This step is complete`,
+        body: `Continue to ${SECTION_META[nextSection].title.toLowerCase()} next.`,
+      }
+    }
+
+    return {
+      title: 'Profile details complete',
+      body: 'The next screen will review your saved business details and handle document upload or submission.',
+    }
+  }, [currentSectionMissing, nextSection])
 
   const businessTypeOptions = useMemo(
     () => (Array.isArray(requirements?.fields?.business_type?.options) && requirements.fields.business_type.options.length
@@ -588,11 +616,10 @@ const BusinessOnboardingScreen = () => {
 
       const isLastSection = sectionIndex >= SECTION_ORDER.length
       if (isLastSection) {
-        router.replace('/business' as any)
+        router.replace('/business/kyb' as any)
         return
       }
 
-      const nextSection = SECTION_ORDER[sectionIndex]
       router.replace(`/business/onboarding?section=${nextSection}` as any)
     } catch (error: any) {
       const message = buildApiErrorMessage({
@@ -638,6 +665,11 @@ const BusinessOnboardingScreen = () => {
           })}
         </View>
         <Text className="mt-4 text-slate-300 text-sm">{sectionMeta.description}</Text>
+      </View>
+
+      <View className="mt-4 rounded-2xl border border-[#FFB05A]/20 bg-[#FFB05A]/10 px-4 py-4">
+        <Text className="text-[#FFD7A6] text-sm font-semibold">{stepSummary.title}</Text>
+        <Text className="text-slate-200 text-xs mt-2">{stepSummary.body}</Text>
       </View>
 
       {errorMessage ? (
@@ -1128,10 +1160,27 @@ const BusinessOnboardingScreen = () => {
             </View>
           ) : null}
           <TouchableOpacity onPress={handleSave} disabled={saving} className="rounded-2xl bg-[#FFB05A] px-4 py-4 items-center">
-            {saving ? <ActivityIndicator size="small" color="#111827" /> : <Text className="text-black text-sm font-semibold">Continue</Text>}
+            {saving ? (
+              <ActivityIndicator size="small" color="#111827" />
+            ) : (
+              <Text className="text-black text-sm font-semibold">
+                {nextSection ? `Continue to ${SECTION_META[nextSection].title}` : 'Continue to verification review'}
+              </Text>
+            )}
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => router.replace('/business' as any)} className="mt-3 rounded-2xl border border-gray-700 px-4 py-4 items-center">
-            <Text className="text-white text-sm font-semibold">Back to setup hub</Text>
+          <TouchableOpacity
+            onPress={() => {
+              if (previousSection) {
+                router.replace(`/business/onboarding?section=${previousSection}` as any)
+                return
+              }
+              router.replace('/business' as any)
+            }}
+            className="mt-3 rounded-2xl border border-gray-700 px-4 py-4 items-center"
+          >
+            <Text className="text-white text-sm font-semibold">
+              {previousSection ? `Back to ${SECTION_META[previousSection].title}` : 'Back to business overview'}
+            </Text>
           </TouchableOpacity>
         </View>
       ) : null}
