@@ -17,7 +17,6 @@ export default function CircleWorkspaceLayout() {
       <Stack.Screen name="display-name" options={{ animation: 'default' }} />
       <Stack.Screen name="governance" options={{ animation: 'default' }} />
       <Stack.Screen name="invite" options={{ animation: 'default' }} />
-      <Stack.Screen name="legacy" options={{ animation: 'default' }} />
       <Stack.Screen name="members" options={{ animation: 'default' }} />
     </Stack>
   )
