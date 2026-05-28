@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { ActivityIndicator, Image, ScrollView, Text, TouchableOpacity, View } from 'react-native'
+import { ActivityIndicator, Image, Platform, ScrollView, Text, TouchableOpacity, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useIsFocused } from '@react-navigation/native'
 import { CameraView, useCameraPermissions } from 'expo-camera'
@@ -21,7 +21,7 @@ const prettyTier3Error = (value?: string, options?: { retryAfterSeconds?: number
   if (msg.includes('tier 2 must be complete')) return 'Complete Tier 2 first. Verify your BVN and add identity evidence, then return for live selfie verification.'
   if (msg.includes('verified bvn not available') || msg.includes('re-verify bvn')) return 'Your BVN needs to be verified again before live selfie verification can continue.'
   if (msg.includes('bvn must be verified')) return 'Verify your BVN before starting Tier 3 live selfie verification.'
-  if (msg.includes('payload too large')) return 'This selfie is too large. Retake it with less background and try again.'
+  if (msg.includes('payload too large')) return 'We couldn’t submit this selfie because the image is too large. Move closer, keep only your face and shoulders in frame, and try again.'
   if (msg.includes('image is required')) return 'Capture a selfie before submitting.'
   if (msg.includes('temporarily unavailable')) return retryWindow
     ? `Live selfie verification is temporarily unavailable. Please try again in about ${retryWindow}.`
@@ -37,10 +37,22 @@ const prettyTier3Error = (value?: string, options?: { retryAfterSeconds?: number
   return 'Live selfie verification failed. Please retry with a clear, well-lit selfie.'
 }
 
-// 2MB backend limit; base64 is ~4/3 of binary. Guard at ~1.8MB base64 length.
-const MAX_BASE64_LEN = Math.floor(1.8 * 1024 * 1024 * (4 / 3))
+// Keep the mobile payload comfortably below the backend's 2,000,000 char limit.
+const MAX_BASE64_LEN = 1_500_000
 // Extremely small payloads often fail provider liveness quality checks.
 const MIN_BASE64_LEN = 110_000
+const CAPTURE_QUALITY = 0.5
+
+const logTier3CaptureDiagnostics = (event: string, details: Record<string, unknown>) => {
+  try {
+    console.info('[Tier3Capture]', event, {
+      platform: Platform.OS,
+      ...details,
+    })
+  } catch {
+    // ignore logging failures
+  }
+}
 
 type Tier3State = 'idle' | 'pending' | 'processing' | 'verified' | 'failed' | 'error'
 type CaptureStep = 'guidance' | 'camera' | 'review'
@@ -204,7 +216,7 @@ const Tier3CaptureScreen = () => {
 
   const handleCaptureSubmit = async () => {
     setLoading(true)
-    setMessage(null)
+    setMessage('Submitting verification...')
     setTookTooLong(false)
     setStatus('processing')
     submitStartedAtRef.current = Date.now()
@@ -235,7 +247,7 @@ const Tier3CaptureScreen = () => {
       await loadProfile({ force: true })
       await fetchStatus()
     } catch (err: unknown) {
-      const errorDetails = extractApiErrorDetails(err)
+      const errorDetails = extractApiErrorDetails(err as ApiErrorLike)
       setStatus('failed')
       setMessage(prettyTier3Error(errorDetails.message, { retryAfterSeconds: errorDetails.retryAfterSeconds }))
     } finally {
@@ -276,29 +288,70 @@ const Tier3CaptureScreen = () => {
   const takeSelfie = async () => {
     if (!cameraRef.current || capturing) return
     setCapturing(true)
-    setMessage(null)
+    setMessage('Optimizing selfie...')
 
     try {
       const photo = await cameraRef.current.takePictureAsync({
         base64: true,
-        quality: 0.85,
-        skipProcessing: true,
+        quality: CAPTURE_QUALITY,
+        skipProcessing: false,
       })
 
       if (!photo?.base64) {
+        logTier3CaptureDiagnostics('capture_failed', {
+          failure_reason: 'base64_missing',
+          width: photo?.width || null,
+          height: photo?.height || null,
+        })
         setMessage('Unable to read image. Please try again.')
         return
       }
+
+      const originalWidth = photo.width || 0
+      const originalHeight = photo.height || 0
+      const base64Length = photo.base64.length
+      logTier3CaptureDiagnostics('capture_complete', {
+        width: originalWidth,
+        height: originalHeight,
+        normalized_width: originalWidth,
+        normalized_height: originalHeight,
+        base64_length: base64Length,
+        normalized_base64_length: base64Length,
+        capture_quality: CAPTURE_QUALITY,
+        skip_processing: false,
+      })
       if ((photo.width || 0) < 600 || (photo.height || 0) < 600) {
+        logTier3CaptureDiagnostics('capture_rejected', {
+          failure_reason: 'resolution_too_low',
+          width: originalWidth,
+          height: originalHeight,
+          base64_length: base64Length,
+          size_guard_result: 'resolution_too_low',
+        })
         setMessage('Image resolution is too low. Retake in better light and keep your face closer.')
         return
       }
 
-      if (photo.base64.length > MAX_BASE64_LEN) {
-        setMessage('Selfie is too large. Retake closer with less background to reduce size.')
+      if (base64Length > MAX_BASE64_LEN) {
+        logTier3CaptureDiagnostics('capture_rejected', {
+          failure_reason: 'image_too_large',
+          width: originalWidth,
+          height: originalHeight,
+          base64_length: base64Length,
+          size_guard_result: 'too_large',
+          max_base64_length: MAX_BASE64_LEN,
+        })
+        setMessage('We couldn’t submit this selfie because the image is too large. Move closer, keep only your face and shoulders in frame, and try again.')
         return
       }
-      if (photo.base64.length < MIN_BASE64_LEN) {
+      if (base64Length < MIN_BASE64_LEN) {
+        logTier3CaptureDiagnostics('capture_rejected', {
+          failure_reason: 'image_detail_too_low',
+          width: originalWidth,
+          height: originalHeight,
+          base64_length: base64Length,
+          size_guard_result: 'too_small',
+        })
         setMessage('Image detail is too low. Improve front lighting and retake.')
         return
       }
@@ -306,8 +359,12 @@ const Tier3CaptureScreen = () => {
       const dataUrl = `data:image/jpeg;base64,${photo.base64}`
       imageBase64Ref.current = dataUrl
       setSelfiePreviewUri(photo.uri || null)
+      setMessage(null)
       setStep('review')
     } catch {
+      logTier3CaptureDiagnostics('capture_failed', {
+        failure_reason: 'camera_exception',
+      })
       setMessage('Unable to capture image. Please try again.')
     } finally {
       setCapturing(false)
