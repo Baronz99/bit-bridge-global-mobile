@@ -6,20 +6,35 @@ import { CameraView, useCameraPermissions } from 'expo-camera'
 import { startTier3, getTier3Status } from '@/api/kyc'
 import { useAuth } from '@/services/useAuth'
 
-const prettyTier3Error = (value?: string) => {
+const formatRetryDelay = (seconds?: number) => {
+  if (!seconds || Number.isNaN(seconds) || seconds <= 0) return null
+  if (seconds < 60) return `${seconds} seconds`
+  const minutes = Math.ceil(seconds / 60)
+  return `${minutes} minute${minutes === 1 ? '' : 's'}`
+}
+
+const prettyTier3Error = (value?: string, options?: { retryAfterSeconds?: number | null }) => {
   const msg = (value || '').toLowerCase()
-  if (!msg) return 'Liveness failed. Please try again in good lighting.'
+  const retryWindow = formatRetryDelay(options?.retryAfterSeconds ?? undefined)
+
+  if (!msg) return 'Live selfie verification failed. Please try again in bright front lighting.'
+  if (msg.includes('tier 2 must be complete')) return 'Complete Tier 2 first. Verify your BVN and add identity evidence, then return for live selfie verification.'
+  if (msg.includes('verified bvn not available') || msg.includes('re-verify bvn')) return 'Your BVN needs to be verified again before live selfie verification can continue.'
+  if (msg.includes('bvn must be verified')) return 'Verify your BVN before starting Tier 3 live selfie verification.'
+  if (msg.includes('payload too large')) return 'This selfie is too large. Retake it with less background and try again.'
+  if (msg.includes('image is required')) return 'Capture a selfie before submitting.'
+  if (msg.includes('temporarily unavailable')) return retryWindow
+    ? `Live selfie verification is temporarily unavailable. Please try again in about ${retryWindow}.`
+    : 'Live selfie verification is temporarily unavailable. Please try again later.'
+  if (msg.includes('prembly is disabled')) return 'Live selfie verification is temporarily unavailable right now. Please try again later.'
   if (msg.includes('abnormal_texture_variance')) return 'Texture quality check failed. Retake in bright front lighting and avoid filters.'
   if (msg.includes('professional_color_grading')) return 'Photo looks filtered. Disable beauty filters and retake with natural colors.'
   if (msg.includes('insufficient_detail')) return 'Image detail is too low. Move closer, improve lighting, and retake.'
   if (msg.includes('professional_intensity_profile')) return 'Lighting appears unnatural. Use soft front light and avoid overhead-only lighting.'
-  if (msg.includes('unnatural_sharpness_uniformity')) return 'Image appears over-processed. Retake without portrait/beauty effects.'
+  if (msg.includes('unnatural_sharpness_uniformity')) return 'Image appears over-processed. Retake without portrait or beauty effects.'
   if (msg.includes('some_professional_characteristics')) return 'Photo quality appears synthetic. Retake with normal camera settings and natural light.'
-  if (msg.includes('payload too large')) return 'Image is too large. Try a smaller photo.'
-  if (msg.includes('temporarily unavailable')) return 'Service is temporarily unavailable. Try again later.'
-  if (msg.includes('confidence')) return 'Face not clear enough. Retake with better lighting.'
-  if (msg.includes('bvn must be verified')) return 'BVN must be verified before Tier 3.'
-  return 'Liveness failed. Please retry with a clear selfie.'
+  if (msg.includes('confidence')) return 'Face not clear enough. Retake with better lighting and keep your face centered.'
+  return 'Live selfie verification failed. Please retry with a clear, well-lit selfie.'
 }
 
 // 2MB backend limit; base64 is ~4/3 of binary. Guard at ~1.8MB base64 length.
@@ -30,13 +45,45 @@ const MIN_BASE64_LEN = 110_000
 type Tier3State = 'idle' | 'pending' | 'processing' | 'verified' | 'failed' | 'error'
 type CaptureStep = 'guidance' | 'camera' | 'review'
 
-const extractApiErrorMessage = (error: any) =>
-  error?.response?.data?.error ||
-  error?.response?.data?.message ||
-  error?.message ||
-  'Unable to continue. Please retry.'
+type ApiErrorLike = {
+  response?: {
+    data?: {
+      error?: string
+      message?: string
+      retry_after_seconds?: number | string
+    }
+    headers?: Record<string, string | number | undefined>
+  }
+  message?: string
+}
 
-const normalizeTier3State = (res: any): Tier3State => {
+type Tier3ResponseLike = {
+  status?: unknown
+  error?: string
+  message?: string
+  detail?: string
+  retry_after_seconds?: number | null
+  tier3_status?: string
+  tier3_error?: string
+  verification?: { status?: unknown }
+  data?: {
+    status?: unknown
+    tier3_status?: string
+    tier3_error?: string
+  }
+}
+
+const extractApiErrorDetails = (error: ApiErrorLike) => ({
+  message:
+    error?.response?.data?.error ||
+    error?.response?.data?.message ||
+    error?.message ||
+    'Unable to continue. Please retry.',
+  retryAfterSeconds:
+    Number(error?.response?.data?.retry_after_seconds || error?.response?.headers?.['retry-after'] || 0) || null,
+})
+
+const normalizeTier3State = (res: Tier3ResponseLike): Tier3State => {
   const topStatus = res?.status
   if (typeof topStatus === 'string') {
     const s = topStatus.toLowerCase()
@@ -60,7 +107,7 @@ const normalizeTier3State = (res: any): Tier3State => {
   return 'failed'
 }
 
-const extractTier3StatusPayload = (res: any) => {
+const extractTier3StatusPayload = (res: Tier3ResponseLike | null | undefined) => {
   if (!res || typeof res !== 'object') return {}
   if (typeof res.tier3_status === 'string') return res
   if (res.data && typeof res.data === 'object') return res.data
@@ -120,8 +167,9 @@ const Tier3CaptureScreen = () => {
       setLoading(true)
       try {
         await fetchStatus()
-      } catch (err: any) {
-        setMessage(extractApiErrorMessage(err))
+      } catch (err: unknown) {
+        const errorDetails = extractApiErrorDetails(err as ApiErrorLike)
+        setMessage(prettyTier3Error(errorDetails.message, { retryAfterSeconds: errorDetails.retryAfterSeconds }))
       } finally {
         setLoading(false)
       }
@@ -181,14 +229,15 @@ const Tier3CaptureScreen = () => {
         schedulePoll()
       } else {
         setStatus('failed')
-        setMessage(prettyTier3Error(res?.error || res?.message || res?.detail))
+        setMessage(prettyTier3Error(res?.error || res?.message || res?.detail, { retryAfterSeconds: res?.retry_after_seconds }))
       }
 
       await loadProfile({ force: true })
       await fetchStatus()
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const errorDetails = extractApiErrorDetails(err)
       setStatus('failed')
-      setMessage(prettyTier3Error(extractApiErrorMessage(err)))
+      setMessage(prettyTier3Error(errorDetails.message, { retryAfterSeconds: errorDetails.retryAfterSeconds }))
     } finally {
       setLoading(false)
     }

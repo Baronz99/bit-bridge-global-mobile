@@ -166,6 +166,10 @@ export type Tier3StatusResponse = {
   tier3_error?: string
   tier3_reference?: string
   tier3_verified_at?: string
+  requirements?: {
+    missing?: string[]
+    next_steps?: string[]
+  }
 }
 
 export type Tier3StartResponse = {
@@ -173,6 +177,11 @@ export type Tier3StartResponse = {
   message?: string
   detail?: string
   error?: string
+  retry_after_seconds?: number
+  requirements?: {
+    missing?: string[]
+    next_steps?: string[]
+  }
 }
 
 export type Tier3LivenessResponse = {

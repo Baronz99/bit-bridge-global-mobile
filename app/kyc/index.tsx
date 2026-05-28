@@ -73,6 +73,17 @@ const normalizeTierKey = (raw: string | undefined) => {
   return (tierOrder.includes(key as typeof tierOrder[number]) ? key : 'tier_0') as typeof tierOrder[number]
 }
 
+const prettyTier3StatusMessage = (value?: string) => {
+  const msg = String(value || '').toLowerCase()
+  if (!msg) return 'Capture a live selfie to complete Tier 3 verification.'
+  if (msg.includes('tier 2 must be complete')) return 'Complete Tier 2 first, then return for live selfie verification.'
+  if (msg.includes('verified bvn not available') || msg.includes('re-verify bvn')) return 'Your BVN needs to be verified again before live selfie verification can continue.'
+  if (msg.includes('bvn must be verified')) return 'Verify your BVN before starting Tier 3 live selfie verification.'
+  if (msg.includes('temporarily unavailable')) return 'Live selfie verification is temporarily unavailable. Please try again later.'
+  if (msg.includes('payload too large')) return 'Your last selfie was too large. Retake it with less background and try again.'
+  return value || 'Capture a live selfie to complete Tier 3 verification.'
+}
+
 const StepRow = ({
   title,
   description,
@@ -304,7 +315,7 @@ export default function KycCenter() {
                   : tier3Pending
                   ? 'Liveness submitted. Awaiting result.'
                   : tier3Error
-                  ? tier3Error
+                  ? prettyTier3StatusMessage(tier3Error)
                   : 'Capture a live selfie to complete Tier 3 verification.'
               }
               done={tier3Verified}
