@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react'
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
-import { Text, TouchableOpacity, View } from 'react-native'
+import { KeyboardAvoidingView, Platform, Text, TouchableOpacity, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { getBusinessEntities } from '@/api/business'
 import { listCircles } from '@/api/circles'
@@ -332,10 +332,33 @@ export const CircleShell = ({
     return 'Personal'
   }, [activeAccount, bucketLabel, roleLabel])
 
+  const canGoBack = typeof router.canGoBack === 'function' ? router.canGoBack() : false
+  const fallbackRoute = active === 'home' ? '/circles' : `/circles/${circleId}`
+  const fallbackLabel = active === 'home' ? 'All circles' : 'Circle home'
+
+  const handleBack = useCallback(() => {
+    if (canGoBack) {
+      router.back()
+      return
+    }
+    router.replace(fallbackRoute as any)
+  }, [canGoBack, fallbackRoute, router])
+
   return (
     <View className="flex-1 bg-[#020712]">
       <View className="px-5 pb-5" style={{ paddingTop: Math.max(insets.top, 12) }}>
         <View className="rounded-[28px] border border-gray-900 bg-[#050b1b] px-5 py-5">
+          <TouchableOpacity
+            onPress={handleBack}
+            className="mb-4 self-start rounded-full border border-gray-800 bg-gray-950 px-4 py-2"
+          >
+            <View className="flex-row items-center gap-2">
+              <Ionicons name="chevron-back" size={16} color="#cbd5e1" />
+              <Text className="text-xs font-semibold uppercase tracking-[1.2px] text-gray-200">
+                {canGoBack ? 'Back' : fallbackLabel}
+              </Text>
+            </View>
+          </TouchableOpacity>
           <View className="flex-row items-start justify-between gap-4">
             <View className="flex-1">
               <Text className="text-[11px] uppercase tracking-[2px] text-gray-500">Circle</Text>
@@ -371,7 +394,13 @@ export const CircleShell = ({
           </View>
         </View>
       </View>
-      <View className="flex-1 px-5">{children}</View>
+      <KeyboardAvoidingView
+        className="flex-1 px-5"
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 24 : 0}
+      >
+        {children}
+      </KeyboardAvoidingView>
       <WorkspaceSwitcherModal
         open={switchAccountOpen}
         onClose={() => setSwitchAccountOpen(false)}
@@ -609,3 +638,4 @@ export const PaymentCheckout = ({
     </View>
   )
 }
+

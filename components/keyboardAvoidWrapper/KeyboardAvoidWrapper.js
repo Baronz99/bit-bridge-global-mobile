@@ -18,11 +18,18 @@ const KeyboardAvoidWrapper = ({ children, scrollEnabled = true, dismissOnTap = t
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 24 : 0}
     >
       <View className="flex-1 p-2">
         {scrollEnabled ? (
-          <ScrollView showsVerticalScrollIndicator={false} className="">
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+            contentContainerStyle={{ paddingBottom: 80 }}
+            className=""
+          >
             {content}
           </ScrollView>
         ) : <View className="flex-1">{content}</View>}
@@ -32,3 +39,4 @@ const KeyboardAvoidWrapper = ({ children, scrollEnabled = true, dismissOnTap = t
 }
 
 export default KeyboardAvoidWrapper
+

@@ -635,7 +635,9 @@ const CircleManageScreen = () => {
       >
         <ScrollView
           className="flex-1"
-          contentContainerStyle={{ paddingBottom: 32, gap: 16 }}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+          contentContainerStyle={{ paddingBottom: 120, gap: 16 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadManage(true)} />}
         >
           <View className="rounded-[28px] border border-gray-900 bg-[#050b1b] px-5 py-5">
@@ -1154,3 +1156,4 @@ const CircleManageScreen = () => {
 }
 
 export default CircleManageScreen
+
