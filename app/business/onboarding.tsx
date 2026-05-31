@@ -257,7 +257,7 @@ const routeParamString = (value: string | string[] | undefined) => {
 
 const BusinessOnboardingScreen = () => {
   const router = useRouter()
-  const params = useLocalSearchParams<{ section?: string; field?: string; field_error?: string; route_error?: string }>()
+  const params = useLocalSearchParams<{ section?: string; field?: string; field_error?: string; route_error?: string; mode?: string; return_to?: string }>()
   const { activeAccount } = useActiveAccount()
   const insets = useSafeAreaInsets()
   const [loading, setLoading] = useState(true)
@@ -314,6 +314,7 @@ const BusinessOnboardingScreen = () => {
   const routeField = routeParamString(params?.field)
   const routeFieldError = routeParamString(params?.field_error)
   const routedBannerMessage = routeParamString(params?.route_error)
+  const correctionMode = routeParamString(params?.mode) === 'fix' || routeParamString(params?.return_to) === 'kyb'
   const normalizedRouteField = routeField === 'signatory_title' ? 'title' : routeField
   const routedFieldMessage = routeFieldError || 'Update this field and save again.'
 
@@ -756,7 +757,12 @@ const BusinessOnboardingScreen = () => {
       setReadiness(data.readiness || null)
       setRequirements(data.requirements || null)
       setBusinessName(String(entity.name || businessName || ''))
-      setSuccessMessage('Business profile saved.')
+      setSuccessMessage(correctionMode ? 'Correction saved.' : 'Business profile saved.')
+
+      if (correctionMode) {
+        router.replace('/business/kyb' as any)
+        return
+      }
 
       const isLastSection = sectionIndex >= SECTION_ORDER.length
       if (isLastSection) {
@@ -1353,12 +1359,21 @@ const BusinessOnboardingScreen = () => {
               <Text className="text-amber-50 text-sm">{sectionFeedbackMessage}</Text>
             </View>
           ) : null}
+          {correctionMode ? (
+            <View className="mb-3 rounded-2xl border border-sky-500/25 bg-sky-500/10 px-4 py-3">
+              <Text className="text-sky-50 text-sm">Fix the highlighted field, then save to return to verification review.</Text>
+            </View>
+          ) : null}
           <TouchableOpacity onPress={handleSave} disabled={saving} className="rounded-2xl bg-[#FFB05A] px-4 py-4 items-center">
             {saving ? (
-              <ActivityIndicator size="small" color="#111827" />
+              correctionMode ? <Text className="text-black text-sm font-semibold">Saving correction...</Text> : <ActivityIndicator size="small" color="#111827" />
             ) : (
               <Text className="text-black text-sm font-semibold">
-                {nextSection ? `Continue to ${SECTION_META[nextSection].title}` : 'Continue to verification review'}
+                {correctionMode
+                  ? 'Save correction and return to review'
+                  : nextSection
+                    ? `Save and continue to ${SECTION_META[nextSection].title}`
+                    : 'Save and continue to verification review'}
               </Text>
             )}
           </TouchableOpacity>

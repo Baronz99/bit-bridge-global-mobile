@@ -219,6 +219,8 @@ const BusinessKybScreen = () => {
         ...(resolved.fieldMessage ? { field_error: resolved.fieldMessage } : {}),
         ...(!resolved.fieldMessage && fallbackMessage ? { route_error: fallbackMessage } : {}),
         ...(resolved.providerStatus ? { provider_status: resolved.providerStatus } : {}),
+        mode: 'fix',
+        return_to: 'kyb',
       },
     } as any)
     return true
