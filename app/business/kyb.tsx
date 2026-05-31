@@ -15,6 +15,7 @@ import {
 import { buildApiErrorMessage } from '@/utils/apiErrorMessage'
 import { useActiveAccount } from '@/services/useActiveAccount'
 import { pickKycUpload } from '@/utils/kycUploadPicker'
+import { isNigeriaCountry, normalizeNigeriaState } from '@/utils/businessStateValidation'
 
 const REQUIRED_DOCUMENT_KINDS = ['registration_certificate', 'proof_of_address']
 
@@ -34,6 +35,27 @@ const summarizeItem = (label: string, value: any) => ({
   label,
   value: String(value || '').trim() || 'Not provided yet',
 })
+
+const addressSummary = (...parts: unknown[]) =>
+  parts.map((item) => String(item || '').trim()).filter(Boolean).join(', ')
+
+const collectErrorText = (value: unknown): string => {
+  if (!value) return ''
+  if (typeof value === 'string') return value
+  if (Array.isArray(value)) return value.map(collectErrorText).filter(Boolean).join(' ')
+  if (typeof value === 'object') return Object.values(value).map(collectErrorText).filter(Boolean).join(' ')
+  return String(value || '')
+}
+
+const isStateCountryValidationError = (message: string) => {
+  const normalized = String(message || '').toLowerCase()
+  return normalized.includes('invalid state') || (normalized.includes('state') && normalized.includes('country'))
+}
+
+const hasInvalidNigeriaState = (state: unknown, country: unknown) => {
+  const value = String(state || '').trim()
+  return Boolean(value && isNigeriaCountry(country) && !normalizeNigeriaState(value))
+}
 
 const statusTone = (value: any) => {
   const status = String(value || '').toLowerCase()
@@ -149,6 +171,17 @@ const BusinessKybScreen = () => {
     }
     return []
   }, [requirements?.documents?.provider_requested])
+  const stateErrorRoute = useMemo(() => {
+    if (hasInvalidNigeriaState(onboardingProfile?.state, onboardingProfile?.country)) {
+      return '/business/onboarding?section=contact&field=state'
+    }
+    if (hasInvalidNigeriaState(onboardingProfile?.registered_state, onboardingProfile?.registered_country)) {
+      return '/business/onboarding?section=contact&field=registered_state'
+    }
+    const invalidSignatory = onboardingSignatories.find((item) => hasInvalidNigeriaState(item?.state, item?.country))
+    if (invalidSignatory) return '/business/onboarding?section=signatory&field=state'
+    return '/business/onboarding?section=contact'
+  }, [onboardingProfile, onboardingSignatories])
   const reviewSections = useMemo(
     () => [
       {
@@ -170,10 +203,11 @@ const BusinessKybScreen = () => {
           summarizeItem('Contact email', onboardingProfile?.contact_email),
           summarizeItem('Contact phone', onboardingProfile?.contact_phone),
           summarizeItem('Operating address', onboardingProfile?.address_line_1),
-          summarizeItem(
-            'Location',
-            [onboardingProfile?.city, onboardingProfile?.state, onboardingProfile?.country].filter(Boolean).join(', ')
-          ),
+          summarizeItem('Operating location', addressSummary(onboardingProfile?.city, onboardingProfile?.state, onboardingProfile?.country)),
+          summarizeItem('Operating state/country', addressSummary(onboardingProfile?.state, onboardingProfile?.country)),
+          summarizeItem('Registered address', onboardingProfile?.registered_address_line_1),
+          summarizeItem('Registered location', addressSummary(onboardingProfile?.registered_city, onboardingProfile?.registered_state, onboardingProfile?.registered_country)),
+          summarizeItem('Registered state/country', addressSummary(onboardingProfile?.registered_state, onboardingProfile?.registered_country)),
         ],
       },
       {
@@ -191,6 +225,7 @@ const BusinessKybScreen = () => {
                     item?.title,
                     item?.email,
                     item?.phone,
+                    addressSummary(item?.city, item?.state, item?.country),
                   ]
                     .filter(Boolean)
                     .join(' • ')
@@ -275,6 +310,9 @@ const BusinessKybScreen = () => {
         fallback: 'Unable to submit KYB right now.',
       })
       setErrorMessage(message)
+      if (isStateCountryValidationError(`${message} ${collectErrorText(error?.response?.data)}`)) {
+        router.replace(stateErrorRoute as any)
+      }
     } finally {
       setSubmitting(false)
     }

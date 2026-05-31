@@ -8,6 +8,10 @@ import FormSelect from '@/components/FormSelect'
 import { getBusinessOnboarding, updateBusinessOnboarding } from '@/api/business'
 import { buildApiErrorMessage } from '@/utils/apiErrorMessage'
 import { useActiveAccount } from '@/services/useActiveAccount'
+import {
+  BUSINESS_NIGERIA_STATE_OPTIONS,
+  sanitizeBusinessStateValue,
+} from '@/utils/businessStateValidation'
 
 const emptySignatory = () => ({
   full_name: '',
@@ -177,46 +181,7 @@ const countryNameToCode = Object.fromEntries(
   ])
 )
 
-const STATE_OPTIONS = [
-  { label: 'Select state', value: '' },
-  { label: 'Abia', value: 'Abia' },
-  { label: 'Adamawa', value: 'Adamawa' },
-  { label: 'Akwa Ibom', value: 'Akwa Ibom' },
-  { label: 'Anambra', value: 'Anambra' },
-  { label: 'Bauchi', value: 'Bauchi' },
-  { label: 'Bayelsa', value: 'Bayelsa' },
-  { label: 'Benue', value: 'Benue' },
-  { label: 'Borno', value: 'Borno' },
-  { label: 'Cross River', value: 'Cross River' },
-  { label: 'Delta', value: 'Delta' },
-  { label: 'Ebonyi', value: 'Ebonyi' },
-  { label: 'Edo', value: 'Edo' },
-  { label: 'Ekiti', value: 'Ekiti' },
-  { label: 'Enugu', value: 'Enugu' },
-  { label: 'FCT (Abuja)', value: 'FCT' },
-  { label: 'Gombe', value: 'Gombe' },
-  { label: 'Imo', value: 'Imo' },
-  { label: 'Jigawa', value: 'Jigawa' },
-  { label: 'Kaduna', value: 'Kaduna' },
-  { label: 'Kano', value: 'Kano' },
-  { label: 'Katsina', value: 'Katsina' },
-  { label: 'Kebbi', value: 'Kebbi' },
-  { label: 'Kogi', value: 'Kogi' },
-  { label: 'Kwara', value: 'Kwara' },
-  { label: 'Lagos', value: 'Lagos' },
-  { label: 'Nasarawa', value: 'Nasarawa' },
-  { label: 'Niger', value: 'Niger' },
-  { label: 'Ogun', value: 'Ogun' },
-  { label: 'Ondo', value: 'Ondo' },
-  { label: 'Osun', value: 'Osun' },
-  { label: 'Oyo', value: 'Oyo' },
-  { label: 'Plateau', value: 'Plateau' },
-  { label: 'Rivers', value: 'Rivers' },
-  { label: 'Sokoto', value: 'Sokoto' },
-  { label: 'Taraba', value: 'Taraba' },
-  { label: 'Yobe', value: 'Yobe' },
-  { label: 'Zamfara', value: 'Zamfara' },
-]
+const STATE_OPTIONS = BUSINESS_NIGERIA_STATE_OPTIONS
 
 const formatLabel = (value: string) =>
   String(value || '')
@@ -333,6 +298,8 @@ const BusinessOnboardingScreen = () => {
       const incomingSignatories = Array.isArray(data.signatories) && data.signatories.length
         ? data.signatories
         : [emptySignatory()]
+      const profileCountry = normalizeCountryValue(String(profile.country || 'NG'))
+      const registeredCountry = normalizeCountryValue(String(profile.registered_country || 'NG'))
 
       setReadiness(data.readiness || null)
       setRequirements(data.requirements || null)
@@ -355,45 +322,48 @@ const BusinessOnboardingScreen = () => {
         address_line_1: String(profile.address_line_1 || ''),
         address_line_2: String(profile.address_line_2 || ''),
         city: String(profile.city || ''),
-        state: String(profile.state || ''),
+        state: sanitizeBusinessStateValue(profile.state, profileCountry),
         postal_code: String(profile.postal_code || ''),
-        country: normalizeCountryValue(String(profile.country || 'NG')),
+        country: profileCountry,
         operating_region: String(profile.operating_region || ''),
         registered_address_line_1: String(profile.registered_address_line_1 || ''),
         registered_address_line_2: String(profile.registered_address_line_2 || ''),
         registered_city: String(profile.registered_city || ''),
-        registered_state: String(profile.registered_state || ''),
+        registered_state: sanitizeBusinessStateValue(profile.registered_state, registeredCountry),
         registered_postal_code: String(profile.registered_postal_code || ''),
-        registered_country: normalizeCountryValue(String(profile.registered_country || 'NG')),
+        registered_country: registeredCountry,
       })
       setSignatories(
-        incomingSignatories.map((item: Record<string, any>) => ({
-          ...emptySignatory(),
-          ...item,
-          id: item?.id,
-          full_name: String(item?.full_name || ''),
-          first_name: String(item?.first_name || ''),
-          middle_name: String(item?.middle_name || ''),
-          last_name: String(item?.last_name || ''),
-          email: String(item?.email || ''),
-          phone: String(item?.phone || ''),
-          title: String(item?.title || ''),
-          date_of_birth: String(item?.date_of_birth || ''),
-          nationality: normalizeCountryValue(String(item?.nationality || 'NG')),
-          address_line_1: String(item?.address_line_1 || ''),
-          city: String(item?.city || ''),
-          state: String(item?.state || ''),
-          postal_code: String(item?.postal_code || ''),
-          country: normalizeCountryValue(String(item?.country || 'NG')),
-          bvn: String(item?.bvn || ''),
-          identification_type: String(item?.identification_type || ''),
-          id_document_number: String(item?.id_document_number || ''),
-          ownership_percentage:
-            item?.ownership_percentage === null || item?.ownership_percentage === undefined ? '' : String(item.ownership_percentage),
-          status: String(item?.status || 'active'),
-          authorized_signatory: item?.authorized_signatory !== false,
-          director: item?.director !== false,
-        }))
+        incomingSignatories.map((item: Record<string, any>) => {
+          const signatoryCountry = normalizeCountryValue(String(item?.country || 'NG'))
+          return {
+            ...emptySignatory(),
+            ...item,
+            id: item?.id,
+            full_name: String(item?.full_name || ''),
+            first_name: String(item?.first_name || ''),
+            middle_name: String(item?.middle_name || ''),
+            last_name: String(item?.last_name || ''),
+            email: String(item?.email || ''),
+            phone: String(item?.phone || ''),
+            title: String(item?.title || ''),
+            date_of_birth: String(item?.date_of_birth || ''),
+            nationality: normalizeCountryValue(String(item?.nationality || 'NG')),
+            address_line_1: String(item?.address_line_1 || ''),
+            city: String(item?.city || ''),
+            state: sanitizeBusinessStateValue(item?.state, signatoryCountry),
+            postal_code: String(item?.postal_code || ''),
+            country: signatoryCountry,
+            bvn: String(item?.bvn || ''),
+            identification_type: String(item?.identification_type || ''),
+            id_document_number: String(item?.id_document_number || ''),
+            ownership_percentage:
+              item?.ownership_percentage === null || item?.ownership_percentage === undefined ? '' : String(item.ownership_percentage),
+            status: String(item?.status || 'active'),
+            authorized_signatory: item?.authorized_signatory !== false,
+            director: item?.director !== false,
+          }
+        })
       )
     } catch (error: any) {
       const message = buildApiErrorMessage({
@@ -421,7 +391,20 @@ const BusinessOnboardingScreen = () => {
     setTouchedFields((current) => ({ ...current, [field]: true }))
     setForm((current) => ({
       ...current,
-      [field]: value,
+      [field]:
+        field === 'state'
+          ? sanitizeBusinessStateValue(value, current.country)
+          : field === 'registered_state'
+            ? sanitizeBusinessStateValue(value, current.registered_country)
+            : field === 'country' || field === 'registered_country'
+              ? normalizeCountryValue(value)
+              : value,
+      ...(field === 'country'
+        ? { state: sanitizeBusinessStateValue(current.state, normalizeCountryValue(value)) }
+        : {}),
+      ...(field === 'registered_country'
+        ? { registered_state: sanitizeBusinessStateValue(current.registered_state, normalizeCountryValue(value)) }
+        : {}),
       ...(field === 'category' && value !== current.category ? { anchor_industry: '' } : {}),
     }))
   }
@@ -432,7 +415,30 @@ const BusinessOnboardingScreen = () => {
       [index]: { ...(current[index] || {}), [field]: true },
     }))
     setSignatories((current) =>
-      current.map((item, itemIndex) => (itemIndex === index ? { ...item, [field]: value } : item))
+      current.map((item, itemIndex) => {
+        if (itemIndex !== index) return item
+        if (field === 'country') {
+          const country = normalizeCountryValue(String(value || 'NG'))
+          return {
+            ...item,
+            country,
+            state: sanitizeBusinessStateValue(item.state, country),
+          }
+        }
+        if (field === 'state') {
+          return {
+            ...item,
+            state: sanitizeBusinessStateValue(value, item.country),
+          }
+        }
+        if (field === 'nationality') {
+          return {
+            ...item,
+            nationality: normalizeCountryValue(String(value || 'NG')),
+          }
+        }
+        return { ...item, [field]: value }
+      })
     )
   }
 
