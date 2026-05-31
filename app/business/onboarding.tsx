@@ -225,9 +225,14 @@ const formatMissingItems = (items: string[]) =>
     .filter(Boolean)
     .join(', ')
 
+const routeParamString = (value: string | string[] | undefined) => {
+  if (Array.isArray(value)) return String(value[0] || '')
+  return String(value || '')
+}
+
 const BusinessOnboardingScreen = () => {
   const router = useRouter()
-  const params = useLocalSearchParams<{ section?: string }>()
+  const params = useLocalSearchParams<{ section?: string; field?: string; field_error?: string; route_error?: string }>()
   const { activeAccount } = useActiveAccount()
   const insets = useSafeAreaInsets()
   const [loading, setLoading] = useState(true)
@@ -281,6 +286,11 @@ const BusinessOnboardingScreen = () => {
   const progressLabel = `${sectionIndex} of ${SECTION_ORDER.length}`
   const nextSection = sectionIndex < SECTION_ORDER.length ? SECTION_ORDER[sectionIndex] : null
   const previousSection = sectionIndex > 1 ? SECTION_ORDER[sectionIndex - 2] : null
+  const routeField = routeParamString(params?.field)
+  const routeFieldError = routeParamString(params?.field_error)
+  const routedBannerMessage = routeParamString(params?.route_error)
+  const normalizedRouteField = routeField === 'signatory_title' ? 'title' : routeField
+  const routedFieldMessage = routeFieldError || 'Update this field and save again.'
 
   const loadOnboarding = useCallback(async () => {
     if (!businessId) {
@@ -386,6 +396,28 @@ const BusinessOnboardingScreen = () => {
     setErrorMessage(null)
     setSuccessMessage(null)
   }, [section])
+
+  useEffect(() => {
+    if (!normalizedRouteField) return
+    if (section === 'signatory') {
+      setTouchedSignatories((current) => ({
+        ...current,
+        0: { ...(current[0] || {}), [normalizedRouteField]: true },
+      }))
+      return
+    }
+    setTouchedFields((current) => ({ ...current, [normalizedRouteField]: true }))
+  }, [normalizedRouteField, section])
+
+  const contactFieldError = useCallback((field: string) => {
+    if (section !== 'contact' || normalizedRouteField !== field) return ''
+    return routedFieldMessage
+  }, [normalizedRouteField, routedFieldMessage, section])
+
+  const signatoryFieldError = useCallback((field: string) => {
+    if (section !== 'signatory' || normalizedRouteField !== field) return ''
+    return routedFieldMessage
+  }, [normalizedRouteField, routedFieldMessage, section])
 
   const handleChange = (field: string, value: string) => {
     setTouchedFields((current) => ({ ...current, [field]: true }))
@@ -678,9 +710,9 @@ const BusinessOnboardingScreen = () => {
         <Text className="text-slate-200 text-xs mt-2">{stepSummary.body}</Text>
       </View>
 
-      {errorMessage ? (
+      {errorMessage || routedBannerMessage ? (
         <View className="mt-4 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-4">
-          <Text className="text-red-100 text-sm">{errorMessage}</Text>
+          <Text className="text-red-100 text-sm">{errorMessage || routedBannerMessage}</Text>
         </View>
       ) : null}
       {successMessage ? (
@@ -910,6 +942,9 @@ const BusinessOnboardingScreen = () => {
                   options={STATE_OPTIONS}
                   placeholder="Select state"
                 />
+                {contactFieldError('state') ? (
+                  <Text className="text-red-300 text-xs mt-2">{contactFieldError('state')}</Text>
+                ) : null}
               </View>
 
               <View className="mt-4">
@@ -920,6 +955,9 @@ const BusinessOnboardingScreen = () => {
                   options={COUNTRY_OPTIONS}
                   placeholder="Select country"
                 />
+                {contactFieldError('country') ? (
+                  <Text className="text-red-300 text-xs mt-2">{contactFieldError('country')}</Text>
+                ) : null}
               </View>
 
               <View className="mt-6 border-t border-white/6 pt-6">
@@ -978,6 +1016,9 @@ const BusinessOnboardingScreen = () => {
                   options={STATE_OPTIONS}
                   placeholder="Select registered state"
                 />
+                {contactFieldError('registered_state') ? (
+                  <Text className="text-red-300 text-xs mt-2">{contactFieldError('registered_state')}</Text>
+                ) : null}
               </View>
 
               <View className="mt-4">
@@ -988,6 +1029,9 @@ const BusinessOnboardingScreen = () => {
                   options={COUNTRY_OPTIONS}
                   placeholder="Select registered country"
                 />
+                {contactFieldError('registered_country') ? (
+                  <Text className="text-red-300 text-xs mt-2">{contactFieldError('registered_country')}</Text>
+                ) : null}
               </View>
             </View>
           ) : null}
@@ -1031,19 +1075,25 @@ const BusinessOnboardingScreen = () => {
                       ['city', 'City'],
                       ['postal_code', 'Postal code'],
                       ['bvn', 'BVN'],
-                    ].map(([field, label]) => (
-                      <View key={field} className="mt-4">
-                        <Text className="text-gray-400 text-xs">{label}</Text>
-                        <TextInput
-                          value={String(signatory[field] || '')}
-                          onChangeText={(value) => handleSignatoryChange(index, field, value)}
-                          autoCapitalize={field.includes('email') || field === 'bvn' ? 'none' : 'words'}
-                          placeholder={label}
-                          placeholderTextColor="#6B7280"
-                          className="mt-2 rounded-2xl border border-gray-700 bg-gray-900/70 px-4 py-4 text-white"
-                        />
-                      </View>
-                    ))}
+                    ].map(([field, label]) => {
+                      const inlineError = signatoryFieldError(field)
+                      return (
+                        <View key={field} className="mt-4">
+                          <Text className="text-gray-400 text-xs">{label}</Text>
+                          <TextInput
+                            value={String(signatory[field] || '')}
+                            onChangeText={(value) => handleSignatoryChange(index, field, value)}
+                            autoCapitalize={field.includes('email') || field === 'bvn' ? 'none' : 'words'}
+                            placeholder={label}
+                            placeholderTextColor="#6B7280"
+                            className="mt-2 rounded-2xl border border-gray-700 bg-gray-900/70 px-4 py-4 text-white"
+                          />
+                          {inlineError ? (
+                            <Text className="text-red-300 text-xs mt-2">{inlineError}</Text>
+                          ) : null}
+                        </View>
+                      )
+                    })}
 
                     <View className="mt-6 border-t border-white/6 pt-6">
                       <Text className="text-[11px] uppercase tracking-[1.4px] text-slate-500">Birth and residency</Text>
@@ -1117,6 +1167,9 @@ const BusinessOnboardingScreen = () => {
                         options={STATE_OPTIONS}
                         placeholder="Select state"
                       />
+                      {signatoryFieldError('state') ? (
+                        <Text className="text-red-300 text-xs mt-2">{signatoryFieldError('state')}</Text>
+                      ) : null}
                     </View>
 
                     <View className="mt-4">
@@ -1127,6 +1180,9 @@ const BusinessOnboardingScreen = () => {
                         options={COUNTRY_OPTIONS}
                         placeholder="Select country"
                       />
+                      {signatoryFieldError('country') ? (
+                        <Text className="text-red-300 text-xs mt-2">{signatoryFieldError('country')}</Text>
+                      ) : null}
                     </View>
 
                     <View className="mt-6 border-t border-white/6 pt-6">

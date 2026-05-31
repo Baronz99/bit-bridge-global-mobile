@@ -16,6 +16,10 @@ import { buildApiErrorMessage } from '@/utils/apiErrorMessage'
 import { useActiveAccount } from '@/services/useActiveAccount'
 import { pickKycUpload } from '@/utils/kycUploadPicker'
 import { isNigeriaCountry, normalizeNigeriaState } from '@/utils/businessStateValidation'
+import {
+  BusinessKybValidationRoute,
+  resolveBusinessKybValidationRoute,
+} from '@/utils/businessKybValidationRouting'
 
 const REQUIRED_DOCUMENT_KINDS = ['registration_certificate', 'proof_of_address']
 
@@ -38,19 +42,6 @@ const summarizeItem = (label: string, value: any) => ({
 
 const addressSummary = (...parts: unknown[]) =>
   parts.map((item) => String(item || '').trim()).filter(Boolean).join(', ')
-
-const collectErrorText = (value: unknown): string => {
-  if (!value) return ''
-  if (typeof value === 'string') return value
-  if (Array.isArray(value)) return value.map(collectErrorText).filter(Boolean).join(' ')
-  if (typeof value === 'object') return Object.values(value).map(collectErrorText).filter(Boolean).join(' ')
-  return String(value || '')
-}
-
-const isStateCountryValidationError = (message: string) => {
-  const normalized = String(message || '').toLowerCase()
-  return normalized.includes('invalid state') || (normalized.includes('state') && normalized.includes('country'))
-}
 
 const hasInvalidNigeriaState = (state: unknown, country: unknown) => {
   const value = String(state || '').trim()
@@ -171,17 +162,37 @@ const BusinessKybScreen = () => {
     }
     return []
   }, [requirements?.documents?.provider_requested])
-  const stateErrorRoute = useMemo(() => {
+  const savedStateErrorRoute = useMemo<Pick<BusinessKybValidationRoute, 'section' | 'field'> | null>(() => {
     if (hasInvalidNigeriaState(onboardingProfile?.state, onboardingProfile?.country)) {
-      return '/business/onboarding?section=contact&field=state'
+      return { section: 'contact', field: 'state' }
     }
     if (hasInvalidNigeriaState(onboardingProfile?.registered_state, onboardingProfile?.registered_country)) {
-      return '/business/onboarding?section=contact&field=registered_state'
+      return { section: 'contact', field: 'registered_state' }
     }
     const invalidSignatory = onboardingSignatories.find((item) => hasInvalidNigeriaState(item?.state, item?.country))
-    if (invalidSignatory) return '/business/onboarding?section=signatory&field=state'
-    return '/business/onboarding?section=contact'
+    if (invalidSignatory) return { section: 'signatory', field: 'state' }
+    return null
   }, [onboardingProfile, onboardingSignatories])
+
+  const navigateToValidationRoute = useCallback((route: BusinessKybValidationRoute | null, fallbackMessage?: string) => {
+    if (!route) return false
+    const resolved =
+      route.source === 'fallback' && route.section === 'contact' && route.field === 'state' && savedStateErrorRoute
+        ? { ...route, ...savedStateErrorRoute }
+        : route
+
+    router.replace({
+      pathname: '/business/onboarding',
+      params: {
+        section: resolved.section,
+        ...(resolved.field ? { field: resolved.field } : {}),
+        ...(resolved.fieldMessage ? { field_error: resolved.fieldMessage } : {}),
+        ...(!resolved.fieldMessage && fallbackMessage ? { route_error: fallbackMessage } : {}),
+        ...(resolved.providerStatus ? { provider_status: resolved.providerStatus } : {}),
+      },
+    } as any)
+    return true
+  }, [router, savedStateErrorRoute])
   const reviewSections = useMemo(
     () => [
       {
@@ -304,15 +315,14 @@ const BusinessKybScreen = () => {
       setSuccessMessage(response?.data?.message || 'Business submitted for review.')
       await loadKybState({ silent: true })
     } catch (error: any) {
+      const data = error?.response?.data
       const message = buildApiErrorMessage({
         status: error?.response?.status,
-        data: error?.response?.data,
+        data,
         fallback: 'Unable to submit KYB right now.',
       })
       setErrorMessage(message)
-      if (isStateCountryValidationError(`${message} ${collectErrorText(error?.response?.data)}`)) {
-        router.replace(stateErrorRoute as any)
-      }
+      navigateToValidationRoute(resolveBusinessKybValidationRoute(data, message), message)
     } finally {
       setSubmitting(false)
     }
@@ -350,12 +360,14 @@ const BusinessKybScreen = () => {
       setSuccessMessage(response?.data?.message || 'Review status refreshed.')
       await loadKybState({ silent: true })
     } catch (error: any) {
+      const data = error?.response?.data
       const message = buildApiErrorMessage({
         status: error?.response?.status,
-        data: error?.response?.data,
+        data,
         fallback: 'Unable to refresh provider status right now.',
       })
       setErrorMessage(message)
+      navigateToValidationRoute(resolveBusinessKybValidationRoute(data, message), message)
     } finally {
       setResyncing(false)
     }
