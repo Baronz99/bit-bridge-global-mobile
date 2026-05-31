@@ -137,14 +137,6 @@ const BusinessKybScreen = () => {
     { label: 'Ready to activate', value: canActivate },
   ], [canActivate, readiness?.documents_ready, readiness?.profile_ready, readiness?.ready_for_kyb_submission])
 
-  const documentKinds = useMemo(() => {
-    const existing = documents.map((item) => String(item.document_kind || '')).filter(Boolean)
-    const missing = Array.isArray(readiness?.missing_document_kinds)
-      ? readiness.missing_document_kinds.map((item: any) => String(item || '')).filter(Boolean)
-      : []
-    return [...new Set([...missing, ...existing, ...REQUIRED_DOCUMENT_KINDS])]
-  }, [documents, readiness?.missing_document_kinds])
-
   const preSubmissionDocuments = useMemo(() => {
     if (Array.isArray(requirements?.documents?.pre_submission) && requirements.documents.pre_submission.length) {
       return requirements.documents.pre_submission
@@ -208,17 +200,23 @@ const BusinessKybScreen = () => {
       },
       {
         key: 'contact',
-        title: 'Contact and address',
+        title: 'Operating and registered addresses',
         route: '/business/onboarding?section=contact',
         items: [
           summarizeItem('Contact email', onboardingProfile?.contact_email),
           summarizeItem('Contact phone', onboardingProfile?.contact_phone),
-          summarizeItem('Operating address', onboardingProfile?.address_line_1),
-          summarizeItem('Operating location', addressSummary(onboardingProfile?.city, onboardingProfile?.state, onboardingProfile?.country)),
-          summarizeItem('Operating state/country', addressSummary(onboardingProfile?.state, onboardingProfile?.country)),
-          summarizeItem('Registered address', onboardingProfile?.registered_address_line_1),
-          summarizeItem('Registered location', addressSummary(onboardingProfile?.registered_city, onboardingProfile?.registered_state, onboardingProfile?.registered_country)),
-          summarizeItem('Registered state/country', addressSummary(onboardingProfile?.registered_state, onboardingProfile?.registered_country)),
+          summarizeItem('Operating address line 1', onboardingProfile?.address_line_1),
+          summarizeItem('Operating address line 2', onboardingProfile?.address_line_2),
+          summarizeItem('Operating city', onboardingProfile?.city),
+          summarizeItem('Operating state', onboardingProfile?.state),
+          summarizeItem('Operating country', onboardingProfile?.country),
+          summarizeItem('Operating postal code', onboardingProfile?.postal_code),
+          summarizeItem('Registered address line 1', onboardingProfile?.registered_address_line_1),
+          summarizeItem('Registered address line 2', onboardingProfile?.registered_address_line_2),
+          summarizeItem('Registered city', onboardingProfile?.registered_city),
+          summarizeItem('Registered state', onboardingProfile?.registered_state),
+          summarizeItem('Registered country', onboardingProfile?.registered_country),
+          summarizeItem('Registered postal code', onboardingProfile?.registered_postal_code),
         ],
       },
       {
@@ -242,6 +240,32 @@ const BusinessKybScreen = () => {
                     .join(' • ')
                 )
               )
+            : [summarizeItem('Primary signatory', '')],
+      },
+      {
+        key: 'signatory_values',
+        title: 'Signatory field values',
+        route: '/business/onboarding?section=signatory',
+        items:
+          onboardingSignatories.length > 0
+            ? onboardingSignatories.flatMap((item, index) => {
+                const prefix = onboardingSignatories.length > 1 ? `Signatory ${index + 1}` : 'Primary signatory'
+                return [
+                  summarizeItem(`${prefix} full name`, item?.full_name || [item?.first_name, item?.last_name].filter(Boolean).join(' ')),
+                  summarizeItem(`${prefix} title`, item?.title),
+                  summarizeItem(`${prefix} email`, item?.email),
+                  summarizeItem(`${prefix} phone`, item?.phone),
+                  summarizeItem(`${prefix} date of birth`, item?.date_of_birth),
+                  summarizeItem(`${prefix} nationality`, item?.nationality),
+                  summarizeItem(`${prefix} address`, item?.address_line_1),
+                  summarizeItem(`${prefix} city`, item?.city),
+                  summarizeItem(`${prefix} state`, item?.state),
+                  summarizeItem(`${prefix} country`, item?.country),
+                  summarizeItem(`${prefix} ID type`, item?.identification_type),
+                  summarizeItem(`${prefix} ID number`, item?.id_document_number),
+                  summarizeItem(`${prefix} role flags`, `${item?.authorized_signatory === false ? 'Not authorized signatory' : 'Authorized signatory'} / ${item?.director === false ? 'Not director' : 'Director'}`),
+                ]
+              })
             : [summarizeItem('Primary signatory', '')],
       },
     ],
@@ -374,20 +398,20 @@ const BusinessKybScreen = () => {
   }
 
   return (
-    <ScreenContainer topPadding={20}>
-      <View className="rounded-[28px] border border-[#FF7A18]/40 bg-[#151A22] p-5">
+    <ScreenContainer topPadding={16} horizontalPadding={14}>
+      <View className="rounded-[24px] border border-[#FF7A18]/40 bg-[#151A22] p-4">
         <Text className="text-[#FFB05A] text-[11px] uppercase tracking-[2px]">Business verification</Text>
         <Text className="text-white text-2xl font-semibold mt-3">{businessEntity?.name || 'Business account'}</Text>
         <Text className="text-gray-300 text-sm mt-2">
           {String(journey?.body || 'Submit this business for verification, upload any requested documents, and wait for approval before activating business banking.')}
         </Text>
-        <View className="mt-4 flex-row items-center justify-between gap-3">
-          <View className="rounded-full border border-gray-700 bg-gray-950/50 px-3 py-2">
+        <View className="mt-4 gap-2">
+          <View className="self-start rounded-full border border-gray-700 bg-gray-950/50 px-3 py-2">
             <Text className="text-slate-300 text-[11px] font-semibold uppercase">
               {String(journey?.title || 'Verification stage')}
             </Text>
           </View>
-          <Text className="text-slate-400 text-xs flex-1 text-right">Provider review can continue after submission</Text>
+          <Text className="text-slate-400 text-xs">Provider review can continue after submission</Text>
         </View>
       </View>
 
@@ -413,14 +437,14 @@ const BusinessKybScreen = () => {
           {!loading ? (
         <>
           <View className="mt-4 rounded-2xl border border-gray-800 bg-gray-900/80 p-4">
-            <View className="flex-row items-start justify-between gap-3">
-              <View className="flex-1">
+            <View className="gap-3">
+              <View>
                 <Text className="text-white text-base font-semibold">Verification checklist</Text>
                 <Text className="text-gray-400 text-sm mt-2">
                   Finish the remaining requirement, submit once, then return only when you need to upload more documents or check review status.
                 </Text>
               </View>
-              <View className="rounded-full border border-gray-700 bg-gray-950/50 px-3 py-2">
+              <View className="self-start rounded-full border border-gray-700 bg-gray-950/50 px-3 py-2">
                 <Text className="text-slate-300 text-[11px] font-semibold uppercase">
                   {readyFlags.filter((item) => item.value).length}/{readyFlags.length} ready
                 </Text>
@@ -475,7 +499,7 @@ const BusinessKybScreen = () => {
                   </Text>
                 </View>
               ) : null}
-              {Boolean(gate?.approved_for_provisioning) ? (
+              {gate?.approved_for_provisioning ? (
                 <View className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-4">
                   <Text className="text-emerald-100 text-sm font-semibold">Ready to activate</Text>
                   <Text className="text-emerald-50/90 text-xs mt-2">

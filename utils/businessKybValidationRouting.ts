@@ -60,7 +60,7 @@ const routeFromPath = (pathValue: unknown, sectionValue?: unknown): Omit<Busines
   if (!path) return null
   if (section && path === normalizeKey(sectionValue)) return { section }
 
-  if (path.includes('title')) return { section: 'signatory', field: 'signatory_title' }
+  if (path.includes('title')) return { section: 'signatory', field: 'title' }
 
   if (path.includes('state') || path.includes('country')) {
     if (pathLooksSignatory(path) || section === 'signatory') return { section: 'signatory', field: path.includes('country') ? 'country' : 'state' }
@@ -76,7 +76,7 @@ const routeFromPath = (pathValue: unknown, sectionValue?: unknown): Omit<Busines
 const routeFromFallbackText = (textValue: unknown): Omit<BusinessKybValidationRoute, 'source' | 'fieldMessage' | 'providerStatus'> | null => {
   const text = normalizeKey(textValue)
   if (!text) return null
-  if (text.includes('title')) return { section: 'signatory', field: 'signatory_title' }
+  if (text.includes('title')) return { section: 'signatory', field: 'title' }
   if (text.includes('registered') && (text.includes('state') || text.includes('country'))) {
     return { section: 'contact', field: text.includes('country') ? 'registered_country' : 'registered_state' }
   }
@@ -124,7 +124,7 @@ const messageForRoute = (entries: FieldErrorEntry[], route: Omit<BusinessKybVali
   const match = entries.find((entry) => {
     const path = normalizeKey(entry.path)
     if (!routeField) return false
-    if (routeField === 'signatory_title') return path.includes('title')
+    if (routeField === 'title') return path.includes('title')
     if (routeField === 'registered_state') return path.includes('registered') && path.includes('state')
     if (routeField === 'registered_country') return path.includes('registered') && path.includes('country')
     return path.endsWith(routeField) || path.includes(`_${routeField}`) || path.includes(routeField)

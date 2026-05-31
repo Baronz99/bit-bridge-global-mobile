@@ -1,5 +1,5 @@
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native'
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import AppModal from '@/components/modal/Modal'
 
 const FormSelect = ({
@@ -20,10 +20,16 @@ const FormSelect = ({
   )
 
   const hasValue =
-    selectedValue !== undefined && selectedValue !== null && String(selectedValue).length > 0
+    Boolean(selected)
 
   const fallbackLabel = placeholder || placeHolder || 'Select option'
   const displayLabel = selected?.label || fallbackLabel
+
+  useEffect(() => {
+    const rawValue = selectedValue !== undefined && selectedValue !== null ? String(selectedValue).trim() : ''
+    if (!rawValue || selected || disabled || items.length === 0) return
+    onValueChange?.('')
+  }, [disabled, items.length, onValueChange, selected, selectedValue])
 
   // DEV-only duplicate diagnostics (safe to remove later)
   if (__DEV__) {

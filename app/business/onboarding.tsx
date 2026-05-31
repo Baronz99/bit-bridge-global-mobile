@@ -183,6 +183,31 @@ const countryNameToCode = Object.fromEntries(
 
 const STATE_OPTIONS = BUSINESS_NIGERIA_STATE_OPTIONS
 
+const optionValues = (options: Array<{ value?: string }>) =>
+  new Set(options.map((option) => String(option?.value ?? '')).filter(Boolean))
+
+const hasOptionValue = (options: Array<{ value?: string }>, value: unknown) => {
+  const normalized = String(value || '').trim()
+  return Boolean(normalized && optionValues(options).has(normalized))
+}
+
+const sanitizePickerStateValue = (value: unknown, country: unknown) => {
+  const normalized = sanitizeBusinessStateValue(value, country)
+  return hasOptionValue(STATE_OPTIONS, normalized) ? normalized : ''
+}
+
+const signatoryTitleOptionsFromRequirements = (requirementsValue: Record<string, any> | null | undefined) => {
+  const fields = requirementsValue?.fields || {}
+  const options = fields.signatory_title?.options || fields.title?.options
+  return Array.isArray(options) ? options : []
+}
+
+const sanitizeOptionValue = (value: unknown, options: Array<{ value?: string }>) => {
+  const normalized = String(value || '').trim()
+  if (!normalized) return ''
+  return hasOptionValue(options, normalized) ? normalized : ''
+}
+
 const formatLabel = (value: string) =>
   String(value || '')
     .replace(/_/g, ' ')
@@ -191,7 +216,7 @@ const formatLabel = (value: string) =>
 const normalizeCountryValue = (value: string, fallback = 'NG') => {
   const normalized = String(value || '').trim().toLowerCase()
   if (!normalized) return fallback
-  return String(countryNameToCode[normalized] || value || fallback)
+  return String(countryNameToCode[normalized] || '')
 }
 
 const formatLocalDate = (value: Date) => {
@@ -305,6 +330,8 @@ const BusinessOnboardingScreen = () => {
       const data = response?.data?.data || {}
       const profile = data.profile || {}
       const entity = data.business_entity || {}
+      const incomingRequirements = data.requirements || null
+      const incomingTitleOptions = signatoryTitleOptionsFromRequirements(incomingRequirements)
       const incomingSignatories = Array.isArray(data.signatories) && data.signatories.length
         ? data.signatories
         : [emptySignatory()]
@@ -312,7 +339,7 @@ const BusinessOnboardingScreen = () => {
       const registeredCountry = normalizeCountryValue(String(profile.registered_country || 'NG'))
 
       setReadiness(data.readiness || null)
-      setRequirements(data.requirements || null)
+      setRequirements(incomingRequirements)
       setBusinessName(String(entity.name || ''))
       setForm({
         legal_name: String(profile.legal_name || ''),
@@ -332,14 +359,14 @@ const BusinessOnboardingScreen = () => {
         address_line_1: String(profile.address_line_1 || ''),
         address_line_2: String(profile.address_line_2 || ''),
         city: String(profile.city || ''),
-        state: sanitizeBusinessStateValue(profile.state, profileCountry),
+        state: sanitizePickerStateValue(profile.state, profileCountry),
         postal_code: String(profile.postal_code || ''),
         country: profileCountry,
         operating_region: String(profile.operating_region || ''),
         registered_address_line_1: String(profile.registered_address_line_1 || ''),
         registered_address_line_2: String(profile.registered_address_line_2 || ''),
         registered_city: String(profile.registered_city || ''),
-        registered_state: sanitizeBusinessStateValue(profile.registered_state, registeredCountry),
+        registered_state: sanitizePickerStateValue(profile.registered_state, registeredCountry),
         registered_postal_code: String(profile.registered_postal_code || ''),
         registered_country: registeredCountry,
       })
@@ -356,12 +383,12 @@ const BusinessOnboardingScreen = () => {
             last_name: String(item?.last_name || ''),
             email: String(item?.email || ''),
             phone: String(item?.phone || ''),
-            title: String(item?.title || ''),
+            title: incomingTitleOptions.length ? sanitizeOptionValue(item?.title, incomingTitleOptions) : String(item?.title || ''),
             date_of_birth: String(item?.date_of_birth || ''),
             nationality: normalizeCountryValue(String(item?.nationality || 'NG')),
             address_line_1: String(item?.address_line_1 || ''),
             city: String(item?.city || ''),
-            state: sanitizeBusinessStateValue(item?.state, signatoryCountry),
+            state: sanitizePickerStateValue(item?.state, signatoryCountry),
             postal_code: String(item?.postal_code || ''),
             country: signatoryCountry,
             bvn: String(item?.bvn || ''),
@@ -425,17 +452,17 @@ const BusinessOnboardingScreen = () => {
       ...current,
       [field]:
         field === 'state'
-          ? sanitizeBusinessStateValue(value, current.country)
+          ? sanitizePickerStateValue(value, current.country)
           : field === 'registered_state'
-            ? sanitizeBusinessStateValue(value, current.registered_country)
+            ? sanitizePickerStateValue(value, current.registered_country)
             : field === 'country' || field === 'registered_country'
               ? normalizeCountryValue(value)
               : value,
       ...(field === 'country'
-        ? { state: sanitizeBusinessStateValue(current.state, normalizeCountryValue(value)) }
+        ? { state: sanitizePickerStateValue(current.state, normalizeCountryValue(value)) }
         : {}),
       ...(field === 'registered_country'
-        ? { registered_state: sanitizeBusinessStateValue(current.registered_state, normalizeCountryValue(value)) }
+        ? { registered_state: sanitizePickerStateValue(current.registered_state, normalizeCountryValue(value)) }
         : {}),
       ...(field === 'category' && value !== current.category ? { anchor_industry: '' } : {}),
     }))
@@ -454,19 +481,26 @@ const BusinessOnboardingScreen = () => {
           return {
             ...item,
             country,
-            state: sanitizeBusinessStateValue(item.state, country),
+            state: sanitizePickerStateValue(item.state, country),
           }
         }
         if (field === 'state') {
           return {
             ...item,
-            state: sanitizeBusinessStateValue(value, item.country),
+            state: sanitizePickerStateValue(value, item.country),
           }
         }
         if (field === 'nationality') {
           return {
             ...item,
             nationality: normalizeCountryValue(String(value || 'NG')),
+          }
+        }
+        if (field === 'title') {
+          const titleOptions = signatoryTitleOptionsFromRequirements(requirements)
+          return {
+            ...item,
+            title: titleOptions.length ? sanitizeOptionValue(value, titleOptions) : String(value || ''),
           }
         }
         return { ...item, [field]: value }
@@ -568,6 +602,11 @@ const BusinessOnboardingScreen = () => {
       : IDENTIFICATION_TYPE_OPTIONS),
     [requirements?.fields?.identification_type?.options]
   )
+  const signatoryTitleOptions = useMemo(
+    () => signatoryTitleOptionsFromRequirements(requirements),
+    [requirements]
+  )
+  const showSignatoryTitlePicker = signatoryTitleOptions.length > 0
   const preSubmissionDocuments = useMemo(
     () => (Array.isArray(requirements?.documents?.pre_submission) ? requirements.documents.pre_submission : []),
     [requirements?.documents?.pre_submission]
@@ -603,9 +642,72 @@ const BusinessOnboardingScreen = () => {
     closePicker()
   }
 
+  const validateCurrentSection = () => {
+    const requiredMissing = (field: string, value: unknown) =>
+      currentSectionMissing.includes(field) && !String(value || '').trim()
+
+    if (section === 'contact') {
+      const invalidFields = [
+        !hasOptionValue(COUNTRY_OPTIONS, form.country) ? 'country' : '',
+        !hasOptionValue(COUNTRY_OPTIONS, form.registered_country) ? 'registered_country' : '',
+        (form.state || requiredMissing('state', form.state)) && !hasOptionValue(STATE_OPTIONS, form.state) ? 'state' : '',
+        (form.registered_state || requiredMissing('registered_state', form.registered_state)) && !hasOptionValue(STATE_OPTIONS, form.registered_state)
+          ? 'registered_state'
+          : '',
+      ].filter(Boolean)
+
+      if (invalidFields.length) {
+        setTouchedFields((current) => ({
+          ...current,
+          ...Object.fromEntries(invalidFields.map((field) => [field, true])),
+        }))
+        return `Select valid values for: ${invalidFields.map(formatLabel).join(', ')}.`
+      }
+    }
+
+    if (section === 'signatory') {
+      const invalidByIndex: Record<number, string[]> = {}
+      signatories.forEach((signatory, index) => {
+        const fields = [
+          !hasOptionValue(COUNTRY_OPTIONS, signatory.country) ? 'country' : '',
+          !hasOptionValue(COUNTRY_OPTIONS, signatory.nationality) ? 'nationality' : '',
+          (signatory.state || requiredMissing('state', signatory.state)) && !hasOptionValue(STATE_OPTIONS, signatory.state) ? 'state' : '',
+          showSignatoryTitlePicker && (signatory.title || requiredMissing('title', signatory.title)) && !hasOptionValue(signatoryTitleOptions, signatory.title)
+            ? 'title'
+            : '',
+        ].filter(Boolean)
+        if (fields.length) invalidByIndex[index] = fields
+      })
+
+      const invalidEntries = Object.entries(invalidByIndex)
+      if (invalidEntries.length) {
+        setTouchedSignatories((current) => {
+          const next = { ...current }
+          invalidEntries.forEach(([index, fields]) => {
+            next[Number(index)] = {
+              ...(next[Number(index)] || {}),
+              ...Object.fromEntries(fields.map((field) => [field, true])),
+            }
+          })
+          return next
+        })
+        const uniqueFields = [...new Set(invalidEntries.flatMap(([, fields]) => fields))]
+        return `Select valid signatory values for: ${uniqueFields.map(formatLabel).join(', ')}.`
+      }
+    }
+
+    return null
+  }
+
   const handleSave = async () => {
     if (!businessId) return
     setSubmitAttempted(true)
+    const localValidationMessage = validateCurrentSection()
+    if (localValidationMessage) {
+      setErrorMessage(localValidationMessage)
+      setSuccessMessage(null)
+      return
+    }
     setSaving(true)
     setErrorMessage(null)
     setSuccessMessage(null)
@@ -614,6 +716,10 @@ const BusinessOnboardingScreen = () => {
         onboarding: {
           name: businessName,
           ...form,
+          country: normalizeCountryValue(form.country),
+          state: sanitizePickerStateValue(form.state, form.country),
+          registered_country: normalizeCountryValue(form.registered_country),
+          registered_state: sanitizePickerStateValue(form.registered_state, form.registered_country),
           signatories: signatories
             .filter((item) => String(item.full_name || item.first_name || item.last_name || '').trim())
             .map((item) => ({
@@ -624,14 +730,14 @@ const BusinessOnboardingScreen = () => {
               last_name: item.last_name,
               email: item.email,
               phone: item.phone,
-              title: item.title,
+              title: showSignatoryTitlePicker ? sanitizeOptionValue(item.title, signatoryTitleOptions) : item.title,
               date_of_birth: item.date_of_birth,
-              nationality: item.nationality,
+              nationality: normalizeCountryValue(item.nationality),
               address_line_1: item.address_line_1,
               city: item.city,
-              state: item.state,
+              state: sanitizePickerStateValue(item.state, item.country),
               postal_code: item.postal_code,
-              country: item.country,
+              country: normalizeCountryValue(item.country),
               bvn: item.bvn,
               identification_type: item.identification_type,
               id_document_number: item.id_document_number,
@@ -672,9 +778,9 @@ const BusinessOnboardingScreen = () => {
   }
 
   return (
-    <ScreenContainer scroll={false} includeTabBarPadding={false} topPadding={20}>
+    <ScreenContainer scroll={false} includeTabBarPadding={false} topPadding={16} horizontalPadding={14}>
       <View className="flex-1">
-      <View className="rounded-[28px] border border-white/8 bg-[#151A22] px-5 py-4">
+      <View className="rounded-[24px] border border-white/8 bg-[#151A22] px-4 py-4">
         <View className="flex-row items-start justify-between gap-4">
           <View className="flex-1">
             <Text className="text-[#FFB05A] text-[11px] uppercase tracking-[2px]">{sectionMeta.eyebrow}</Text>
@@ -705,7 +811,7 @@ const BusinessOnboardingScreen = () => {
         <Text className="mt-4 text-slate-300 text-sm">{sectionMeta.description}</Text>
       </View>
 
-      <View className="mt-4 rounded-2xl border border-[#FFB05A]/20 bg-[#FFB05A]/10 px-4 py-4">
+      <View className="mt-3 rounded-2xl border border-[#FFB05A]/20 bg-[#FFB05A]/10 px-4 py-3">
         <Text className="text-[#FFD7A6] text-sm font-semibold">{stepSummary.title}</Text>
         <Text className="text-slate-200 text-xs mt-2">{stepSummary.body}</Text>
       </View>
@@ -730,7 +836,7 @@ const BusinessOnboardingScreen = () => {
         <ScrollView
           showsVerticalScrollIndicator={false}
           className="flex-1"
-          contentContainerStyle={{ paddingBottom: 120 }}
+          contentContainerStyle={{ paddingBottom: 112 }}
         >
           {section === 'business' ? (
             <>
@@ -1070,7 +1176,6 @@ const BusinessOnboardingScreen = () => {
                       ['last_name', 'Last name'],
                       ['email', 'Email'],
                       ['phone', 'Phone'],
-                      ['title', 'Title'],
                       ['address_line_1', 'Residential address'],
                       ['city', 'City'],
                       ['postal_code', 'Postal code'],
@@ -1094,6 +1199,33 @@ const BusinessOnboardingScreen = () => {
                         </View>
                       )
                     })}
+
+                    <View className="mt-4">
+                      {showSignatoryTitlePicker ? (
+                        <FormSelect
+                          label="Title"
+                          selectedValue={String(signatory.title || '')}
+                          onValueChange={(value: string) => handleSignatoryChange(index, 'title', value)}
+                          options={signatoryTitleOptions}
+                          placeholder="Select title"
+                        />
+                      ) : (
+                        <>
+                          <Text className="text-gray-400 text-xs">Title</Text>
+                          <TextInput
+                            value={String(signatory.title || '')}
+                            onChangeText={(value) => handleSignatoryChange(index, 'title', value)}
+                            autoCapitalize="words"
+                            placeholder="Title"
+                            placeholderTextColor="#6B7280"
+                            className="mt-2 rounded-2xl border border-gray-700 bg-gray-900/70 px-4 py-4 text-white"
+                          />
+                        </>
+                      )}
+                      {signatoryFieldError('title') ? (
+                        <Text className="text-red-300 text-xs mt-2">{signatoryFieldError('title')}</Text>
+                      ) : null}
+                    </View>
 
                     <View className="mt-6 border-t border-white/6 pt-6">
                       <Text className="text-[11px] uppercase tracking-[1.4px] text-slate-500">Birth and residency</Text>
