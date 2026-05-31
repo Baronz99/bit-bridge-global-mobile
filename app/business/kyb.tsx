@@ -166,6 +166,44 @@ const BusinessKybScreen = () => {
     return null
   }, [onboardingProfile, onboardingSignatories])
 
+  const providerFailureRoute = useMemo<BusinessKybValidationRoute | null>(() => {
+    const message = String(provider?.anchor_failure_reason || '').trim()
+    if (!message) return null
+
+    const metadata = provider?.anchor_last_sync_metadata || {}
+    const structuredRoute = resolveBusinessKybValidationRoute(
+      {
+        message,
+        error_code: metadata?.error_code,
+        field_path: metadata?.field_path,
+        section: metadata?.section,
+        field_errors: metadata?.field_errors || metadata?.validation_errors,
+        provider_status: provider?.anchor_kyb_status,
+      },
+      message
+    )
+    if (structuredRoute) return structuredRoute
+
+    if (savedStateErrorRoute) {
+      return {
+        ...savedStateErrorRoute,
+        fieldMessage: 'Update this field and save again.',
+        providerStatus: String(provider?.anchor_kyb_status || ''),
+        source: 'fallback',
+      }
+    }
+
+    return resolveBusinessKybValidationRoute(message, message)
+  }, [provider, savedStateErrorRoute])
+
+  const providerFailureTitle = useMemo(() => {
+    if (!providerFailureRoute) return 'Verification needs attention'
+    if (providerFailureRoute.section === 'signatory') return 'Signatory information needs correction'
+    if (providerFailureRoute.field?.includes('registered')) return 'Registered address needs correction'
+    if (providerFailureRoute.field === 'state' || providerFailureRoute.field === 'country') return 'Address information needs correction'
+    return 'Business information needs correction'
+  }, [providerFailureRoute])
+
   const navigateToValidationRoute = useCallback((route: BusinessKybValidationRoute | null, fallbackMessage?: string) => {
     if (!route) return false
     const resolved =
@@ -185,6 +223,10 @@ const BusinessKybScreen = () => {
     } as any)
     return true
   }, [router, savedStateErrorRoute])
+
+  const handleFixProviderFailure = useCallback(() => {
+    navigateToValidationRoute(providerFailureRoute, String(provider?.anchor_failure_reason || 'Update the highlighted field and resubmit verification.'))
+  }, [navigateToValidationRoute, provider?.anchor_failure_reason, providerFailureRoute])
   const reviewSections = useMemo(
     () => [
       {
@@ -439,9 +481,9 @@ const BusinessKybScreen = () => {
           <View className="mt-4 rounded-2xl border border-gray-800 bg-gray-900/80 p-4">
             <View className="gap-3">
               <View>
-                <Text className="text-white text-base font-semibold">Verification checklist</Text>
+                <Text className="text-white text-base font-semibold">Business profile completion</Text>
                 <Text className="text-gray-400 text-sm mt-2">
-                  Finish the remaining requirement, submit once, then return only when you need to upload more documents or check review status.
+                  These checks confirm the saved profile, documents, and signatory details are complete before provider review.
                 </Text>
               </View>
               <View className="self-start rounded-full border border-gray-700 bg-gray-950/50 px-3 py-2">
@@ -472,23 +514,28 @@ const BusinessKybScreen = () => {
           </View>
 
           <View className="mt-4 rounded-2xl border border-gray-800 bg-gray-900/80 p-4">
-            <Text className="text-white text-base font-semibold">Review status</Text>
+            <Text className="text-white text-base font-semibold">Provider verification</Text>
             <View className="mt-4 gap-3">
-              <View>
-                <Text className="text-gray-400 text-xs">Current stage</Text>
-                <Text className={`text-base font-semibold mt-1 capitalize ${statusTone(businessEntity?.status)}`}>{businessEntity?.status || 'draft'}</Text>
-              </View>
               <View>
                 <Text className="text-gray-400 text-xs">Verification status</Text>
                 <Text className={`text-base font-semibold mt-1 capitalize ${statusTone(provider?.anchor_kyb_status)}`}>{provider?.anchor_kyb_status || 'not_started'}</Text>
               </View>
+              <View>
+                <Text className="text-gray-400 text-xs">Onboarding stage</Text>
+                <Text className={`text-base font-semibold mt-1 capitalize ${statusTone(businessEntity?.status)}`}>{businessEntity?.status || 'draft'}</Text>
+              </View>
               {provider?.anchor_failure_reason ? (
                 <View className="rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-4">
-                  <Text className="text-red-100 text-sm font-semibold">Verification note</Text>
+                  <Text className="text-red-100 text-sm font-semibold">{providerFailureTitle}</Text>
                   <Text className="text-red-50/90 text-sm mt-2">{String(provider.anchor_failure_reason)}</Text>
                   <Text className="text-red-50/80 text-xs mt-2">
-                    Update the missing document or business information, then return here and submit again.
+                    This message came from the previous provider submission. Save the corrected field, then return here and submit verification again.
                   </Text>
+                  {providerFailureRoute ? (
+                    <TouchableOpacity onPress={handleFixProviderFailure} className="mt-3 rounded-2xl border border-red-200/40 px-4 py-3 items-center">
+                      <Text className="text-red-50 text-sm font-semibold">Fix Now</Text>
+                    </TouchableOpacity>
+                  ) : null}
                 </View>
               ) : null}
               {String(businessEntity?.status || '').toLowerCase() === 'under_review' ? (
