@@ -10,9 +10,10 @@ import TransactionPinModal from '@/components/TransactionPinModal'
 import ReviewSummaryCard from '@/components/bankTransfer/ReviewSummaryCard'
 import { createCounterParty, getBanks, getBeneficiaries, initiateFundTransfer, resolveAccountName } from '@/api/account'
 import { getWallet } from '@/api/wallet'
-import { getTodayTransferSpent, getTransferQuoteSnapshot } from '@/services/bankTransfer'
+import { getTransferQuoteSnapshot } from '@/services/bankTransfer'
 import { useAuth } from '@/services/useAuth'
 import { useActiveAccount } from '@/services/useActiveAccount'
+import { invalidateFetchQueries } from '@/services/useFetch'
 import { resolveTransactionBiometricUserId, useTransactionBiometrics } from '@/services/useTransactionBiometrics'
 import { buildApiErrorMessage } from '@/utils/apiErrorMessage'
 import { log, warn } from '@/utils/logger'
@@ -91,6 +92,43 @@ const extractCounterPartyId = (payload: any): string => {
   return nested ? String(nested) : ''
 }
 
+const isWalletQueryKey = (queryKey: unknown[]) => queryKey[0] === 'wallet'
+
+type LooseRecord = Record<string, unknown>
+
+const readPath = (payload: unknown, path: string[]) => {
+  let current: unknown = payload
+  for (const key of path) {
+    if (!current || typeof current !== 'object') return undefined
+    current = (current as LooseRecord)[key]
+  }
+  return current
+}
+
+const extractBalanceSnapshot = (payload: unknown): number | null => {
+  const candidates = [
+    readPath(payload, ['balance_snapshot', 'bridge', 'balance']),
+    readPath(payload, ['balance_snapshot', 'bridge', 'amount']),
+    readPath(payload, ['balance_snapshot', 'wallet', 'available_balance']),
+    readPath(payload, ['balance_snapshot', 'wallet', 'balance']),
+    readPath(payload, ['wallet', 'available_balance']),
+    readPath(payload, ['wallet', 'balance']),
+    readPath(payload, ['bridge', 'balance']),
+    readPath(payload, ['bridge', 'amount']),
+    readPath(payload, ['available_balance']),
+    readPath(payload, ['wallet_balance_after']),
+    readPath(payload, ['balance_after']),
+    readPath(payload, ['new_balance']),
+    readPath(payload, ['remaining_balance']),
+  ]
+
+  for (const value of candidates) {
+    const parsed = Number(value)
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return null
+}
+
 const BankTransferScreen = () => {
   const router = useRouter()
   const { userProfileData, loadProfile } = useAuth()
@@ -107,7 +145,9 @@ const BankTransferScreen = () => {
   const lastQuoteAmountRef = useRef<number | null>(null)
   const transferReferenceRef = useRef<string>(buildTransferReference())
 
-  const [loading, setLoading] = useState(false)
+  const [banksLoading, setBanksLoading] = useState(true)
+  const [beneficiariesLoading, setBeneficiariesLoading] = useState(true)
+  const [balanceLoading, setBalanceLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [pinModalOpen, setPinModalOpen] = useState(false)
   const [pinError, setPinError] = useState<string | null>(null)
@@ -204,13 +244,16 @@ const BankTransferScreen = () => {
     amountValue > 0 &&
     canResolve &&
     quotedAmount === amountValue
+  const quoteReadyForAmount = amountValue <= 0 || (quotedAmount === amountValue && !quoteLoading)
 
   const canContinue =
     effectiveTierEligible &&
     !!formData.bank_code &&
     sanitizeDigits(formData.account_number).length === 10 &&
     accountLookupStatus === 'success' &&
-    amountValidation.valid
+    amountValidation.valid &&
+    quoteReadyForAmount &&
+    !balanceLoading
   const draft = useMemo<TransferDraft>(() => ({
     bank_code: formData.bank_code,
     bank_name: selectedBankLabel || formData.bank_name,
@@ -284,62 +327,79 @@ const BankTransferScreen = () => {
   }, [tierEligible, loadProfile, userProfileData])
 
   useEffect(() => {
-    const loadData = async () => {
-      setLoading(true)
-      setNotice({ message: null, error: false, data: null })
+    let mounted = true
+    const fallbackBalance = Number(userProfileData?.wallet?.balance ?? 0)
+    if (Number.isFinite(fallbackBalance)) {
+      setAvailableBalance(fallbackBalance)
+    }
+
+    const loadBanks = async () => {
+      setBanksLoading(true)
       try {
-        const [bankList, beneficiaryList, walletResult, todaySpentResult] = await Promise.all([
-          getBanks(),
-          getBeneficiaries().catch(() => []),
-          getWallet(activeAccount).catch(() => ({})),
-          getTodayTransferSpent().catch(() => 0),
-        ])
-        setBanks(Array.isArray(bankList) ? bankList : [])
+        const bankList = await getBanks()
+        if (mounted) setBanks(Array.isArray(bankList) ? bankList : [])
+      } catch (error: unknown) {
+        const parsedError = error as { response?: { status?: number; data?: unknown }; message?: string }
+        const status = parsedError?.response?.status
+        if (status !== 401 && mounted) {
+          setNotice({
+            message: buildApiErrorMessage({
+              status,
+              data: parsedError?.response?.data,
+              fallback: parsedError?.message || 'Unable to load bank list. You can keep entering details while it retries on reopen.',
+            }),
+            error: true,
+            data: null,
+          })
+        }
+      } finally {
+        if (mounted) setBanksLoading(false)
+      }
+    }
+
+    const loadBeneficiaries = async () => {
+      setBeneficiariesLoading(true)
+      try {
+        const beneficiaryList = await getBeneficiaries()
+        if (!mounted) return
         const safeBeneficiaries = Array.isArray(beneficiaryList) ? beneficiaryList : []
         setBeneficiaries(safeBeneficiaries)
-        const seededRecentBanks = safeBeneficiaries
+        setRecentBankCodes(safeBeneficiaries
           .map((item: any) => String(item?.bank_code || '').trim())
           .filter(Boolean)
-          .slice(0, 4)
-        setRecentBankCodes(seededRecentBanks)
+          .slice(0, 4))
+      } catch {
+        if (mounted) setBeneficiaries([])
+      } finally {
+        if (mounted) setBeneficiariesLoading(false)
+      }
+    }
+
+    const loadBalance = async () => {
+      setBalanceLoading(true)
+      try {
+        const walletResult = await getWallet(activeAccount)
+        if (!mounted) return
         const walletBalance =
           walletResult?.data?.bridge?.balance ??
           walletResult?.data?.bridge?.amount ??
           userProfileData?.wallet?.balance ??
           0
         setAvailableBalance(Number(walletBalance || 0))
-        const initialSpent = Number(todaySpentResult || 0)
-        setTodaySpent(initialSpent)
-        const quote = await getTransferQuoteSnapshot(MIN_TRANSFER_AMOUNT).catch(() => null)
-        if (quote) {
-          setQuotedFee(Number(quote.fee || 0))
-          setQuotedFeeBreakdown({
-            platform_fee: Number(quote?.feeBreakdown?.platform_fee ?? quote?.feeBreakdown?.platformFee ?? 0),
-            stamp_duty_fee: Number(quote?.feeBreakdown?.stamp_duty_fee ?? quote?.feeBreakdown?.stampDutyFee ?? 0),
-            total_fee: Number(quote?.feeBreakdown?.total_fee ?? quote?.fee ?? 0),
-          })
-          setFeeEstimated(quote.feeIsEstimate === true)
-          setQuotedDailyLimit(Number(quote.dailyLimit || 0))
-          setQuotedDailySpent(Number(quote.dailySpent || initialSpent))
-          setQuotedAmount(MIN_TRANSFER_AMOUNT)
-        }
-      } catch (error: any) {
-        const status = error?.response?.status
-        if (status === 401) return
-        setNotice({
-          message: buildApiErrorMessage({
-            status,
-            data: error?.response?.data,
-            fallback: error?.message || 'Unable to load transfer form',
-          }),
-          error: true,
-          data: null,
-        })
+      } catch {
+        if (mounted && Number.isFinite(fallbackBalance)) setAvailableBalance(fallbackBalance)
       } finally {
-        setLoading(false)
+        if (mounted) setBalanceLoading(false)
       }
     }
-    loadData()
+
+    void loadBanks()
+    void loadBeneficiaries()
+    void loadBalance()
+
+    return () => {
+      mounted = false
+    }
   }, [activeAccount, userProfileData?.wallet?.balance])
 
   useEffect(() => {
@@ -360,6 +420,7 @@ const BankTransferScreen = () => {
         setFeeEstimated(quote.feeIsEstimate === true)
         setQuotedDailyLimit(Number(quote.dailyLimit || 0))
         setQuotedDailySpent(Number(quote.dailySpent || 0))
+        setTodaySpent(Number(quote.dailySpent || 0))
         setQuotedAmount(quoteAmount)
         lastQuoteAmountRef.current = quoteAmount
       } finally {
@@ -535,6 +596,11 @@ const BankTransferScreen = () => {
         dailyLimitRemaining: Number(draft.daily_remaining_before || 0),
         totalDebit: backendTotalDebit,
       })
+      const balanceSnapshot = extractBalanceSnapshot(responseData)
+      if (balanceSnapshot !== null) {
+        setAvailableBalance(balanceSnapshot)
+      }
+      void invalidateFetchQueries(isWalletQueryKey)
       const lifecycle = resolveTransferLifecycle({
         lifecycle_state: responseData?.lifecycle_state,
         status: responseData?.status,
@@ -588,6 +654,7 @@ const BankTransferScreen = () => {
               (response as any)?.transfer_id ||
               (response as any)?.id ||
               '',
+            balance_after: balanceSnapshot,
             daily_remaining_after: nextDailyRemaining,
             lifecycle_state: lifecycle.state,
             status: responseData?.status || lifecycle.state,
@@ -783,12 +850,13 @@ const BankTransferScreen = () => {
             <View className="bg-gray-900 border border-gray-800 rounded-2xl p-4 mb-4">
               <Text className="text-gray-400 text-xs uppercase tracking-widest">Available Balance</Text>
               <Text className="text-white text-2xl font-semibold mt-2">{formatNaira(availableBalance)}</Text>
+              {balanceLoading ? <Text className="text-gray-500 text-[11px] mt-1">Refreshing balance...</Text> : null}
               <Text className="text-gray-300 text-xs mt-2">
                 Daily limit remaining: {formatNaira(dailyLimitRemaining)}
               </Text>
               <Text className="text-gray-500 text-xs mt-1">Daily limit: {dailyLimit.toLocaleString('en-NG')}</Text>
               <Text className="text-gray-500 text-[11px] mt-1">
-                Today spent: {formatNaira(effectiveTodaySpent)}
+                {quoteLoading && quotedDailySpent <= 0 ? 'Loading today spent...' : `Today spent: ${formatNaira(effectiveTodaySpent)}`}
               </Text>
             </View>
 
@@ -863,6 +931,12 @@ const BankTransferScreen = () => {
                         focusField(accountNumberRef, 240)
                       }}
                     />
+                    {banksLoading ? <Text className="text-gray-500 text-[11px] mt-2">Loading bank list...</Text> : null}
+                    {!banksLoading && bankOptions.length < 1 ? (
+                      <Text className="text-yellow-300 text-[11px] mt-2">
+                        Bank list is not available yet. Reopen this screen or try again shortly.
+                      </Text>
+                    ) : null}
                   </View>
 
                   <View className="mt-4 border border-gray-800 rounded-xl bg-gray-950/40">
@@ -916,6 +990,12 @@ const BankTransferScreen = () => {
                             lastLookupKeyRef.current = ''
                           }}
                         />
+                        {beneficiariesLoading ? (
+                          <Text className="text-gray-500 text-[11px] mt-2">Loading saved beneficiaries...</Text>
+                        ) : null}
+                        {!beneficiariesLoading && beneficiaryOptions.length < 1 ? (
+                          <Text className="text-gray-500 text-[11px] mt-2">No saved beneficiaries yet.</Text>
+                        ) : null}
                       </View>
                     ) : null}
                   </View>
@@ -1002,6 +1082,10 @@ const BankTransferScreen = () => {
                       </View>
                       {quoteLoading ? <Text className="text-gray-600 text-[10px] mt-2">Refreshing quote...</Text> : null}
                     </View>
+                  ) : amountValue > 0 && canResolve && quoteLoading ? (
+                    <View className="mt-4 bg-gray-950 border border-gray-800 rounded-xl p-3">
+                      <Text className="text-gray-400 text-xs">Getting fees and daily limit...</Text>
+                    </View>
                   ) : null}
 
                   <View className="flex-row items-center justify-between mt-5">
@@ -1053,7 +1137,7 @@ const BankTransferScreen = () => {
             {flowStep === 1 ? (
               <TouchableOpacity
                 onPress={handleContinue}
-                disabled={!canContinue || loading || submitting}
+                disabled={!canContinue || submitting}
                 className={`${canContinue ? 'bg-theme-primary' : 'bg-gray-700'} py-5 rounded-xl`}
               >
                 <Text className="text-alt font-semibold text-center">Continue to review</Text>

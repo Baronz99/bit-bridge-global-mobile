@@ -14,6 +14,7 @@ import type { WalletTransaction } from '@/components/finance/types'
 import WalletHeader from './wallet/components/WalletHeader'
 import WalletActivityPreview from './wallet/components/WalletActivityPreview'
 import { Feather } from '@expo/vector-icons'
+import { useFocusEffect } from '@react-navigation/native'
 import { useAuth } from '@/services/useAuth'
 import { useBalancePrivacy } from '@/services/useBalancePrivacy'
 import moneyFormat from '@/utils/moneyFormat'
@@ -283,6 +284,12 @@ const WalletScreen = () => {
   useEffect(() => {
     void refreshWalletFetches()
   }, [refreshWalletFetches, transactionFilter, walletMode])
+
+  useFocusEffect(
+    useCallback(() => {
+      void refreshWalletFetches()
+    }, [refreshWalletFetches])
+  )
 
   // HARD FILTER by wallet type so NGN cannot leak into USD (or vice versa)
   const walletScopedTransactions = useMemo(() => {
