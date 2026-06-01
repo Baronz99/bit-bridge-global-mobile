@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'expo-router'
-import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native'
+import { ActivityIndicator, LayoutChangeEvent, ScrollView, Text, TouchableOpacity, View } from 'react-native'
 import ScreenContainer from '@/components/ScreenContainer'
 import {
   createBusinessProvisioning,
@@ -55,8 +55,34 @@ const statusTone = (value: any) => {
   return 'text-amber-300'
 }
 
+const UPLOADED_PROVIDER_STATUSES = ['submitted', 'uploaded', 'pending', 'approved', 'verified']
+
+const providerDocumentType = (item: any) =>
+  String(item?.provider_type || item?.provider_document_type || item?.type || item?.metadata?.provider_type || '').trim().toUpperCase()
+
+const providerDocumentId = (item: any) =>
+  String(item?.provider_document_id || item?.provider_id || item?.id || '').trim()
+
+const providerDocumentKey = (item: any, index: number) =>
+  providerDocumentId(item) || providerDocumentType(item) || String(item?.kind || item?.document_kind || `provider-doc-${index}`)
+
+const isUploadedProviderDocument = (document: any, item?: any) => {
+  const status = String(document?.provider_status || document?.status || item?.provider_status || item?.status || '').toLowerCase()
+  return UPLOADED_PROVIDER_STATUSES.includes(status)
+}
+
+type ProviderDocumentRow = {
+  key: string
+  item: any
+  document: any
+  uploaded: boolean
+  label: string
+  status: string
+}
+
 const BusinessKybScreen = () => {
   const router = useRouter()
+  const scrollRef = useRef<ScrollView | null>(null)
   const { activeAccount } = useActiveAccount()
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -74,6 +100,7 @@ const BusinessKybScreen = () => {
   const [onboardingProfile, setOnboardingProfile] = useState<Record<string, any> | null>(null)
   const [onboardingSignatories, setOnboardingSignatories] = useState<Record<string, any>[]>([])
   const [activating, setActivating] = useState(false)
+  const [documentsSectionY, setDocumentsSectionY] = useState(0)
   const businessId = activeAccount.type === 'business' ? activeAccount.businessId : null
   const fallbackRole = activeAccount.type === 'business' ? String((activeAccount as Record<string, any>)?.current_user_role || '') : ''
 
@@ -154,6 +181,41 @@ const BusinessKybScreen = () => {
     }
     return []
   }, [requirements?.documents?.provider_requested])
+
+  const providerDocumentRows = useMemo<ProviderDocumentRow[]>(() => {
+    const requested = providerRequestedDocuments.length
+      ? providerRequestedDocuments
+      : documents.filter((entry) => String(entry?.provider_status || entry?.status || '').toLowerCase() === 'required')
+
+    return requested.map((item: any, index: number) => {
+      const requestedProviderId = providerDocumentId(item)
+      const requestedProviderType = providerDocumentType(item)
+      const requestedKind = String(item?.kind || item?.document_kind || '').trim()
+      const document = documents.find((entry) => {
+        const entryProviderId = providerDocumentId(entry)
+        if (requestedProviderId && entryProviderId === requestedProviderId) return true
+        if (requestedProviderType && providerDocumentType(entry) === requestedProviderType) return true
+        return Boolean(requestedKind && String(entry?.document_kind || entry?.kind || '') === requestedKind && !entryProviderId)
+      })
+      const uploaded = isUploadedProviderDocument(document, item)
+
+      return {
+        key: providerDocumentKey(item, index),
+        item,
+        document,
+        uploaded,
+        label: String(item?.label || item?.name || formatLabel(requestedProviderType || requestedKind || 'Document')),
+        status: String(document?.provider_status || document?.status || item?.provider_status || item?.status || 'required'),
+      }
+    })
+  }, [documents, providerRequestedDocuments])
+
+  const providerActionRequired = useMemo(
+    () => String(provider?.anchor_kyb_status || '').toLowerCase() === 'awaiting_documents' || providerRequestedDocuments.length > 0,
+    [provider?.anchor_kyb_status, providerRequestedDocuments.length]
+  )
+  const uploadedProviderRows = useMemo(() => providerDocumentRows.filter((row: ProviderDocumentRow) => row.uploaded), [providerDocumentRows])
+  const missingProviderRows = useMemo(() => providerDocumentRows.filter((row: ProviderDocumentRow) => !row.uploaded), [providerDocumentRows])
   const savedStateErrorRoute = useMemo<Pick<BusinessKybValidationRoute, 'section' | 'field'> | null>(() => {
     if (hasInvalidNigeriaState(onboardingProfile?.state, onboardingProfile?.country)) {
       return { section: 'contact', field: 'state' }
@@ -229,6 +291,18 @@ const BusinessKybScreen = () => {
   const handleFixProviderFailure = useCallback(() => {
     navigateToValidationRoute(providerFailureRoute, String(provider?.anchor_failure_reason || 'Update the highlighted field and resubmit verification.'))
   }, [navigateToValidationRoute, provider?.anchor_failure_reason, providerFailureRoute])
+
+  const handleDocumentsSectionLayout = useCallback((event: LayoutChangeEvent) => {
+    setDocumentsSectionY(event.nativeEvent.layout.y)
+  }, [])
+
+  const handleUploadMissingDocuments = useCallback(() => {
+    if (documentsSectionY > 0) {
+      scrollRef.current?.scrollTo({ y: Math.max(documentsSectionY - 16, 0), animated: true })
+      return
+    }
+    router.push('/business/kyb' as any)
+  }, [documentsSectionY, router])
   const reviewSections = useMemo(
     () => [
       {
@@ -442,7 +516,7 @@ const BusinessKybScreen = () => {
   }
 
   return (
-    <ScreenContainer topPadding={16} horizontalPadding={14}>
+    <ScreenContainer topPadding={16} horizontalPadding={14} scrollProps={{ ref: scrollRef } as any}>
       <View className="rounded-[24px] border border-[#FF7A18]/40 bg-[#151A22] p-4">
         <Text className="text-[#FFB05A] text-[11px] uppercase tracking-[2px]">Business verification</Text>
         <Text className="text-white text-2xl font-semibold mt-3">{businessEntity?.name || 'Business account'}</Text>
@@ -481,6 +555,59 @@ const BusinessKybScreen = () => {
           {!loading ? (
         <>
           <View className="mt-4 rounded-2xl border border-gray-800 bg-gray-900/80 p-4">
+            {providerActionRequired ? (
+              <View className="mb-4 rounded-[24px] border border-amber-400/40 bg-amber-500/10 p-4">
+                <Text className="text-amber-100 text-lg font-semibold">Action required</Text>
+                <Text className="text-amber-50/90 text-sm mt-2">
+                  Our banking partner needs additional business documents before verification can continue.
+                </Text>
+
+                {providerDocumentRows.length ? (
+                  <View className="mt-4 gap-3">
+                    {missingProviderRows.length ? (
+                      <View>
+                        <Text className="text-amber-100 text-xs font-semibold uppercase tracking-[1px]">Missing documents</Text>
+                        <View className="mt-2 gap-2">
+                          {missingProviderRows.map((row: ProviderDocumentRow) => (
+                            <View key={`missing-${row.key}`} className="rounded-2xl border border-amber-300/25 bg-black/20 px-3 py-3">
+                              <Text className="text-white text-sm font-semibold">{row.label}</Text>
+                              <Text className={`text-xs mt-1 capitalize ${statusTone(row.status)}`}>{row.status}</Text>
+                              <Text className="text-amber-50/75 text-xs mt-1">Upload required</Text>
+                            </View>
+                          ))}
+                        </View>
+                      </View>
+                    ) : null}
+
+                    {uploadedProviderRows.length ? (
+                      <View>
+                        <Text className="text-emerald-100 text-xs font-semibold uppercase tracking-[1px]">Already uploaded</Text>
+                        <View className="mt-2 gap-2">
+                          {uploadedProviderRows.map((row: ProviderDocumentRow) => (
+                            <View key={`uploaded-${row.key}`} className="rounded-2xl border border-emerald-300/20 bg-emerald-500/10 px-3 py-3">
+                              <Text className="text-white text-sm font-semibold">{row.label}</Text>
+                              <Text className={`text-xs mt-1 capitalize ${statusTone(row.status)}`}>{row.status}</Text>
+                              <Text className="text-emerald-50/80 text-xs mt-1">
+                                {row.document?.provider_synced_at ? `Synced ${formatDate(row.document.provider_synced_at)}` : 'Uploaded locally'}
+                              </Text>
+                            </View>
+                          ))}
+                        </View>
+                      </View>
+                    ) : null}
+                  </View>
+                ) : (
+                  <Text className="text-amber-50/80 text-xs mt-4">
+                    Refresh verification status if the requested document list has not loaded yet.
+                  </Text>
+                )}
+
+                <TouchableOpacity onPress={handleUploadMissingDocuments} className="mt-4 rounded-2xl bg-[#FFB05A] px-4 py-4 items-center">
+                  <Text className="text-black text-sm font-semibold">Upload missing documents</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
+
             <View className="gap-3">
               <View>
                 <Text className="text-white text-base font-semibold">Business profile completion</Text>
@@ -596,7 +723,7 @@ const BusinessKybScreen = () => {
             </View>
           </View>
 
-          <View className="mt-4 rounded-2xl border border-gray-800 bg-gray-900/80 p-4">
+          <View onLayout={handleDocumentsSectionLayout} className="mt-4 rounded-2xl border border-gray-800 bg-gray-900/80 p-4">
             <Text className="text-white text-base font-semibold">Documents</Text>
             <Text className="text-gray-400 text-xs mt-2">
               Upload the minimum documents required before submission first. Additional provider-requested documents may appear later during verification.
