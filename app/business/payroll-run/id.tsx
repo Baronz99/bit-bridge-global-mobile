@@ -191,7 +191,7 @@ const BusinessPayrollRunDetailScreen = () => {
                   <Text className="text-white text-sm font-semibold mt-3">{formatNgn(item?.amount || 0)}</Text>
                   {item?.receipt_reference ? <Text className="text-gray-400 text-xs mt-1">Receipt {String(item.receipt_reference)}</Text> : null}
                   {item?.transfer_reference ? <Text className="text-gray-500 text-xs mt-1">Transfer {String(item.transfer_reference)}</Text> : null}
-                  {item?.provider_status ? <Text className="text-gray-500 text-xs mt-1">Provider {String(item.provider_status).replace(/_/g, ' ')}</Text> : null}
+                  {item?.provider_status ? <Text className="text-gray-500 text-xs mt-1">Processing {String(item.provider_status).replace(/_/g, ' ')}</Text> : null}
                 </View>
               )) : (
                 <Text className="text-gray-400 text-sm">No payment entries on this payroll run.</Text>

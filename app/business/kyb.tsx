@@ -55,6 +55,20 @@ const statusTone = (value: any) => {
   return 'text-amber-300'
 }
 
+const neutralizeProviderCopy = (value: unknown) =>
+  String(value || '')
+    .replace(/\bAnchor requested additional business documents\./gi, 'Additional business documents are required.')
+    .replace(/\bAnchor requested additional business documents\b/gi, 'Additional business documents are required')
+    .replace(/\bAnchor\b/g, 'BitBridge')
+    .replace(/\bprovider-requested documents\b/gi, 'additional requested documents')
+    .replace(/\bprovider-requested\b/gi, 'additional')
+    .replace(/\bProvider documents required\b/g, 'Additional documents required')
+    .replace(/\bprovider review\b/gi, 'verification review')
+    .replace(/\bverification provider\b/gi, 'verification process')
+    .replace(/\bprovider submission\b/gi, 'verification submission')
+    .replace(/\bprovider status\b/gi, 'verification status')
+    .replace(/\bprovider\b/gi, 'verification')
+
 const UPLOADED_PROVIDER_STATUSES = ['submitted', 'uploaded', 'pending', 'approved', 'verified']
 
 const providerDocumentType = (item: any) =>
@@ -506,7 +520,7 @@ const BusinessKybScreen = () => {
       const message = buildApiErrorMessage({
         status: error?.response?.status,
         data,
-        fallback: 'Unable to refresh provider status right now.',
+        fallback: 'Unable to refresh verification status right now.',
       })
       setErrorMessage(message)
       navigateToValidationRoute(resolveBusinessKybValidationRoute(data, message), message)
@@ -521,15 +535,15 @@ const BusinessKybScreen = () => {
         <Text className="text-[#FFB05A] text-[11px] uppercase tracking-[2px]">Business verification</Text>
         <Text className="text-white text-2xl font-semibold mt-3">{businessEntity?.name || 'Business account'}</Text>
         <Text className="text-gray-300 text-sm mt-2">
-          {String(journey?.body || 'Submit this business for verification, upload any requested documents, and wait for approval before activating business banking.')}
+          {neutralizeProviderCopy(journey?.body || 'Submit this business for verification, upload any requested documents, and wait for approval before activating business banking.')}
         </Text>
         <View className="mt-4 gap-2">
           <View className="self-start rounded-full border border-gray-700 bg-gray-950/50 px-3 py-2">
             <Text className="text-slate-300 text-[11px] font-semibold uppercase">
-              {String(journey?.title || 'Verification stage')}
+              {neutralizeProviderCopy(journey?.title || 'Verification stage')}
             </Text>
           </View>
-          <Text className="text-slate-400 text-xs">Provider review can continue after submission</Text>
+          <Text className="text-slate-400 text-xs">Verification review can continue after submission</Text>
         </View>
       </View>
 
@@ -559,7 +573,7 @@ const BusinessKybScreen = () => {
               <View className="mb-4 rounded-[24px] border border-amber-400/40 bg-amber-500/10 p-4">
                 <Text className="text-amber-100 text-lg font-semibold">Action required</Text>
                 <Text className="text-amber-50/90 text-sm mt-2">
-                  Our banking partner needs additional business documents before verification can continue.
+                  Additional business documents are required before verification can continue.
                 </Text>
 
                 {providerDocumentRows.length ? (
@@ -612,7 +626,7 @@ const BusinessKybScreen = () => {
               <View>
                 <Text className="text-white text-base font-semibold">Business profile completion</Text>
                 <Text className="text-gray-400 text-sm mt-2">
-                  These checks confirm the saved profile, documents, and signatory details are complete before provider review.
+                  These checks confirm the saved profile, documents, and signatory details are complete before verification review.
                 </Text>
               </View>
               <View className="self-start rounded-full border border-gray-700 bg-gray-950/50 px-3 py-2">
@@ -643,7 +657,7 @@ const BusinessKybScreen = () => {
           </View>
 
           <View className="mt-4 rounded-2xl border border-gray-800 bg-gray-900/80 p-4">
-            <Text className="text-white text-base font-semibold">Provider verification</Text>
+            <Text className="text-white text-base font-semibold">Verification review</Text>
             <View className="mt-4 gap-3">
               <View>
                 <Text className="text-gray-400 text-xs">Verification status</Text>
@@ -656,9 +670,9 @@ const BusinessKybScreen = () => {
               {provider?.anchor_failure_reason ? (
                 <View className="rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-4">
                   <Text className="text-red-100 text-sm font-semibold">{providerFailureTitle}</Text>
-                  <Text className="text-red-50/90 text-sm mt-2">{String(provider.anchor_failure_reason)}</Text>
+                  <Text className="text-red-50/90 text-sm mt-2">{neutralizeProviderCopy(provider.anchor_failure_reason)}</Text>
                   <Text className="text-red-50/80 text-xs mt-2">
-                    This message came from the previous provider submission. Save the corrected field, then return here and submit verification again.
+                    This message came from the previous verification submission. Save the corrected field, then return here and submit verification again.
                   </Text>
                   {providerFailureRoute ? (
                     <TouchableOpacity onPress={handleFixProviderFailure} className="mt-3 rounded-2xl border border-red-200/40 px-4 py-3 items-center">
@@ -726,7 +740,7 @@ const BusinessKybScreen = () => {
           <View onLayout={handleDocumentsSectionLayout} className="mt-4 rounded-2xl border border-gray-800 bg-gray-900/80 p-4">
             <Text className="text-white text-base font-semibold">Documents</Text>
             <Text className="text-gray-400 text-xs mt-2">
-              Upload the minimum documents required before submission first. Additional provider-requested documents may appear later during verification.
+              Upload the minimum documents required before submission first. Additional requested documents may appear later during verification.
             </Text>
 
             <View className="mt-4">
@@ -759,9 +773,9 @@ const BusinessKybScreen = () => {
 
             {providerRequestedDocuments.length ? (
               <View className="mt-5">
-                <Text className="text-sky-100 text-sm font-semibold">Provider-requested documents</Text>
+                <Text className="text-sky-100 text-sm font-semibold">Additional requested documents</Text>
                 <Text className="text-slate-400 text-xs mt-2">
-                  These appear only when the verification provider requests additional compliance documents.
+                  These appear only when extra compliance documents are required.
                 </Text>
                 <View className="mt-3 gap-3">
                   {providerRequestedDocuments.map((item: any) => {
@@ -771,7 +785,7 @@ const BusinessKybScreen = () => {
                     return (
                       <View key={`${documentKind}-provider`} className="rounded-2xl border border-sky-500/20 bg-sky-500/10 px-4 py-4">
                         <Text className="text-white text-sm font-semibold">{String(item?.label || formatLabel(documentKind))}</Text>
-                        <Text className="text-sky-50/90 text-xs mt-1">{String(item?.description || 'Requested during provider verification.')}</Text>
+                        <Text className="text-sky-50/90 text-xs mt-1">{neutralizeProviderCopy(item?.description || 'Requested during verification review.')}</Text>
                         <Text className={`text-xs mt-2 capitalize ${statusTone(document?.status || item?.provider_status || document?.provider_status || 'pending')}`}>
                           {document?.provider_status || item?.provider_status || document?.status || 'required'}
                         </Text>

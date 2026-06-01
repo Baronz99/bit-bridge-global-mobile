@@ -58,7 +58,7 @@ const SECTION_META: Record<SectionKey, {
   contact: {
     title: 'Contact and address details',
     eyebrow: 'Section 2',
-    description: 'Add the operating and registered addresses the provider will use during verification.',
+    description: 'Add the operating and registered addresses used during verification.',
   },
   signatory: {
     title: 'Authorized signatory',
@@ -973,14 +973,14 @@ const BusinessOnboardingScreen = () => {
                 {showAnchorIndustryField ? (
                   <View className="mt-4">
                     <FormSelect
-                      label={String(requirements?.fields?.anchor_industry?.label || 'Anchor industry')}
+                      label={String(requirements?.fields?.anchor_industry?.label || 'Industry subcategory').replace(/\bAnchor\b/g, 'BitBridge')}
                       selectedValue={form.anchor_industry}
                       onValueChange={(value: string) => handleChange('anchor_industry', value)}
                       options={anchorIndustryOptions}
-                      placeholder="Select Anchor industry"
+                      placeholder="Select industry subcategory"
                     />
                     <Text className="text-gray-500 text-[11px] mt-2">
-                      {String(requirements?.fields?.anchor_industry?.helper || 'Choose the exact Anchor subcategory before KYB submission.')}
+                      {String(requirements?.fields?.anchor_industry?.helper || 'Choose the exact industry subcategory before verification submission.').replace(/\bAnchor\b/g, 'BitBridge').replace(/\bKYB\b/g, 'verification')}
                     </Text>
                   </View>
                 ) : null}
@@ -1003,7 +1003,7 @@ const BusinessOnboardingScreen = () => {
                 <View className="mt-6 rounded-2xl border border-[#FFB05A]/20 bg-[#FFB05A]/10 p-4">
                   <Text className="text-[#FFD7A6] text-sm font-semibold">Required before submission</Text>
                   <Text className="text-slate-200 text-xs mt-2">
-                    These are BitBridge pre-submission requirements. Provider-requested documents may appear later during verification.
+                    These are BitBridge pre-submission requirements. Additional requested documents may appear later during verification.
                   </Text>
                   <View className="mt-3 gap-2">
                     {preSubmissionDocuments.map((document: any) => (

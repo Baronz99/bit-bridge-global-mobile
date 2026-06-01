@@ -129,11 +129,9 @@ const BusinessTransferStatusScreen = () => {
           </View>
 
           <View className="mt-4 rounded-2xl border border-gray-800 bg-gray-900/80 p-4">
-            <Text className="text-white text-base font-semibold">Provider and approval</Text>
-            <Text className="text-gray-400 text-xs mt-4">Provider</Text>
-            <Text className="text-white text-sm mt-1">{transfer?.provider?.name || 'anchor'}</Text>
-            <Text className="text-gray-400 text-xs mt-4">Provider status</Text>
-            <Text className="text-white text-sm mt-1">{transfer?.provider?.provider_status || 'Awaiting provider update'}</Text>
+            <Text className="text-white text-base font-semibold">Processing and approval</Text>
+            <Text className="text-gray-400 text-xs mt-4">Processing status</Text>
+            <Text className="text-white text-sm mt-1">{transfer?.provider?.provider_status || 'Awaiting processing update'}</Text>
             <Text className="text-gray-400 text-xs mt-4">Required approvals</Text>
             <Text className="text-white text-sm mt-1">{transfer?.meta?.required_approvals ?? 'Not applicable'}</Text>
             <Text className="text-gray-400 text-xs mt-4">Collected approvals</Text>

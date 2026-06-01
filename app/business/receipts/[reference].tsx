@@ -303,9 +303,8 @@ const BusinessReceiptScreen = () => {
 
   const providerRows: FinanceSummaryRow[] = receipt
     ? [
-        cleanText(receipt.provider?.name) ? { label: 'Provider', value: cleanText(receipt.provider?.name) } : null,
-        cleanText(receipt.provider?.reference) ? { label: 'Provider ref', value: cleanText(receipt.provider?.reference), mono: true, wrap: true } : null,
-        cleanText(receipt.provider?.status) ? { label: 'Provider status', value: cleanText(receipt.provider?.status) } : null,
+        cleanText(receipt.provider?.reference) ? { label: 'Processing reference', value: cleanText(receipt.provider?.reference), mono: true, wrap: true } : null,
+        cleanText(receipt.provider?.status) ? { label: 'Processing status', value: cleanText(receipt.provider?.status) } : null,
       ].filter(Boolean) as FinanceSummaryRow[]
     : []
 
@@ -400,7 +399,7 @@ const BusinessReceiptScreen = () => {
               {providerRows.length ? (
                 <>
                   <View className="h-px bg-[#22324A] my-4" />
-                  <FinancialSummaryCard title="Provider" rows={providerRows} variant="document" />
+                  <FinancialSummaryCard title="Processing" rows={providerRows} variant="document" />
                 </>
               ) : null}
 
