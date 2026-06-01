@@ -85,6 +85,40 @@ const isUploadedProviderDocument = (document: any, item?: any) => {
   return UPLOADED_PROVIDER_STATUSES.includes(status)
 }
 
+const providerRequirementInputType = (item: any) =>
+  String(item?.input_type || item?.metadata?.input_type || 'file').trim().toLowerCase()
+
+const providerRequirementDocumentKind = (item: any) =>
+  String(item?.document_kind || item?.kind || '').trim()
+
+const providerRequirementProfileField = (item: any) =>
+  String(item?.profile_field || item?.metadata?.profile_field || '').trim()
+
+const providerRequirementActionLabel = (item: any) =>
+  String(item?.action_label || '').trim()
+
+const isProviderRequirementValuePresent = (item: any) =>
+  item?.current_value_present === true || item?.current_value_present === 'true'
+
+const canAutoSubmitProviderRequirement = (item: any) =>
+  item?.can_auto_submit === true || item?.can_auto_submit === 'true'
+
+const routeForProfileField = (field: string) => {
+  if (!field) return { section: 'business', field: undefined }
+  if (['registration_number', 'tax_identifier', 'business_bvn'].includes(field)) return { section: 'business', field }
+  if (field.includes('state') || field.includes('country') || field.includes('address')) return { section: 'contact', field }
+  return { section: 'business', field }
+}
+
+const statusSummaryForRequirement = (row: ProviderDocumentRow) => {
+  if (row.uploaded) return row.document?.provider_synced_at ? `Synced ${formatDate(row.document.provider_synced_at)}` : 'Submitted for review'
+  if (row.inputType === 'file') return 'Upload required'
+  if (row.currentValuePresent) return 'Saved value ready to submit'
+  if (row.profileField === 'tax_identifier') return 'Enter TIN in business details'
+  if (row.profileField === 'registration_number') return 'Registration number is required'
+  return 'Information required'
+}
+
 type ProviderDocumentRow = {
   key: string
   item: any
@@ -92,6 +126,13 @@ type ProviderDocumentRow = {
   uploaded: boolean
   label: string
   status: string
+  inputType: string
+  documentKind: string
+  profileField: string
+  providerDocumentId: string
+  actionLabel: string
+  currentValuePresent: boolean
+  canAutoSubmit: boolean
 }
 
 const BusinessKybScreen = () => {
@@ -204,7 +245,7 @@ const BusinessKybScreen = () => {
     return requested.map((item: any, index: number) => {
       const requestedProviderId = providerDocumentId(item)
       const requestedProviderType = providerDocumentType(item)
-      const requestedKind = String(item?.kind || item?.document_kind || '').trim()
+      const requestedKind = providerRequirementDocumentKind(item)
       const document = documents.find((entry) => {
         const entryProviderId = providerDocumentId(entry)
         if (requestedProviderId && entryProviderId === requestedProviderId) return true
@@ -212,6 +253,9 @@ const BusinessKybScreen = () => {
         return Boolean(requestedKind && String(entry?.document_kind || entry?.kind || '') === requestedKind && !entryProviderId)
       })
       const uploaded = isUploadedProviderDocument(document, item)
+      const inputType = providerRequirementInputType(item)
+      const profileField = providerRequirementProfileField(item)
+      const actionLabel = providerRequirementActionLabel(item)
 
       return {
         key: providerDocumentKey(item, index),
@@ -220,6 +264,13 @@ const BusinessKybScreen = () => {
         uploaded,
         label: String(item?.label || item?.name || formatLabel(requestedProviderType || requestedKind || 'Document')),
         status: String(document?.provider_status || document?.status || item?.provider_status || item?.status || 'required'),
+        inputType,
+        documentKind: requestedKind,
+        profileField,
+        providerDocumentId: requestedProviderId,
+        actionLabel,
+        currentValuePresent: isProviderRequirementValuePresent(item),
+        canAutoSubmit: canAutoSubmitProviderRequirement(item),
       }
     })
   }, [documents, providerRequestedDocuments])
@@ -317,6 +368,20 @@ const BusinessKybScreen = () => {
     }
     router.push('/business/kyb' as any)
   }, [documentsSectionY, router])
+
+  const navigateToProfileField = useCallback((field: string, message?: string) => {
+    const route = routeForProfileField(field)
+    router.replace({
+      pathname: '/business/onboarding',
+      params: {
+        section: route.section,
+        ...(route.field ? { field: route.field } : {}),
+        ...(message ? { field_error: message } : {}),
+        mode: 'fix',
+        return_to: 'kyb',
+      },
+    } as any)
+  }, [router])
   const reviewSections = useMemo(
     () => [
       {
@@ -435,19 +500,21 @@ const BusinessKybScreen = () => {
     return null
   }, [missingProfileFields, missingSignatoryRequirements, readiness?.documents_ready, readiness?.ready_for_kyb_submission])
 
-  const handleUpload = async (documentKind: string) => {
+  const handleUpload = async (documentKind: string, providerDocumentIdValue?: string, label?: string) => {
     if (!businessId) return
-    setUploadingKind(documentKind)
+    const uploadingKey = providerDocumentIdValue || documentKind
+    setUploadingKind(uploadingKey)
     setErrorMessage(null)
     setSuccessMessage(null)
     try {
-      const file = await pickKycUpload({ title: `Upload ${formatLabel(documentKind)}` })
+      const file = await pickKycUpload({ title: `Upload ${label || formatLabel(documentKind)}` })
       if (!file) return
       const response = await uploadBusinessKybDocument(businessId, {
         document_kind: documentKind,
+        provider_document_id: providerDocumentIdValue,
         file,
       })
-      setSuccessMessage(response?.data?.message || `${formatLabel(documentKind)} uploaded.`)
+      setSuccessMessage(response?.data?.message || `${label || formatLabel(documentKind)} uploaded.`)
       await loadKybState({ silent: true })
     } catch (error: any) {
       const message = buildApiErrorMessage({
@@ -459,6 +526,49 @@ const BusinessKybScreen = () => {
     } finally {
       setUploadingKind(null)
     }
+  }
+
+  const handleSubmitProviderRequirement = async (row: ProviderDocumentRow) => {
+    if (!businessId) return
+    if (!row.documentKind) {
+      setErrorMessage('This requirement is missing a document type. Refresh verification status and try again.')
+      return
+    }
+
+    const uploadingKey = row.providerDocumentId || row.key
+    setUploadingKind(uploadingKey)
+    setErrorMessage(null)
+    setSuccessMessage(null)
+    try {
+      const response = await uploadBusinessKybDocument(businessId, {
+        document_kind: row.documentKind,
+        provider_document_id: row.providerDocumentId,
+        force: true,
+      })
+      setSuccessMessage(response?.data?.message || `${row.label} submitted.`)
+      await loadKybState({ silent: true })
+    } catch (error: any) {
+      const message = buildApiErrorMessage({
+        status: error?.response?.status,
+        data: error?.response?.data,
+        fallback: error?.message || 'Unable to submit this requirement right now.',
+      })
+      setErrorMessage(message)
+    } finally {
+      setUploadingKind(null)
+    }
+  }
+
+  const handleProviderRequirementAction = (row: ProviderDocumentRow) => {
+    if (row.inputType === 'file') {
+      void handleUpload(row.documentKind, row.providerDocumentId, row.label)
+      return
+    }
+    if (row.canAutoSubmit || row.currentValuePresent) {
+      void handleSubmitProviderRequirement(row)
+      return
+    }
+    navigateToProfileField(row.profileField, `${row.label} is required before verification can continue.`)
   }
 
   const handleSubmit = async () => {
@@ -586,7 +696,10 @@ const BusinessKybScreen = () => {
                             <View key={`missing-${row.key}`} className="rounded-2xl border border-amber-300/25 bg-black/20 px-3 py-3">
                               <Text className="text-white text-sm font-semibold">{row.label}</Text>
                               <Text className={`text-xs mt-1 capitalize ${statusTone(row.status)}`}>{row.status}</Text>
-                              <Text className="text-amber-50/75 text-xs mt-1">Upload required</Text>
+                              <Text className="text-amber-50/75 text-xs mt-1">{statusSummaryForRequirement(row)}</Text>
+                              <Text className="text-amber-50/60 text-[11px] mt-1">
+                                {row.inputType === 'file' ? 'Document upload' : row.currentValuePresent ? 'Saved business information' : 'Business information'}
+                              </Text>
                             </View>
                           ))}
                         </View>
@@ -617,7 +730,7 @@ const BusinessKybScreen = () => {
                 )}
 
                 <TouchableOpacity onPress={handleUploadMissingDocuments} className="mt-4 rounded-2xl bg-[#FFB05A] px-4 py-4 items-center">
-                  <Text className="text-black text-sm font-semibold">Upload missing documents</Text>
+                  <Text className="text-black text-sm font-semibold">Complete required items</Text>
                 </TouchableOpacity>
               </View>
             ) : null}
@@ -778,23 +891,32 @@ const BusinessKybScreen = () => {
                   These appear only when extra compliance documents are required.
                 </Text>
                 <View className="mt-3 gap-3">
-                  {providerRequestedDocuments.map((item: any) => {
-                    const documentKind = String(item?.kind || '')
-                    const document = documents.find((entry) => String(entry.document_kind) === documentKind)
-                    const uploading = uploadingKind === documentKind
+                  {providerDocumentRows.map((row: ProviderDocumentRow) => {
+                    const documentKind = row.documentKind
+                    const document = row.document
+                    const uploading = uploadingKind === (row.providerDocumentId || row.key) || uploadingKind === documentKind
+                    const actionLabel =
+                      row.uploaded
+                        ? 'Submitted'
+                        : row.actionLabel || (row.inputType === 'file' ? (document ? 'Replace document' : 'Upload document') : row.currentValuePresent ? 'Submit saved value' : 'Enter required value')
                     return (
-                      <View key={`${documentKind}-provider`} className="rounded-2xl border border-sky-500/20 bg-sky-500/10 px-4 py-4">
-                        <Text className="text-white text-sm font-semibold">{String(item?.label || formatLabel(documentKind))}</Text>
-                        <Text className="text-sky-50/90 text-xs mt-1">{neutralizeProviderCopy(item?.description || 'Requested during verification review.')}</Text>
-                        <Text className={`text-xs mt-2 capitalize ${statusTone(document?.status || item?.provider_status || document?.provider_status || 'pending')}`}>
-                          {document?.provider_status || item?.provider_status || document?.status || 'required'}
+                      <View key={`${row.key}-provider`} className="rounded-2xl border border-sky-500/20 bg-sky-500/10 px-4 py-4">
+                        <Text className="text-white text-sm font-semibold">{row.label}</Text>
+                        <Text className="text-sky-50/90 text-xs mt-1">{neutralizeProviderCopy(row.item?.description || 'Requested during verification review.')}</Text>
+                        <Text className={`text-xs mt-2 capitalize ${statusTone(row.status)}`}>
+                          {row.status}
                         </Text>
                         <Text className="text-slate-300 text-xs mt-2">
-                          {document ? `Updated ${formatDate(document.provider_synced_at || document.updated_at || document.created_at)}` : 'Awaiting upload'}
+                          {statusSummaryForRequirement(row)}
                         </Text>
-                        {canUpload ? (
-                          <TouchableOpacity onPress={() => handleUpload(documentKind)} disabled={uploading} className="mt-3 rounded-2xl border border-sky-400/30 px-4 py-3 items-center">
-                            {uploading ? <ActivityIndicator size="small" color="#FFB05A" /> : <Text className="text-white text-sm font-semibold">{document ? 'Replace document' : 'Upload document'}</Text>}
+                        {row.profileField ? (
+                          <Text className="text-slate-400 text-[11px] mt-1">
+                            Linked field: {formatLabel(row.profileField)}
+                          </Text>
+                        ) : null}
+                        {canUpload && !row.uploaded ? (
+                          <TouchableOpacity onPress={() => handleProviderRequirementAction(row)} disabled={uploading} className="mt-3 rounded-2xl border border-sky-400/30 px-4 py-3 items-center">
+                            {uploading ? <ActivityIndicator size="small" color="#FFB05A" /> : <Text className="text-white text-sm font-semibold">{actionLabel}</Text>}
                           </TouchableOpacity>
                         ) : null}
                       </View>

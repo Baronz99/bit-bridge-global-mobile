@@ -21,10 +21,11 @@ export const resyncBusinessKyb = (businessId: string | number) =>
   client.post(`/business_entities/${businessId}/kyb/resync`)
 export const uploadBusinessKybDocument = (
   businessId: string | number,
-  payload: { document_kind: string; file?: { uri: string; name?: string; type?: string } | null; text_data?: string; force?: boolean }
+  payload: { document_kind: string; provider_document_id?: string; file?: { uri: string; name?: string; type?: string } | null; text_data?: string; force?: boolean }
 ) => {
   const formData = new FormData()
   formData.append('document_kind', payload.document_kind)
+  if (payload.provider_document_id) formData.append('provider_document_id', payload.provider_document_id)
   if (payload.file) {
     formData.append('file', {
       uri: payload.file.uri,
