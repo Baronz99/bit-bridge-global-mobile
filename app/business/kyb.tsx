@@ -22,6 +22,20 @@ import {
 } from '@/utils/businessKybValidationRouting'
 
 const REQUIRED_DOCUMENT_KINDS = ['registration_certificate', 'proof_of_address']
+const DIRECTOR_IDENTIFICATION_KIND = 'director_identification'
+const DIRECTOR_IDENTIFICATION_SYNC_STATUS = 'local_pending_provider_route'
+const CONTACT_BLOCKER_FIELDS = [
+  'contact_email',
+  'contact_phone',
+  'address_line_1',
+  'city',
+  'state',
+  'country',
+  'registered_address_line_1',
+  'registered_city',
+  'registered_state',
+  'registered_country',
+]
 
 const formatDate = (value?: string | null) => {
   if (!value) return 'Not available'
@@ -119,6 +133,62 @@ const statusSummaryForRequirement = (row: ProviderDocumentRow) => {
   return 'Information required'
 }
 
+const uploadNoticeTitle = (notice: UploadNotice) => {
+  if (notice.phase === 'success') return `${notice.label} uploaded`
+  if (notice.phase === 'error') return `${notice.label} upload needs attention`
+  if (notice.phase === 'refreshing') return `Confirming ${notice.label}`
+  if (notice.phase === 'selecting') return `Select ${notice.label}`
+  return `Uploading ${notice.label}`
+}
+
+const uploadNoticeBody = (notice: UploadNotice) => {
+  if (notice.message) return notice.message
+  if (notice.phase === 'success') return 'Document uploaded successfully. Verification status may take a few moments to update.'
+  if (notice.phase === 'error') return 'Upload failed. Check your connection and retry.'
+  if (notice.phase === 'refreshing') return 'Upload received. Refreshing verification status now.'
+  if (notice.phase === 'selecting') return 'Choose a JPG, PNG, or PDF document.'
+  return 'Please keep this screen open while the document uploads.'
+}
+
+const uploadNoticeTone = (phase: UploadPhase) => {
+  if (phase === 'success') return 'border-emerald-500/30 bg-emerald-500/10'
+  if (phase === 'error') return 'border-red-500/30 bg-red-500/10'
+  return 'border-amber-500/30 bg-amber-500/10'
+}
+
+const uploadNoticeTextTone = (phase: UploadPhase) => {
+  if (phase === 'success') return 'text-emerald-100'
+  if (phase === 'error') return 'text-red-100'
+  return 'text-amber-100'
+}
+
+const uploadPhaseLabel = (phase?: UploadPhase) => {
+  if (phase === 'selecting') return 'Selecting file...'
+  if (phase === 'uploading') return 'Uploading...'
+  if (phase === 'refreshing') return 'Refreshing status...'
+  if (phase === 'success') return 'Uploaded successfully'
+  if (phase === 'error') return 'Upload failed'
+  return null
+}
+
+const hasDirectorIdentificationEvidence = (document: any) =>
+  Boolean(
+    document &&
+      String(document.document_kind || '') === DIRECTOR_IDENTIFICATION_KIND &&
+      ['submitted', 'approved', 'verified'].includes(String(document.status || '').toLowerCase())
+  )
+
+const hasOfficerIdMetadata = (signatory: any) =>
+  Boolean(
+    String(signatory?.identification_type || '').trim() &&
+      String(signatory?.id_document_number || '').trim()
+  )
+
+const isDirectorOrBeneficialOwner = (signatory: any) => {
+  const ownership = Number(signatory?.ownership_percentage || 0)
+  return signatory?.director !== false || ownership >= 70
+}
+
 type ProviderDocumentRow = {
   key: string
   item: any
@@ -135,6 +205,24 @@ type ProviderDocumentRow = {
   canAutoSubmit: boolean
 }
 
+type UploadPhase = 'selecting' | 'uploading' | 'refreshing' | 'success' | 'error'
+
+type UploadNotice = {
+  key: string
+  label: string
+  phase: UploadPhase
+  fileName?: string
+  message?: string
+}
+
+type SubmissionBlocker = {
+  key: string
+  title: string
+  body: string
+  actionLabel: string
+  onPress: () => void
+}
+
 const BusinessKybScreen = () => {
   const router = useRouter()
   const scrollRef = useRef<ScrollView | null>(null)
@@ -143,6 +231,7 @@ const BusinessKybScreen = () => {
   const [submitting, setSubmitting] = useState(false)
   const [resyncing, setResyncing] = useState(false)
   const [uploadingKind, setUploadingKind] = useState<string | null>(null)
+  const [uploadNotice, setUploadNotice] = useState<UploadNotice | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [businessEntity, setBusinessEntity] = useState<Record<string, any> | null>(null)
@@ -212,12 +301,14 @@ const BusinessKybScreen = () => {
   const canActivate = Boolean(gate?.approved_for_provisioning)
   const missingProfileFields = Array.isArray(readiness?.missing_profile_fields) ? readiness.missing_profile_fields : []
   const missingSignatoryRequirements = Array.isArray(readiness?.missing_signatory_requirements) ? readiness.missing_signatory_requirements : []
+  const missingDocumentKinds = Array.isArray(readiness?.missing_document_kinds) ? readiness.missing_document_kinds : []
+  const readyForSubmission = Boolean(readiness?.ready_for_kyb_submission)
   const readyFlags = useMemo(() => [
     { label: 'Business details complete', value: Boolean(readiness?.profile_ready) },
     { label: 'Required documents uploaded', value: Boolean(readiness?.documents_ready) },
-    { label: 'Ready for review', value: Boolean(readiness?.ready_for_kyb_submission) },
+    { label: 'Ready for review', value: readyForSubmission },
     { label: 'Ready to activate', value: canActivate },
-  ], [canActivate, readiness?.documents_ready, readiness?.profile_ready, readiness?.ready_for_kyb_submission])
+  ], [canActivate, readiness?.documents_ready, readiness?.profile_ready, readyForSubmission])
 
   const preSubmissionDocuments = useMemo(() => {
     if (Array.isArray(requirements?.documents?.pre_submission) && requirements.documents.pre_submission.length) {
@@ -281,6 +372,26 @@ const BusinessKybScreen = () => {
   )
   const uploadedProviderRows = useMemo(() => providerDocumentRows.filter((row: ProviderDocumentRow) => row.uploaded), [providerDocumentRows])
   const missingProviderRows = useMemo(() => providerDocumentRows.filter((row: ProviderDocumentRow) => !row.uploaded), [providerDocumentRows])
+  const directorIdentificationDocument = useMemo(
+    () => documents.find((entry) => String(entry?.document_kind || '') === DIRECTOR_IDENTIFICATION_KIND),
+    [documents]
+  )
+  const directorIdentificationCollected = useMemo(
+    () => hasDirectorIdentificationEvidence(directorIdentificationDocument),
+    [directorIdentificationDocument]
+  )
+  const directorIdentificationRequired = useMemo(
+    () =>
+      onboardingSignatories.some(
+        (item) =>
+          isDirectorOrBeneficialOwner(item) &&
+          hasOfficerIdMetadata(item)
+      ) && !directorIdentificationCollected,
+    [directorIdentificationCollected, onboardingSignatories]
+  )
+  const directorIdentificationPendingProviderRoute =
+    directorIdentificationCollected &&
+    String(directorIdentificationDocument?.last_sync_status || '') === DIRECTOR_IDENTIFICATION_SYNC_STATUS
   const savedStateErrorRoute = useMemo<Pick<BusinessKybValidationRoute, 'section' | 'field'> | null>(() => {
     if (hasInvalidNigeriaState(onboardingProfile?.state, onboardingProfile?.country)) {
       return { section: 'contact', field: 'state' }
@@ -382,6 +493,107 @@ const BusinessKybScreen = () => {
       },
     } as any)
   }, [router])
+
+  const navigateToSetupField = useCallback((section: string, field?: string, message?: string) => {
+    router.replace({
+      pathname: '/business/onboarding',
+      params: {
+        section,
+        ...(field ? { field } : {}),
+        ...(message ? { field_error: message } : {}),
+        mode: 'fix',
+        return_to: 'kyb',
+      },
+    } as any)
+  }, [router])
+
+  const submissionBlockers = useMemo<SubmissionBlocker[]>(() => {
+    if (readyForSubmission) return []
+
+    const blockers: SubmissionBlocker[] = []
+
+    missingProfileFields.forEach((field: any) => {
+      const key = String(field || '').trim()
+      if (!key) return
+
+      if (key === 'anchor_industry') {
+        blockers.push({
+          key: `profile-${key}`,
+          title: 'Select industry subcategory',
+          body: 'Choose the exact industry subcategory before verification can start.',
+          actionLabel: 'Fix industry',
+          onPress: () => navigateToSetupField('business', 'anchor_industry', 'Select the business industry subcategory before submitting.'),
+        })
+        return
+      }
+
+      const section = CONTACT_BLOCKER_FIELDS.includes(key) ? 'contact' : 'business'
+      blockers.push({
+        key: `profile-${key}`,
+        title: `${formatLabel(key)} required`,
+        body: 'Complete this saved business detail before submitting for verification.',
+        actionLabel: section === 'contact' ? 'Fix contact details' : 'Fix business details',
+        onPress: () => navigateToSetupField(section, key, `${formatLabel(key)} is required before submitting.`),
+      })
+    })
+
+    missingSignatoryRequirements.forEach((field: any) => {
+      const key = String(field || '').trim()
+      if (!key) return
+
+      if (key === 'authorized_signatory') {
+        blockers.push({
+          key: `signatory-${key}`,
+          title: 'Mark an authorized signatory',
+          body: 'At least one signatory must be marked authorized for verification and account control.',
+          actionLabel: 'Fix signatory',
+          onPress: () => navigateToSetupField('signatory', 'authorized_signatory', 'Mark at least one signatory as authorized before submitting.'),
+        })
+        return
+      }
+
+      blockers.push({
+        key: `signatory-${key}`,
+        title: `${formatLabel(key)} required`,
+        body: 'Complete the authorized signatory information before submitting.',
+        actionLabel: 'Fix signatory',
+        onPress: () => navigateToSetupField('signatory', key, `${formatLabel(key)} is required before submitting.`),
+      })
+    })
+
+    missingDocumentKinds.forEach((kind: any) => {
+      const key = String(kind || '').trim()
+      if (!key) return
+      blockers.push({
+        key: `document-${key}`,
+        title: `Upload ${formatLabel(key)}`,
+        body: 'Upload this business document before submitting for verification.',
+        actionLabel: 'Upload document',
+        onPress: handleUploadMissingDocuments,
+      })
+    })
+
+    if (!readiness?.documents_ready && !missingDocumentKinds.length) {
+      blockers.push({
+        key: 'documents',
+        title: 'Upload required documents',
+        body: 'Upload the minimum pre-submission documents before sending this business for review.',
+        actionLabel: 'Upload documents',
+        onPress: handleUploadMissingDocuments,
+      })
+    }
+
+    return blockers
+  }, [
+    handleUploadMissingDocuments,
+    missingDocumentKinds,
+    missingProfileFields,
+    missingSignatoryRequirements,
+    navigateToSetupField,
+    readiness?.documents_ready,
+    readyForSubmission,
+  ])
+
   const reviewSections = useMemo(
     () => [
       {
@@ -468,59 +680,89 @@ const BusinessKybScreen = () => {
     ],
     [businessEntity?.name, onboardingProfile, onboardingSignatories]
   )
-  const nextRecoveryAction = useMemo(() => {
-    if (missingProfileFields.some((field: any) => ['contact_email', 'contact_phone', 'address_line_1', 'city', 'state', 'country', 'registered_address_line_1', 'registered_city', 'registered_state', 'registered_country'].includes(String(field)))) {
-      return {
-        label: 'Finish contact details',
-        route: '/business/onboarding?section=contact',
-        body: `Still needed: ${missingProfileFields.map((field: any) => formatLabel(field)).join(', ')}.`,
-      }
-    }
-    if (missingSignatoryRequirements.length > 0) {
-      return {
-        label: 'Finish signatory details',
-        route: '/business/onboarding?section=signatory',
-        body: `Still needed: ${missingSignatoryRequirements.map((field: any) => formatLabel(field)).join(', ')}.`,
-      }
-    }
-    if (missingProfileFields.length > 0) {
-      return {
-        label: 'Finish business details',
-        route: '/business/onboarding?section=business',
-        body: `Still needed: ${missingProfileFields.map((field: any) => formatLabel(field)).join(', ')}.`,
-      }
-    }
-    if (!readiness?.documents_ready || !readiness?.ready_for_kyb_submission) {
-      return {
-        label: 'Upload required documents',
-        route: '/business/kyb',
-        body: 'Upload the minimum pre-submission documents before sending this business for review.',
-      }
-    }
-    return null
-  }, [missingProfileFields, missingSignatoryRequirements, readiness?.documents_ready, readiness?.ready_for_kyb_submission])
-
-  const handleUpload = async (documentKind: string, providerDocumentIdValue?: string, label?: string) => {
+  const handleUpload = async (documentKind: string, providerDocumentIdValue?: string, label?: string, forceReplace = false) => {
     if (!businessId) return
     const uploadingKey = providerDocumentIdValue || documentKind
+    const uploadLabel = label || formatLabel(documentKind)
     setUploadingKind(uploadingKey)
+    setUploadNotice({
+      key: uploadingKey,
+      label: uploadLabel,
+      phase: 'selecting',
+      message: 'Choose a JPG, PNG, or PDF document.',
+    })
     setErrorMessage(null)
     setSuccessMessage(null)
     try {
-      const file = await pickKycUpload({ title: `Upload ${label || formatLabel(documentKind)}` })
-      if (!file) return
+      const file = await pickKycUpload({ title: `Upload ${uploadLabel}` })
+      if (!file) {
+        setUploadNotice(null)
+        return
+      }
+      setUploadNotice({
+        key: uploadingKey,
+        label: uploadLabel,
+        phase: 'uploading',
+        fileName: file.name,
+        message: `${file.name || 'Document'} is uploading. Please keep this screen open.`,
+      })
       const response = await uploadBusinessKybDocument(businessId, {
         document_kind: documentKind,
         provider_document_id: providerDocumentIdValue,
         file,
+        force: forceReplace || Boolean(providerDocumentIdValue),
       })
-      setSuccessMessage(response?.data?.message || `${label || formatLabel(documentKind)} uploaded.`)
-      await loadKybState({ silent: true })
+      const success =
+        documentKind === DIRECTOR_IDENTIFICATION_KIND && !providerDocumentIdValue
+          ? 'ID collected. We will submit it to our banking partner if required.'
+          : response?.data?.message || `${uploadLabel} uploaded successfully.`
+      setSuccessMessage(
+        documentKind === DIRECTOR_IDENTIFICATION_KIND && !providerDocumentIdValue
+          ? success
+          : `${success} Verification status may take a few moments to update.`
+      )
+      setUploadNotice({
+        key: uploadingKey,
+        label: uploadLabel,
+        phase: 'refreshing',
+        fileName: file.name,
+        message: 'Upload received. Refreshing verification status now.',
+      })
+      try {
+        await loadKybState({ silent: true })
+        setUploadNotice({
+          key: uploadingKey,
+          label: uploadLabel,
+          phase: 'success',
+          fileName: file.name,
+          message:
+            documentKind === DIRECTOR_IDENTIFICATION_KIND && !providerDocumentIdValue
+              ? 'ID collected. We will submit it to our banking partner if required.'
+              : `${file.name || uploadLabel} uploaded successfully.`,
+        })
+      } catch {
+        setUploadNotice({
+          key: uploadingKey,
+          label: uploadLabel,
+          phase: 'success',
+          fileName: file.name,
+          message:
+            documentKind === DIRECTOR_IDENTIFICATION_KIND && !providerDocumentIdValue
+              ? 'ID collected. Pull down or tap Refresh verification status if the latest status is not visible yet.'
+              : 'Document uploaded successfully. Pull down or tap Refresh verification status if the latest status is not visible yet.',
+        })
+      }
     } catch (error: any) {
       const message = buildApiErrorMessage({
         status: error?.response?.status,
         data: error?.response?.data,
         fallback: error?.message || 'Unable to upload the business document right now.',
+      })
+      setUploadNotice({
+        key: uploadingKey,
+        label: uploadLabel,
+        phase: 'error',
+        message,
       })
       setErrorMessage(message)
     } finally {
@@ -561,7 +803,7 @@ const BusinessKybScreen = () => {
 
   const handleProviderRequirementAction = (row: ProviderDocumentRow) => {
     if (row.inputType === 'file') {
-      void handleUpload(row.documentKind, row.providerDocumentId, row.label)
+      void handleUpload(row.documentKind, row.providerDocumentId, row.label, true)
       return
     }
     if (row.canAutoSubmit || row.currentValuePresent) {
@@ -573,6 +815,10 @@ const BusinessKybScreen = () => {
 
   const handleSubmit = async () => {
     if (!businessId) return
+    if (!readyForSubmission) {
+      setErrorMessage('Complete the required items above before submitting for verification.')
+      return
+    }
     setSubmitting(true)
     setErrorMessage(null)
     setSuccessMessage(null)
@@ -669,6 +915,27 @@ const BusinessKybScreen = () => {
         </View>
       ) : null}
 
+      {uploadNotice ? (
+        <View className={`mt-4 rounded-2xl px-4 py-4 border ${uploadNoticeTone(uploadNotice.phase)}`}>
+          <View className="flex-row items-start gap-3">
+            {['selecting', 'uploading', 'refreshing'].includes(uploadNotice.phase) ? (
+              <ActivityIndicator size="small" color="#FFB05A" />
+            ) : null}
+            <View className="flex-1">
+              <Text className={`text-sm font-semibold ${uploadNoticeTextTone(uploadNotice.phase)}`}>
+                {uploadNoticeTitle(uploadNotice)}
+              </Text>
+              <Text className={`text-xs mt-2 ${uploadNoticeTextTone(uploadNotice.phase)}`}>
+                {uploadNoticeBody(uploadNotice)}
+              </Text>
+              {uploadNotice.fileName ? (
+                <Text className="text-slate-300 text-[11px] mt-2">File: {uploadNotice.fileName}</Text>
+              ) : null}
+            </View>
+          </View>
+        </View>
+      ) : null}
+
       {loading ? (
         <View className="py-10 items-center justify-center">
           <ActivityIndicator size="small" color="#FFB05A" />
@@ -732,6 +999,72 @@ const BusinessKybScreen = () => {
                 <TouchableOpacity onPress={handleUploadMissingDocuments} className="mt-4 rounded-2xl bg-[#FFB05A] px-4 py-4 items-center">
                   <Text className="text-black text-sm font-semibold">Complete required items</Text>
                 </TouchableOpacity>
+              </View>
+            ) : null}
+
+            {directorIdentificationRequired ? (
+              <View className="mb-4 rounded-[24px] border border-amber-400/40 bg-amber-500/10 p-4">
+                <Text className="text-amber-100 text-lg font-semibold">Upload director ID</Text>
+                <Text className="text-amber-50/90 text-sm mt-2">
+                  Upload a valid ID for the director or beneficial owner. Accepted documents include NIN slip, National ID, passport, or driver&apos;s license.
+                </Text>
+                <Text className="text-amber-50/75 text-xs mt-3">
+                  This collects the ID securely. We will submit it to our banking partner if it is required during review.
+                </Text>
+                {canUpload ? (
+                  <TouchableOpacity
+                    onPress={() => handleUpload(DIRECTOR_IDENTIFICATION_KIND, undefined, 'Director ID', true)}
+                    disabled={uploadingKind === DIRECTOR_IDENTIFICATION_KIND}
+                    className="mt-4 rounded-2xl bg-[#FFB05A] px-4 py-4 items-center"
+                  >
+                    <Text className="text-black text-sm font-semibold">
+                      {uploadingKind === DIRECTOR_IDENTIFICATION_KIND ? 'Uploading...' : 'Upload director ID'}
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            ) : null}
+
+            {directorIdentificationPendingProviderRoute ? (
+              <View className="mb-4 rounded-[24px] border border-sky-400/30 bg-sky-500/10 p-4">
+                <Text className="text-sky-100 text-lg font-semibold">Director ID collected</Text>
+                <Text className="text-sky-50/90 text-sm mt-2">
+                  ID collected. We will submit it to our banking partner if required.
+                </Text>
+                <Text className="text-sky-50/70 text-xs mt-2">
+                  File: {directorIdentificationDocument?.file_name || 'Uploaded ID document'}
+                </Text>
+                {canUpload ? (
+                  <TouchableOpacity
+                    onPress={() => handleUpload(DIRECTOR_IDENTIFICATION_KIND, undefined, 'Director ID', true)}
+                    disabled={uploadingKind === DIRECTOR_IDENTIFICATION_KIND}
+                    className="mt-4 rounded-2xl border border-sky-300/40 px-4 py-3 items-center"
+                  >
+                    <Text className="text-sky-50 text-sm font-semibold">
+                      {uploadingKind === DIRECTOR_IDENTIFICATION_KIND ? 'Uploading...' : 'Replace director ID'}
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            ) : null}
+
+            {!readyForSubmission && submissionBlockers.length ? (
+              <View className="mb-4 rounded-[24px] border border-amber-400/35 bg-amber-500/10 p-4">
+                <Text className="text-amber-100 text-lg font-semibold">Complete setup before submission</Text>
+                <Text className="text-amber-50/90 text-sm mt-2">
+                  Finish each required item below. Verification can only be submitted after all blockers are cleared.
+                </Text>
+                <View className="mt-4 gap-3">
+                  {submissionBlockers.map((blocker) => (
+                    <View key={blocker.key} className="rounded-2xl border border-amber-300/25 bg-black/20 px-3 py-3">
+                      <Text className="text-white text-sm font-semibold">{blocker.title}</Text>
+                      <Text className="text-amber-50/80 text-xs mt-1">{blocker.body}</Text>
+                      <TouchableOpacity onPress={blocker.onPress} className="mt-3 rounded-2xl bg-[#FFB05A] px-4 py-3 items-center">
+                        <Text className="text-black text-sm font-semibold">{blocker.actionLabel}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
               </View>
             ) : null}
 
@@ -813,16 +1146,6 @@ const BusinessKybScreen = () => {
             </View>
           </View>
 
-          {!canActivate && nextRecoveryAction ? (
-            <View className="mt-4 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4">
-              <Text className="text-amber-100 text-sm font-semibold">Next required action</Text>
-              <Text className="text-amber-50/90 text-xs mt-2">{nextRecoveryAction.body}</Text>
-              <TouchableOpacity onPress={() => router.push(nextRecoveryAction.route as any)} className="mt-3 rounded-2xl border border-amber-300/30 px-4 py-3 items-center">
-                <Text className="text-amber-50 text-sm font-semibold">{nextRecoveryAction.label}</Text>
-              </TouchableOpacity>
-            </View>
-          ) : null}
-
           <View className="mt-4 rounded-2xl border border-gray-800 bg-gray-900/80 p-4">
             <Text className="text-white text-base font-semibold">Review saved details</Text>
             <Text className="text-gray-400 text-xs mt-2">
@@ -862,7 +1185,12 @@ const BusinessKybScreen = () => {
                 {preSubmissionDocuments.map((item: any) => {
                   const documentKind = String(item?.kind || '')
                   const document = documents.find((entry) => String(entry.document_kind) === documentKind)
-                  const uploading = uploadingKind === documentKind
+                  const documentProviderId = providerDocumentId(document)
+                  const uploading = uploadingKind === documentKind || Boolean(documentProviderId && uploadingKind === documentProviderId)
+                  const uploadPhase = uploadNotice?.key === documentKind || (documentProviderId && uploadNotice?.key === documentProviderId)
+                    ? uploadNotice.phase
+                    : null
+                  const phaseLabel = uploadPhaseLabel(uploadPhase || undefined)
                   return (
                     <View key={documentKind} className="rounded-2xl border border-gray-800 bg-gray-950/45 px-4 py-4">
                       <Text className="text-white text-sm font-semibold">{String(item?.label || formatLabel(documentKind))}</Text>
@@ -870,12 +1198,17 @@ const BusinessKybScreen = () => {
                       <Text className={`text-xs mt-2 capitalize ${statusTone(document?.status || document?.provider_status || 'pending')}`}>
                         {document?.provider_status || document?.status || 'missing'}
                       </Text>
+                      {phaseLabel ? (
+                        <Text className={`text-xs mt-2 ${uploadPhase === 'error' ? 'text-red-200' : uploadPhase === 'success' ? 'text-emerald-200' : 'text-amber-200'}`}>
+                          {phaseLabel}
+                        </Text>
+                      ) : null}
                       <Text className="text-gray-400 text-xs mt-2">
                         {document ? `Updated ${formatDate(document.provider_synced_at || document.updated_at || document.created_at)}` : 'No document uploaded yet'}
                       </Text>
                       {canUpload ? (
-                        <TouchableOpacity onPress={() => handleUpload(documentKind)} disabled={uploading} className="mt-3 rounded-2xl border border-gray-700 px-4 py-3 items-center">
-                          {uploading ? <ActivityIndicator size="small" color="#FFB05A" /> : <Text className="text-white text-sm font-semibold">{document ? 'Replace document' : 'Upload document'}</Text>}
+                        <TouchableOpacity onPress={() => handleUpload(documentKind, documentProviderId, String(item?.label || formatLabel(documentKind)), Boolean(documentProviderId))} disabled={uploading} className="mt-3 rounded-2xl border border-gray-700 px-4 py-3 items-center">
+                          {uploading ? <Text className="text-[#FFB05A] text-sm font-semibold">{phaseLabel || 'Uploading...'}</Text> : <Text className="text-white text-sm font-semibold">{document ? 'Replace document' : 'Upload document'}</Text>}
                         </TouchableOpacity>
                       ) : null}
                     </View>
@@ -895,6 +1228,10 @@ const BusinessKybScreen = () => {
                     const documentKind = row.documentKind
                     const document = row.document
                     const uploading = uploadingKind === (row.providerDocumentId || row.key) || uploadingKind === documentKind
+                    const uploadPhase = uploadNotice?.key === (row.providerDocumentId || row.key) || uploadNotice?.key === documentKind
+                      ? uploadNotice.phase
+                      : null
+                    const phaseLabel = uploadPhaseLabel(uploadPhase || undefined)
                     const actionLabel =
                       row.uploaded
                         ? 'Submitted'
@@ -909,14 +1246,19 @@ const BusinessKybScreen = () => {
                         <Text className="text-slate-300 text-xs mt-2">
                           {statusSummaryForRequirement(row)}
                         </Text>
+                        {phaseLabel ? (
+                          <Text className={`text-xs mt-2 ${uploadPhase === 'error' ? 'text-red-200' : uploadPhase === 'success' ? 'text-emerald-200' : 'text-amber-200'}`}>
+                            {phaseLabel}
+                          </Text>
+                        ) : null}
                         {row.profileField ? (
                           <Text className="text-slate-400 text-[11px] mt-1">
                             Linked field: {formatLabel(row.profileField)}
                           </Text>
                         ) : null}
-                        {canUpload && !row.uploaded ? (
+                        {canUpload && (row.inputType === 'file' || !row.uploaded) ? (
                           <TouchableOpacity onPress={() => handleProviderRequirementAction(row)} disabled={uploading} className="mt-3 rounded-2xl border border-sky-400/30 px-4 py-3 items-center">
-                            {uploading ? <ActivityIndicator size="small" color="#FFB05A" /> : <Text className="text-white text-sm font-semibold">{actionLabel}</Text>}
+                            {uploading ? <Text className="text-[#FFB05A] text-sm font-semibold">{phaseLabel || 'Uploading...'}</Text> : <Text className="text-white text-sm font-semibold">{row.uploaded && row.inputType === 'file' ? 'Replace document' : actionLabel}</Text>}
                           </TouchableOpacity>
                         ) : null}
                       </View>
@@ -932,10 +1274,15 @@ const BusinessKybScreen = () => {
               <TouchableOpacity onPress={handleActivate} disabled={activating} className="rounded-2xl bg-[#FFB05A] px-4 py-4 items-center">
                 {activating ? <ActivityIndicator size="small" color="#111827" /> : <Text className="text-black text-sm font-semibold">Activate business banking</Text>}
               </TouchableOpacity>
-            ) : canSubmit ? (
+            ) : canSubmit && readyForSubmission ? (
               <TouchableOpacity onPress={handleSubmit} disabled={submitting} className="rounded-2xl bg-[#FFB05A] px-4 py-4 items-center">
                 {submitting ? <ActivityIndicator size="small" color="#111827" /> : <Text className="text-black text-sm font-semibold">Submit business for verification</Text>}
               </TouchableOpacity>
+            ) : canSubmit ? (
+              <View className="rounded-2xl border border-amber-500/25 bg-amber-500/10 px-4 py-4">
+                <Text className="text-amber-100 text-sm font-semibold">Submission locked</Text>
+                <Text className="text-amber-50/85 text-xs mt-2">Complete required items above before submission.</Text>
+              </View>
             ) : null}
             <TouchableOpacity onPress={handleResync} disabled={resyncing} className="rounded-2xl border border-gray-700 px-4 py-4 items-center">
               {resyncing ? <ActivityIndicator size="small" color="#FFB05A" /> : <Text className="text-white text-sm font-semibold">Refresh verification status</Text>}

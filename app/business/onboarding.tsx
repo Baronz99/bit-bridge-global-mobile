@@ -119,6 +119,7 @@ const SECTION_FIELD_MAP: Record<SectionKey, string[]> = {
     'identification_type',
     'id_document_number',
     'ownership_percentage',
+    'authorized_signatory',
   ],
 }
 
@@ -442,6 +443,11 @@ const BusinessOnboardingScreen = () => {
     return routedFieldMessage
   }, [normalizedRouteField, routedFieldMessage, section])
 
+  const businessFieldError = useCallback((field: string) => {
+    if (section !== 'business' || normalizedRouteField !== field) return ''
+    return routedFieldMessage
+  }, [normalizedRouteField, routedFieldMessage, section])
+
   const signatoryFieldError = useCallback((field: string) => {
     if (section !== 'signatory' || normalizedRouteField !== field) return ''
     return routedFieldMessage
@@ -541,6 +547,7 @@ const BusinessOnboardingScreen = () => {
   }, [section, requirements?.groups, missingProfileFields, missingSignatoryRequirements])
 
   const shouldShowSectionFeedback = useMemo(() => {
+    if (correctionMode || normalizedRouteField) return true
     if (submitAttempted) return true
 
     if (section === 'signatory') {
@@ -551,7 +558,7 @@ const BusinessOnboardingScreen = () => {
     }
 
     return SECTION_FIELD_MAP[section].some((field) => touchedFields[field])
-  }, [section, submitAttempted, signatories, touchedFields, touchedSignatories])
+  }, [correctionMode, normalizedRouteField, section, submitAttempted, signatories, touchedFields, touchedSignatories])
 
   const sectionFeedbackMessage = useMemo(() => {
     if (!shouldShowSectionFeedback || !currentSectionMissing.length) return null
@@ -982,6 +989,9 @@ const BusinessOnboardingScreen = () => {
                     <Text className="text-gray-500 text-[11px] mt-2">
                       {String(requirements?.fields?.anchor_industry?.helper || 'Choose the exact industry subcategory before verification submission.').replace(/\bAnchor\b/g, 'BitBridge').replace(/\bKYB\b/g, 'verification')}
                     </Text>
+                    {businessFieldError('anchor_industry') ? (
+                      <Text className="text-red-300 text-xs mt-2">{businessFieldError('anchor_industry')}</Text>
+                    ) : null}
                   </View>
                 ) : null}
 
@@ -1326,10 +1336,18 @@ const BusinessOnboardingScreen = () => {
                     <View className="mt-6 border-t border-white/6 pt-6">
                       <Text className="text-[11px] uppercase tracking-[1.4px] text-slate-500">Role</Text>
                     </View>
-                    <View className="mt-4 flex-row gap-3">
+                    <View className={`mt-4 rounded-2xl border p-3 ${signatoryFieldError('authorized_signatory') ? 'border-red-300/45 bg-red-500/10' : 'border-transparent bg-transparent'}`}>
+                      <Text className="text-slate-400 text-xs">
+                        At least one signatory must be marked authorized before verification can be submitted.
+                      </Text>
+                      {signatoryFieldError('authorized_signatory') ? (
+                        <Text className="text-red-300 text-xs mt-2">{signatoryFieldError('authorized_signatory')}</Text>
+                      ) : null}
+                    </View>
+                    <View className="mt-3 flex-row gap-3">
                       <TouchableOpacity
                         onPress={() => handleSignatoryChange(index, 'authorized_signatory', !signatory.authorized_signatory)}
-                        className={`flex-1 rounded-2xl border px-4 py-3 ${signatory.authorized_signatory ? 'border-[#FFB05A] bg-[#FFB05A]/12' : 'border-gray-700 bg-transparent'}`}
+                        className={`flex-1 rounded-2xl border px-4 py-3 ${signatory.authorized_signatory ? 'border-[#FFB05A] bg-[#FFB05A]/12' : signatoryFieldError('authorized_signatory') ? 'border-red-300/55 bg-red-500/10' : 'border-gray-700 bg-transparent'}`}
                       >
                         <Text className="text-white text-xs font-semibold text-center">Authorized signatory</Text>
                       </TouchableOpacity>
