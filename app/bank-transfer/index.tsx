@@ -78,6 +78,11 @@ const FORCE_REFRESH_RETRY_DELAY_MS = 1700
 const DEFAULT_TRANSFER_DESCRIPTION = 'Fund Transfer'
 
 const sanitizeDigits = (value: string) => String(value || '').replace(/\D/g, '')
+const formatWholeNairaInput = (value: string) => {
+  const digits = sanitizeDigits(value)
+  if (!digits) return ''
+  return digits.replace(/^0+(?=\d)/, '').replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+}
 
 const extractCounterPartyId = (payload: any): string => {
   const direct =
@@ -229,6 +234,10 @@ const BankTransferScreen = () => {
     dailyLimitRemaining,
     minAmount: MIN_TRANSFER_AMOUNT,
   })
+  const amountValidationMessage =
+    amountValidation.message === 'Enter an amount greater than 0.'
+      ? 'Enter amount in whole naira.'
+      : amountValidation.message
 
   const narrationValue = formData.description.trim()
   const resolvedNarration = narrationValue || DEFAULT_TRANSFER_DESCRIPTION
@@ -1036,9 +1045,9 @@ const BankTransferScreen = () => {
                     <TextInput
                       ref={amountRef}
                       value={formData.amount}
-                      onChangeText={(text) => setFormData((prev) => ({ ...prev, amount: text.replace(/[^0-9.]/g, '') }))}
+                      onChangeText={(text) => setFormData((prev) => ({ ...prev, amount: formatWholeNairaInput(text) }))}
                       keyboardType="numeric"
-                      placeholder="0.00"
+                      placeholder="0"
                       placeholderTextColor="gray"
                       onFocus={() => scrollRef.current?.scrollTo({ y: 520, animated: true })}
                       className="flex-1 py-4 text-white"
@@ -1049,7 +1058,7 @@ const BankTransferScreen = () => {
                     {QUICK_AMOUNTS.map((quick) => (
                       <TouchableOpacity
                         key={`quick-${quick}`}
-                        onPress={() => setFormData((prev) => ({ ...prev, amount: String(quick) }))}
+                        onPress={() => setFormData((prev) => ({ ...prev, amount: formatWholeNairaInput(String(quick)) }))}
                         className="bg-gray-950 border border-gray-800 rounded-full px-3 py-2"
                       >
                         <Text className="text-white text-xs">{formatNaira(quick)}</Text>
@@ -1058,7 +1067,7 @@ const BankTransferScreen = () => {
                   </View>
 
                   {!amountValidation.valid && formData.amount ? (
-                    <Text className="text-red-300 text-xs mt-3">{amountValidation.message}</Text>
+                    <Text className="text-red-300 text-xs mt-3">{amountValidationMessage}</Text>
                   ) : null}
 
                   {quoteVisible ? (
