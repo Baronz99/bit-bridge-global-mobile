@@ -1,4 +1,4 @@
-﻿name: production-ota-release
+name: production-ota-release
 
 on:
   push:
@@ -40,5 +40,26 @@ jobs:
       - name: Release guard (full)
         run: node scripts/release/guard-production-release.mjs --mode=release
 
+      - name: Release guard (worktree scope)
+        run: pwsh -ExecutionPolicy Bypass -File scripts/release/guard-release-worktree.ps1 --base=origin/production
+
+      - name: Verify phone-first signup env
+        shell: bash
+        run: |
+          export EXPO_PUBLIC_ENABLE_PHONE_FIRST_SIGNUP="${EXPO_PUBLIC_ENABLE_PHONE_FIRST_SIGNUP:-1}"
+          echo "EXPO_PUBLIC_ENABLE_PHONE_FIRST_SIGNUP=$EXPO_PUBLIC_ENABLE_PHONE_FIRST_SIGNUP"
+          if [ "$EXPO_PUBLIC_ENABLE_PHONE_FIRST_SIGNUP" != "1" ]; then
+            echo "EXPO_PUBLIC_ENABLE_PHONE_FIRST_SIGNUP must be 1 for production OTA releases" >&2
+            exit 1
+          fi
+
       - name: Publish OTA to production branch
-        run: npx eas update --branch production --message "release(production): $GITHUB_SHA" --non-interactive
+        shell: bash
+        run: |
+          export EXPO_PUBLIC_ENABLE_PHONE_FIRST_SIGNUP="${EXPO_PUBLIC_ENABLE_PHONE_FIRST_SIGNUP:-1}"
+          echo "Publishing with EXPO_PUBLIC_ENABLE_PHONE_FIRST_SIGNUP=$EXPO_PUBLIC_ENABLE_PHONE_FIRST_SIGNUP"
+          if [ "$EXPO_PUBLIC_ENABLE_PHONE_FIRST_SIGNUP" != "1" ]; then
+            echo "EXPO_PUBLIC_ENABLE_PHONE_FIRST_SIGNUP must be 1 for production OTA releases" >&2
+            exit 1
+          fi
+          npx eas update --branch production --message "release(production): $GITHUB_SHA" --non-interactive

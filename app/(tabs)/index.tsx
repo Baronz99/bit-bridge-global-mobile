@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   FlatList,
@@ -52,7 +52,6 @@ import { FEATURE_LEGACY_HOME } from '@/constants/featureFlags'
 import { getTierFromProfile, isTierEligibleForBankTransfer } from '@/utils/bankTransfer'
 import { log } from '@/utils/logger'
 import { resolveTransferLifecycle } from '@/utils/transferLifecycle'
-import { describeCurrentUserDues } from '@/utils/circleWorkspace'
 
 const FORCE_REFRESH_RETRY_DELAY_MS = 1700
 
@@ -103,6 +102,35 @@ const toBankStatus = (item: TimelineItem): 'successful' | 'pending' | 'failed' |
   if (lifecycle.isSuccess) return 'successful'
   if (lifecycle.isFailure) return 'failed'
   return 'pending'
+}
+const describeCircleCurrentUserDues = (
+  summary: Record<string, any> | null | undefined,
+  options?: { compact?: boolean }
+) => {
+  const payload = summary && typeof summary === 'object' ? summary : {}
+  const totalDue = Number(
+    payload.total_due_amount ?? payload.amount_due ?? payload.outstanding_amount ?? payload.next_due_amount ?? 0
+  )
+  const currency = s(payload.currency, 'NGN') || 'NGN'
+  const dueDate = s(payload.next_due_date ?? payload.due_date, '')
+  const compact = options?.compact === true
+
+  if (!Number.isFinite(totalDue) || totalDue <= 0) {
+    return {
+      summaryLabel: compact ? 'No dues outstanding.' : 'You have no dues outstanding.',
+    }
+  }
+
+  const amountLabel = moneyFormat(totalDue, currency)
+  if (!dueDate) {
+    return {
+      summaryLabel: compact ? `${amountLabel} due.` : `${amountLabel} is due.`,
+    }
+  }
+
+  return {
+    summaryLabel: compact ? `${amountLabel} due by ${dueDate}.` : `${amountLabel} is due by ${dueDate}.`,
+  }
 }
 
 // ---------------------------
@@ -273,6 +301,7 @@ export default function Index() {
   useEffect(() => {
     log('Runtime Versions:', Constants.manifest2?.runtimeVersion)
   }, [])
+
 
   useEffect(() => {
     if (!authHydrated) return
@@ -655,9 +684,32 @@ export default function Index() {
   const circlePermissions = circleAccount?.permissions ?? {}
   const circleDuesSummary = circleAccount?.dues_summary ?? {}
   const circleDuesPresentation = useMemo(
-    () => describeCurrentUserDues(circleDuesSummary?.current_user_due_summary ?? circleDuesSummary?.current_user_summary ?? {}, { compact: true }),
+    () =>
+      describeCircleCurrentUserDues(
+        circleDuesSummary?.current_user_due_summary ?? circleDuesSummary?.current_user_summary ?? {},
+        { compact: true }
+      ),
     [circleDuesSummary]
   )
+
+  useEffect(() => {
+    if (!__DEV__) return
+    log('[HOME_DIAGNOSTIC]', {
+      route: '(tabs)/index',
+      authenticated: Boolean(authState?.authenticated),
+      userProfilePresent: Boolean(userProfileData),
+      activeAccountType: activeAccount?.type || 'personal',
+      featureLegacyHome: FEATURE_LEGACY_HOME,
+      helperTypes: {
+        getEmailVerificationState: typeof getEmailVerificationState,
+        isTierEligibleForBankTransfer: typeof isTierEligibleForBankTransfer,
+        getTierFromProfile: typeof getTierFromProfile,
+        describeCircleCurrentUserDues: typeof describeCircleCurrentUserDues,
+      },
+      circleSummaryPresent: Boolean(circleDuesSummary && typeof circleDuesSummary === 'object'),
+      walletPresent: Boolean(walletData),
+    })
+  }, [authState?.authenticated, userProfileData, activeAccount?.type, circleDuesSummary, walletData])
   const tunnelWallet = useMemo(() => {
     return walletPayload?.tunnel ?? walletPayload?.data?.tunnel ?? null
   }, [walletPayload])
