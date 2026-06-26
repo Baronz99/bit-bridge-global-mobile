@@ -10,7 +10,9 @@ import { Link } from 'expo-router'
 import { useAuth } from '@/services/useAuth'
 import { AntDesign, Feather, FontAwesome, Ionicons } from '@expo/vector-icons'
 import AppModal from '@/components/modal/Modal'
+import EmailVerificationCard from '@/components/EmailVerificationCard'
 import ScreenContainer from '@/components/ScreenContainer'
+import { requestEmailVerification } from '@/api/auth'
 import {
   FEATURE_CIRCLES,
   FEATURE_KYC_CENTER,
@@ -23,6 +25,11 @@ import {
   FEATURE_CARD_TOKENS,
   FEATURE_PAYMENT_TOOLS,
 } from '@/constants/featureFlags'
+import {
+  EMAIL_VERIFICATION_SUCCESS_MESSAGE,
+  getEmailVerificationFeedback,
+  getEmailVerificationState,
+} from '@/services/emailVerification'
 
 type RowItem = {
   label: string
@@ -34,6 +41,8 @@ type RowItem = {
 
 const Profile = () => {
   const [toggleModal, setToggleModal] = useState(false)
+  const [emailVerificationLoading, setEmailVerificationLoading] = useState(false)
+  const [emailVerificationMessage, setEmailVerificationMessage] = useState<string | null>(null)
   const { userProfileData, onLogout, loadProfile, authState, authHydrated } = useAuth()
   const didKickoffProfileRef = useRef(false)
 
@@ -50,6 +59,14 @@ const Profile = () => {
     didKickoffProfileRef.current = false
   }, [authState?.authenticated])
 
+  const emailVerification = useMemo(() => getEmailVerificationState(userProfileData), [userProfileData])
+
+  useEffect(() => {
+    if (emailVerification.isVerified) {
+      setEmailVerificationMessage(null)
+    }
+  }, [emailVerification.isVerified])
+
   const kycLabel = (userProfileData?.kyc_level || 'unverified')
     .toString()
     .replace('_', ' ')
@@ -58,7 +75,21 @@ const Profile = () => {
     const role = String(userProfileData?.role || userProfileData?.user_profile?.role || '').toLowerCase()
     return role === 'admin' || role === 'super_admin'
   }, [userProfileData])
-  const securityLockActive = Boolean(userProfileData?.security_lock?.active || userProfileData?.security_lock?.security_locked)
+
+  const handleSendEmailVerification = async () => {
+    setEmailVerificationLoading(true)
+    setEmailVerificationMessage(null)
+
+    try {
+      await requestEmailVerification()
+      setEmailVerificationMessage(EMAIL_VERIFICATION_SUCCESS_MESSAGE)
+      await loadProfile({ force: true })
+    } catch (error: unknown) {
+      setEmailVerificationMessage(getEmailVerificationFeedback(error))
+    } finally {
+      setEmailVerificationLoading(false)
+    }
+  }
 
   const sections = useMemo(() => {
     const data: { title: string; items: RowItem[] }[] = []
@@ -99,7 +130,7 @@ const Profile = () => {
           ...(FEATURE_KYC_CENTER
             ? [
               {
-                label: 'KYC Center',
+                label: 'Identity Verification',
                   href: '/kyc',
                   icon: <Ionicons name="shield-checkmark-outline" size={18} color="white" />,
                 },
@@ -243,7 +274,6 @@ const Profile = () => {
     isInternalAdmin,
     FEATURE_TIMELINE,
     FEATURE_TRANSACTION_PIN,
-    securityLockActive,
   ])
 
   return (
@@ -266,10 +296,10 @@ const Profile = () => {
 
             <View className="flex-row flex-wrap gap-2 mt-4">
               <View className="bg-gray-950 border border-gray-800 rounded-full px-3 py-1">
-                <Text className="text-xs text-gray-300">Plan: Core</Text>
+                <Text className="text-xs text-gray-300">Plan: Account</Text>
               </View>
               <View className="bg-gray-950 border border-gray-800 rounded-full px-3 py-1">
-                <Text className="text-xs text-gray-300">KYC: {kycLabel}</Text>
+                <Text className="text-xs text-gray-300">Identity: {kycLabel}</Text>
               </View>
             </View>
 
@@ -286,6 +316,19 @@ const Profile = () => {
               </Link>
             </View>
           </View>
+
+            {emailVerification.email ? (
+              <View className="mt-4">
+                <EmailVerificationCard
+                  verified={emailVerification.isVerified}
+                  hasEmail
+                  loading={emailVerificationLoading}
+                  message={emailVerificationMessage}
+                  onSend={emailVerification.isVerified ? undefined : handleSendEmailVerification}
+                  compact
+                />
+              </View>
+            ) : null}
 
           <View className="mt-6 gap-5">
             {sections.map((section) => (
@@ -350,3 +393,6 @@ const Profile = () => {
 }
 
 export default Profile
+
+
+

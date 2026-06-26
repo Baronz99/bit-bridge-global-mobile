@@ -113,6 +113,43 @@ export const sendUserConfirmation = async (email: string) => {
   }
 }
 
+export type RequestUnconfirmedEmailRecoveryPayload = {
+  phone_number: string
+  current_password: string
+  new_email: string
+}
+
+export type ConfirmUnconfirmedEmailRecoveryPayload = {
+  phone_number: string
+  current_password: string
+  new_email: string
+  phone_otp_code: string
+}
+
+export const requestUnconfirmedEmailRecovery = async (payload: RequestUnconfirmedEmailRecoveryPayload) => {
+  try {
+    const response = await client.post('/users/request_unconfirmed_email_recovery', payload)
+    return response.data
+  } catch (error: any) {
+    if (error?.response) {
+      throw new Error(error.response.data?.message || 'Unable to verify this account')
+    }
+    throw new Error('Unable to verify this account')
+  }
+}
+
+export const confirmUnconfirmedEmailRecovery = async (payload: ConfirmUnconfirmedEmailRecoveryPayload) => {
+  try {
+    const response = await client.post('/users/confirm_unconfirmed_email_recovery', payload)
+    return response.data
+  } catch (error: any) {
+    if (error?.response) {
+      throw new Error(error.response.data?.message || 'Unable to update unconfirmed email')
+    }
+    throw new Error('Unable to update unconfirmed email')
+  }
+}
+
 export type RequestEmailChangePayload = {
   new_email: string
   current_password: string
@@ -145,6 +182,18 @@ export const confirmEmailChange = async (payload: ConfirmEmailChangePayload) => 
       throw new Error(error.response.data?.message || 'Unable to confirm email change')
     }
     throw new Error('Unable to confirm email change')
+  }
+}
+
+export const requestEmailVerification = async () => {
+  try {
+    const response = await client.post('/users/request_email_verification')
+    return response.data
+  } catch (error: unknown) {
+    if ((error as { response?: unknown } | null)?.response) {
+      throw error
+    }
+    throw new Error('Unable to send verification email')
   }
 }
 
@@ -206,4 +255,5 @@ export const confirmPasswordReset = async (payload: {
     throw new Error('Something went wrong')
   }
 }
+
 

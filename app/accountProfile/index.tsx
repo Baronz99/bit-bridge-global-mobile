@@ -10,7 +10,8 @@ import {
   View,
 } from 'react-native'
 import React, { useEffect, useRef, useState } from 'react'
-import { confirmEmailChange, requestEmailChange, userProfileUpdate } from '@/api/auth'
+import EmailVerificationCard from '@/components/EmailVerificationCard'
+import { confirmEmailChange, requestEmailChange, requestEmailVerification, userProfileUpdate } from '@/api/auth'
 import { useAuth } from '@/services/useAuth'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
 import FormInput from '@/components/FormInput'
@@ -22,6 +23,11 @@ import FormSelect from '@/components/FormSelect'
 import AppModal from '@/components/modal/Modal'
 import { router } from 'expo-router'
 import { setConfirmationFlow, setEmailForVerification } from '@/auth/tokenstore'
+import {
+  EMAIL_VERIFICATION_SUCCESS_MESSAGE,
+  getEmailVerificationFeedback,
+  getEmailVerificationState,
+} from '@/services/emailVerification'
 
 const formatLocalDate = (value: Date) => {
   const year = value.getFullYear()
@@ -523,7 +529,10 @@ const index = () => {
     phone_otp_code: '',
   })
   const [emailChangeLoading, setEmailChangeLoading] = useState(false)
+  const [emailVerificationLoading, setEmailVerificationLoading] = useState(false)
+  const [emailVerificationMessage, setEmailVerificationMessage] = useState<string | null>(null)
   const initialSnapshotRef = useRef<string>('')
+  const emailVerification = getEmailVerificationState(userProfileData)
 
   const resetEmailChangeFlow = () => {
     setEmailChangeOpen(false)
@@ -636,6 +645,27 @@ const index = () => {
       initialSnapshotRef.current = JSON.stringify(mapped)
     }
   }, [userProfileData])
+
+  useEffect(() => {
+    if (emailVerification.isVerified) {
+      setEmailVerificationMessage(null)
+    }
+  }, [emailVerification.isVerified])
+
+  const handleSendEmailVerification = async () => {
+    setEmailVerificationLoading(true)
+    setEmailVerificationMessage(null)
+
+    try {
+      await requestEmailVerification()
+      setEmailVerificationMessage(EMAIL_VERIFICATION_SUCCESS_MESSAGE)
+      await loadProfile({ force: true })
+    } catch (error: unknown) {
+      setEmailVerificationMessage(getEmailVerificationFeedback(error))
+    } finally {
+      setEmailVerificationLoading(false)
+    }
+  }
 
   const isDirty = JSON.stringify(formInput) !== initialSnapshotRef.current
   const badges: string[] = []
@@ -796,19 +826,40 @@ const index = () => {
                 </SectionCard>
 
                 <SectionCard title="Contact">
-                  <ReadOnlyField label="Email" value={formInput.email} icon={icons.email} />
+                  <View className="rounded-2xl border border-[rgba(255,255,255,0.12)] bg-[#111827] px-4 py-3">
+                    <View className="flex-row items-center justify-between">
+                      <Text className="text-gray-400 text-xs" style={{ lineHeight: 18 }}>
+                        Sign-in email
+                      </Text>
+                      <TouchableOpacity
+                        className="flex-row items-center"
+                        onPress={() => setEmailChangeOpen(true)}
+                      >
+                        <Text className="text-gray-400 text-sm font-semibold">Manage</Text>
+                        <Text className="text-gray-400 text-sm font-semibold ml-1">{'>'}</Text>
+                      </TouchableOpacity>
+                    </View>
+                    <Text className="text-white text-sm font-semibold mt-2" style={{ lineHeight: 20 }}>
+                      {formInput.email || 'Not set'}
+                    </Text>
+                    <View className="mt-2 self-start px-2.5 py-1 rounded-full border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.04)]">
+                      <Text className={`text-xs font-semibold ${emailVerification.isVerified ? 'text-emerald-400' : 'text-amber-300'}`}>
+                        {emailVerification.isVerified ? 'Verified' : 'Email not verified'}
+                      </Text>
+                    </View>
+                  </View>
 
-                  <TouchableOpacity
-                    className={`rounded-2xl border px-4 py-3 ${phoneVerified ? 'border-app-primary/40 bg-app-primary/10' : 'border-gray-700 bg-gray-900'}`}
-                    onPress={() => setEmailChangeOpen(true)}
-                  >
-                    <Text className={`${phoneVerified ? 'text-app-primary' : 'text-gray-300'} text-sm font-semibold`}>
-                      Change email
-                    </Text>
-                    <Text className="text-gray-400 text-xs mt-1">
-                      Requires your current password and a code sent to your verified phone.
-                    </Text>
-                  </TouchableOpacity>
+                  {emailVerification.email && !emailVerification.isVerified ? (
+                    <EmailVerificationCard
+                      verified={false}
+                      hasEmail
+                      loading={emailVerificationLoading}
+                      message={emailVerificationMessage}
+                      onSend={handleSendEmailVerification}
+                      compact
+                    />
+                  ) : null}
+
 
                   {isEditing ? (
                     <Field
@@ -1023,4 +1074,7 @@ const index = () => {
 }
 
 export default index
+
+
+
 

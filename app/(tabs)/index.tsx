@@ -20,11 +20,21 @@ import { getBusinessTransactions } from '@/api/business'
 import { getTransactionsForAccount } from '@/api/transactions'
 import { listTimeline } from '@/api/timeline'
 import { getWallet } from '@/api/wallet'
+import { requestEmailVerification } from '@/api/auth'
 
 import { icons } from '@/constants/icons'
 
+import EmailVerificationCard from '@/components/EmailVerificationCard'
 import { useAuth } from '@/services/useAuth'
 import { useActiveAccount } from '@/services/useActiveAccount'
+import {
+  clearEmailVerificationDismissed,
+  EMAIL_VERIFICATION_SUCCESS_MESSAGE,
+  getEmailVerificationFeedback,
+  getEmailVerificationState,
+  readEmailVerificationDismissed,
+  writeEmailVerificationDismissed,
+} from '@/services/emailVerification'
 import { useBalancePrivacy } from '@/services/useBalancePrivacy'
 import useFetch from '@/services/useFetch'
 
@@ -42,6 +52,7 @@ import { FEATURE_LEGACY_HOME } from '@/constants/featureFlags'
 import { getTierFromProfile, isTierEligibleForBankTransfer } from '@/utils/bankTransfer'
 import { log } from '@/utils/logger'
 import { resolveTransferLifecycle } from '@/utils/transferLifecycle'
+import { describeCurrentUserDues } from '@/utils/circleWorkspace'
 
 const FORCE_REFRESH_RETRY_DELAY_MS = 1700
 
@@ -251,9 +262,13 @@ export default function Index() {
   const [getstarted, setOpenStarted] = useState(false)
   const [sendOpen, setSendOpen] = useState(false)
   const [loader, setLoader] = useState(false)
+  const [emailVerificationLoading, setEmailVerificationLoading] = useState(false)
+  const [emailVerificationMessage, setEmailVerificationMessage] = useState<string | null>(null)
+  const [emailVerificationDismissed, setEmailVerificationDismissed] = useState(false)
 
   // âœ… Recent Activity toggle (money vs all)
   const [activityMode, setActivityMode] = useState<'money' | 'all'>('money')
+  const emailVerification = useMemo(() => getEmailVerificationState(userProfileData), [userProfileData])
 
   useEffect(() => {
     log('Runtime Versions:', Constants.manifest2?.runtimeVersion)
@@ -271,6 +286,38 @@ export default function Index() {
     if (authState?.authenticated) return
     didKickoffProfileRef.current = false
   }, [authState?.authenticated])
+
+  useEffect(() => {
+    let active = true
+
+    const syncDismissState = async () => {
+      if (!emailVerification.email) {
+        if (active) setEmailVerificationDismissed(false)
+        return
+      }
+
+      if (emailVerification.isVerified) {
+        await clearEmailVerificationDismissed(emailVerification.email)
+        if (active) setEmailVerificationDismissed(false)
+        return
+      }
+
+      const dismissed = await readEmailVerificationDismissed(emailVerification.email)
+      if (active) setEmailVerificationDismissed(dismissed)
+    }
+
+    syncDismissState().catch(() => {
+      if (active) setEmailVerificationDismissed(false)
+    })
+
+    return () => {
+      active = false
+    }
+  }, [emailVerification.email, emailVerification.isVerified])
+
+  useEffect(() => {
+    setEmailVerificationMessage(null)
+  }, [emailVerification.email, emailVerification.emailVerifiedAt])
 
   if (loading) return <LoaderScreen />
   if (!authState?.authenticated) return <LoaderScreen />
@@ -334,6 +381,27 @@ export default function Index() {
         setTimeout(() => setRefreshing(false), 700)
       })
   }, [activeAccount, loadProfile, refetchCards, refetchWalletData])
+
+  const handleSendEmailVerification = useCallback(async () => {
+    setEmailVerificationLoading(true)
+    setEmailVerificationMessage(null)
+
+    try {
+      await requestEmailVerification()
+      setEmailVerificationMessage(EMAIL_VERIFICATION_SUCCESS_MESSAGE)
+      await loadProfile({ force: true })
+    } catch (error: unknown) {
+      setEmailVerificationMessage(getEmailVerificationFeedback(error))
+    } finally {
+      setEmailVerificationLoading(false)
+    }
+  }, [loadProfile])
+
+  const dismissEmailVerificationBanner = useCallback(async () => {
+    if (!emailVerification.email) return
+    setEmailVerificationDismissed(true)
+    await writeEmailVerificationDismissed(emailVerification.email)
+  }, [emailVerification.email])
 
   // -------- Quick services --------
   const quickItems = useMemo(
@@ -401,7 +469,7 @@ export default function Index() {
     if (!primaryUseCase || stage === 'email_confirmed') {
       return {
         title: 'Personalize your BitBridge account',
-        subtitle: 'Pick how you plan to use BitBridge so we can guide your limits and KYC flow.',
+        subtitle: 'Pick how you plan to use BitBridge so we can guide your limits and Identity Verification flow.',
         cta: 'Complete setup',
         href: '/onboarding/use-case',
       }
@@ -586,6 +654,10 @@ export default function Index() {
   const circleMembersCount = Number(circleAccount?.member_count ?? circleAccount?.members_count ?? 0)
   const circlePermissions = circleAccount?.permissions ?? {}
   const circleDuesSummary = circleAccount?.dues_summary ?? {}
+  const circleDuesPresentation = useMemo(
+    () => describeCurrentUserDues(circleDuesSummary?.current_user_due_summary ?? circleDuesSummary?.current_user_summary ?? {}, { compact: true }),
+    [circleDuesSummary]
+  )
   const tunnelWallet = useMemo(() => {
     return walletPayload?.tunnel ?? walletPayload?.data?.tunnel ?? null
   }, [walletPayload])
@@ -707,9 +779,9 @@ export default function Index() {
                   {circleDuesSummary?.enabled ? (
                     <View className="mt-4 rounded-2xl border border-sky-500/20 bg-black/20 px-4 py-3">
                       <Text className="text-white text-xs">
-                        Dues active:
+                        Dues:
                         {' '}
-                        {Number(circleDuesSummary?.current_user_due_summary?.payable_months_count || 0)} open cycle(s)
+                        {circleDuesPresentation.summaryLabel}
                       </Text>
                     </View>
                   ) : null}
@@ -809,15 +881,15 @@ export default function Index() {
             </View>
           ) : (
             <>
-              {/* Bridge rail card */}
+              {/* Payments card */}
               <View
                 className="overflow-hidden rounded-[30px] border bg-[#0f131b]/92 p-5"
                 style={{ borderColor: 'rgba(47, 107, 255, 0.35)' }}
               >
                 <View className="flex-row justify-between items-start">
                   <View>
-                    <Text className="text-white text-2xl font-semibold">Bridge</Text>
-                    <Text className="text-white/60 text-sm mt-1">Local NGN rail.</Text>
+                    <Text className="text-white text-2xl font-semibold">Payments</Text>
+                    <Text className="text-white/60 text-sm mt-1">Local NGN payments.</Text>
                     <Text className="text-white text-3xl font-semibold mt-2">
                       {bridgeBalanceDisplay}
                     </Text>
@@ -882,22 +954,22 @@ export default function Index() {
                     className="py-3 rounded-xl border bg-black/20"
                     style={{ borderColor: 'rgba(47, 107, 255, 0.2)' }}
                   >
-                    <Text className="text-white text-center">All Bridge actions</Text>
+                    <Text className="text-white text-center">All payment actions</Text>
                   </TouchableOpacity>
                 </View>
 
               </View>
 
-              {/* Tunnel rail card */}
+              {/* Global card */}
               <View
                 className="mt-5 mx-2 overflow-hidden rounded-[30px] border bg-[#0f131b]/92 p-4"
                 style={{ borderColor: 'rgba(255, 154, 31, 0.34)' }}
               >
                 <View className="flex-row items-start justify-between gap-4">
                   <View className="flex-1">
-                    <Text className="text-white text-xl font-semibold">Tunnel</Text>
+                    <Text className="text-white text-xl font-semibold">Global</Text>
                     <Text className="text-white/60 text-sm mt-1">
-                      {tunnelHasLiveState ? 'Global USD access.' : 'Activation and access rail.'}
+                      {tunnelHasLiveState ? 'Global USD access.' : 'Activate USD access.'}
                     </Text>
                   </View>
                   <Link href={(tunnelHasLiveState ? '/(tabs)/wallet' : '/tunnel-activation') as any} asChild>
@@ -914,15 +986,15 @@ export default function Index() {
                     <Text className="text-white text-2xl font-semibold">{tunnelBalanceDisplay}</Text>
                     <Text className="text-white/55 text-xs mt-1">
                       {tunnelCardsCount > 0
-                        ? `${tunnelCardsCount} active card${tunnelCardsCount === 1 ? '' : 's'} linked to Tunnel`
+                        ? `${tunnelCardsCount} active card${tunnelCardsCount === 1 ? '' : 's'} linked to Global`
                         : 'USD wallet live. Cards available when you need them.'}
                     </Text>
                   </View>
                 ) : (
                   <View className="mt-4 rounded-2xl border px-3 py-3" style={{ borderColor: 'rgba(255, 154, 31, 0.18)', backgroundColor: 'rgba(0, 0, 0, 0.18)' }}>
-                    <Text className="text-white text-sm font-medium">Tunnel not active yet</Text>
+                    <Text className="text-white text-sm font-medium">Global not active yet</Text>
                     <Text className="text-white/60 text-xs mt-1">
-                      Activate Tunnel to unlock a USD balance, conversion, and card access.
+                      Activate Global to unlock a USD balance, conversion, and card access.
                     </Text>
                   </View>
                 )}
@@ -973,6 +1045,22 @@ export default function Index() {
             </View>
           ) : null}
 
+          {emailVerification.canPrompt && !emailVerificationDismissed ? (
+            <View className="mt-4">
+              <EmailVerificationCard
+                verified={false}
+                hasEmail
+                loading={emailVerificationLoading}
+                message={emailVerificationMessage}
+                onSend={handleSendEmailVerification}
+                dismissible
+                onDismiss={() => {
+                  void dismissEmailVerificationBanner()
+                }}
+              />
+            </View>
+          ) : null}
+
           {/* Top error */}
           {showTopError ? (
             <View className="bg-red-500/20 border border-red-500/30 rounded-xl p-3 mt-4">
@@ -995,12 +1083,12 @@ export default function Index() {
             <View className="mt-6 rounded-[24px] border border-gray-800/70 bg-gray-950/35 p-4">
               <View className="flex-row items-center justify-between">
                 <View>
-                  <Text className="text-white text-lg font-semibold">Bridge utilities</Text>
+                  <Text className="text-white text-lg font-semibold">Payment utilities</Text>
                   <Text className="text-gray-400 text-xs mt-1">Everyday local payments and account tools.</Text>
                 </View>
                 <Link href={'/(tabs)/bridge' as any} asChild>
                   <TouchableOpacity>
-                    <Text className="text-alt font-medium">All Bridge tools</Text>
+                    <Text className="text-alt font-medium">All payment tools</Text>
                   </TouchableOpacity>
                 </Link>
               </View>
@@ -1297,8 +1385,8 @@ export default function Index() {
       {/* Explore services modal */}
       <AppModal open={getstarted} onclose={() => setOpenStarted(false)}>
         <View className="bg-gray-900 p-6 rounded-2xl w-full max-w-md">
-          <Text className="text-white text-xl font-semibold text-center mb-2">Explore rails</Text>
-          <Text className="text-gray-300 text-center mb-5">Recommended actions across Bridge and Tunnel.</Text>
+          <Text className="text-white text-xl font-semibold text-center mb-2">Explore services</Text>
+          <Text className="text-gray-300 text-center mb-5">Recommended actions across Payments and Global.</Text>
 
           <View className="flex-row flex-wrap -mx-2">
             {recommendedServices.map((item) => (
@@ -1323,7 +1411,7 @@ export default function Index() {
             }}
             className="bg-app-primary py-3 rounded-xl items-center mt-5"
           >
-            <Text className="text-white font-medium">Open Bridge hub</Text>
+            <Text className="text-white font-medium">Open Payments</Text>
           </TouchableOpacity>
         </View>
       </AppModal>
