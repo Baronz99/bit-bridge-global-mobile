@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { Stack } from 'expo-router'
 import { StatusBar, Text, TouchableOpacity, View } from 'react-native'
 import * as SplashScreen from 'expo-splash-screen'
@@ -195,15 +195,16 @@ export default function RootLayout() {
         <Stack.Screen name="lock" options={{ headerShown: false }} />
 
         <Stack.Screen name="login" options={{ headerShown: false }} />
-        <Stack.Screen name="sign-up" options={{ headerTitle: 'Register' }} />
+        <Stack.Screen name="sign-up" options={{ headerShown: false }} />
         <Stack.Screen name="forgot-password" options={{ headerTitle: 'Forgot Password' }} />
+        <Stack.Screen name="recover-unconfirmed" options={{ headerShown: false }} />
         <Stack.Screen name="reset-password" options={{ headerTitle: 'Reset Password' }} />
 
         <Stack.Screen name="onboarding/index" options={{ headerTitle: 'Onboarding' }} />
         <Stack.Screen name="onboarding/basic-profile" options={{ headerTitle: 'Basic Profile' }} />
         <Stack.Screen name="onboarding/use-case" options={{ headerTitle: 'Use Case' }} />
-        <Stack.Screen name="onboarding/kyc-profile" options={{ headerTitle: 'KYC Profile' }} />
-        <Stack.Screen name="kyc/documents" options={{ headerTitle: 'KYC Documents' }} />
+        <Stack.Screen name="onboarding/kyc-profile" options={{ headerTitle: 'Identity Profile' }} />
+        <Stack.Screen name="kyc/documents" options={{ headerTitle: 'Identity Documents' }} />
         <Stack.Screen name="kyc/address" options={{ headerTitle: 'Address Verification' }} />
 
         <Stack.Screen name="mobileProviders/index" options={{ headerTitle: 'Mobile Top Up' }} />
@@ -227,7 +228,7 @@ export default function RootLayout() {
         <Stack.Screen name="business/index" options={{ headerShown: false }} />
         <Stack.Screen name="business/activate" options={{ headerTitle: 'Activate Business Account' }} />
         <Stack.Screen name="business/onboarding" options={{ headerTitle: 'Business Profile' }} />
-        <Stack.Screen name="business/kyb" options={{ headerTitle: 'Business KYB' }} />
+        <Stack.Screen name="business/kyb" options={{ headerTitle: 'Business Verification' }} />
         <Stack.Screen name="business/team" options={{ headerTitle: 'Business Team' }} />
         <Stack.Screen name="business/approvals" options={{ headerTitle: 'Business Approvals' }} />
         <Stack.Screen name="business/transfers" options={{ headerTitle: 'Business Transfers' }} />
@@ -236,7 +237,7 @@ export default function RootLayout() {
         <Stack.Screen name="business/payroll-run/[id]" options={{ headerTitle: 'Payroll Run' }} />
         <Stack.Screen name="business/receipts/[reference]" options={{ headerTitle: 'Business Receipt' }} />
 
-        <Stack.Screen name="tunnel-activation/index" options={{ headerTitle: 'Tunnel Activation' }} />
+        <Stack.Screen name="tunnel-activation/index" options={{ headerTitle: 'Global Activation' }} />
         <Stack.Screen name="fx/index" options={{ headerTitle: 'Convert' }} />
 
         <Stack.Screen name="transaction/confirm" options={{ headerTitle: 'Status' }} />
@@ -305,6 +306,24 @@ export default function RootLayout() {
         <Stack.Screen name="cards/create" options={{ headerTitle: 'Create Card' }} />
         <Stack.Screen name="confirmEmail" options={{ headerTitle: 'Email Confirmation' }} />
         <Stack.Screen name="confirmation" options={{ headerTitle: 'Confirm Email' }} />
+        <Stack.Screen name="circles/index" options={{ headerShown: false }} />
+        <Stack.Screen name="circles/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="circles/[id]/pay" options={{ headerShown: false }} />
+        <Stack.Screen name="circles/[id]/manage" options={{ headerShown: false }} />
+        <Stack.Screen name="circles/[id]/timeline" options={{ headerShown: false }} />
+        <Stack.Screen name="circles/[id]/treasury" options={{ headerShown: false }} />
+        <Stack.Screen name="circles/[id]/treasury/inflows" options={{ headerShown: false }} />
+        <Stack.Screen name="circles/[id]/treasury/inflows/[inflowId]" options={{ headerShown: false }} />
+        <Stack.Screen name="circles/[id]/treasury/payouts" options={{ headerShown: false }} />
+        <Stack.Screen name="circles/[id]/fund" options={{ headerShown: false }} />
+        <Stack.Screen name="circles/[id]/withdraw" options={{ headerShown: false }} />
+        <Stack.Screen name="circles/[id]/activities" options={{ headerShown: false }} />
+        <Stack.Screen name="circles/[id]/audit" options={{ headerShown: false }} />
+        <Stack.Screen name="circles/[id]/display-name" options={{ headerShown: false }} />
+        <Stack.Screen name="circles/[id]/governance" options={{ headerShown: false }} />
+        <Stack.Screen name="circles/[id]/invite" options={{ headerShown: false }} />
+        <Stack.Screen name="circles/[id]/members" options={{ headerShown: false }} />
+        <Stack.Screen name="circles/[id]/timeline/[eventId]" options={{ headerShown: false }} />
             </Stack>
             <PushNotificationsBridge />
             <SecurityLockNoticeOverlay />
@@ -316,4 +335,5 @@ export default function RootLayout() {
     </RootErrorBoundary>
   )
 }
+
 

@@ -397,11 +397,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } as any)
       } catch (err: any) {
         const msg =
-          err?.response?.data?.error ||
           err?.response?.data?.message ||
+          err?.response?.data?.error ||
           err?.message ||
           'Login failed'
-        throw new Error(msg)
+        const nextError = new Error(msg) as Error & { code?: string; status?: number }
+        nextError.code = err?.response?.data?.error || err?.code
+        nextError.status = err?.response?.status
+        throw nextError
       }
 
       log('[AUTH] login', { url: loginUrl, status: res.status })
@@ -534,3 +537,4 @@ export function useAuth() {
 }
 
 export { resolveUserProfile } from '@/services/auth/resolveUserProfile'
+
