@@ -213,6 +213,19 @@ export default function BridgeHub() {
           </View>
         </View>
 
+        <View className="rounded-[24px] border border-gray-800 bg-gray-900/70 px-4 py-4 shadow-lg">
+          <Text className="text-white text-lg font-semibold">Utilities</Text>
+          <Text className="text-gray-400 text-xs mt-1">Everyday local payments without leaving Bridge.</Text>
+
+          <View className="flex-row flex-wrap mt-5 -mx-1">
+            {utilities.map((item) => (
+              <View key={item.id} className="w-1/4 px-1">
+                {renderCompactItem(item, 'utility')}
+              </View>
+            ))}
+          </View>
+        </View>
+
         {FEATURE_REWARDS && isPersonalAccount ? (
           <TouchableOpacity
             activeOpacity={0.9}
@@ -243,19 +256,6 @@ export default function BridgeHub() {
             </View>
           </TouchableOpacity>
         ) : null}
-
-        <View className="rounded-[24px] border border-gray-800 bg-gray-900/70 px-4 py-4 shadow-lg">
-          <Text className="text-white text-lg font-semibold">Utilities</Text>
-          <Text className="text-gray-400 text-xs mt-1">Everyday local payments without leaving Bridge.</Text>
-
-          <View className="flex-row flex-wrap mt-5 -mx-1">
-            {utilities.map((item) => (
-              <View key={item.id} className="w-1/4 px-1">
-                {renderCompactItem(item, 'utility')}
-              </View>
-            ))}
-          </View>
-        </View>
           </>
         )}
       </View>

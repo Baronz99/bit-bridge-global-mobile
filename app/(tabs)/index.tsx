@@ -49,6 +49,9 @@ import useNotification from '@/hooks/useNotification'
 import ScreenContainer from '@/components/ScreenContainer'
 import ViewBox from '@/components/view-box/ViewBoxIcon'
 import { FEATURE_LEGACY_HOME } from '@/constants/featureFlags'
+import type { ActionWorkspace } from '@/api/actions'
+import CommandBarEntry from '@/components/actions/CommandBarEntry'
+import CommandOverlay from '@/components/actions/CommandOverlay'
 import { getTierFromProfile, isTierEligibleForBankTransfer } from '@/utils/bankTransfer'
 import { log } from '@/utils/logger'
 import { resolveTransferLifecycle } from '@/utils/transferLifecycle'
@@ -289,6 +292,7 @@ export default function Index() {
   const [refreshing, setRefreshing] = useState(false)
   const [getstarted, setOpenStarted] = useState(false)
   const [sendOpen, setSendOpen] = useState(false)
+  const [commandOpen, setCommandOpen] = useState(false)
   const [loader, setLoader] = useState(false)
   const [emailVerificationLoading, setEmailVerificationLoading] = useState(false)
   const [emailVerificationMessage, setEmailVerificationMessage] = useState<string | null>(null)
@@ -538,6 +542,12 @@ export default function Index() {
       href: '/onboarding',
     }
   }, [userProfileData])
+
+  const commandWorkspace = useMemo<ActionWorkspace>(() => {
+    if (activeAccount?.type === 'business') return 'business'
+    if (activeAccount?.type === 'circle') return 'circle'
+    return 'personal'
+  }, [activeAccount])
 
   const recommendedServices = useMemo(() => {
     const utilities = [
@@ -1011,6 +1021,8 @@ export default function Index() {
                 </View>
 
               </View>
+
+              <CommandBarEntry onPress={() => setCommandOpen(true)} />
 
               {/* Global card */}
               <View
@@ -1510,6 +1522,12 @@ export default function Index() {
         </View>
       </AppModal>
 
+      <CommandOverlay
+        visible={commandOpen}
+        workspace={commandWorkspace}
+        onClose={() => setCommandOpen(false)}
+      />
+
       <Loader open={loader} />
     </>
   )
@@ -1521,4 +1539,5 @@ const LabelText = ({ label, value }: any) => (
     <Text className="text-white text-center">{value}</Text>
   </View>
 )
+
 
