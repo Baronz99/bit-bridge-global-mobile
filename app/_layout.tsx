@@ -397,22 +397,6 @@ export default function RootLayout() {
         <Stack.Screen name="confirmation" options={{ headerTitle: 'Confirm Email' }} />
         <Stack.Screen name="circles/index" options={{ headerShown: false }} />
         <Stack.Screen name="circles/[id]" options={{ headerShown: false }} />
-        <Stack.Screen name="circles/[id]/pay" options={{ headerShown: false }} />
-        <Stack.Screen name="circles/[id]/manage" options={{ headerShown: false }} />
-        <Stack.Screen name="circles/[id]/timeline" options={{ headerShown: false }} />
-        <Stack.Screen name="circles/[id]/treasury" options={{ headerShown: false }} />
-        <Stack.Screen name="circles/[id]/treasury/inflows" options={{ headerShown: false }} />
-        <Stack.Screen name="circles/[id]/treasury/inflows/[inflowId]" options={{ headerShown: false }} />
-        <Stack.Screen name="circles/[id]/treasury/payouts" options={{ headerShown: false }} />
-        <Stack.Screen name="circles/[id]/fund" options={{ headerShown: false }} />
-        <Stack.Screen name="circles/[id]/withdraw" options={{ headerShown: false }} />
-        <Stack.Screen name="circles/[id]/activities" options={{ headerShown: false }} />
-        <Stack.Screen name="circles/[id]/audit" options={{ headerShown: false }} />
-        <Stack.Screen name="circles/[id]/display-name" options={{ headerShown: false }} />
-        <Stack.Screen name="circles/[id]/governance" options={{ headerShown: false }} />
-        <Stack.Screen name="circles/[id]/invite" options={{ headerShown: false }} />
-        <Stack.Screen name="circles/[id]/members" options={{ headerShown: false }} />
-        <Stack.Screen name="circles/[id]/timeline/[eventId]" options={{ headerShown: false }} />
             </Stack>
             <PushNotificationsBridge />
             <SecurityLockNoticeOverlay />
@@ -424,5 +408,4 @@ export default function RootLayout() {
     </RootErrorBoundary>
   )
 }
-
 
