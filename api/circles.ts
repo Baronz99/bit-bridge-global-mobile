@@ -16,7 +16,10 @@ export type CircleTreasuryInflowAssignmentCorrectionPayload = CircleTreasuryInfl
   correction_reason?: string
 }
 
+export type CircleTreasurySettlementKind = 'dues' | 'outstanding_dues'
+
 export type CircleTreasuryInflowDuesPreviewPayload = {
+  settlement_kind?: CircleTreasurySettlementKind
   circle_person_id?: string | number
   periods_count?: number | string
   through_on?: string

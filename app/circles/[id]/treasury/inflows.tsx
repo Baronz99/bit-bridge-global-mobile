@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
@@ -38,6 +37,7 @@ type TreasuryInflow = Record<string, any>
 
 const inputClass = 'rounded-2xl border border-gray-800 bg-gray-950 px-4 py-4 text-sm text-white'
 const MONTH_OPTIONS = Array.from({ length: 12 }, (_, index) => index + 1)
+const OUTSTANDING_DUES_PURPOSE_KEY = '__outstanding_dues__'
 
 const cleanText = (value: unknown) => String(value || '').trim()
 
@@ -82,6 +82,14 @@ const getCirclePersonLabel = (item: Record<string, any>) => {
   if (username) parts.push(`@${username}`)
   if (status) parts.push(status)
   return parts.join(' - ')
+}
+
+const resolveDuesSettlementKind = (item: Record<string, any> | null | undefined): 'dues' | 'outstanding_dues' | null => {
+  if (!item) return null
+  if (String(item?.settlement_kind || '').trim() === 'outstanding_dues') return 'outstanding_dues'
+  const type = String(item?.type || item?.checkout_mode || '').toLowerCase()
+  if (type === 'dues' || String(item?.linked_reference_type || '') === 'CircleDuePlan') return 'dues'
+  return null
 }
 
 const formatInflowsMeta = (inflow: TreasuryInflow) => {
@@ -230,13 +238,26 @@ const CircleTreasuryInflowsScreen = () => {
     [inflows, selectedInflowId]
   )
   const displayInflows = useMemo(() => inflows, [inflows])
-  const selectedPurposeOptions = useMemo(
-    () =>
-      paymentItems.map((item) => ({
+  const selectedPurposeOptions = useMemo<Array<{ label: string; value: string; data: Record<string, any> }>>(
+    () => [
+      ...paymentItems.map((item) => ({
         label: String(item.title || item.name || 'Payment item'),
         value: String(item.key || item.id || getCircleActivityPurposeId(item)),
         data: item,
       })),
+      {
+        label: 'Outstanding dues',
+        value: OUTSTANDING_DUES_PURPOSE_KEY,
+        data: {
+          key: OUTSTANDING_DUES_PURPOSE_KEY,
+          title: 'Outstanding dues',
+          type: 'dues',
+          settlement_kind: 'outstanding_dues',
+          linked_reference_type: 'CircleLegacyDueBalance',
+          is_synthetic: true,
+        },
+      },
+    ],
     [paymentItems]
   )
   const selectedPersonOptions = useMemo(
@@ -250,10 +271,8 @@ const CircleTreasuryInflowsScreen = () => {
   )
   const selectedPurposeItem = useMemo(
     () =>
-      paymentItems.find(
-        (item) => String(item.key || item.id || getCircleActivityPurposeId(item)) === String(selectedPurposeKey || '')
-      ) || null,
-    [paymentItems, selectedPurposeKey]
+      selectedPurposeOptions.find((item) => String(item.value) === String(selectedPurposeKey || ''))?.data || null,
+    [selectedPurposeKey, selectedPurposeOptions]
   )
   const selectedPersonItem = useMemo(
     () => people.find((item) => getCirclePersonOptionValue(item) === String(selectedPersonKey || '')) || null,
@@ -263,8 +282,9 @@ const CircleTreasuryInflowsScreen = () => {
     () => people.find((item) => getCirclePersonOptionValue(item) === String(duesPersonKey || '')) || null,
     [duesPersonKey, people]
   )
-  const isDuesPurpose = String(selectedPurposeItem?.type || selectedPurposeItem?.checkout_mode || '').toLowerCase() === 'dues' ||
-    String(selectedPurposeItem?.linked_reference_type || '') === 'CircleDuePlan'
+  const selectedDuesSettlementKind = resolveDuesSettlementKind(selectedPurposeItem)
+  const isOutstandingDuesPurpose = selectedDuesSettlementKind === 'outstanding_dues'
+  const isDuesPurpose = selectedDuesSettlementKind !== null
   const duesPreviewData = duesPreview?.preview && typeof duesPreview.preview === 'object' ? duesPreview.preview : null
   const duesPreviewCoverage = duesPreviewData?.covered_due_range && typeof duesPreviewData.covered_due_range === 'object'
     ? duesPreviewData.covered_due_range
@@ -275,11 +295,12 @@ const CircleTreasuryInflowsScreen = () => {
 
   const duesPreviewParams = useMemo(
     () => ({
+      settlement_kind: selectedDuesSettlementKind || undefined,
       circle_person_id: duesPersonItem ? getCirclePersonOptionValue(duesPersonItem) : undefined,
-      periods_count: duesCoverageMode === 'period_count' ? duesPeriodsCount : undefined,
-      through_on: duesCoverageMode === 'through_date' ? duesThroughDate.toISOString().slice(0, 10) : undefined,
+      periods_count: !isOutstandingDuesPurpose && duesCoverageMode === 'period_count' ? duesPeriodsCount : undefined,
+      through_on: !isOutstandingDuesPurpose && duesCoverageMode === 'through_date' ? duesThroughDate.toISOString().slice(0, 10) : undefined,
     }),
-    [duesCoverageMode, duesPersonItem, duesPeriodsCount, duesThroughDate]
+    [duesCoverageMode, duesPersonItem, duesPeriodsCount, duesThroughDate, isOutstandingDuesPurpose, selectedDuesSettlementKind]
   )
 
   const refreshDuesPreview = useCallback(async () => {
@@ -445,12 +466,13 @@ const CircleTreasuryInflowsScreen = () => {
     setDuesNotice('')
     try {
       await settleCircleTreasuryInflowDues(circleId, selectedInflowId, {
+        settlement_kind: selectedDuesSettlementKind || 'dues',
         circle_person_id: getCirclePersonOptionValue(duesPersonItem),
-        periods_count: duesCoverageMode === 'period_count' ? duesPeriodsCount : undefined,
-        through_on: duesCoverageMode === 'through_date' ? duesThroughDate.toISOString().slice(0, 10) : undefined,
+        periods_count: !isOutstandingDuesPurpose && duesCoverageMode === 'period_count' ? duesPeriodsCount : undefined,
+        through_on: !isOutstandingDuesPurpose && duesCoverageMode === 'through_date' ? duesThroughDate.toISOString().slice(0, 10) : undefined,
         note: cleanText(duesNote) || undefined,
       })
-      setDuesNotice('Dues settled.')
+      setDuesNotice(isOutstandingDuesPurpose ? 'Outstanding dues settled.' : 'Dues settled.')
       setDuesNote('')
       await loadInflows(page, true)
     } catch (requestError: any) {
@@ -464,7 +486,7 @@ const CircleTreasuryInflowsScreen = () => {
     } finally {
       setDuesSaving(false)
     }
-  }, [circleId, duesCoverageMode, duesNote, duesPersonItem, duesPeriodsCount, duesSaving, isDuesPurpose, loadInflows, page, selectedInflowId, duesThroughDate])
+  }, [circleId, duesCoverageMode, duesNote, duesPersonItem, duesPeriodsCount, duesSaving, isDuesPurpose, isOutstandingDuesPurpose, loadInflows, page, selectedDuesSettlementKind, selectedInflowId, duesThroughDate])
 
   const handleDuesDateChange = useCallback((_: unknown, selectedDate?: Date) => {
     if (selectedDate) {
@@ -761,9 +783,11 @@ const CircleTreasuryInflowsScreen = () => {
 
               {isDuesPurpose ? (
                 <View className="mt-4 rounded-2xl border border-cyan-400/20 bg-[#06111e] px-4 py-4">
-                  <Text className="text-[11px] uppercase tracking-[2px] text-cyan-200">Settle dues</Text>
+                  <Text className="text-[11px] uppercase tracking-[2px] text-cyan-200">{isOutstandingDuesPurpose ? 'Settle outstanding dues' : 'Settle dues'}</Text>
                   <Text className="mt-2 text-sm text-gray-300">
-                    Use the same inflow to cover recurring dues for a selected person.
+                    {isOutstandingDuesPurpose
+                      ? 'Use the same inflow to clear historical dues balances that sit outside the current dues plan.'
+                      : 'Use the same inflow to cover recurring dues for a selected person.'}
                   </Text>
 
                   {selectedPersonOptions.length > 0 ? (
@@ -778,25 +802,35 @@ const CircleTreasuryInflowsScreen = () => {
                     </View>
                   ) : null}
 
-                  <View className="mt-4 rounded-2xl border border-gray-900 bg-gray-950 px-4 py-4">
-                    <Text className="text-[11px] uppercase tracking-[1.6px] text-gray-500">Coverage mode</Text>
-                    <View className="mt-3 flex-row gap-2">
-                      <TouchableOpacity
-                        onPress={() => setDuesCoverageMode('through_date')}
-                        className={`flex-1 rounded-2xl border px-3 py-3 ${duesCoverageMode === 'through_date' ? 'border-cyan-400 bg-cyan-500/15' : 'border-gray-800 bg-gray-900'}`}
-                      >
-                        <Text className="text-center text-sm font-semibold text-white">Through date</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={() => setDuesCoverageMode('period_count')}
-                        className={`flex-1 rounded-2xl border px-3 py-3 ${duesCoverageMode === 'period_count' ? 'border-cyan-400 bg-cyan-500/15' : 'border-gray-800 bg-gray-900'}`}
-                      >
-                        <Text className="text-center text-sm font-semibold text-white">Period count</Text>
-                      </TouchableOpacity>
+                  {isOutstandingDuesPurpose ? (
+                    <View className="mt-4 rounded-2xl border border-gray-900 bg-gray-950 px-4 py-4">
+                      <Text className="text-[11px] uppercase tracking-[1.6px] text-gray-500">Coverage</Text>
+                      <Text className="mt-2 text-sm text-white">Oldest outstanding balances first</Text>
+                      <Text className="mt-1 text-xs text-gray-400">
+                        BitBridge will apply this inflow to the oldest recorded carried-over dues for the selected person.
+                      </Text>
                     </View>
-                  </View>
+                  ) : (
+                    <>
+                      <View className="mt-4 rounded-2xl border border-gray-900 bg-gray-950 px-4 py-4">
+                        <Text className="text-[11px] uppercase tracking-[1.6px] text-gray-500">Coverage mode</Text>
+                        <View className="mt-3 flex-row gap-2">
+                          <TouchableOpacity
+                            onPress={() => setDuesCoverageMode('through_date')}
+                            className={`flex-1 rounded-2xl border px-3 py-3 ${duesCoverageMode === 'through_date' ? 'border-cyan-400 bg-cyan-500/15' : 'border-gray-800 bg-gray-900'}`}
+                          >
+                            <Text className="text-center text-sm font-semibold text-white">Through date</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            onPress={() => setDuesCoverageMode('period_count')}
+                            className={`flex-1 rounded-2xl border px-3 py-3 ${duesCoverageMode === 'period_count' ? 'border-cyan-400 bg-cyan-500/15' : 'border-gray-800 bg-gray-900'}`}
+                          >
+                            <Text className="text-center text-sm font-semibold text-white">Period count</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
 
-                  {duesCoverageMode === 'through_date' ? (
+                      {duesCoverageMode === 'through_date' ? (
                     <TouchableOpacity
                       onPress={() => setShowDuesDatePicker(true)}
                       className="rounded-2xl border border-gray-800 bg-gray-950 px-4 py-4"
@@ -827,6 +861,8 @@ const CircleTreasuryInflowsScreen = () => {
                       </View>
                     </View>
                   )}
+                    </>
+                  )}
 
                   <View className="mt-4 rounded-2xl border border-gray-900 bg-gray-950 px-4 py-4">
                     <Text className="text-[11px] uppercase tracking-[1.6px] text-gray-500">Preview</Text>
@@ -845,7 +881,9 @@ const CircleTreasuryInflowsScreen = () => {
                             : 'No dues amount can be settled yet'}
                         </Text>
                         <Text className="mt-1 text-xs text-gray-400">
-                          {duesPreview.periods_count || 0} month{Number(duesPreview.periods_count || 0) === 1 ? '' : 's'}
+                          {isOutstandingDuesPurpose
+                            ? `${Number(duesPreviewData?.balance_items_count || 0)} outstanding balance item${Number(duesPreviewData?.balance_items_count || 0) === 1 ? '' : 's'}`
+                            : `${duesPreviewData?.periods_count || 0} month${Number(duesPreviewData?.periods_count || 0) === 1 ? '' : 's'}`}
                           {duesPreviewCoverage?.start && duesPreviewCoverage?.end
                             ? ` - ${String(duesPreviewCoverage.start)} to ${String(duesPreviewCoverage.end)}`
                             : ''}
@@ -857,8 +895,12 @@ const CircleTreasuryInflowsScreen = () => {
                         </Text>
                         <Text className="mt-1 text-xs text-gray-400">
                           {duesPreviewAllocations.length > 0
-                            ? `${duesPreviewAllocations.length} due period${duesPreviewAllocations.length === 1 ? '' : 's'} will be settled`
-                            : 'No dues periods available to settle'}
+                            ? isOutstandingDuesPurpose
+                              ? `${duesPreviewAllocations.length} outstanding balance item${duesPreviewAllocations.length === 1 ? '' : 's'} will be settled`
+                              : `${duesPreviewAllocations.length} due period${duesPreviewAllocations.length === 1 ? '' : 's'} will be settled`
+                            : isOutstandingDuesPurpose
+                              ? 'No outstanding dues balances available to settle'
+                              : 'No dues periods available to settle'}
                         </Text>
                         {duesPreviewSuggestedTotal > 0 && duesPreviewSuggestedRemaining > 0 ? (
                           <Text className="mt-2 text-xs text-amber-200">
@@ -916,8 +958,12 @@ const CircleTreasuryInflowsScreen = () => {
                       {duesSaving
                         ? 'Settling...'
                         : duesPreviewAllocations.length === 0
-                          ? 'No dues to settle'
-                          : 'Settle dues now'}
+                          ? isOutstandingDuesPurpose
+                            ? 'No outstanding dues to settle'
+                            : 'No dues to settle'
+                          : isOutstandingDuesPurpose
+                            ? 'Settle outstanding dues'
+                            : 'Settle dues now'}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -992,3 +1038,4 @@ const CircleTreasuryInflowsScreen = () => {
 }
 
 export default CircleTreasuryInflowsScreen
+

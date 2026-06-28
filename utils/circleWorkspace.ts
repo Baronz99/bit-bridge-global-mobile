@@ -54,6 +54,7 @@ export const extractCircleContextPayload = (payload: unknown) => {
     permissions: asObject(root.permissions),
     dues_summary: asObject(root.dues_summary),
     approvals: asObject(root.approvals),
+    recent_dues_activity: asObject(root.recent_dues_activity),
     recent_activity: asObject(root.recent_activity),
     circle_os_enabled: root.circle_os_enabled === true,
     circle_os: asObject(root.circle_os),
@@ -125,7 +126,17 @@ const isDuesActivityRecord = (record: Record<string, any>) => {
 }
 
 export const extractCircleDuesActivity = (payload: unknown): any[] => {
-  return extractCircleRecentActivity(payload).filter((record) => isDuesActivityRecord(asObject(record)))
+  const root = extractCirclePayload(payload)
+  const context = extractCircleContextPayload(root)
+  const dedicatedDuesActivity = asArray(context.recent_dues_activity.items).length
+    ? asArray(context.recent_dues_activity.items)
+    : asArray(root.recent_dues_activity?.items).length
+      ? asArray(root.recent_dues_activity.items)
+      : asArray(root.recent_dues_activity)
+
+  return dedicatedDuesActivity.length
+    ? dedicatedDuesActivity.map(asObject)
+    : extractCircleRecentActivity(payload).filter((record) => isDuesActivityRecord(asObject(record)))
 }
 
 export const normalizeTreasuryAccount = (payload: unknown): Record<string, any> => {
@@ -356,6 +367,7 @@ export const normalizeCircleWorkspace = ({
   const duesSummary = Object.keys(asObject(context.dues_summary)).length
     ? context.dues_summary
     : normalizeLegacyDuesSummary(circle)
+  const recentDuesItems = extractCircleDuesActivity(contextPayload || circlePayload)
   const recentItems = extractCircleRecentActivity(contextPayload || circlePayload)
   const treasuryBalanceCents =
     Number.isFinite(Number(treasuryAccount.balance_cents)) ? Number(treasuryAccount.balance_cents || 0) : null
@@ -434,10 +446,14 @@ export const normalizeCircleWorkspace = ({
       treasury_balance_cents: treasuryBalanceCents,
       balance_cents: resolvedBalanceCents,
       recent_activity: {
-        ...context.recent_activity,
-        items: recentItems,
-      },
-      recent_transactions: recentItems,
+      ...context.recent_activity,
+      items: recentItems,
+    },
+    recent_dues_activity: {
+      ...context.recent_dues_activity,
+      items: recentDuesItems,
+    },
+    recent_transactions: recentItems,
     }),
     balance_visible: balance.visible != null ? Boolean(balance.visible) : circle.balance_visible !== false,
     withdrawal_requires_approval: Boolean(
@@ -465,6 +481,10 @@ export const normalizeCircleWorkspace = ({
     recent_activity: {
       ...context.recent_activity,
       items: recentItems,
+    },
+    recent_dues_activity: {
+      ...context.recent_dues_activity,
+      items: recentDuesItems,
     },
     recent_transactions: recentItems,
   }
@@ -620,3 +640,6 @@ export const buildCircleActionRequired = ({
     secondaryLabel: null,
   }
 }
+
+
+
