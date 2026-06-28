@@ -3,8 +3,11 @@ import React from 'react'
 
 import powerDistribution from '../../data/powerDistributions.json'
 import PowerProviderCard from '@/components/ProviderCard'
+import useServiceAvailability from '@/hooks/useServiceAvailability'
 
 const Index = () => {
+  const { getStatus } = useServiceAvailability()
+
   return (
     <View className="flex-1 bg-primary px-4">
       <View className="mt-6 rounded-3xl border border-gray-800 bg-gray-900/80 p-5">
@@ -15,6 +18,7 @@ const Index = () => {
 
       <View className="mt-6 rounded-2xl border border-gray-800 bg-gray-900/70 p-4">
         <Text className="text-white text-sm font-semibold">Discos</Text>
+        <Text className="mt-1 text-xs text-gray-400">Select the electricity provider for your meter.</Text>
         <FlatList
           numColumns={3}
           data={powerDistribution}
@@ -29,9 +33,18 @@ const Index = () => {
             paddingRight: 5,
             marginBottom: 10,
           }}
-          renderItem={({ item }: any) => <PowerProviderCard item={item} />}
+          renderItem={({ item }: any) => (
+            <PowerProviderCard
+              item={item}
+              status={getStatus({
+                provider: item?.biller,
+                serviceType: 'ELECTRICITY',
+                label: String(item?.name || 'Power provider'),
+              })}
+            />
+          )}
           keyExtractor={(item) => item?.id?.toString()}
-          className="px-5"
+          className="mt-4"
         />
       </View>
     </View>

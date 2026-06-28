@@ -26,6 +26,8 @@ import Loader from '@/components/Loader'
 import useNotification from '@/hooks/useNotification'
 import AppModal from '@/components/modal/Modal'
 import NotificationAlert from '@/components/notification'
+import ServiceStatusPill from '@/components/service-availability/ServiceStatusPill'
+import useServiceAvailability from '@/hooks/useServiceAvailability'
 
 const getImageByKey = (key: string) => {
   const dict = images as Record<string, any>
@@ -38,6 +40,20 @@ const normalizeBiller = (raw: string) => {
   return biller
 }
 
+const getProviderDisplayName = (provider: (typeof powerDistribution)[number] | undefined) => {
+  const raw = String(provider?.name || '').trim()
+  if (!raw) return 'Power provider'
+  const [primary] = raw.split(' - ')
+  return primary.replace(/\s+Payment$/i, '').trim()
+}
+
+const getProviderShortCode = (provider: (typeof powerDistribution)[number] | undefined) => {
+  const raw = String(provider?.name || '').trim()
+  const match = raw.match(/-\s*([A-Z]{3,6})\s*$/)
+  if (match?.[1]) return match[1]
+  return String(provider?.image || '').trim().toUpperCase()
+}
+
 const METER_TYPE_OPTIONS = [
   { label: 'Prepaid', value: 'PREPAID' },
   { label: 'Postpaid', value: 'POSTPAID' },
@@ -48,10 +64,17 @@ const ProvideDertails = () => {
   const router = useRouter()
   const { userProfileData } = useAuth()
   const { notification, setNotification } = useNotification()
+  const { getStatus } = useServiceAvailability()
   const [loader, setLoader] = useState(false)
 
   const data = powerDistribution.find((item) => String(item.id) === id)
   const serviceKey = useMemo(() => makeElectricityServiceKey(String(data?.biller || '')), [data?.biller])
+  const providerDisplayName = useMemo(() => getProviderDisplayName(data), [data])
+  const providerShortCode = useMemo(() => getProviderShortCode(data), [data])
+  const selectedServiceStatus = useMemo(
+    () => getStatus({ provider: data?.biller, serviceType: 'ELECTRICITY', label: providerDisplayName }),
+    [data?.biller, getStatus, providerDisplayName]
+  )
 
   const [formValue, setFormValue] = useState({
     billersCode: '',
@@ -138,6 +161,14 @@ const ProvideDertails = () => {
       setNotification({ error: true, message: 'Enter a valid amount greater than 0', data: null })
       return
     }
+    if (selectedServiceStatus.advice?.can_checkout === false) {
+      setNotification({
+        error: true,
+        message: selectedServiceStatus.advice?.message || 'This service is temporarily unavailable right now.',
+        data: null,
+      })
+      return
+    }
 
     setLoader(true)
 
@@ -197,7 +228,7 @@ const ProvideDertails = () => {
           <Text className="text-white/70 text-xs tracking-widest uppercase">Utilities</Text>
           <Text className="text-white text-2xl font-semibold mt-2">Electricity Payment</Text>
           <Text className="text-gray-400 mt-2 text-sm">
-            {data?.biller || 'Disco'} power purchase.
+            Complete your {providerDisplayName} purchase securely.
           </Text>
         </View>
 
@@ -208,11 +239,23 @@ const ProvideDertails = () => {
             resizeMode="stretch"
             className="w-full h-40 rounded-2xl mt-4"
           />
+          <View className="mt-4 rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
+            <View className="flex-row items-start justify-between gap-3">
+              <View className="flex-1">
+                <Text className="text-base font-semibold text-white">{providerDisplayName}</Text>
+                <Text className="mt-1 text-xs uppercase tracking-[0.8px] text-blue-200">{providerShortCode}</Text>
+              </View>
+              <ServiceStatusPill state={selectedServiceStatus.state} />
+            </View>
+            <Text className="mt-2 text-xs text-gray-400">
+              {selectedServiceStatus.advice?.message || 'Status currently unavailable. You can still try.'}
+            </Text>
+          </View>
           <View className="mt-4 flex-row items-center justify-between rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
             <View className="flex-1 pr-4">
               <Text className="text-white font-semibold">Notify me when service is back</Text>
               <Text className="mt-1 text-xs text-gray-400">
-                Get a push alert when {data?.biller || 'this disco'} becomes available again.
+                Get a push alert when {providerDisplayName} becomes available again.
               </Text>
             </View>
             <Switch
@@ -265,9 +308,13 @@ const ProvideDertails = () => {
 
               <TouchableOpacity
                 onPress={handleFormSubmit}
+                disabled={selectedServiceStatus.advice?.can_checkout === false}
                 className="bg-app-primary rounded-xl mt-4 py-4"
+                style={{ opacity: selectedServiceStatus.advice?.can_checkout === false ? 0.55 : 1 }}
               >
-                <Text className="text-white text-center font-semibold">Proceed</Text>
+                <Text className="text-white text-center font-semibold">
+                  {selectedServiceStatus.advice?.can_checkout === false ? 'Temporarily unavailable' : 'Proceed'}
+                </Text>
               </TouchableOpacity>
             </View>
         </View>
