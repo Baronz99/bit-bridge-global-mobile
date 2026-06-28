@@ -2,6 +2,7 @@
 import React, { useCallback, useMemo, useState } from 'react'
 import { ActivityIndicator, RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
+import { backOrFallback } from '@/utils/navigationRecovery'
 import useFetch from '@/services/useFetch'
 import { getCardHistory, getCardDetails } from '@/api/cards'
 import moneyFormat from '@/utils/moneyFormat'
@@ -262,7 +263,7 @@ const CardReceipt = () => {
         ) : null}
 
         <TouchableOpacity
-          onPress={() => router.back()}
+          onPress={() => backOrFallback(router, cardId ? '/cards' : '/(tabs)/timeline')}
           className="mt-6 bg-gray-900 border border-gray-800 py-3 rounded-xl"
         >
           <Text className="text-white text-center font-medium">Back</Text>

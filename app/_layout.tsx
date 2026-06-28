@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Stack } from 'expo-router'
-import { StatusBar, Text, TouchableOpacity, View } from 'react-native'
+import { Stack, router } from 'expo-router'
+import { Linking, StatusBar, Text, TouchableOpacity, View } from 'react-native'
 import * as SplashScreen from 'expo-splash-screen'
 import './globals.css'
 
@@ -10,6 +10,7 @@ import { BalancePrivacyProvider } from '@/services/useBalancePrivacy'
 import { ActiveAccountProvider } from '@/services/useActiveAccount'
 import { useAuth } from '@/services/useAuth'
 import { setLastFatalError } from '@/services/fatalError'
+import { authEvents, clearTokens } from '@/api/client'
 import { FEATURE_TIMELINE } from '@/constants/featureFlags'
 import { log } from '@/utils/logger'
 import BootScreen from '@/src/components/BootScreen'
@@ -44,12 +45,52 @@ class RootErrorBoundary extends React.Component<{ children: React.ReactNode }, E
 
   render() {
     if (this.state.hasError) {
+      const handleRetry = () => {
+        this.setState({ hasError: false, message: null })
+      }
+
+      const handleGoHome = () => {
+        this.setState({ hasError: false, message: null })
+        router.replace('/(tabs)' as any)
+      }
+
+      const handleSignOut = async () => {
+        await clearTokens().catch(() => null)
+        authEvents.emit('unauthorized', { reason: 'fatal_error_sign_out' })
+        this.setState({ hasError: false, message: null })
+        router.replace('/welcome' as any)
+      }
+
+      const handleContactSupport = async () => {
+        const subject = encodeURIComponent('BitBridge Global mobile support')
+        const body = encodeURIComponent('I hit a recovery screen in the BitBridge Global mobile app and need help.')
+        await Linking.openURL(`mailto:support@bitbridgeglobal.com?subject=${subject}&body=${body}`
+        ).catch(() => null)
+      }
+
       return (
-        <View style={{ flex: 1, backgroundColor: '#111', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <Text style={{ color: 'white', fontSize: 16, fontWeight: '600' }}>Something went wrong</Text>
-          <Text style={{ color: '#aaa', marginTop: 8, fontSize: 12, textAlign: 'center' }}>
-            {this.state.message || 'Unknown render failure'}
-          </Text>
+        <View style={{ flex: 1, backgroundColor: '#05070D', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <View style={{ width: '100%', maxWidth: 420, borderRadius: 28, borderWidth: 1, borderColor: 'rgba(148,163,184,0.14)', backgroundColor: '#0F172A', padding: 24 }}>
+            <Text style={{ color: '#94A3B8', fontSize: 11, fontWeight: '700', letterSpacing: 2, textTransform: 'uppercase' }}>
+              Recovery
+            </Text>
+            <Text style={{ color: 'white', fontSize: 24, fontWeight: '700', marginTop: 12 }}>We need to reload this screen</Text>
+            <Text style={{ color: '#CBD5E1', marginTop: 10, fontSize: 14, lineHeight: 22 }}>
+              Something interrupted the app. Your account is safe. Try again or return to a safe screen.
+            </Text>
+            <TouchableOpacity onPress={handleRetry} style={{ marginTop: 22, borderRadius: 18, backgroundColor: '#2563EB', paddingVertical: 15, paddingHorizontal: 18 }}>
+              <Text style={{ color: 'white', textAlign: 'center', fontSize: 15, fontWeight: '700' }}>Try again</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleGoHome} style={{ marginTop: 12, borderRadius: 18, borderWidth: 1, borderColor: 'rgba(148,163,184,0.18)', backgroundColor: '#111827', paddingVertical: 15, paddingHorizontal: 18 }}>
+              <Text style={{ color: 'white', textAlign: 'center', fontSize: 15, fontWeight: '600' }}>Go Home</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => { void handleSignOut() }} style={{ marginTop: 12, borderRadius: 18, borderWidth: 1, borderColor: 'rgba(148,163,184,0.18)', backgroundColor: '#111827', paddingVertical: 15, paddingHorizontal: 18 }}>
+              <Text style={{ color: 'white', textAlign: 'center', fontSize: 15, fontWeight: '600' }}>Sign out</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => { void handleContactSupport() }} style={{ marginTop: 12, alignSelf: 'center' }}>
+              <Text style={{ color: '#93C5FD', textAlign: 'center', fontSize: 13, fontWeight: '600' }}>Contact Support</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )
     }
@@ -78,9 +119,9 @@ function SecurityLockNoticeOverlay() {
 }
 
 function StartupGate({ children }: { children: React.ReactNode }) {
-  const { loading, authHydrated, authenticated, userProfileData, profileLoading, loadProfile } = useAuth()
+  const { loading, authHydrated, authenticated, userProfileData, profileLoading, loadProfile, onLogout } = useAuth()
   const [warmupDone, setWarmupDone] = useState(false)
-  const [hardTimeoutReached, setHardTimeoutReached] = useState(false)
+  const [showRecoveryActions, setShowRecoveryActions] = useState(false)
 
   useEffect(() => {
     // Hide native splash as soon as JS is ready to render our in-app boot overlay.
@@ -112,23 +153,71 @@ function StartupGate({ children }: { children: React.ReactNode }) {
   }, [authHydrated, loading, authenticated, loadProfile])
 
   useEffect(() => {
-    const timeout = setTimeout(() => setHardTimeoutReached(true), 8000)
+    if (authHydrated && !loading && warmupDone && (!authenticated || userProfileData || !profileLoading)) {
+      setShowRecoveryActions(false)
+      return
+    }
+
+    const timeout = setTimeout(() => setShowRecoveryActions(true), 5000)
     return () => clearTimeout(timeout)
-  }, [])
+  }, [authHydrated, loading, warmupDone, authenticated, userProfileData, profileLoading])
 
   const appReady = useMemo(() => {
-    if (hardTimeoutReached) return true
     if (!authHydrated || loading) return false
     if (!warmupDone) return false
     if (!authenticated) return true
     if (userProfileData) return true
     return !profileLoading
-  }, [hardTimeoutReached, authHydrated, loading, warmupDone, authenticated, userProfileData, profileLoading])
+  }, [authHydrated, loading, warmupDone, authenticated, userProfileData, profileLoading])
+
+  const handleRetry = async () => {
+    setShowRecoveryActions(false)
+    setWarmupDone(false)
+    await Promise.race([
+      authenticated ? loadProfile({ force: true }).catch(() => null) : Promise.resolve(null),
+      new Promise((resolve) => setTimeout(resolve, 2500)),
+    ])
+    setWarmupDone(true)
+  }
+
+  const handleGoSafe = () => {
+    setShowRecoveryActions(false)
+    router.replace((authenticated ? '/(tabs)' : '/welcome') as any)
+  }
+
+  const handleContactSupport = async () => {
+    const subject = encodeURIComponent('BitBridge Global mobile support')
+    const body = encodeURIComponent('The app is taking too long to open and I need help.')
+    await Linking.openURL(`mailto:support@bitbridgeglobal.com?subject=${subject}&body=${body}`
+    ).catch(() => null)
+  }
 
   return (
     <>
       {children}
       <BootScreen visible={!appReady} />
+      {!appReady && showRecoveryActions ? (
+        <View pointerEvents="box-none" style={{ position: 'absolute', left: 0, right: 0, bottom: 36, paddingHorizontal: 20 }}>
+          <View style={{ alignSelf: 'center', width: '100%', maxWidth: 420, borderRadius: 24, borderWidth: 1, borderColor: 'rgba(148,163,184,0.14)', backgroundColor: 'rgba(15,23,42,0.96)', padding: 20 }}>
+            <Text style={{ color: 'white', fontSize: 18, fontWeight: '700' }}>Still loading your account</Text>
+            <Text style={{ color: '#CBD5E1', fontSize: 13, lineHeight: 20, marginTop: 8 }}>
+              This is taking longer than usual. You can retry, return to a safe screen, or contact support.
+            </Text>
+            <TouchableOpacity onPress={() => { void handleRetry() }} style={{ marginTop: 16, borderRadius: 16, backgroundColor: '#2563EB', paddingVertical: 14 }}>
+              <Text style={{ color: 'white', textAlign: 'center', fontWeight: '700' }}>Try again</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleGoSafe} style={{ marginTop: 10, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(148,163,184,0.18)', backgroundColor: '#111827', paddingVertical: 14 }}>
+              <Text style={{ color: 'white', textAlign: 'center', fontWeight: '600' }}>{authenticated ? 'Go Home' : 'Go to Sign in'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => { void onLogout() }} style={{ marginTop: 10, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(148,163,184,0.18)', backgroundColor: '#111827', paddingVertical: 14 }}>
+              <Text style={{ color: 'white', textAlign: 'center', fontWeight: '600' }}>Sign out</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => { void handleContactSupport() }} style={{ marginTop: 10 }}>
+              <Text style={{ color: '#93C5FD', textAlign: 'center', fontWeight: '600' }}>Contact Support</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : null}
     </>
   )
 }

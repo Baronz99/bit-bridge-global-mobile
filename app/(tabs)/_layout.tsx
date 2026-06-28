@@ -213,7 +213,7 @@ const CustomTabBar = ({ state, descriptors, navigation }: BottomTabBarProps) => 
 }
 
 export default function TabsLayout() {
-  const { loading, authHydrated, authState, token, profileLoading, profileError, userProfileData, onLogout } = useAuth()
+  const { loading, authHydrated, authState, token, profileLoading, profileError, userProfileData, onLogout, loadProfile } = useAuth()
   const { locked } = useAppLock()
   const router = useRouter()
   const { activeAccount, hydrated: accountHydrated, selectPersonalAccount, selectBusinessAccount, selectCircleAccount } =
@@ -226,6 +226,7 @@ export default function TabsLayout() {
   const [circleAccounts, setCircleAccounts] = useState<WorkspaceCircle[]>([])
   const insets = useSafeAreaInsets()
   const hasProfile = !!userProfileData
+  const [loadingRecoveryVisible, setLoadingRecoveryVisible] = useState(false)
 
   const bootTrace = useCallback(
     (event: string, redirect: string | null = null) => {
@@ -375,7 +376,47 @@ export default function TabsLayout() {
   const personalFirstName =
     userProfileData?.user_profile?.first_name || userProfileData?.first_name || userProfileData?.email || 'there'
 
-  if (loading || !authHydrated) return <LoaderScreen />
+  const waitingForTabs = loading || !authHydrated
+
+  useEffect(() => {
+    if (!waitingForTabs) {
+      setLoadingRecoveryVisible(false)
+      return
+    }
+    const timeout = setTimeout(() => setLoadingRecoveryVisible(true), 5000)
+    return () => clearTimeout(timeout)
+  }, [waitingForTabs])
+
+  if (waitingForTabs) {
+    if (!loadingRecoveryVisible) return <LoaderScreen />
+    return (
+      <SafeAreaView edges={['left', 'right']} className="flex-1 bg-[#05070D]">
+        <View className="flex-1 items-center justify-center px-5">
+          <View className="w-full max-w-[420px] rounded-[28px] border border-white/10 bg-[#0F172A] p-6">
+            <Text className="text-white text-xl font-semibold">Still opening your account</Text>
+            <Text className="mt-3 text-sm leading-6 text-slate-300">
+              {profileError || 'This is taking longer than usual. You can retry loading or sign in again.'}
+            </Text>
+            <TouchableOpacity
+              onPress={() => {
+                setLoadingRecoveryVisible(false)
+                void loadProfile({ force: true }).catch(() => {})
+              }}
+              className="mt-5 rounded-2xl bg-app-primary px-4 py-4"
+            >
+              <Text className="text-center font-semibold text-white">Try again</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => void onLogout()}
+              className="mt-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-4"
+            >
+              <Text className="text-center font-semibold text-white">Sign in again</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    )
+  }
   if (!authState?.authenticated) {
     bootTrace('redirect', '/login')
     return <Redirect href="/login" />
@@ -454,13 +495,13 @@ export default function TabsLayout() {
           <Tabs.Screen
             name="bridge"
             options={{
-              title: 'Bridge',
+              title: 'Payments',
               headerTitle:
                 activeAccount.type === 'circle'
                   ? selectedCircle?.name || 'Circle'
                   : activeAccount.type === 'business'
                     ? selectedBusiness?.name || 'Business'
-                    : 'Bridge',
+                    : 'Payments',
               headerShown: true,
               tabBarIcon: ({ focused }) => (
                 <TabVectorIcon
@@ -477,7 +518,7 @@ export default function TabsLayout() {
           <Tabs.Screen
             name="tunnel"
             options={{
-              title: 'Tunnel',
+              title: 'Global',
               headerTintColor: 'white',
               tabBarIcon: ({ focused }) => (
                 <TabVectorIcon
@@ -510,7 +551,7 @@ export default function TabsLayout() {
           <Tabs.Screen
             name="core"
             options={{
-              title: 'Core',
+              title: 'Account',
               headerShown: true,
               tabBarIcon: ({ focused }) => <TabIcon focused={focused} icon={icons.person} />,
             }}
@@ -582,12 +623,12 @@ export default function TabsLayout() {
         }}
         onSelectBusiness={async (businessId) => {
           await selectBusinessAccount(businessId)
-          router.push('/business' as any)
+          router.replace('/business' as any)
         }}
         onSelectCircle={async (circleId) => {
           const selectedCircle = circleAccounts.find((item) => String(item.id) === String(circleId))
           await selectCircleAccount(circleId)
-          router.push({
+          router.replace({
             pathname: `/circles/${circleId}` as any,
             params: {
               name: selectedCircle?.name || 'Circle',

@@ -6,7 +6,9 @@ import { useRouter } from 'expo-router'
 import { registerNotificationDevice, unregisterNotificationDevice } from '@/api/notifications'
 import { resolveElectricityRouteFromServiceKey } from '@/api/serviceAvailability'
 import { useAuth } from '@/services/useAuth'
+import { useActiveAccount } from '@/services/useActiveAccount'
 import { log } from '@/utils/logger'
+import { resolveSafeNotificationRoute } from '@/utils/navigationRecovery'
 
 type ExpoNotificationsModule = {
   AndroidImportance?: { MAX: number }
@@ -70,6 +72,7 @@ const getExpoPushToken = async (): Promise<string | null> => {
 export default function PushNotificationsBridge() {
   const router = useRouter()
   const { authenticated, token: accessToken, user } = useAuth()
+  const { activeAccount } = useActiveAccount()
   const registeredTokenRef = useRef<string | null>(null)
 
   useEffect(() => {
@@ -111,21 +114,26 @@ export default function PushNotificationsBridge() {
       if (serviceKey.endsWith('_ELECTRICITY')) {
         const route = resolveElectricityRouteFromServiceKey(serviceKey)
         if (route) {
-          router.push(route as any)
+          const safeRoute = resolveSafeNotificationRoute({ route, authenticated: !!authenticated, activeAccountType: activeAccount?.type })
+          router.push(safeRoute as any)
           return
         }
       }
 
       if (deeplink) {
-        router.push(deeplink as any)
+        const safeRoute = resolveSafeNotificationRoute({ route: deeplink, authenticated: !!authenticated, activeAccountType: activeAccount?.type })
+        router.push(safeRoute as any)
+        return
       }
+
+      router.push((authenticated ? '/(tabs)/timeline' : '/welcome') as any)
     })
 
     return () => {
       received.remove()
       response.remove()
     }
-  }, [])
+  }, [activeAccount?.type, authenticated, router])
 
   useEffect(() => {
     let cancelled = false

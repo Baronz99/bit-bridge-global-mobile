@@ -3,12 +3,16 @@ import * as SecureStore from 'expo-secure-store'
 
 import { CommandAction } from '@/api/actions'
 
-const RECENT_ACTIONS_KEY = 'bitbridge_recent_actions'
+const RECENT_ACTIONS_KEY = 'bitbridge_recent_actions_v2'
 const MAX_RECENT_ACTIONS = 8
 
 const sanitizeRecentActions = (value: unknown): CommandAction[] => {
   if (!Array.isArray(value)) return []
-  return value.filter((item) => item && typeof item === 'object' && typeof (item as CommandAction).key === 'string') as CommandAction[]
+  return value.filter((item) => {
+    if (!item || typeof item !== 'object') return false
+    const action = item as CommandAction
+    return typeof action.key === 'string' && action.enabled === true && typeof action.route === 'string' && action.route.length > 0
+  }) as CommandAction[]
 }
 
 export const useRecentActions = () => {
@@ -43,6 +47,8 @@ export const useRecentActions = () => {
   }, [])
 
   const recordRecentAction = useCallback(async (action: CommandAction) => {
+    if (!action.enabled || !action.route) return
+
     setRecentActions((current) => {
       const deduped = current.filter((item) => item.key !== action.key)
       const next = [action, ...deduped].slice(0, MAX_RECENT_ACTIONS)

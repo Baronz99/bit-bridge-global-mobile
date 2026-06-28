@@ -2,6 +2,7 @@
 import React, { useMemo } from 'react'
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
+import { backOrFallback } from '@/utils/navigationRecovery'
 import moneyFormat from '@/utils/moneyFormat'
 
 const safeStr = (v: any, fb = '') => {
@@ -149,7 +150,7 @@ export default function TimelineReceipt() {
         </View>
 
         <TouchableOpacity
-          onPress={() => router.back()}
+          onPress={() => backOrFallback(router, '/(tabs)/timeline')}
           className="mt-6 bg-gray-900 border border-gray-800 py-3 rounded-xl"
         >
           <Text className="text-white text-center font-medium">Back</Text>

@@ -6,9 +6,10 @@ import FormInput from '@/components/FormInput'
 import { images } from '@/constants/images'
 import Loader from '@/components/Loader'
 import { router } from 'expo-router'
+import { backOrFallback } from '@/utils/navigationRecovery'
 
 const index = () => {
-  const [errorMessage, setErrorMessage] = useState(null)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   const [formInput, setFormInput] = useState({
     password: '',
@@ -36,7 +37,7 @@ const index = () => {
       Alert.alert('Password updated', result?.message || 'Your password has been changed successfully.', [
         {
           text: 'OK',
-          onPress: () => router.back(),
+          onPress: () => backOrFallback(router as any, '/(tabs)/core'),
         },
       ])
     } catch (error: unknown) {

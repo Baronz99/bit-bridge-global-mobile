@@ -8,6 +8,7 @@ import { KycDocumentsPayload, updateKycDocuments } from '@/api/kycDocuments'
 import { NinVerifyResponse, verifyNin } from '@/api/kyc'
 import { useAuth } from '@/services/useAuth'
 import { pickKycUpload } from '@/utils/kycUploadPicker'
+import { backOrFallback } from '@/utils/navigationRecovery'
 
 const ID_TYPE_OPTIONS = [
   { label: 'Select ID type', value: '' },
@@ -381,7 +382,7 @@ const KycDocumentsScreen = () => {
       </TouchableOpacity>
 
       <TouchableOpacity
-        onPress={() => router.back()}
+        onPress={() => backOrFallback(router, '/kyc')}
         className="border border-gray-800 py-3 rounded-xl mt-3"
       >
         <Text className="text-white text-center">Back</Text>

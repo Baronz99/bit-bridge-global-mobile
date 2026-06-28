@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react'
 import { Text, TextInput, TouchableOpacity, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import FormInput from '@/components/FormInput'
+import { backOrFallback } from '@/utils/navigationRecovery'
 import {
   AUTH_COLORS,
   AuthHeader,
@@ -97,7 +98,7 @@ const RecoverUnconfirmed = () => {
       setErrorMessage(null)
       return
     }
-    router.back()
+    backOrFallback(router, '/login')
   }
 
   return (

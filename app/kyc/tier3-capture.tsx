@@ -5,6 +5,7 @@ import { useIsFocused } from '@react-navigation/native'
 import { CameraView, useCameraPermissions } from 'expo-camera'
 import { startTier3, getTier3Status } from '@/api/kyc'
 import { useAuth } from '@/services/useAuth'
+import { backOrFallback } from '@/utils/navigationRecovery'
 
 const formatRetryDelay = (seconds?: number) => {
   if (!seconds || Number.isNaN(seconds) || seconds <= 0) return null
@@ -21,7 +22,7 @@ const prettyTier3Error = (value?: string, options?: { retryAfterSeconds?: number
   if (msg.includes('tier 2 must be complete')) return 'Complete Tier 2 first. Verify your BVN and add identity evidence, then return for live selfie verification.'
   if (msg.includes('verified bvn not available') || msg.includes('re-verify bvn')) return 'Your BVN needs to be verified again before live selfie verification can continue.'
   if (msg.includes('bvn must be verified')) return 'Verify your BVN before starting Tier 3 live selfie verification.'
-  if (msg.includes('payload too large')) return 'We couldn’t submit this selfie because the image is too large. Move closer, keep only your face and shoulders in frame, and try again.'
+  if (msg.includes('payload too large')) return 'We couldnï¿½t submit this selfie because the image is too large. Move closer, keep only your face and shoulders in frame, and try again.'
   if (msg.includes('image is required')) return 'Capture a selfie before submitting.'
   if (msg.includes('temporarily unavailable')) return retryWindow
     ? `Live selfie verification is temporarily unavailable. Please try again in about ${retryWindow}.`
@@ -341,7 +342,7 @@ const Tier3CaptureScreen = () => {
           size_guard_result: 'too_large',
           max_base64_length: MAX_BASE64_LEN,
         })
-        setMessage('We couldn’t submit this selfie because the image is too large. Move closer, keep only your face and shoulders in frame, and try again.')
+        setMessage('We couldnï¿½t submit this selfie because the image is too large. Move closer, keep only your face and shoulders in frame, and try again.')
         return
       }
       if (base64Length < MIN_BASE64_LEN) {
@@ -533,7 +534,7 @@ const Tier3CaptureScreen = () => {
       ) : null}
 
       <TouchableOpacity
-        onPress={() => router.back()}
+        onPress={() => backOrFallback(router, '/kyc')}
         className="border border-gray-800 py-3 rounded-xl mt-2 items-center"
       >
         <Text className="text-white">Back to KYC</Text>

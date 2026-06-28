@@ -5,6 +5,7 @@ import ScreenContainer from '@/components/ScreenContainer'
 import { getBusinessPayoutRun } from '@/api/business'
 import { useActiveAccount } from '@/services/useActiveAccount'
 import { buildApiErrorMessage } from '@/utils/apiErrorMessage'
+import { backOrFallback } from '@/utils/navigationRecovery'
 
 const formatNgn = (value: any) =>
   new Intl.NumberFormat('en-NG', {
@@ -89,7 +90,7 @@ const BusinessPayrollRunDetailScreen = () => {
           {run?.period_label ? String(run.period_label) : 'Review this payroll cycle and each payment entry.'}
         </Text>
         <TouchableOpacity
-          onPress={() => router.back()}
+          onPress={() => backOrFallback(router, '/business/payouts')}
           className="self-start mt-4 rounded-2xl border border-gray-700 px-4 py-3"
         >
           <Text className="text-white text-sm font-semibold">Back to payroll</Text>
@@ -123,8 +124,8 @@ const BusinessPayrollRunDetailScreen = () => {
             <Text className="text-white text-xl font-semibold mt-4">{formatNgn(run?.total_amount || 0)}</Text>
             <Text className="text-gray-400 text-xs mt-1">
               {Number(run?.total_items || 0)} entries
-              {run?.review_ready ? ' • Review locked' : ''}
-              {run?.approval_status ? ` • Approval ${String(run.approval_status).replace(/_/g, ' ')}` : ''}
+              {run?.review_ready ? ' ï¿½ Review locked' : ''}
+              {run?.approval_status ? ` ï¿½ Approval ${String(run.approval_status).replace(/_/g, ' ')}` : ''}
             </Text>
 
             <View className="flex-row flex-wrap gap-2 mt-4">
@@ -162,7 +163,7 @@ const BusinessPayrollRunDetailScreen = () => {
               ) : null}
               {preview?.approval?.required ? (
                 <Text className="text-gray-300 text-sm">
-                  Approval required{preview?.approval?.mode ? ` • ${String(preview.approval.mode).replace(/_/g, ' ')}` : ''}
+                  Approval required{preview?.approval?.mode ? ` ï¿½ ${String(preview.approval.mode).replace(/_/g, ' ')}` : ''}
                 </Text>
               ) : (
                 <Text className="text-gray-300 text-sm">Approval not required for this payroll total.</Text>
@@ -179,7 +180,7 @@ const BusinessPayrollRunDetailScreen = () => {
                     <View className="flex-1">
                       <Text className="text-white text-sm font-semibold">{String(item?.payee_name || item?.account_name || 'Payroll entry')}</Text>
                       <Text className="text-gray-400 text-xs mt-1">
-                        {String(item?.bank_name || item?.bank_code || 'Bank')} • {String(item?.account_number || '')}
+                        {String(item?.bank_name || item?.bank_code || 'Bank')} ï¿½ {String(item?.account_number || '')}
                       </Text>
                       {item?.employee_code ? <Text className="text-gray-500 text-xs mt-1">Employee code {String(item.employee_code)}</Text> : null}
                     </View>
