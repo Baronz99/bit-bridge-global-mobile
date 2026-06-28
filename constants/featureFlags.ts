@@ -9,6 +9,7 @@ export const FEATURE_OTP = flagEnabled(process.env.EXPO_PUBLIC_FEATURE_OTP ?? '1
 export const FEATURE_BVN = flagEnabled(process.env.EXPO_PUBLIC_FEATURE_BVN ?? '1')
 export const FEATURE_KYC_CENTER = flagEnabled(process.env.EXPO_PUBLIC_FEATURE_KYC_CENTER ?? '1')
 export const FEATURE_CIRCLES = flagEnabled(process.env.EXPO_PUBLIC_FEATURE_CIRCLES ?? '1')
+export const FEATURE_CIRCLE_OS = flagEnabled(process.env.EXPO_PUBLIC_FEATURE_CIRCLE_OS ?? '0')
 export const FEATURE_TIMELINE = flagEnabled(process.env.EXPO_PUBLIC_FEATURE_TIMELINE ?? '1')
 export const FEATURE_NEW_DASHBOARD = flagEnabled(process.env.EXPO_PUBLIC_FEATURE_NEW_DASHBOARD ?? '1')
 export const FEATURE_ONBOARDING = flagEnabled(process.env.EXPO_PUBLIC_FEATURE_ONBOARDING ?? '1')

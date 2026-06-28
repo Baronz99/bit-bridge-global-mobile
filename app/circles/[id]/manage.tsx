@@ -1,12 +1,13 @@
-import React, { useCallback, useMemo, useState } from 'react'
-import { ActivityIndicator, Modal, Platform, Pressable, RefreshControl, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { ActivityIndicator, Image, Modal, Platform, Pressable, RefreshControl, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import * as ImagePicker from 'expo-image-picker'
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
-import { useFocusEffect } from '@react-navigation/native'
 import DateTimePicker from '@react-native-community/datetimepicker'
 import {
   approveCircleApprovalRequest,
   createCircleActivity,
   getCircleDuePlan,
+  listCirclePeople,
   listCircleDueObligations,
   getCirclePaymentItems,
   getCircleSettings,
@@ -17,6 +18,7 @@ import {
   updateCircleDuePlan,
   updateCircleSettings,
   upsertCircleDuePlan,
+  uploadCircleLogo,
 } from '@/api/circles'
 import {
   CircleShell,
@@ -27,16 +29,21 @@ import {
 } from '@/components/circles/rebuild'
 import FormSelect from '@/components/FormSelect'
 import { getCircleRoleLabel } from '@/utils/circleRoleLabel'
-import { buildMemberDuesLookup } from '@/utils/circleDues'
+import { buildRosterDuesLookup } from '@/utils/circleDues'
+import { canAccessManageCircle, canViewSharedFundTab } from '@/utils/circleWorkspace'
 import { replaceCircleWorkspaceSection } from '@/utils/circleWorkspaceNav'
 import moneyFormat from '@/utils/moneyFormat'
+
+type ManageSection = 'payment_items' | 'members' | 'governance' | 'settings'
+
+const LAST_MANAGE_SECTION_BY_CIRCLE: Record<string, ManageSection> = {}
 
 const PAYMENT_TEMPLATES_BY_BUCKET: Record<string, Array<Record<string, any>>> = {
   clubs_teams: [
     { key: 'monthly_dues', title: 'Monthly Dues', setup_type: 'recurring', cadence: 'monthly' },
     { key: 'match_fee', title: 'Match Fee', setup_type: 'activity', contribution_frequency: 'one_time' },
     { key: 'jersey', title: 'Jersey', setup_type: 'activity', contribution_frequency: 'one_time' },
-    { key: 'general_support', title: 'General Support', setup_type: 'activity', contribution_frequency: 'one_time' },
+    { key: 'general_support', title: 'Treasury Contribution', setup_type: 'activity', contribution_frequency: 'one_time' },
   ],
   estates_communities: [
     { key: 'security_levy', title: 'Security Levy', setup_type: 'recurring', cadence: 'monthly' },
@@ -154,6 +161,26 @@ const toMajor = (value: any) => {
   return Number.isFinite(amount) ? String(amount / 100) : ''
 }
 
+const getArray = (value: unknown) => (Array.isArray(value) ? value : [])
+const asRecord = (value: unknown) => ((value && typeof value === 'object' ? value : {}) as Record<string, any>)
+const getCircleMemberUserId = (member: Record<string, any>) => {
+  const user = asRecord(member.user)
+  return String(user.id || member.user_id || member.linked_user_id || '').trim()
+}
+const getPersonLinkedUserId = (person: Record<string, any>) => {
+  const linkedUser = asRecord(person.linked_user)
+  const linkedMembership = asRecord(person.linked_membership)
+  const linkedMembershipUser = asRecord(linkedMembership.user)
+  return String(
+    person.linked_user_id ||
+      linkedUser.id ||
+      linkedMembership.user_id ||
+      linkedMembershipUser.id ||
+      linkedMembershipUser.user_id ||
+      ''
+  ).trim()
+}
+
 const toMinor = (value: any) => {
   const normalized = String(value || '').replace(/,/g, '').trim()
   if (!normalized) return null
@@ -174,7 +201,7 @@ const activitySetupTone = (template?: Record<string, any> | null) => {
     case 'emergency_support':
     case 'emergency_contribution':
     case 'welfare_support':
-      return 'Open support item'
+      return 'Open collection item'
     case 'match_fee':
     case 'utility_bill':
     case 'maintenance_levy':
@@ -183,9 +210,9 @@ const activitySetupTone = (template?: Record<string, any> | null) => {
     case 'special_contribution':
       return 'Fixed collection item'
     case 'jersey':
-      return 'Quantity item'
+      return 'Quantity collection item'
     default:
-      return 'Payment item'
+      return 'Collection'
   }
 }
 
@@ -208,6 +235,50 @@ const activityKindForTemplate = (template?: Record<string, any> | null) => {
     default:
       return 'fixed'
   }
+}
+
+const ACTIVITY_TYPE_OPTIONS = [
+  { value: 'goal', label: 'Goal', helper: 'Raise toward a target' },
+  { value: 'collection', label: 'Collection', helper: 'Collect money for a purpose' },
+  { value: 'assessment', label: 'Assessment', helper: 'Required one-time charge' },
+  { value: 'campaign', label: 'Campaign', helper: 'Open fundraising drive' },
+] as const
+
+const activityTypeLabel = (value?: string | null) =>
+  ACTIVITY_TYPE_OPTIONS.find((option) => option.value === String(value || '').toLowerCase())?.label || 'Goal'
+
+const activityTypeHelper = (value?: string | null) =>
+  ACTIVITY_TYPE_OPTIONS.find((option) => option.value === String(value || '').toLowerCase())?.helper || ACTIVITY_TYPE_OPTIONS[0].helper
+
+const activityTypeForTemplate = (template?: Record<string, any> | null) => {
+  if (!template) return 'goal'
+  if (template.setup_type === 'fine') return 'assessment'
+
+  switch (template.key) {
+    case 'general_support':
+    case 'emergency_support':
+    case 'emergency_contribution':
+    case 'welfare_support':
+    case 'match_fee':
+    case 'jersey':
+    case 'utility_bill':
+    case 'maintenance_levy':
+    case 'event_fund':
+    case 'event_contribution':
+    case 'special_contribution':
+    case 'penalty_fee':
+      return template.key === 'maintenance_levy' || template.key === 'penalty_fee' ? 'assessment' : 'collection'
+    default:
+      return 'goal'
+  }
+}
+
+const activityTypeFromText = (title?: string | null, paymentKind?: string | null) => {
+  const text = [title, paymentKind].filter(Boolean).join(' ').toLowerCase()
+  if (text.includes('campaign')) return 'campaign'
+  if (/(levy|fine|penalty|charge|assessment)/i.test(text)) return 'assessment'
+  if (/(contribution|support|welfare|collection)/i.test(text)) return 'collection'
+  return 'goal'
 }
 
 const activityAvailabilityLabel = (frequency: string) => {
@@ -247,8 +318,15 @@ const formatDisplayDate = (value: string) => {
 }
 
 const CircleManageScreen = () => {
-  const { id } = useLocalSearchParams<{ id?: string | string[] }>()
+  const { id, section: sectionParam } = useLocalSearchParams<{ id?: string | string[]; section?: string | string[] }>()
   const circleId = Array.isArray(id) ? id[0] : id
+  const requestedSection = String(Array.isArray(sectionParam) ? sectionParam[0] : sectionParam || '').toLowerCase()
+  const rememberedSection = circleId ? LAST_MANAGE_SECTION_BY_CIRCLE[circleId] : undefined
+  const normalizedRequestedSection = requestedSection === 'decisions' ? 'governance' : requestedSection
+  const initialSection: ManageSection =
+    normalizedRequestedSection === 'members' || normalizedRequestedSection === 'governance' || normalizedRequestedSection === 'settings'
+      ? normalizedRequestedSection
+      : rememberedSection || 'members'
   const router = useRouter()
   const [workspace, setWorkspace] = useState<Record<string, any> | null>(null)
   const [paymentItems, setPaymentItems] = useState<any[]>([])
@@ -258,13 +336,16 @@ const CircleManageScreen = () => {
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
-  const [section, setSection] = useState<'payment_items' | 'members' | 'governance' | 'settings'>('payment_items')
+  const [section, setSection] = useState<ManageSection>(initialSection)
   const [saving, setSaving] = useState(false)
   const [processingApprovalId, setProcessingApprovalId] = useState('')
   const [activityTemplate, setActivityTemplate] = useState<Record<string, any> | null>(null)
   const [editingActivityId, setEditingActivityId] = useState('')
   const [pickerTarget, setPickerTarget] = useState<PickerTarget>(null)
   const [pickerDraftDate, setPickerDraftDate] = useState<Date>(new Date())
+  const [showDuesAdvanced, setShowDuesAdvanced] = useState(false)
+  const [showCollectionAdvanced, setShowCollectionAdvanced] = useState(false)
+  const [showSettingsAdvanced, setShowSettingsAdvanced] = useState(false)
 
   const [inviteEmail, setInviteEmail] = useState('')
   const [settingsForm, setSettingsForm] = useState({
@@ -276,7 +357,11 @@ const CircleManageScreen = () => {
     withdrawal_approval_threshold: '',
     governance_setup_completed: false,
   })
+  const [circleLogoUrl, setCircleLogoUrl] = useState('')
+  const [uploadingLogo, setUploadingLogo] = useState(false)
   const [duePlan, setDuePlan] = useState<Record<string, any> | null>(null)
+  const [people, setPeople] = useState<Record<string, any>[]>([])
+  const [peopleLoadingError, setPeopleLoadingError] = useState('')
   const [duePlanForm, setDuePlanForm] = useState({
     amount_ngn: '',
     cadence: 'monthly',
@@ -295,72 +380,113 @@ const CircleManageScreen = () => {
     deadline_at: '',
     contribution_frequency: 'one_time',
     payment_item_kind: 'fixed',
+    activity_type: 'goal',
   })
 
-  const loadManage = useCallback(async (isRefresh = false) => {
+  const loadManage = useCallback(async (isRefresh = false, targetSection: ManageSection = section) => {
     if (!circleId) return
-    if (isRefresh) setRefreshing(true)
+    if (isRefresh || workspace) setRefreshing(true)
     else setLoading(true)
     setError('')
     try {
-      const [workspaceResponse, paymentItemsResponse, settingsResponse, duePlanResponse, obligationsResponse] = await Promise.all([
-        getCircleWorkspace(circleId),
-        getCirclePaymentItems(circleId),
-        getCircleSettings(circleId).catch(() => null),
-        getCircleDuePlan(circleId).catch(() => null),
-        listCircleDueObligations(circleId).catch(() => null),
-      ])
-
+      const workspaceResponse = await getCircleWorkspace(circleId)
       const ws = workspaceResponse || {}
-      const settingsRoot = settingsResponse?.data || settingsResponse || {}
-      const identity = settingsRoot.identity || {}
-      const governance = settingsRoot.governance || {}
-      const dueRoot = duePlanResponse?.data || duePlanResponse || null
-
       setWorkspace(ws)
       setMembers(Array.isArray(ws?.members) ? ws.members : [])
-      setDueObligations(Array.isArray(obligationsResponse?.data) ? obligationsResponse.data : [])
-      setPaymentItems(normalizePaymentItems(paymentItemsResponse))
-      setSettingsForm({
-        name: identity.name || ws?.name || '',
-        purpose: identity.purpose || '',
-        description: identity.description || ws?.description || '',
-        badge_label: identity.badge_label || '',
-        visibility: settingsRoot?.privacy?.visibility || 'private',
-        withdrawal_approval_threshold: String(governance.configured_withdrawal_approval_threshold ?? ''),
-        governance_setup_completed: Boolean(governance.governance_setup_completed),
-      })
-      setDuePlan(dueRoot)
-      if (dueRoot) {
-        const enrolledRoles = Array.isArray(dueRoot.enrolled_roles) && dueRoot.enrolled_roles.length
-          ? dueRoot.enrolled_roles
-          : rolesForDueScope('everyone')
-        setDuePlanForm({
-          amount_ngn: toMajor(dueRoot.amount_cents),
-          cadence: dueRoot.cadence || 'monthly',
-          due_day_of_month: String(dueRoot.due_day_of_month || '1'),
-          due_weekday: String(dueRoot.due_weekday ?? '1'),
-          due_month_of_year: String(dueRoot.due_month_of_year || '1'),
-          grace_period_days: String(dueRoot.grace_period_days || '0'),
-          starts_on: dueRoot.starts_on || '',
-          ends_on: dueRoot.ends_on || '',
-          due_scope: dueScopeFromRoles(enrolledRoles),
-          enrolled_roles: enrolledRoles,
+
+      if (targetSection === 'payment_items') {
+        const [paymentItemsResponse, duePlanResponse] = await Promise.all([
+          getCirclePaymentItems(circleId),
+          getCircleDuePlan(circleId).catch(() => null),
+        ])
+        const dueRoot = duePlanResponse?.data || duePlanResponse || null
+        setPaymentItems(normalizePaymentItems(paymentItemsResponse))
+        setDuePlan(dueRoot)
+        if (dueRoot) {
+          const enrolledRoles = Array.isArray(dueRoot.enrolled_roles) && dueRoot.enrolled_roles.length
+            ? dueRoot.enrolled_roles
+            : rolesForDueScope('everyone')
+          setDuePlanForm({
+            amount_ngn: toMajor(dueRoot.amount_cents),
+            cadence: dueRoot.cadence || 'monthly',
+            due_day_of_month: String(dueRoot.due_day_of_month || '1'),
+            due_weekday: String(dueRoot.due_weekday ?? '1'),
+            due_month_of_year: String(dueRoot.due_month_of_year || '1'),
+            grace_period_days: String(dueRoot.grace_period_days || '0'),
+            starts_on: dueRoot.starts_on || '',
+            ends_on: dueRoot.ends_on || '',
+            due_scope: dueScopeFromRoles(enrolledRoles),
+            enrolled_roles: enrolledRoles,
+          })
+        }
+      } else if (targetSection === 'members') {
+        const [duePlanResponse, obligationsResponse] = await Promise.all([
+          getCircleDuePlan(circleId).catch(() => null),
+          listCircleDueObligations(circleId).catch(() => null),
+        ])
+        const peopleResponse = await listCirclePeople(circleId).catch(() => null)
+        const dueRoot = duePlanResponse?.data || duePlanResponse || null
+        setDueObligations(
+          getArray(obligationsResponse?.data?.obligations || obligationsResponse?.data || obligationsResponse).map(asRecord)
+        )
+        setPeople(getArray(peopleResponse?.data?.people || peopleResponse?.people).map(asRecord))
+        setPeopleLoadingError('')
+        setDuePlan(dueRoot)
+        if (dueRoot) {
+          const enrolledRoles = Array.isArray(dueRoot.enrolled_roles) && dueRoot.enrolled_roles.length
+            ? dueRoot.enrolled_roles
+            : rolesForDueScope('everyone')
+          setDuePlanForm({
+            amount_ngn: toMajor(dueRoot.amount_cents),
+            cadence: dueRoot.cadence || 'monthly',
+            due_day_of_month: String(dueRoot.due_day_of_month || '1'),
+            due_weekday: String(dueRoot.due_weekday ?? '1'),
+            due_month_of_year: String(dueRoot.due_month_of_year || '1'),
+            grace_period_days: String(dueRoot.grace_period_days || '0'),
+            starts_on: dueRoot.starts_on || '',
+            ends_on: dueRoot.ends_on || '',
+            due_scope: dueScopeFromRoles(enrolledRoles),
+            enrolled_roles: enrolledRoles,
+          })
+        }
+      } else if (targetSection === 'governance' || targetSection === 'settings') {
+        const settingsResponse = await getCircleSettings(circleId).catch(() => null)
+        const settingsRoot = settingsResponse?.data || settingsResponse || {}
+        const identity = settingsRoot.identity || {}
+        const governance = settingsRoot.governance || {}
+        const logoUrl = String(identity.logo_url || settingsRoot.logo_url || '').trim()
+        setSettingsForm({
+          name: identity.name || ws?.name || '',
+          purpose: identity.purpose || '',
+          description: identity.description || ws?.description || '',
+          badge_label: identity.badge_label || '',
+          visibility: settingsRoot?.privacy?.visibility || 'private',
+          withdrawal_approval_threshold: String(governance.configured_withdrawal_approval_threshold ?? ''),
+          governance_setup_completed: Boolean(governance.governance_setup_completed),
         })
+        setCircleLogoUrl(logoUrl)
       }
     } catch {
+      if (targetSection === 'members') {
+        setPeople([])
+        setPeopleLoadingError('Unable to load people registry right now.')
+      }
       setError('Unable to load this circle right now.')
     } finally {
       if (isRefresh) setRefreshing(false)
       else setLoading(false)
     }
-  }, [circleId])
+  }, [circleId, section, workspace])
 
-  useFocusEffect(
-    useCallback(() => {
-      loadManage(false)
-    }, [loadManage])
-  )
+  useEffect(() => {
+    setSection(initialSection)
+  }, [initialSection])
+
+  useEffect(() => {
+    if (!circleId) return
+    LAST_MANAGE_SECTION_BY_CIRCLE[circleId] = section
+    void loadManage(false, section)
+  }, [circleId, loadManage, section])
 
   const bucketKey = String(workspace?.product_bucket_key || '').trim()
   const templates = PAYMENT_TEMPLATES_BY_BUCKET[bucketKey] || []
@@ -368,7 +494,10 @@ const CircleManageScreen = () => {
   const permissions = workspace?.permissions || {}
   const approvals = workspace?.approvals || {}
   const approvalItems = Array.isArray(approvals?.items) ? approvals.items : []
-  const memberDuesLookup = useMemo(() => buildMemberDuesLookup(members, dueObligations, duePlan), [members, dueObligations, duePlan])
+  const memberDuesLookup = useMemo(
+    () => buildRosterDuesLookup(members, people, dueObligations, duePlan),
+    [members, people, dueObligations, duePlan]
+  )
   const maxWithdrawalThreshold = Math.max(Number(workspace?.governance_summary?.max_withdrawal_approval_threshold || 0), 0)
   const withdrawalThresholdOptions = useMemo(() => {
     const options = [{ value: '', label: 'Use recommended setting' }]
@@ -386,6 +515,16 @@ const CircleManageScreen = () => {
       permissions.can_manage_members ||
       permissions.can_manage_governance
   )
+  const showAdminTab = canAccessManageCircle(workspace)
+  const showTreasuryTab = canViewSharedFundTab(workspace)
+  const sectionLabel =
+    section === 'payment_items'
+      ? 'Collections'
+      : section === 'members'
+        ? 'Connected members'
+        : section === 'governance'
+          ? 'Decisions'
+          : 'Settings'
 
   const handleTemplate = (template: Record<string, any>) => {
     if (template.disabled) return
@@ -403,6 +542,7 @@ const CircleManageScreen = () => {
       deadline_at: '',
       contribution_frequency: template.contribution_frequency || 'one_time',
       payment_item_kind: activityKindForTemplate(template),
+      activity_type: activityTypeForTemplate(template),
     })
   }
 
@@ -417,13 +557,14 @@ const CircleManageScreen = () => {
       deadline_at: item?.due_on ? String(item.due_on).slice(0, 10) : '',
       contribution_frequency: item?.contribution_frequency || 'one_time',
       payment_item_kind: item?.payment_item_kind || item?.item_type || 'fixed',
+      activity_type: item?.activity_type || activityTypeFromText(item?.title || item?.name, item?.payment_item_kind || item?.item_type),
     })
   }
 
   const resetActivityForm = () => {
     setEditingActivityId('')
     setActivityTemplate(null)
-    setActivityForm({ name: '', amount_ngn: '', deadline_at: '', contribution_frequency: 'one_time', payment_item_kind: 'fixed' })
+    setActivityForm({ name: '', amount_ngn: '', deadline_at: '', contribution_frequency: 'one_time', payment_item_kind: 'fixed', activity_type: 'goal' })
   }
 
   const pickerTitle =
@@ -431,7 +572,7 @@ const CircleManageScreen = () => {
       ? 'Dues start date'
       : pickerTarget === 'due_end'
         ? 'Dues end date'
-        : 'Payment item deadline'
+        : 'Collection deadline'
 
   const openDatePicker = useCallback((target: PickerTarget) => {
     if (!target) return
@@ -497,7 +638,7 @@ const CircleManageScreen = () => {
   const saveActivityItem = async () => {
     if (!circleId) return
     const amountCents = toMinor(activityForm.amount_ngn)
-    if (!activityForm.name.trim()) return setError('Payment item name is required.')
+    if (!activityForm.name.trim()) return setError('Collection name is required.')
     if (!amountCents || amountCents <= 0) return setError('Enter a valid amount or target.')
 
     try {
@@ -508,6 +649,7 @@ const CircleManageScreen = () => {
         target_amount_cents: amountCents,
         contribution_frequency: activityForm.contribution_frequency,
         payment_item_kind: activityForm.payment_item_kind,
+        activity_type: activityForm.activity_type,
       }
       if (activityForm.deadline_at) payload.deadline_at = new Date(activityForm.deadline_at).toISOString()
       if (editingActivityId) {
@@ -520,11 +662,11 @@ const CircleManageScreen = () => {
       setNotice(
         editingActivityId
           ? `${activityForm.name.trim()} updated.`
-          : `${activityForm.name.trim()} added to other payment items.`
+          : `${activityForm.name.trim()} added to collections.`
       )
       resetActivityForm()
     } catch (requestError: any) {
-      setError(requestError?.response?.data?.errors?.join(', ') || requestError?.response?.data?.error || requestError?.message || 'Unable to save this payment item.')
+      setError(requestError?.response?.data?.errors?.join(', ') || requestError?.response?.data?.error || requestError?.message || 'Unable to save this collection.')
     } finally {
       setSaving(false)
     }
@@ -539,7 +681,7 @@ const CircleManageScreen = () => {
       setNotice('Member invited.')
       setInviteEmail('')
     } catch (requestError: any) {
-      setError(requestError?.response?.data?.errors?.join(', ') || requestError?.response?.data?.error || requestError?.message || 'Unable to invite member.')
+      setError(requestError?.response?.data?.errors?.join(', ') || requestError?.response?.data?.error || requestError?.message || 'Unable to invite this BitBridge user.')
     } finally {
       setSaving(false)
     }
@@ -571,6 +713,56 @@ const CircleManageScreen = () => {
       setError(requestError?.response?.data?.errors?.join(', ') || requestError?.response?.data?.error || requestError?.message || 'Unable to update settings.')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleUploadCircleLogo = async () => {
+    if (!circleId || uploadingLogo) return
+    setError('')
+    setNotice('')
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: false,
+      quality: 0.9,
+    })
+
+    if (result.canceled || !result.assets?.length) return
+
+    const asset = result.assets[0]
+    const uri = String(asset.uri || '').trim()
+    if (!uri) return
+
+    const mimeType =
+      asset.mimeType ||
+      (uri.toLowerCase().endsWith('.png') ? 'image/png' : uri.toLowerCase().endsWith('.webp') ? 'image/webp' : 'image/jpeg')
+    const name =
+      asset.fileName ||
+      `circle-logo-${Date.now()}.${mimeType === 'image/png' ? 'png' : mimeType === 'image/webp' ? 'webp' : 'jpg'}`
+
+    setUploadingLogo(true)
+    try {
+      const response = await uploadCircleLogo(circleId, {
+        uri,
+        name,
+        type: mimeType,
+      })
+      const payload = response?.data || response || {}
+      const updatedLogoUrl = String(payload?.data?.identity?.logo_url || payload?.data?.logo_url || payload?.logo_url || '').trim()
+      if (updatedLogoUrl) setCircleLogoUrl(updatedLogoUrl)
+      if (updatedLogoUrl) {
+        setWorkspace((prev) => (prev ? { ...prev, logo_url: updatedLogoUrl } : prev))
+      }
+      setNotice('Circle logo uploaded successfully.')
+    } catch (requestError: any) {
+      setError(
+        requestError?.response?.data?.message ||
+          requestError?.response?.data?.error ||
+          requestError?.message ||
+          'Unable to upload circle logo.'
+      )
+    } finally {
+      setUploadingLogo(false)
     }
   }
 
@@ -625,13 +817,17 @@ const CircleManageScreen = () => {
       <CircleShell
         circleId={String(circleId)}
         title={circleTitle(workspace)}
+        logoUrl={circleLogoUrl || String(workspace?.logo_url || '')}
         roleLabel={getCircleRoleLabel(workspace)}
         bucketLabel={circleBucketLabel(workspace)}
         active="manage"
+        showAdminTab={showAdminTab}
         onHome={() => replaceCircleWorkspaceSection(router, String(circleId), 'home')}
         onPay={() => replaceCircleWorkspaceSection(router, String(circleId), 'pay')}
-        onManage={() => replaceCircleWorkspaceSection(router, String(circleId), 'manage')}
+        onManage={() => router.push(`/circles/${circleId}/members` as any)}
+        onTreasury={() => router.push(`/circles/${circleId}/treasury` as any)}
         onTimeline={() => replaceCircleWorkspaceSection(router, String(circleId), 'timeline')}
+        showTreasuryTab={showTreasuryTab}
       >
         <ScrollView
           className="flex-1"
@@ -641,14 +837,18 @@ const CircleManageScreen = () => {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadManage(true)} />}
         >
           <View className="rounded-[28px] border border-gray-900 bg-[#050b1b] px-5 py-5">
-            <Text className="text-[11px] uppercase tracking-[2px] text-gray-500">Manage</Text>
-            <Text className="mt-2 text-xl font-semibold text-white">Configure what this group collects and who can operate it.</Text>
+            <Text className="text-[11px] uppercase tracking-[2px] text-gray-500">Manage Circle</Text>
+            <TouchableOpacity onPress={() => router.replace(`/circles/${circleId}` as any)} className="mt-4 self-start rounded-full border border-white/10 bg-white/[0.04] px-4 py-2">
+              <Text className="text-white text-[11px] font-semibold">Back to Overview</Text>
+            </TouchableOpacity>
+            <Text className="mt-2 text-xl font-semibold text-white">Configure the circle from one place.</Text>
             <View className="mt-5 flex-row flex-wrap gap-3">
-              <TouchableOpacity onPress={() => setSection('payment_items')} className={pillClass(section === 'payment_items')}><Text className="text-sm font-medium text-white">Payment Items</Text></TouchableOpacity>
-              <TouchableOpacity onPress={() => setSection('members')} className={pillClass(section === 'members')}><Text className="text-sm font-medium text-white">Members</Text></TouchableOpacity>
-              <TouchableOpacity onPress={() => setSection('governance')} className={pillClass(section === 'governance')}><Text className="text-sm font-medium text-white">Governance</Text></TouchableOpacity>
+              <TouchableOpacity onPress={() => setSection('payment_items')} className={pillClass(section === 'payment_items')}><Text className="text-sm font-medium text-white">Collections</Text></TouchableOpacity>
+              <TouchableOpacity onPress={() => setSection('members')} className={pillClass(section === 'members')}><Text className="text-sm font-medium text-white">Connected members</Text></TouchableOpacity>
+              <TouchableOpacity onPress={() => setSection('governance')} className={pillClass(section === 'governance')}><Text className="text-sm font-medium text-white">Decisions</Text></TouchableOpacity>
               <TouchableOpacity onPress={() => setSection('settings')} className={pillClass(section === 'settings')}><Text className="text-sm font-medium text-white">Settings</Text></TouchableOpacity>
             </View>
+            <Text className="mt-3 text-xs text-gray-400">Current section: {sectionLabel}</Text>
           </View>
 
           {!!notice && <View className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-4"><Text className="text-sm text-emerald-200">{notice}</Text></View>}
@@ -666,7 +866,7 @@ const CircleManageScreen = () => {
                         <View className="flex-1">
                           <Text className="text-sm font-semibold text-white">{template.title}</Text>
                           <Text className="mt-1 text-xs text-gray-400">
-                            {template.setup_type === 'recurring' ? 'Recurring payment item' : template.setup_type === 'fine' ? 'Assigned charge' : 'Collection payment item'}
+                            {template.setup_type === 'recurring' ? 'Recurring collection' : template.setup_type === 'fine' ? 'Assigned charge' : 'Collection payment option'}
                           </Text>
                         </View>
                         <TouchableOpacity
@@ -685,17 +885,20 @@ const CircleManageScreen = () => {
               </View>
 
               <View className="rounded-[28px] border border-gray-900 bg-[#050b1b] px-5 py-5">
-                <Text className="text-[11px] uppercase tracking-[2px] text-gray-500">Active Payment Items</Text>
+                <Text className="text-[11px] uppercase tracking-[2px] text-gray-500">Active Collections</Text>
                 <View className="mt-4 gap-3">
                   {activeItems.length === 0 ? (
-                    <View className="rounded-2xl border border-dashed border-gray-800 px-4 py-4"><Text className="text-sm text-gray-400">No active payment items yet.</Text></View>
+                    <View className="rounded-2xl border border-dashed border-gray-800 px-4 py-4"><Text className="text-sm text-gray-400">No active collections yet.</Text></View>
                   ) : (
                     activeItems.map((item) => (
                       <View key={String(item?.key || item?.id)} className="rounded-2xl border border-gray-900 bg-gray-950 px-4 py-4">
                         <View className="flex-row items-center justify-between gap-3">
                           <View className="flex-1">
                             <Text className="text-sm font-semibold text-white">{item?.title}</Text>
-                            <Text className="mt-1 text-xs text-gray-400">{item?.linked_reference_type === 'CircleDuePlan' ? 'Dues plan' : item?.type === 'treasury_topup' ? 'Treasury top-up' : 'Other payment item'}</Text>
+                            <Text className="mt-1 text-[11px] uppercase tracking-[1.5px] text-gray-500">
+                              {activityTypeLabel(item?.activity_type || activityTypeFromText(item?.title || item?.name, item?.payment_item_kind || item?.item_type))}
+                            </Text>
+                            <Text className="mt-1 text-xs text-gray-400">{item?.linked_reference_type === 'CircleDuePlan' ? 'Dues plan' : item?.type === 'treasury_topup' ? 'Treasury Contribution' : 'Collection'}</Text>
                           </View>
                           <View className="items-end">
                             <Text className="text-sm font-medium text-gray-200">{paymentItemAmount(item)}</Text>
@@ -732,8 +935,8 @@ const CircleManageScreen = () => {
                   <View className="mt-4 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-4">
                     <View className="flex-row items-center justify-between gap-3">
                       <View className="flex-1">
-                        <Text className="text-sm font-semibold text-white">Editing active payment item</Text>
-                        <Text className="mt-1 text-xs text-amber-100/80">Changes will update the live item members see in Circle payments.</Text>
+                        <Text className="text-sm font-semibold text-white">Editing active collection</Text>
+                        <Text className="mt-1 text-xs text-amber-100/80">Changes will update the live collection members see in Circle contributions.</Text>
                       </View>
                       <View className="rounded-full border border-amber-400/30 bg-amber-500/10 px-3 py-1">
                         <Text className="text-[11px] font-semibold uppercase tracking-[1.5px] text-amber-200">Live</Text>
@@ -751,57 +954,69 @@ const CircleManageScreen = () => {
                     placeholder="Select frequency"
                   />
                   <View className="rounded-2xl border border-gray-900 bg-gray-950 px-4 py-4">
-                    <Text className="text-sm font-medium text-white">Members can pay multiple periods</Text>
+                    <Text className="text-sm font-medium text-white">Connected members can pay multiple periods</Text>
                     <Text className="mt-1 text-xs text-gray-400">
                       Checkout supports paying one or more periods at a time. Set one clear frequency and due date here.
                     </Text>
                   </View>
-                  <View className="flex-row flex-wrap gap-2">
-                    {DUE_SCOPE_OPTIONS.map((option) => (
-                      <TouchableOpacity
-                        key={option.value}
-                        onPress={() => setDuePlanForm((prev) => ({
-                          ...prev,
-                          due_scope: option.value,
-                          enrolled_roles: option.value === 'custom_roles' ? prev.enrolled_roles : rolesForDueScope(option.value),
-                        }))}
-                        className={pillClass(duePlanForm.due_scope === option.value)}
-                      >
-                        <Text className="text-xs font-semibold text-white">{option.label}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                  <View className="rounded-2xl border border-cyan-500/20 bg-cyan-500/5 px-4 py-4">
-                    <Text className="text-sm font-medium text-white">Everyone pays by default</Text>
-                    <Text className="mt-1 text-xs text-gray-300">
-                      New dues plans include the creator, admins, treasurers, and members unless you choose a narrower scope.
+                  <TouchableOpacity
+                    onPress={() => setShowDuesAdvanced((value) => !value)}
+                    className="rounded-2xl border border-gray-800 px-4 py-4"
+                  >
+                    <Text className="text-center text-sm font-medium text-white">
+                      {showDuesAdvanced ? 'Hide advanced dues controls' : 'Show advanced dues controls'}
                     </Text>
-                    <Text className="mt-1 text-xs text-gray-400">
-                      New members start owing from when they join the Circle. They are not back-billed for periods before they joined.
-                    </Text>
-                  </View>
-                  {duePlanForm.due_scope === 'custom_roles' ? (
-                    <View className="flex-row flex-wrap gap-2">
-                      {DUE_ROLE_OPTIONS.map((role) => {
-                        const active = duePlanForm.enrolled_roles.includes(role.value)
-                        return (
+                  </TouchableOpacity>
+                  {showDuesAdvanced ? (
+                    <>
+                      <View className="flex-row flex-wrap gap-2">
+                        {DUE_SCOPE_OPTIONS.map((option) => (
                           <TouchableOpacity
-                            key={role.value}
-                            onPress={() =>
-                              setDuePlanForm((prev) => ({
-                                ...prev,
-                                enrolled_roles: active
-                                  ? prev.enrolled_roles.filter((value) => value !== role.value)
-                                  : [...prev.enrolled_roles, role.value],
-                              }))
-                            }
-                            className={pillClass(active)}
+                            key={option.value}
+                            onPress={() => setDuePlanForm((prev) => ({
+                              ...prev,
+                              due_scope: option.value,
+                              enrolled_roles: option.value === 'custom_roles' ? prev.enrolled_roles : rolesForDueScope(option.value),
+                            }))}
+                            className={pillClass(duePlanForm.due_scope === option.value)}
                           >
-                            <Text className="text-xs font-semibold text-white">{role.label}</Text>
+                            <Text className="text-xs font-semibold text-white">{option.label}</Text>
                           </TouchableOpacity>
-                        )
-                      })}
-                    </View>
+                        ))}
+                      </View>
+                      <View className="rounded-2xl border border-cyan-500/20 bg-cyan-500/5 px-4 py-4">
+                        <Text className="text-sm font-medium text-white">Everyone pays by default</Text>
+                        <Text className="mt-1 text-xs text-gray-300">
+                          New dues plans include the creator, admins, treasurers, and members unless you choose a narrower scope.
+                        </Text>
+                        <Text className="mt-1 text-xs text-gray-400">
+                          New members start owing from when they join the Circle. They are not back-billed for periods before they joined.
+                        </Text>
+                      </View>
+                      {duePlanForm.due_scope === 'custom_roles' ? (
+                        <View className="flex-row flex-wrap gap-2">
+                          {DUE_ROLE_OPTIONS.map((role) => {
+                            const active = duePlanForm.enrolled_roles.includes(role.value)
+                            return (
+                              <TouchableOpacity
+                                key={role.value}
+                                onPress={() =>
+                                  setDuePlanForm((prev) => ({
+                                    ...prev,
+                                    enrolled_roles: active
+                                      ? prev.enrolled_roles.filter((value) => value !== role.value)
+                                      : [...prev.enrolled_roles, role.value],
+                                  }))
+                                }
+                                className={pillClass(active)}
+                              >
+                                <Text className="text-xs font-semibold text-white">{role.label}</Text>
+                              </TouchableOpacity>
+                            )
+                          })}
+                        </View>
+                      ) : null}
+                    </>
                   ) : null}
                   <FormSelect
                     label={duePlanForm.cadence === 'weekly' ? 'Due weekday' : 'Due day'}
@@ -852,10 +1067,28 @@ const CircleManageScreen = () => {
               </View>
 
               <View className="rounded-[28px] border border-gray-900 bg-[#050b1b] px-5 py-5">
-                <Text className="text-[11px] uppercase tracking-[2px] text-gray-500">Other Payment Items</Text>
-                <Text className="mt-2 text-lg font-semibold text-white">{editingActivityId ? `Edit ${activityForm.name || 'payment item'}` : activityTemplate ? `Configure ${activityTemplate.title}` : 'Create other payment item'}</Text>
+                <Text className="text-[11px] uppercase tracking-[2px] text-gray-500">Collections</Text>
+                <Text className="mt-2 text-lg font-semibold text-white">{editingActivityId ? `Edit ${activityForm.name || 'collection'}` : activityTemplate ? `Configure ${activityTemplate.title}` : 'Create collection'}</Text>
                   <View className="mt-4 gap-4">
-                    <TextInput value={activityForm.name} onChangeText={(value) => setActivityForm((prev) => ({ ...prev, name: value }))} placeholder="Payment item name" placeholderTextColor="#64748b" className={inputClass} />
+                    <TextInput value={activityForm.name} onChangeText={(value) => setActivityForm((prev) => ({ ...prev, name: value }))} placeholder="Collection name" placeholderTextColor="#64748b" className={inputClass} />
+                  <View>
+                    <Text className="mb-2 text-sm text-gray-300">Structure type</Text>
+                    <View className="flex-row flex-wrap gap-2">
+                      {ACTIVITY_TYPE_OPTIONS.map((option) => {
+                        const active = activityForm.activity_type === option.value
+                        return (
+                          <TouchableOpacity
+                            key={option.value}
+                            onPress={() => setActivityForm((prev) => ({ ...prev, activity_type: option.value }))}
+                            className={pillClass(active)}
+                          >
+                            <Text className="text-xs font-semibold text-white">{option.label}</Text>
+                          </TouchableOpacity>
+                        )
+                      })}
+                    </View>
+                    <Text className="mt-2 text-xs text-gray-400">{activityTypeHelper(activityForm.activity_type)}</Text>
+                  </View>
                   <View>
                     <Text className="mb-2 text-sm text-gray-300">Item type</Text>
                     <View className="flex-row flex-wrap gap-2">
@@ -892,17 +1125,27 @@ const CircleManageScreen = () => {
                     </Text>
                   </TouchableOpacity>
                   <Text className="text-xs text-gray-500">Leave the date blank to keep this item available until you close it.</Text>
-                  <View className="rounded-2xl border border-gray-900 bg-gray-950 px-4 py-4">
-                    <View className="flex-row items-center justify-between gap-3">
-                      <Text className="text-[11px] uppercase tracking-[1.5px] text-gray-500">How members will see it</Text>
-                      <View className="rounded-full border border-gray-800 px-3 py-1">
-                        <Text className="text-[11px] font-semibold uppercase tracking-[1.5px] text-gray-300">{activityAvailabilityLabel(activityForm.contribution_frequency)}</Text>
+                  <TouchableOpacity
+                    onPress={() => setShowCollectionAdvanced((value) => !value)}
+                    className="rounded-2xl border border-gray-800 px-4 py-4"
+                  >
+                    <Text className="text-center text-sm font-medium text-white">
+                      {showCollectionAdvanced ? 'Hide advanced collection details' : 'Show advanced collection details'}
+                    </Text>
+                  </TouchableOpacity>
+                  {showCollectionAdvanced ? (
+                    <View className="rounded-2xl border border-gray-900 bg-gray-950 px-4 py-4">
+                      <View className="flex-row items-center justify-between gap-3">
+                        <Text className="text-[11px] uppercase tracking-[1.5px] text-gray-500">How members will see it</Text>
+                        <View className="rounded-full border border-gray-800 px-3 py-1">
+                          <Text className="text-[11px] font-semibold uppercase tracking-[1.5px] text-gray-300">{activityAvailabilityLabel(activityForm.contribution_frequency)}</Text>
+                        </View>
                       </View>
+                      <Text className="mt-3 text-sm text-gray-300">Connected members will see this in Circle payments after you save it.</Text>
                     </View>
-                    <Text className="mt-3 text-sm text-gray-300">Members will see this in Circle payments after you save it.</Text>
-                  </View>
+                  ) : null}
                   <TouchableOpacity onPress={saveActivityItem} disabled={saving} className="rounded-2xl bg-cyan-400 px-4 py-4">
-                    <Text className="text-center text-sm font-semibold text-slate-950">{saving ? 'Saving…' : editingActivityId ? 'Update payment item' : 'Save payment item'}</Text>
+                    <Text className="text-center text-sm font-semibold text-slate-950">{saving ? 'Saving…' : editingActivityId ? 'Update collection' : 'Save collection'}</Text>
                   </TouchableOpacity>
                   {activityTemplate || editingActivityId ? (
                     <TouchableOpacity onPress={resetActivityForm} className="rounded-2xl border border-gray-800 px-4 py-4">
@@ -917,28 +1160,99 @@ const CircleManageScreen = () => {
           {section === 'members' ? (
             <>
               <View className="rounded-[28px] border border-gray-900 bg-[#050b1b] px-5 py-5">
-                <Text className="text-[11px] uppercase tracking-[2px] text-gray-500">Invite Member</Text>
+                <Text className="text-[11px] uppercase tracking-[2px] text-gray-500">Invite BitBridge user</Text>
                 <View className="mt-4 gap-4">
                   <TextInput value={inviteEmail} onChangeText={setInviteEmail} placeholder="Email" placeholderTextColor="#64748b" className={inputClass} autoCapitalize="none" />
                   <TouchableOpacity onPress={sendInvite} disabled={saving} className="rounded-2xl bg-cyan-400 px-4 py-4">
-                    <Text className="text-center text-sm font-semibold text-slate-950">{saving ? 'Sending…' : 'Invite member'}</Text>
+                    <Text className="text-center text-sm font-semibold text-slate-950">{saving ? 'Sending…' : 'Invite BitBridge user'}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
               <View className="rounded-[28px] border border-gray-900 bg-[#050b1b] px-5 py-5">
-                <Text className="text-[11px] uppercase tracking-[2px] text-gray-500">Members</Text>
+                <Text className="text-[11px] uppercase tracking-[2px] text-gray-500">People registry</Text>
+                <Text className="mt-2 text-sm text-gray-400">
+                  Canonical names come from the registry. Linked app accounts are shown as secondary metadata.
+                </Text>
+                <View className="mt-4 gap-3">
+                  {peopleLoadingError ? (
+                    <View className="rounded-2xl border border-dashed border-gray-800 px-4 py-4">
+                      <Text className="text-sm text-gray-400">{peopleLoadingError}</Text>
+                    </View>
+                  ) : people.length === 0 ? (
+                    <View className="rounded-2xl border border-dashed border-gray-800 px-4 py-4">
+                      <Text className="text-sm text-gray-400">No registry people yet.</Text>
+                    </View>
+                  ) : (
+                    people.map((person, index) => {
+                      const displayName = String(person?.display_name || person?.name || 'Person')
+                      const linkedUserId = getPersonLinkedUserId(person)
+                      const linkedMember = members.find((member) => getCircleMemberUserId(member) === linkedUserId) || null
+                      const dues = memberDuesLookup[String(person?.id || linkedUserId || displayName)]
+                      const role = String(
+                        person?.role ||
+                          asRecord(person?.linked_membership).role ||
+                          linkedMember?.role ||
+                          'member'
+                      ).toLowerCase()
+                      const linkedLabel =
+                        String(
+                          asRecord(person?.linked_user).display_name ||
+                            asRecord(asRecord(person?.linked_membership).user).display_name ||
+                            linkedMember?.display_name ||
+                            linkedMember?.user?.display_name ||
+                            linkedMember?.user?.email ||
+                            ''
+                        ).trim()
+                      return (
+                        <View key={String(person?.id || index)} className="rounded-2xl border border-gray-900 bg-gray-950 px-4 py-4">
+                          <View className="flex-row items-start justify-between gap-3">
+                            <View className="flex-1">
+                              <Text className="text-sm font-semibold text-white">{displayName}</Text>
+                              <Text className="mt-1 text-xs text-gray-400">{role.replace(/_/g, ' ')}</Text>
+                              {linkedLabel ? (
+                                <Text className="mt-2 text-xs text-gray-500">Linked app member: {linkedLabel}</Text>
+                              ) : null}
+                              {dues ? (
+                                <Text className="mt-2 text-xs text-gray-500">
+                                  Dues: {dues.statusLabel} - {moneyFormat(Number(dues.outstandingAmountCents || 0) / 100)} outstanding
+                                </Text>
+                              ) : duePlan ? (
+                                <Text className="mt-2 text-xs text-gray-500">No dues status for this cycle.</Text>
+                              ) : null}
+                            </View>
+                            {dues ? (
+                              <View className={`rounded-full px-3 py-1 ${dues.statusKey === 'paid' ? 'border border-emerald-400/20 bg-emerald-400/10' : 'border border-amber-400/20 bg-amber-400/10'}`}>
+                                <Text className={`text-[10px] font-semibold uppercase tracking-[1.5px] ${dues.statusKey === 'paid' ? 'text-emerald-100' : 'text-amber-100'}`}>
+                                  {dues.statusLabel}
+                                </Text>
+                              </View>
+                            ) : null}
+                          </View>
+                        </View>
+                      )
+                    })
+                  )}
+                </View>
+              </View>
+              <View className="rounded-[28px] border border-gray-900 bg-[#050b1b] px-5 py-5">
+                <Text className="text-[11px] uppercase tracking-[2px] text-gray-500">Connected members</Text>
                 <View className="mt-4 gap-3">
                   {members.length === 0 ? (
-                    <View className="rounded-2xl border border-dashed border-gray-800 px-4 py-4"><Text className="text-sm text-gray-400">No member data available yet.</Text></View>
+                    <View className="rounded-2xl border border-dashed border-gray-800 px-4 py-4"><Text className="text-sm text-gray-400">No app member data available yet.</Text></View>
                   ) : (
                     members.map((member, index) => {
-                      const dues = memberDuesLookup[String(member?.id || member?.user?.id || '')]
+                      const linkedPerson = people.find((person) => getPersonLinkedUserId(person) === getCircleMemberUserId(member)) || null
+                      const displayName = String(linkedPerson?.display_name || member?.display_name || member?.user?.display_name || member?.user?.email || 'App member')
+                      const dues = memberDuesLookup[String(linkedPerson?.id || member?.id || member?.user?.id || '')]
                       return (
                         <View key={String(member?.id || index)} className="rounded-2xl border border-gray-900 bg-gray-950 px-4 py-4">
                           <View className="flex-row items-start justify-between gap-3">
                             <View className="flex-1">
-                              <Text className="text-sm font-semibold text-white">{member?.display_name || member?.user?.display_name || member?.user?.email || 'Member'}</Text>
+                              <Text className="text-sm font-semibold text-white">{displayName}</Text>
                               <Text className="mt-1 text-xs text-gray-400">{String(member?.role || member?.membership_role || 'member').replace(/_/g, ' ')}</Text>
+                              {linkedPerson ? (
+                                <Text className="mt-2 text-xs text-gray-500">Registry person: {String(linkedPerson.display_name || '')}</Text>
+                              ) : null}
                               {dues ? (
                                 <Text className="mt-2 text-xs text-gray-500">{dues.periodsPaidLabel} - {moneyFormat(Number(dues.outstandingAmountCents || 0) / 100)} outstanding</Text>
                               ) : duePlan ? (
@@ -965,27 +1279,27 @@ const CircleManageScreen = () => {
           {section === 'governance' ? (
             <>
               <View className="rounded-[28px] border border-gray-900 bg-[#050b1b] px-5 py-5">
-                <Text className="text-[11px] uppercase tracking-[2px] text-gray-500">Governance</Text>
+                <Text className="text-[11px] uppercase tracking-[2px] text-gray-500">Decisions</Text>
                 <View className="mt-4 gap-3">
                   <View className="rounded-2xl border border-gray-900 bg-gray-950 px-4 py-4">
-                    <Text className="text-sm text-gray-400">Withdrawal approval threshold</Text>
+                    <Text className="text-sm text-gray-400">Approval rule</Text>
                     <Text className="mt-1 text-sm font-semibold text-white">{settingsForm.withdrawal_approval_threshold || 'Not set'}</Text>
                   </View>
                   <View className="rounded-2xl border border-gray-900 bg-gray-950 px-4 py-4">
-                    <Text className="text-sm text-gray-400">Governance setup</Text>
+                    <Text className="text-sm text-gray-400">Decision setup</Text>
                     <Text className="mt-1 text-sm font-semibold text-white">{settingsForm.governance_setup_completed ? 'Completed' : 'Pending'}</Text>
                   </View>
                 </View>
               </View>
               <View className="rounded-[28px] border border-gray-900 bg-[#050b1b] px-5 py-5">
-                <Text className="text-[11px] uppercase tracking-[2px] text-gray-500">Withdrawal Queue</Text>
+                <Text className="text-[11px] uppercase tracking-[2px] text-gray-500">Requests waiting</Text>
                 <Text className="mt-3 text-sm text-gray-400">
                   Approved withdrawals land in the requester wallet, then the requester can use their personal bank transfer flow.
                 </Text>
                 <View className="mt-4 gap-3">
                   {approvalItems.length === 0 ? (
                     <View className="rounded-2xl border border-dashed border-gray-800 px-4 py-4">
-                      <Text className="text-sm text-gray-400">No pending withdrawal approvals right now.</Text>
+                      <Text className="text-sm text-gray-400">No requests waiting right now.</Text>
                     </View>
                   ) : (
                     approvalItems.map((item: Record<string, any>) => {
@@ -1014,7 +1328,7 @@ const CircleManageScreen = () => {
                             </View>
                             <View className="rounded-full border border-gray-800 px-3 py-1">
                               <Text className="text-[11px] font-semibold uppercase tracking-[1.5px] text-gray-300">
-                                {String(item?.lifecycle_state || 'pending_approval')}
+                                {String(item?.lifecycle_state || 'pending_approval').replace(/_/g, ' ')}
                               </Text>
                             </View>
                           </View>
@@ -1054,15 +1368,6 @@ const CircleManageScreen = () => {
                   )}
                 </View>
               </View>
-              <TouchableOpacity
-                onPress={() => router.push(`/circles/${circleId}/members` as any)}
-                className="rounded-2xl border border-cyan-400/30 bg-cyan-500/10 px-4 py-4"
-              >
-                <Text className="text-center text-sm font-semibold text-cyan-100">Open member roster</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => router.push(`/circles/${circleId}/treasury` as any)} className="rounded-2xl border border-cyan-400/30 bg-cyan-500/10 px-4 py-4">
-                <Text className="text-center text-sm font-semibold text-cyan-100">Open Circle Treasury</Text>
-              </TouchableOpacity>
             </>
           ) : null}
 
@@ -1070,6 +1375,30 @@ const CircleManageScreen = () => {
             <View className="rounded-[28px] border border-gray-900 bg-[#050b1b] px-5 py-5">
               <Text className="text-[11px] uppercase tracking-[2px] text-gray-500">Settings</Text>
               <View className="mt-4 gap-4">
+                <View className="rounded-2xl border border-gray-800 bg-gray-950 px-4 py-4">
+                  <Text className="text-[11px] uppercase tracking-[2px] text-gray-500">Circle logo</Text>
+                  <Text className="mt-2 text-sm text-gray-400">
+                    Optional. Used in the header and PDF statement when present.
+                  </Text>
+                  <View className="mt-4 flex-row items-center gap-3">
+                    <View className="h-16 w-16 items-center justify-center overflow-hidden rounded-2xl border border-gray-800 bg-transparent p-0">
+                      {circleLogoUrl ? (
+                        <Image source={{ uri: circleLogoUrl }} style={{ width: 56, height: 56 }} resizeMode="contain" />
+                      ) : (
+                        <Text className="text-[10px] font-semibold uppercase tracking-[1px] text-gray-500">No logo</Text>
+                      )}
+                    </View>
+                    <TouchableOpacity
+                      onPress={handleUploadCircleLogo}
+                      disabled={uploadingLogo}
+                      className={`${uploadingLogo ? 'bg-gray-800' : 'bg-cyan-400'} rounded-2xl px-4 py-3`}
+                    >
+                      <Text className="text-sm font-semibold text-slate-950">
+                        {uploadingLogo ? 'Uploading...' : circleLogoUrl ? 'Replace logo' : 'Upload logo'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
                 <TextInput value={settingsForm.name} onChangeText={(value) => setSettingsForm((prev) => ({ ...prev, name: value }))} placeholder="Circle name" placeholderTextColor="#64748b" className={inputClass} />
                 <TextInput value={settingsForm.badge_label} onChangeText={(value) => setSettingsForm((prev) => ({ ...prev, badge_label: value }))} placeholder="Badge label" placeholderTextColor="#64748b" className={inputClass} />
                 <TextInput value={settingsForm.purpose} onChangeText={(value) => setSettingsForm((prev) => ({ ...prev, purpose: value }))} placeholder="Purpose" placeholderTextColor="#64748b" className={inputClass} />
@@ -1083,29 +1412,39 @@ const CircleManageScreen = () => {
                 />
                 {maxWithdrawalThreshold > 0 ? (
                   <FormSelect
-                    label="Withdrawal approval threshold"
+                    label="Approval rule"
                     selectedValue={settingsForm.withdrawal_approval_threshold}
                     onValueChange={(value: string) => setSettingsForm((prev) => ({ ...prev, withdrawal_approval_threshold: String(value || '') }))}
                     options={withdrawalThresholdOptions}
-                    placeholder="Select threshold"
+                    placeholder="Select rule"
                   />
                 ) : (
                   <View className="rounded-2xl border border-gray-900 bg-gray-950 px-4 py-4">
                     <Text className="text-sm text-gray-400">
-                      Add more than one manager before setting a withdrawal approval threshold.
+                      Add more than one admin before setting an approval rule.
                     </Text>
                   </View>
                 )}
                 <TouchableOpacity
-                  onPress={() => setSettingsForm((prev) => ({ ...prev, governance_setup_completed: !prev.governance_setup_completed }))}
-                  className={pillClass(Boolean(settingsForm.governance_setup_completed))}
+                  onPress={() => setShowSettingsAdvanced((value) => !value)}
+                  className="rounded-2xl border border-gray-800 px-4 py-4"
                 >
                   <Text className="text-center text-sm font-medium text-white">
-                    {settingsForm.governance_setup_completed ? 'Governance setup completed' : 'Mark governance as completed'}
+                    {showSettingsAdvanced ? 'Hide decision controls' : 'Show decision controls'}
                   </Text>
                 </TouchableOpacity>
+                {showSettingsAdvanced ? (
+                  <TouchableOpacity
+                    onPress={() => setSettingsForm((prev) => ({ ...prev, governance_setup_completed: !prev.governance_setup_completed }))}
+                    className={pillClass(Boolean(settingsForm.governance_setup_completed))}
+                  >
+                    <Text className="text-center text-sm font-medium text-white">
+                      {settingsForm.governance_setup_completed ? 'Decisions completed' : 'Mark decisions complete'}
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
                 <TouchableOpacity onPress={saveSettings} disabled={saving} className="rounded-2xl bg-cyan-400 px-4 py-4">
-                  <Text className="text-center text-sm font-semibold text-slate-950">{saving ? 'Saving…' : 'Save settings'}</Text>
+                  <Text className="text-center text-sm font-semibold text-slate-950">{saving ? 'Saving…' : 'Save decisions'}</Text>
                 </TouchableOpacity>
               </View>
             </View>

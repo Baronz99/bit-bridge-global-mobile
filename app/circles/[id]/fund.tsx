@@ -9,6 +9,7 @@ import NotificationAlert from '@/components/notification'
 import TransactionPinModal from '@/components/TransactionPinModal'
 import CompletionPanel from '@/components/finance/CompletionPanel'
 import FinancialSummaryCard from '@/components/finance/FinancialSummaryCard'
+import { paymentItemIdentityLabel } from '@/components/circles/rebuild'
 import { fundCircle, getCircle, getCirclePaymentItems, quoteCircleDuePlan } from '@/api/circles'
 import { getTransactionPinStatus } from '@/api/transactionPin'
 import { useAuth } from '@/services/useAuth'
@@ -58,10 +59,10 @@ const paymentPurposeLabel = (item?: PaymentItemRecord | null) => {
   const checkoutMode = String(item?.payment_item_kind || item?.checkout_mode || item?.item_type || '').toLowerCase()
 
   if (item?.linked_reference_type === 'CircleDuePlan' || normalizedType === 'dues' || checkoutMode === 'recurring') return 'dues'
-  if (normalizedType === 'treasury_topup' || item?.support_fallback) return 'treasury top-up'
+  if (normalizedType === 'treasury_topup' || item?.support_fallback) return 'shared fund'
   if (/fine|penalt/i.test(title)) return 'fine'
-  if (/event/i.test(title)) return 'event contribution'
-  if (/support|special|one[- ]off|emergency|welfare|contribution/i.test(title)) return 'one-off contribution'
+  if (/event|goal|collection/i.test(title)) return 'collection'
+  if (/support|special|one[- ]off|emergency|welfare|contribution/i.test(title)) return 'collection'
   return 'contribution'
 }
 
@@ -69,10 +70,18 @@ const paymentTypeLabel = (item?: PaymentItemRecord | null) => {
   const purpose = paymentPurposeLabel(item)
   if (purpose === 'dues') return 'Dues'
   if (purpose === 'fine') return 'Fine'
-  if (purpose === 'event contribution') return 'Event contribution'
-  if (purpose === 'one-off contribution') return 'One-off contribution'
-  if (purpose === 'treasury top-up') return 'Treasury top-up'
-  return 'Contribution'
+  if (purpose === 'collection') return 'Collection'
+  if (purpose === 'shared fund') return 'Shared Fund'
+  return 'Money option'
+}
+
+const getPaymentItemActivityId = (item?: PaymentItemRecord | null) => {
+  const activityId = String(item?.activity_id || '').trim()
+  if (activityId) return activityId
+  if (String(item?.linked_reference_type || '').trim() === 'CircleActivity') {
+    return String(item?.linked_reference_id || '').trim()
+  }
+  return ''
 }
 
 const CircleFundScreen = () => {
@@ -152,6 +161,7 @@ const CircleFundScreen = () => {
     () => paymentItems.find((item) => String(item.key || item.id || '') === String(selectedPaymentItemKey || '')) || null,
     [paymentItems, selectedPaymentItemKey]
   )
+  const selectedPaymentItemIdentity = paymentItemIdentityLabel(selectedPaymentItem)
   const selectedPaymentItemType = String(selectedPaymentItem?.type || selectedPaymentItem?.item_type || '').toLowerCase()
   const selectedIsDueItem =
     selectedPaymentItem?.linked_reference_type === 'CircleDuePlan' ||
@@ -159,6 +169,7 @@ const CircleFundScreen = () => {
     (selectedPaymentItem?.checkout_mode === 'recurring' && selectedPaymentItem?.linked_reference_type === 'CircleDuePlan')
   const selectedIsQuantityItem = selectedPaymentItemType === 'quantity'
   const activePaymentItem = isMonthlyDueFlow ? null : selectedPaymentItem
+  const activePaymentItemActivityId = getPaymentItemActivityId(activePaymentItem)
   const activeDueMonthsOpen = isMonthlyDueFlow
     ? Math.max(dueMonthsOpen || 1, 1)
     : Math.max(Number(selectedPaymentItem?.payable_periods_count || 1), 1)
@@ -241,18 +252,18 @@ const CircleFundScreen = () => {
   const successReference = String(successData?.reference || successData?.transaction_reference || successData?.transfer_reference || '').trim()
   const successTimestamp = String(successData?.created_at || successData?.occurred_at || '').trim()
   const successStatus = String(successData?.status || 'successful').trim()
-  const selectedItemTitle = isMonthlyDueFlow ? activeDueLabel : String(activePaymentItem?.title || 'General Support').trim()
+  const selectedItemTitle = isMonthlyDueFlow ? activeDueLabel : String(activePaymentItem?.title || 'Shared Fund').trim()
   const selectedItemTypeLabel = isMonthlyDueFlow || selectedIsDueItem ? 'Dues' : paymentTypeLabel(activePaymentItem)
   const ctaLabel =
     isMonthlyDueFlow || selectedIsDueItem
       ? `Pay ${formatPeriodCountLabel(dueMonths, activeDueCadence)} dues`
       : paymentPurposeLabel(activePaymentItem) === 'fine'
         ? 'Pay fine'
-        : paymentPurposeLabel(activePaymentItem) === 'event contribution'
-          ? 'Pay event contribution'
-          : paymentPurposeLabel(activePaymentItem) === 'treasury top-up'
-            ? 'Top up treasury'
-            : 'Contribute'
+        : paymentPurposeLabel(activePaymentItem) === 'collection'
+          ? 'Contribute to Collection'
+          : paymentPurposeLabel(activePaymentItem) === 'shared fund'
+            ? 'Add to Shared Fund'
+            : 'Pay now'
   const sourceWalletBalanceValue = Number(profileRoot?.wallet?.available_balance ?? profileRoot?.wallet?.balance ?? 0)
   const sourceWalletBalanceLabel = profileRoot?.wallet
     ? moneyFormat(Number.isFinite(sourceWalletBalanceValue) ? sourceWalletBalanceValue : 0)
@@ -288,6 +299,37 @@ const CircleFundScreen = () => {
     }
   }, [quantityAmountCents, selectedIsQuantityItem])
 
+  useEffect(() => {
+    if (isMonthlyDueFlow || !selectedPaymentItem) return
+
+    if (String(selectedPaymentItem?.checkout_mode || '').toLowerCase() === 'quantity') {
+      setQuantity(1)
+      const unitPrice = Number(
+        selectedPaymentItem?.unit_price_cents || selectedPaymentItem?.amount_cents || selectedPaymentItem?.suggested_amount_cents || 0
+      )
+      setFormData((current) => ({
+        ...current,
+        amount: unitPrice > 0 ? String(unitPrice / 100) : '',
+      }))
+      return
+    }
+
+    if (Number(selectedPaymentItem?.amount_cents || 0) > 0 && selectedPaymentItem?.checkout_mode === 'fixed') {
+      setFormData((current) => ({
+        ...current,
+        amount: String(Number(selectedPaymentItem.amount_cents) / 100),
+      }))
+      return
+    }
+
+    if (Number(selectedPaymentItem?.suggested_amount_cents || 0) > 0) {
+      setFormData((current) => ({
+        ...current,
+        amount: current.amount || String(Number(selectedPaymentItem.suggested_amount_cents) / 100),
+      }))
+    }
+  }, [isMonthlyDueFlow, selectedPaymentItem, selectedPaymentItemKey])
+
   const handleSelectPaymentItem = (item: PaymentItemRecord) => {
     setSelectedPaymentItemKey(String(item.key || item.id || ''))
     setNotice({ message: null, error: false, data: null })
@@ -320,7 +362,7 @@ const CircleFundScreen = () => {
       return
     }
     if (!isMonthlyDueFlow && !selectedPaymentItem) {
-      setNotice({ message: 'Select a payment item first.', error: true, data: null })
+      setNotice({ message: 'Select a money option first.', error: true, data: null })
       return
     }
     if ((isMonthlyDueFlow || selectedIsDueItem) && quotedObligationIds.length === 0) {
@@ -373,7 +415,7 @@ const CircleFundScreen = () => {
         note: formData.description.trim() || undefined,
         circle_due_obligation_id: !isMonthlyDueFlow && !selectedIsDueItem ? dueObligationId || undefined : undefined,
         circle_due_obligation_ids: isMonthlyDueFlow || selectedIsDueItem ? quotedObligationIds : undefined,
-        circle_activity_id: activePaymentItem?.linked_reference_type === 'CircleActivity' ? activePaymentItem?.linked_reference_id : undefined,
+        circle_activity_id: activePaymentItemActivityId || undefined,
         payment_item_quantity: selectedIsQuantityItem ? quantity : undefined,
         payment_item_unit_price_cents: selectedIsQuantityItem ? selectedQuantityUnitPriceCents : undefined,
         payment_purpose:
@@ -458,7 +500,8 @@ const CircleFundScreen = () => {
 
   const preflightRows = [
     { label: 'Circle', value: circleName, emphasis: true },
-    { label: 'Payment item', value: selectedItemTitle || '--' },
+    { label: 'Payment', value: selectedItemTitle || '--' },
+    !isMonthlyDueFlow && selectedPaymentItemIdentity ? { label: 'Item', value: selectedPaymentItemIdentity } : null,
     { label: 'Source', value: selectedSourceLabel },
     { label: 'You pay', value: amountCents > 0 ? moneyFormat(amountCents / 100) : '--' },
     selectedIsQuantityItem ? { label: 'Quantity', value: String(quantity) } : null,
@@ -470,11 +513,12 @@ const CircleFundScreen = () => {
 
   const completionRows = [
     { label: 'Circle', value: circleName, emphasis: true },
-    { label: 'Payment item', value: selectedItemTitle || '--' },
+    { label: 'Payment', value: selectedItemTitle || '--' },
     { label: 'Source', value: selectedSourceLabel },
     { label: 'Amount paid', value: amountCents > 0 ? moneyFormat(amountCents / 100) : '--' },
     selectedIsQuantityItem ? { label: 'Quantity', value: String(quantity) } : null,
     { label: 'Payment type', value: selectedItemTypeLabel || '--' },
+    !isMonthlyDueFlow && selectedPaymentItemIdentity ? { label: 'Item', value: selectedPaymentItemIdentity } : null,
     successReference ? { label: 'Transaction ID', value: successReference, mono: true } : null,
     successTimestamp ? { label: 'Timestamp', value: formatTime(successTimestamp) } : null,
     { label: 'Status', value: successStatus || 'successful' },
@@ -486,18 +530,21 @@ const CircleFundScreen = () => {
     <View className="flex-1 bg-primary px-4">
       <KeyboardAvoidWrapper>
         <View className="flex-1 pt-8 gap-4">
+          <TouchableOpacity onPress={() => router.replace(`/circles/${circleId}/pay` as any)} className="self-start rounded-full border border-white/10 bg-white/[0.04] px-4 py-2">
+            <Text className="text-white text-[11px] font-semibold">Back to Payments</Text>
+          </TouchableOpacity>
           {isSuccessState ? (
             <CompletionPanel
-              eyebrow="Circle payment"
-              title="Contribution completed"
-              supportingText={notice.message || 'Your circle contribution has been recorded.'}
+              eyebrow="Money"
+              title="Payment completed"
+              supportingText={notice.message || 'Your payment has been recorded.'}
               primaryLabel="Circle received"
               primaryValue={amountCents > 0 ? moneyFormat(amountCents / 100) : '--'}
               statusLabel="Successful"
               statusTone="success"
               summaryTitle="Payment receipt"
               summaryRows={completionRows}
-              primaryActionLabel={successReference ? 'View receipt' : 'Done'}
+              primaryActionLabel={successReference ? 'View proof' : 'Done'}
               onPrimaryAction={() => {
                 if (successReference) {
                   router.push({ pathname: '/transaction/receipt', params: { reference: successReference } } as any)
@@ -511,8 +558,8 @@ const CircleFundScreen = () => {
           ) : (
             <>
               <View className="rounded-[30px] bg-[#0F1115] px-5 py-5 border border-white/6">
-                <Text className="text-[#D49A3A] text-[10px] uppercase tracking-[3px]">Circle payment</Text>
-                <Text className="text-white text-[28px] font-semibold mt-2">Pay {circleName}</Text>
+                <Text className="text-[#D49A3A] text-[10px] uppercase tracking-[3px]">Money</Text>
+                <Text className="text-white text-[28px] font-semibold mt-2">Pay into {circleName}</Text>
                 {!itemPickerVisible ? (
                   <Text className="text-[#A9AFB8] text-[13px] leading-5 mt-2">
                     {(isMonthlyDueFlow || selectedIsDueItem)
@@ -524,11 +571,11 @@ const CircleFundScreen = () => {
 
               {itemPickerVisible ? (
                 <View className="rounded-[24px] bg-[#16181D] px-4 py-4 border border-white/6">
-                  <Text className="text-white text-base font-semibold">Payment Items</Text>
+                  <Text className="text-white text-base font-semibold">Ways to pay</Text>
                   {paymentItemsLoading ? (
                     <Text className="text-[#A9AFB8] text-xs mt-3">Loading items...</Text>
                   ) : paymentItems.length === 0 ? (
-                    <Text className="text-[#A9AFB8] text-xs mt-3">No configured payment items yet.</Text>
+                    <Text className="text-[#A9AFB8] text-xs mt-3">No money options are open right now.</Text>
                   ) : (
                     <View className="mt-3 gap-3">
                       {paymentItems.map((item) => (
@@ -539,7 +586,7 @@ const CircleFundScreen = () => {
                         >
                           <View className="flex-row items-center justify-between gap-3">
                             <View className="flex-1">
-                              <Text className="text-white text-sm font-semibold">{String(item.title || 'Payment item')}</Text>
+                              <Text className="text-white text-sm font-semibold">{String(item.title || 'Money option')}</Text>
                               <Text className="text-[#A9AFB8] text-[11px] mt-1">
                                 {String(item.checkout_mode === 'recurring'
                                   ? 'Recurring'
@@ -552,6 +599,9 @@ const CircleFundScreen = () => {
                                         : 'Open'
                                 )}{item.due_on ? ` · Next ${formatTime(String(item.due_on))}` : ''}
                               </Text>
+                              {paymentItemIdentityLabel(item) ? (
+                                <Text className="text-[#7B8391] text-[11px] mt-1">{paymentItemIdentityLabel(item)}</Text>
+                              ) : null}
                             </View>
                             <View className="items-end">
                               <View className="rounded-full border border-white/10 bg-white/5 px-2 py-1 mb-2">
@@ -574,7 +624,7 @@ const CircleFundScreen = () => {
                               </Text>
                               <View className="mt-2 rounded-full border border-white/10 bg-white/5 px-3 py-2">
                                 <Text className="text-white text-[11px] font-semibold">
-                                  {item.support_fallback ? 'Top up treasury' : item.is_payable_now === false ? 'Review' : 'Open'}
+                                  {item.support_fallback ? 'Add to Shared Fund' : item.is_payable_now === false ? 'Review' : 'Open'}
                                 </Text>
                               </View>
                             </View>
@@ -593,7 +643,7 @@ const CircleFundScreen = () => {
                   onPress={() => setSelectedPaymentItemKey('')}
                   className="self-start rounded-full border border-white/10 bg-white/5 px-4 py-2"
                 >
-                  <Text className="text-white text-[11px] font-semibold">Choose another item</Text>
+                  <Text className="text-white text-[11px] font-semibold">Choose another option</Text>
                 </TouchableOpacity>
               ) : null}
 

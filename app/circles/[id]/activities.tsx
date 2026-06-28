@@ -1,12 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+﻿import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Text, TouchableOpacity, View } from 'react-native'
-import { useLocalSearchParams } from 'expo-router'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import FormInput from '@/components/FormInput'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
 import Loader from '@/components/Loader'
 import NotificationAlert from '@/components/notification'
-import { createCircleActivity, listCircleActivities } from '@/api/circles'
-import { useAuth } from '@/services/useAuth'
+import { createCircleActivity, listCircleCollections } from '@/api/circles'
 import { buildApiErrorMessage } from '@/utils/apiErrorMessage'
 import moneyFormat from '@/utils/moneyFormat'
 import { getCircleTypeConfig } from '@/utils/circleTypeConfig'
@@ -18,7 +17,7 @@ const extractActivities = (payload: unknown): ActivityRecord[] => {
   if (Array.isArray(payload)) return payload
   if (payload && typeof payload === 'object') {
     const container = payload as Record<string, any>
-    const list = container.data || container.activities || container.items || []
+    const list = container.data || container.collections || container.activities || container.items || []
     return Array.isArray(list) ? list : []
   }
   return []
@@ -30,14 +29,6 @@ const extractCreatedActivity = (payload: unknown): ActivityRecord | null => {
     return (container.activity as ActivityRecord) || null
   }
   return null
-}
-
-const singularLabel = (value: string) => {
-  const clean = String(value || '').trim()
-  if (!clean) return 'Activity'
-  if (clean.endsWith('ies')) return `${clean.slice(0, -3)}y`
-  if (clean.endsWith('s')) return clean.slice(0, -1)
-  return clean
 }
 
 const ActivitiesScreen = () => {
@@ -54,9 +45,33 @@ const ActivitiesScreen = () => {
   const routeTemplateName = Array.isArray(templateName) ? templateName[0] : templateName
   const routeTemplateFrequency = Array.isArray(templateFrequency) ? templateFrequency[0] : templateFrequency
   const circleTypeConfig = getCircleTypeConfig(routeCircleType)
-  const activitySingularLabel = singularLabel(circleTypeConfig.activityLabel)
+  const router = useRouter()
+  const collectionSingularLabel = 'Collection'
+  const ACTIVITY_TYPES = [
+    { value: 'goal', label: 'Goal', helper: 'Raise toward a target' },
+    { value: 'collection', label: 'Collection', helper: 'Collect money for a purpose' },
+    { value: 'campaign', label: 'Campaign', helper: 'Open fundraising drive' },
+  ] as const
 
-  const { onLogout } = useAuth()
+  const inferActivityType = (value?: string | null) => {
+    const text = String(value || '').toLowerCase()
+    if (text.includes('campaign')) return 'campaign'
+    if (/(contribution|support|welfare|collection)/i.test(text)) return 'collection'
+    return 'goal'
+  }
+
+  const resolveActivityType = (item?: ActivityRecord | null) => {
+    const explicitType = String(item?.activity_type || item?.type || '').toLowerCase().trim()
+    if (explicitType) return explicitType
+    return inferActivityType(String(item?.payment_item_kind || item?.name || ''))
+  }
+
+  const activityTypeLabel = (value?: string | null) =>
+    ACTIVITY_TYPES.find((item) => item.value === String(value || '').toLowerCase())?.label || 'Goal'
+
+  const activityTypeHelper = (value?: string | null) =>
+    ACTIVITY_TYPES.find((item) => item.value === String(value || '').toLowerCase())?.helper || ACTIVITY_TYPES[0].helper
+
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [activities, setActivities] = useState<ActivityRecord[]>([])
@@ -64,7 +79,8 @@ const ActivitiesScreen = () => {
     name: '',
     target_amount: '',
     deadline_at: '',
-    contribution_frequency: 'one_time' })
+    contribution_frequency: 'one_time',
+    activity_type: 'goal' })
   const [notice, setNotice] = useState<NoticeState>({
     message: null,
     error: false,
@@ -75,7 +91,7 @@ const ActivitiesScreen = () => {
     setLoading(true)
     setNotice({ message: null, error: false, data: null })
     try {
-      const response = await listCircleActivities(circleId)
+      const response = await listCircleCollections(circleId)
       setActivities(extractActivities(response))
     } catch (error: any) {
       const status = error?.response?.status
@@ -85,12 +101,12 @@ const ActivitiesScreen = () => {
       const message = buildApiErrorMessage({
         status,
         data: error?.response?.data,
-        fallback: error?.message || 'Unable to load activities' })
+        fallback: error?.message || 'Unable to load collections' })
       setNotice({ message, error: true, data: null })
     } finally {
       setLoading(false)
     }
-  }, [circleId, onLogout])
+  }, [circleId])
 
   useEffect(() => {
     loadActivities()
@@ -102,6 +118,7 @@ const ActivitiesScreen = () => {
       ...previous,
       name: String(routeTemplateName),
       contribution_frequency: String(routeTemplateFrequency || previous.contribution_frequency || 'one_time'),
+      activity_type: inferActivityType(routeTemplateName),
     }))
   }, [routeTemplateFrequency, routeTemplateName])
 
@@ -110,7 +127,7 @@ const ActivitiesScreen = () => {
     const name = formData.name.trim()
     const targetAmount = Number(String(formData.target_amount).replace(/[^0-9.]/g, ''))
     if (!name) {
-      setNotice({ message: 'Enter an activity name to continue.', error: true, data: null })
+      setNotice({ message: 'Enter a collection name to continue.', error: true, data: null })
       return
     }
     if (!targetAmount || Number.isNaN(targetAmount)) {
@@ -128,7 +145,8 @@ const ActivitiesScreen = () => {
         name,
         target_amount_cents: Math.round(targetAmount * 100),
         deadline_at: formData.deadline_at,
-        contribution_frequency: formData.contribution_frequency })
+        contribution_frequency: formData.contribution_frequency,
+        activity_type: formData.activity_type })
       const created = extractCreatedActivity(response)
       if (created) {
         setActivities((prev) => [created, ...prev])
@@ -139,8 +157,9 @@ const ActivitiesScreen = () => {
         name: '',
         target_amount: '',
         deadline_at: '',
-        contribution_frequency: 'one_time' })
-      setNotice({ message: 'Activity created.', error: false, data: null })
+        contribution_frequency: 'one_time',
+        activity_type: 'goal' })
+      setNotice({ message: 'Collection created.', error: false, data: null })
     } catch (error: any) {
       const status = error?.response?.status
       if (status === 401) {
@@ -162,10 +181,14 @@ const ActivitiesScreen = () => {
     <View className="flex-1 bg-primary px-4">
       <KeyboardAvoidWrapper>
         <View className="flex-1 pt-10">
-          <Text className="text-white text-2xl mb-2">{circleTypeConfig.activityLabel}</Text>
+          <Text className="text-white text-2xl mb-2">Collections</Text>
           <Text className="text-gray-300 mb-6">
-            {circleTypeConfig.activityHelper}
+            Set up the collection members will see in Money.
           </Text>
+
+          <TouchableOpacity onPress={() => router.replace(`/circles/${circleId}/pay` as any)} className="self-start rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 mb-4">
+            <Text className="text-white text-[11px] font-semibold">Back to Payments</Text>
+          </TouchableOpacity>
 
           <NotificationAlert message={notice.message} data={notice.data} error={notice.error} />
 
@@ -181,6 +204,7 @@ const ActivitiesScreen = () => {
                       ...prev,
                       name: template.name,
                       contribution_frequency: template.contribution_frequency,
+                      activity_type: inferActivityType(template.name),
                     }))
                   }
                   className="rounded-full border border-gray-700 bg-gray-950 px-3 py-2"
@@ -192,28 +216,42 @@ const ActivitiesScreen = () => {
           </View>
 
           <FormInput
-            label={`${activitySingularLabel} name`}
+            label={`${collectionSingularLabel} name`}
             value={formData.name}
-            name="name"
             onChangeText={(text: string) => setFormData({ ...formData, name: text })}
           />
+          <View className="mb-4">
+            <Text className="mb-2 text-sm text-gray-300">Structure</Text>
+            <View className="flex-row flex-wrap gap-2">
+              {ACTIVITY_TYPES.map((option) => {
+                const active = formData.activity_type === option.value
+                return (
+                  <TouchableOpacity
+                    key={option.value}
+                    onPress={() => setFormData({ ...formData, activity_type: option.value })}
+                    className={`rounded-full border px-3 py-2 ${active ? 'border-cyan-400 bg-cyan-400/15' : 'border-gray-700 bg-gray-950'}`}
+                  >
+                    <Text className="text-xs font-semibold text-white">{option.label}</Text>
+                  </TouchableOpacity>
+                )
+              })}
+            </View>
+            <Text className="mt-2 text-xs text-gray-400">{activityTypeHelper(formData.activity_type)}</Text>
+          </View>
           <FormInput
             label="Target amount (NGN)"
             value={formData.target_amount}
-            name="target_amount"
             keyboardType="numeric"
             onChangeText={(text: string) => setFormData({ ...formData, target_amount: text })}
           />
           <FormInput
             label="Deadline (YYYY-MM-DD)"
             value={formData.deadline_at}
-            name="deadline_at"
             onChangeText={(text: string) => setFormData({ ...formData, deadline_at: text })}
           />
           <FormInput
             label="Frequency (one_time, weekly, monthly)"
             value={formData.contribution_frequency}
-            name="contribution_frequency"
             onChangeText={(text: string) =>
               setFormData({ ...formData, contribution_frequency: text })
             }
@@ -224,14 +262,14 @@ const ActivitiesScreen = () => {
             className={`${submitting ? 'bg-gray-700' : 'bg-theme-primary'} py-5 rounded-xl`}
             disabled={submitting}
           >
-            <Text className="text-alt font-medium text-center">Create {activitySingularLabel.toLowerCase()}</Text>
+            <Text className="text-alt font-medium text-center">Create {collectionSingularLabel.toLowerCase()}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             onPress={loadActivities}
             className="bg-gray-900 py-4 mt-4 rounded-xl"
           >
-            <Text className="text-white text-center">Refresh {circleTypeConfig.activityLabel}</Text>
+            <Text className="text-white text-center">Refresh collections</Text>
           </TouchableOpacity>
 
           {emptyState ? (
@@ -247,13 +285,15 @@ const ActivitiesScreen = () => {
                 const status = item?.status || 'active'
                 const freq = item?.contribution_frequency || 'one_time'
                 const deadline = item?.deadline_at || item?.created_at || ''
+                const activityType = resolveActivityType(item)
                 const pct = target > 0 ? Math.min(100, (raised / target) * 100) : 0
                 return (
                   <View key={key} className="bg-gray-900 p-4 rounded-xl mb-3">
                     <View className="flex-row items-center justify-between">
-                      <Text className="text-white text-sm font-semibold">{item?.name || 'Activity'}</Text>
+                      <Text className="text-white text-sm font-semibold">{item?.name || 'Collection'}</Text>
                       <Text className="text-gray-300 text-xs uppercase">{status}</Text>
                     </View>
+                    <Text className="text-gray-500 text-[10px] mt-1">{activityTypeLabel(activityType)}</Text>
                     <Text className="text-gray-400 text-xs mt-1">
                       {moneyFormat(raised)} raised of {moneyFormat(target)}
                     </Text>

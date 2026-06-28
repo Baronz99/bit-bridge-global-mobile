@@ -30,6 +30,7 @@ type WorkspaceSwitcherModalProps = {
   accountHydrated: boolean
   businessLoading: boolean
   circlesLoading: boolean
+  circlesError?: string | null
   businessAccounts: WorkspaceBusiness[]
   circleAccounts: WorkspaceCircle[]
   selectedBusinessName?: string | null
@@ -57,6 +58,7 @@ export default function WorkspaceSwitcherModal({
   accountHydrated,
   businessLoading,
   circlesLoading,
+  circlesError,
   businessAccounts,
   circleAccounts,
   onSelectPersonal,
@@ -216,7 +218,11 @@ export default function WorkspaceSwitcherModal({
 
           <View>
             <Text className="mb-2 text-[11px] uppercase tracking-[0.18em] text-slate-500">Groups</Text>
-            {circleItems.length ? (
+            {circlesLoading ? (
+              <Text className="px-3 py-2 text-sm text-slate-400">Loading groups...</Text>
+            ) : circlesError ? (
+              <Text className="px-3 py-2 text-sm text-rose-300">{circlesError}</Text>
+            ) : circleItems.length ? (
               <View className="gap-1">
                 {circleItems.map((item) => renderRow({ item, highlighted: item.active }))}
               </View>

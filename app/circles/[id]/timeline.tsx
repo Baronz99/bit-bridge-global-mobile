@@ -5,39 +5,76 @@ import { useFocusEffect } from '@react-navigation/native'
 import { getCircleWorkspace } from '@/api/circles'
 import {
   CircleShell,
-  TimelineFeed,
   circleBucketLabel,
   circleTitle,
+  groupCircleActivityRecords,
 } from '@/components/circles/rebuild'
 import { extractCircleRecentActivity } from '@/utils/circleWorkspace'
 import { decideHomeNavigation } from '@/utils/timelineRefs'
 import { getCircleRoleLabel } from '@/utils/circleRoleLabel'
+import { canAccessManageCircle, canViewSharedFundTab } from '@/utils/circleWorkspace'
 import { replaceCircleWorkspaceSection } from '@/utils/circleWorkspaceNav'
+import { RecentRecords } from '@/components/circles/rebuild'
+import {
+  DEFAULT_CIRCLE_SCREEN_CACHE_TTL_MS,
+  isCircleScreenCacheFresh,
+  readCircleScreenCache,
+  writeCircleScreenCache,
+} from '@/utils/circleScreenCache'
+import { useEffect } from 'react'
+
+type CircleWorkspaceRecord = Record<string, unknown>
+type CircleActivityRecord = Record<string, unknown>
+type CircleTimelineCache = {
+  workspace: CircleWorkspaceRecord | null
+}
 
 const CircleTimelineScreen = () => {
   const { id } = useLocalSearchParams<{ id?: string | string[] }>()
   const circleId = Array.isArray(id) ? id[0] : id
+  const cacheKey = circleId ? `circle-timeline:${circleId}` : ''
+  const cachedTimeline = circleId ? readCircleScreenCache<CircleTimelineCache>(cacheKey)?.data ?? null : null
   const router = useRouter()
-  const [workspace, setWorkspace] = useState<Record<string, any> | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [workspace, setWorkspace] = useState<CircleWorkspaceRecord | null>(() => cachedTimeline?.workspace ?? null)
+  const [loading, setLoading] = useState(() => !cachedTimeline)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
 
+  const applyTimelinePayload = useCallback((payload: CircleTimelineCache) => {
+    setWorkspace(payload.workspace)
+  }, [])
+
+  useEffect(() => {
+    const nextCachedTimeline = circleId ? readCircleScreenCache<CircleTimelineCache>(cacheKey)?.data ?? null : null
+    setWorkspace(nextCachedTimeline?.workspace ?? null)
+    setLoading(!nextCachedTimeline)
+    setRefreshing(false)
+    setError('')
+  }, [cacheKey, circleId])
+
   const loadTimeline = useCallback(async (isRefresh = false) => {
     if (!circleId) return
+    const cached = readCircleScreenCache<CircleTimelineCache>(cacheKey)
+    const hasVisibleData = Boolean(workspace || cached?.data.workspace)
     if (isRefresh) setRefreshing(true)
-    else setLoading(true)
+    else if (!hasVisibleData) setLoading(true)
     setError('')
     try {
+      if (!isRefresh && cached?.data && isCircleScreenCacheFresh(cacheKey, DEFAULT_CIRCLE_SCREEN_CACHE_TTL_MS)) {
+        if (!workspace) applyTimelinePayload(cached.data)
+        return
+      }
       const response = await getCircleWorkspace(circleId)
-      setWorkspace(response || {})
-    } catch (_) {
+      const nextPayload: CircleTimelineCache = { workspace: response || {} }
+      applyTimelinePayload(nextPayload)
+      writeCircleScreenCache(cacheKey, nextPayload)
+    } catch {
       setError('Unable to load this circle timeline right now.')
     } finally {
       if (isRefresh) setRefreshing(false)
       else setLoading(false)
     }
-  }, [circleId])
+  }, [applyTimelinePayload, cacheKey, circleId, workspace])
 
   useFocusEffect(
     useCallback(() => {
@@ -46,15 +83,18 @@ const CircleTimelineScreen = () => {
   )
 
   const records = useMemo(() => extractCircleRecentActivity(workspace), [workspace])
+  const groupedRecords = useMemo(() => groupCircleActivityRecords(records), [records])
+  const showAdminTab = canAccessManageCircle(workspace)
+  const showTreasuryTab = canViewSharedFundTab(workspace)
 
   const handleRecordPress = useCallback(
-    (record: Record<string, any>) => {
+    (record: CircleActivityRecord) => {
       const decision = decideHomeNavigation(record)
       if (decision.type === 'receipt') {
         router.push({
           pathname: '/transaction/receipt',
           params: { reference: decision.reference },
-        } as any)
+        } as never)
         return
       }
 
@@ -62,11 +102,11 @@ const CircleTimelineScreen = () => {
         router.push({
           pathname: '/circles/[id]/timeline/[eventId]',
           params: { id: String(circleId), eventId: decision.id },
-        } as any)
+        } as never)
         return
       }
 
-      router.replace(`/circles/${circleId}/timeline` as any)
+      router.replace(`/circles/${circleId}/timeline` as never)
     },
     [circleId, router]
   )
@@ -101,33 +141,54 @@ const CircleTimelineScreen = () => {
       <CircleShell
         circleId={String(circleId)}
         title={circleTitle(workspace)}
+        logoUrl={String(workspace?.logo_url || '')}
         roleLabel={getCircleRoleLabel(workspace)}
         bucketLabel={circleBucketLabel(workspace)}
         active="timeline"
+        showAdminTab={showAdminTab}
         onHome={() => replaceCircleWorkspaceSection(router, String(circleId), 'home')}
         onPay={() => replaceCircleWorkspaceSection(router, String(circleId), 'pay')}
-        onManage={() => replaceCircleWorkspaceSection(router, String(circleId), 'manage')}
+        onManage={() => router.push(`/circles/${circleId}/members` as never)}
+        onTreasury={() => router.push(`/circles/${circleId}/treasury` as never)}
         onTimeline={() => replaceCircleWorkspaceSection(router, String(circleId), 'timeline')}
+        showTreasuryTab={showTreasuryTab}
       >
-        <ScrollView
-          className="flex-1"
-          contentContainerStyle={{ paddingBottom: 32, gap: 16 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadTimeline(true)} />}
-        >
-          <View className="rounded-[28px] border border-gray-900 bg-[#050b1b] px-5 py-5">
-            <Text className="text-[11px] uppercase tracking-[2px] text-gray-500">Timeline</Text>
-            <Text className="mt-2 text-xl font-semibold text-white">
-              {records.length} recorded update{records.length === 1 ? '' : 's'}
-            </Text>
-            <Text className="mt-2 text-sm text-gray-400">
-              Every dues payment, contribution, fine, and treasury update in one record.
-            </Text>
-            <TouchableOpacity onPress={() => router.push(`/circles/${circleId}/pay` as any)} className="mt-5 rounded-2xl bg-cyan-400 px-4 py-4">
-              <Text className="text-center text-sm font-semibold text-slate-950">Open payments</Text>
-            </TouchableOpacity>
+        <View className="flex-1 gap-3">
+          <Text className="text-[11px] uppercase tracking-[2px] text-gray-500">
+            {records.length} group update{records.length === 1 ? '' : 's'}
+          </Text>
+          <View className="flex-1 rounded-[28px] border border-gray-900 bg-[#050b1b] px-5 py-5">
+            {records.length === 0 ? (
+              <View className="rounded-2xl border border-dashed border-gray-800 px-4 py-4">
+                <Text className="text-sm text-gray-400">No group activity yet. Payments, requests, and updates will appear here.</Text>
+              </View>
+            ) : (
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: 12 }}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadTimeline(true)} />}
+              >
+                {groupedRecords.map((section, index) => {
+                  const firstRecord = section.data[0]
+                  const sectionKey = String(
+                    firstRecord?.id ||
+                      firstRecord?.reference ||
+                      firstRecord?.occurred_at ||
+                      firstRecord?.created_at ||
+                      `${section.title}-${index}`
+                  )
+
+                  return (
+                    <View key={sectionKey} className="mb-6">
+                      <Text className="mb-3 text-sm font-semibold text-gray-300">{section.title}</Text>
+                      <RecentRecords records={section.data} onSelectRecord={handleRecordPress} framed={false} />
+                    </View>
+                  )
+                })}
+              </ScrollView>
+            )}
           </View>
-          <TimelineFeed records={records} onSelectRecord={handleRecordPress} />
-        </ScrollView>
+        </View>
       </CircleShell>
     </>
   )
