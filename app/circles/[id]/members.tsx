@@ -16,6 +16,7 @@ import NotificationAlert from '@/components/notification'
 import {
   createCirclePerson,
   getCircle,
+  getCircleWorkspace,
   getCircleDuePlan,
   listCirclePeople,
   listCircleDueObligations,
@@ -760,16 +761,33 @@ const CircleMembersScreen = () => {
           return
         }
         const allowPeopleFailure = options?.allowPeopleFailure ?? mode === 'initial'
-        const [circleResponse, peopleResponse] = await Promise.all([
-          getCircle(circleId),
+        const cachedPayload = asRecord(cached?.data?.payload)
+        const [circleResponse, workspaceResponse, peopleResponse] = await Promise.all([
+          getCircle(circleId).catch(() => null),
+          getCircleWorkspace(circleId).catch(() => null),
           allowPeopleFailure ? listCirclePeople(circleId).catch(() => null) : listCirclePeople(circleId),
         ])
         const [duePlanResponse, dueObligationsResponse] = await Promise.all([
           getCircleDuePlan(circleId).catch(() => null),
           listCircleDueObligations(circleId).catch(() => null),
         ])
+        const primaryPayload = asRecord(circleResponse?.data ?? circleResponse)
+        const workspacePayload = asRecord(workspaceResponse)
+        const mergedPayload = {
+          ...cachedPayload,
+          ...workspacePayload,
+          ...primaryPayload,
+          name: String(primaryPayload?.name || workspacePayload?.name || cachedPayload?.name || '').trim(),
+          current_user_role: String(primaryPayload?.current_user_role || workspacePayload?.current_user_role || cachedPayload?.current_user_role || '').trim(),
+          permissions: {
+            ...asRecord(cachedPayload?.permissions),
+            ...asRecord(workspacePayload?.permissions),
+            ...asRecord(primaryPayload?.permissions),
+          },
+          members: getArray(primaryPayload?.members).length ? getArray(primaryPayload.members) : getArray(cachedPayload?.members),
+        }
         const nextPayload: CircleMembersCache = {
-          payload: asRecord(circleResponse?.data ?? circleResponse),
+          payload: mergedPayload,
           peoplePayload: asRecord(peopleResponse?.data ?? peopleResponse),
           duePlanPayload: asRecord(duePlanResponse?.data ?? duePlanResponse),
           dueObligationsPayload: getArray(dueObligationsResponse?.data ?? dueObligationsResponse).map(asRecord),
@@ -813,7 +831,7 @@ const CircleMembersScreen = () => {
     }, [loadMembers])
   )
 
-  const title = String(payload?.name || payload?.title || 'People')
+  const title = String(payload?.name || payload?.circle_name || payload?.title || 'People')
   const members = useMemo(() => getArray(payload?.members) as MemberRecord[], [payload])
   const people = useMemo(() => getArray(peoplePayload?.people).map(asPersonRecord), [peoplePayload])
   const memberLabelByUserId = useMemo(() => {
@@ -826,7 +844,7 @@ const CircleMembersScreen = () => {
     return lookup
   }, [members])
   const permissions = asRecord(payload?.permissions)
-  const currentRole = String(payload?.current_user_role || '').toLowerCase()
+  const currentRole = String(payload?.current_user_role || payload?.role || '').toLowerCase()
   const canManageMembers = Boolean(
     permissions.can_manage_members ||
       permissions.can_invite_members ||

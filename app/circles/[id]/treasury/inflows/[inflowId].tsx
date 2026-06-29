@@ -54,6 +54,7 @@ const CircleTreasuryInflowDetailScreen = () => {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
+  const [workspaceError, setWorkspaceError] = useState('')
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false)
 
   const loadDetail = useCallback(async (isRefresh = false, options?: { background?: boolean }) => {
@@ -61,23 +62,39 @@ const CircleTreasuryInflowDetailScreen = () => {
     if (isRefresh) setRefreshing(true)
     else if (!(options?.background && hasLoadedOnce)) setLoading(true)
     setError('')
+    setWorkspaceError('')
     try {
-      const [workspaceResponse, inflowResponse] = await Promise.all([
+      const [workspaceResult, inflowResult] = await Promise.allSettled([
         getCircleWorkspace(circleId),
         getCircleTreasuryInflow(circleId, resolvedInflowId),
       ])
 
-      setWorkspace(workspaceResponse || {})
-      setInflow(asRecord(inflowResponse?.data || inflowResponse))
-      setHasLoadedOnce(true)
-    } catch (requestError: any) {
-      setError(
-        buildApiErrorMessage({
-          status: requestError?.response?.status,
-          data: requestError?.response?.data,
-          fallback: 'Unable to load inflow review details right now.',
-        })
-      )
+      if (workspaceResult.status === 'fulfilled') {
+        setWorkspace(workspaceResult.value || {})
+      } else {
+        const workspaceFailure: any = workspaceResult.reason
+        setWorkspaceError(
+          buildApiErrorMessage({
+            status: workspaceFailure?.response?.status,
+            data: workspaceFailure?.response?.data,
+            fallback: 'Unable to load this circle right now.',
+          })
+        )
+      }
+
+      if (inflowResult.status === 'fulfilled') {
+        setInflow(asRecord(inflowResult.value?.data || inflowResult.value))
+        setHasLoadedOnce(true)
+      } else {
+        const inflowFailure: any = inflowResult.reason
+        setError(
+          buildApiErrorMessage({
+            status: inflowFailure?.response?.status,
+            data: inflowFailure?.response?.data,
+            fallback: 'Unable to load inflow review details right now.',
+          })
+        )
+      }
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -133,10 +150,10 @@ const CircleTreasuryInflowDetailScreen = () => {
     )
   }
 
-  if (error && !workspace) {
+  if ((error || workspaceError) && !workspace) {
     return (
       <View className="flex-1 items-center justify-center bg-[#020712] px-6">
-        <Text className="text-center text-sm text-red-300">{error}</Text>
+        <Text className="text-center text-sm text-red-300">{workspaceError || error}</Text>
       </View>
     )
   }
@@ -178,6 +195,12 @@ const CircleTreasuryInflowDetailScreen = () => {
               <Text className="text-white text-[11px] font-semibold">Back to queue</Text>
             </TouchableOpacity>
           </View>
+
+          {workspaceError ? (
+            <View className="rounded-[28px] border border-amber-400/20 bg-amber-400/10 px-5 py-5">
+              <Text className="text-sm text-amber-100">{workspaceError}</Text>
+            </View>
+          ) : null}
 
           {error ? (
             <View className="rounded-[28px] border border-red-400/20 bg-red-400/10 px-5 py-5">

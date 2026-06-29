@@ -57,12 +57,22 @@ export const getCircleWorkspace = async (
   id: string | number,
   params?: CircleRecord
 ): Promise<any> => {
-  const [circleResponse, contextResponse, settingsResponse] = await Promise.all([
-    getCircle(id).catch(() => null),
-    getCircleContext(id, params).catch(() => null),
-    getCircleSettings(id).catch(() => null),
+  const [circleResult, contextResult, settingsResult, treasuryResult] = await Promise.allSettled([
+    getCircle(id),
+    getCircleContext(id, params),
+    getCircleSettings(id),
+    getCircleTreasury(id),
   ])
-  const treasuryResponse = await getCircleTreasury(id).catch(() => null)
+
+  const circleResponse = circleResult.status === 'fulfilled' ? circleResult.value : null
+  const contextResponse = contextResult.status === 'fulfilled' ? contextResult.value : null
+  const settingsResponse = settingsResult.status === 'fulfilled' ? settingsResult.value : null
+  const treasuryResponse = treasuryResult.status === 'fulfilled' ? treasuryResult.value : null
+
+  if (!circleResponse && !contextResponse) {
+    const primaryFailure = circleResult.status === 'rejected' ? circleResult.reason : contextResult.status === 'rejected' ? contextResult.reason : null
+    throw primaryFailure || new Error('Unable to load circle workspace')
+  }
 
   return normalizeCircleWorkspace({
     circlePayload: circleResponse,

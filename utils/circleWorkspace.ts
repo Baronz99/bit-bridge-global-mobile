@@ -13,6 +13,22 @@ const pickFirstString = (...values: unknown[]) => {
   return ''
 }
 
+const pickFirstFiniteNumber = (...values: unknown[]) => {
+  for (const value of values) {
+    const parsed = Number(value)
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return null
+}
+
+const resolveCircleRole = (sources: Array<Record<string, any>>) => {
+  for (const source of sources) {
+    const role = pickFirstString(source.current_user_role, source.membership_role, source.role)
+    if (role) return role.toLowerCase()
+  }
+  return 'member'
+}
+
 export const canAccessManageCircle = (workspace: Record<string, any> | null | undefined) => {
   const root = asObject(workspace)
   const permissions = asObject(root.permissions)
@@ -361,8 +377,29 @@ export const normalizeCircleWorkspace = ({
   const settings = extractCirclePayload(settingsPayload)
   const settingsIdentity = asObject(settings.identity)
   const balance = asObject(context.balance)
+  const circlePermissions = asObject(circle.permissions)
   const permissions = asObject(context.permissions)
   const approvals = asObject(context.approvals)
+  const resolvedRole = resolveCircleRole([circle, context.circle, settings])
+  const resolvedName = pickFirstString(
+    circle.name,
+    context.circle.name,
+    circle.title,
+    context.circle.title,
+    circle.circle_name,
+    context.circle.circle_name,
+    settings.name,
+    settings.title
+  )
+  const resolvedMemberCount =
+    pickFirstFiniteNumber(
+      circle.member_count,
+      context.circle.member_count,
+      circle.members_count,
+      context.circle.members_count,
+      Array.isArray(circle.members) ? circle.members.length : null,
+      Array.isArray(context.circle.members) ? context.circle.members.length : null
+    ) ?? 0
   const circleOsEnabled = context.circle_os_enabled === true && Object.keys(context.circle_os).length > 0
   const duesSummary = Object.keys(asObject(context.dues_summary)).length
     ? context.dues_summary
@@ -403,6 +440,9 @@ export const normalizeCircleWorkspace = ({
   return {
     ...circle,
     ...context.circle,
+    name: resolvedName || 'Circle',
+    title: resolvedName || 'Circle',
+    circle_name: resolvedName || 'Circle',
     logo_url: resolvedLogoUrl,
     logo_attached:
       circle.logo_attached != null
@@ -410,20 +450,9 @@ export const normalizeCircleWorkspace = ({
         : context.circle.logo_attached != null
           ? Boolean(context.circle.logo_attached)
           : Boolean(resolvedLogoUrl),
-    current_user_role:
-      context.circle.role ||
-      circle.current_user_role ||
-      circle.membership_role ||
-      circle.role ||
-      'member',
-    role:
-      context.circle.role ||
-      circle.role ||
-      circle.current_user_role ||
-      circle.membership_role ||
-      'member',
-    member_count:
-      Number(context.circle.member_count || circle.member_count || circle.members_count || 0) || 0,
+    current_user_role: resolvedRole,
+    role: resolvedRole,
+    member_count: resolvedMemberCount,
     balance_cents: resolvedBalanceCents,
     treasury_balance_cents: treasuryBalanceCents,
     circle_balance_cents: circleBalanceCents,
@@ -446,14 +475,10 @@ export const normalizeCircleWorkspace = ({
       treasury_balance_cents: treasuryBalanceCents,
       balance_cents: resolvedBalanceCents,
       recent_activity: {
-      ...context.recent_activity,
-      items: recentItems,
-    },
-    recent_dues_activity: {
-      ...context.recent_dues_activity,
-      items: recentDuesItems,
-    },
-    recent_transactions: recentItems,
+        ...context.recent_activity,
+        items: recentItems,
+      },
+      recent_transactions: recentItems,
     }),
     balance_visible: balance.visible != null ? Boolean(balance.visible) : circle.balance_visible !== false,
     withdrawal_requires_approval: Boolean(
@@ -461,16 +486,16 @@ export const normalizeCircleWorkspace = ({
     ),
     permissions: {
       can_contribute: permissions.can_contribute !== false,
-      can_pay_dues: Boolean(permissions.can_pay_dues),
-      can_manage_due_plan: Boolean(permissions.can_manage_due_plan),
-      can_withdraw: Boolean(permissions.can_withdraw ?? circle.can_withdraw),
-      can_approve_withdrawals: Boolean(permissions.can_approve_withdrawals),
-      can_invite_members: Boolean(permissions.can_invite_members ?? circle.can_invite),
-      can_manage_members: Boolean(permissions.can_manage_members ?? circle.can_invite),
-      can_assign_admin: Boolean(permissions.can_assign_admin ?? circle.can_assign_admin),
-      can_manage_settings: Boolean(permissions.can_manage_settings ?? circle.can_assign_admin),
-      can_manage_governance: Boolean(permissions.can_manage_governance ?? circle.can_assign_admin),
-      can_view_reports: Boolean(permissions.can_view_reports),
+      can_pay_dues: Boolean(permissions.can_pay_dues ?? circlePermissions.can_pay_dues),
+      can_manage_due_plan: Boolean(permissions.can_manage_due_plan ?? circlePermissions.can_manage_due_plan ?? (resolvedRole === 'owner' || resolvedRole === 'admin')),
+      can_withdraw: Boolean(permissions.can_withdraw ?? circlePermissions.can_withdraw ?? circle.can_withdraw),
+      can_approve_withdrawals: Boolean(permissions.can_approve_withdrawals ?? circlePermissions.can_approve_withdrawals ?? (resolvedRole === 'owner' || resolvedRole === 'admin' || resolvedRole === 'treasurer')),
+      can_invite_members: Boolean(permissions.can_invite_members ?? circlePermissions.can_invite_members ?? circle.can_invite ?? (resolvedRole === 'owner' || resolvedRole === 'admin')),
+      can_manage_members: Boolean(permissions.can_manage_members ?? circlePermissions.can_manage_members ?? circle.can_invite ?? (resolvedRole === 'owner' || resolvedRole === 'admin')),
+      can_assign_admin: Boolean(permissions.can_assign_admin ?? circlePermissions.can_assign_admin ?? circle.can_assign_admin ?? (resolvedRole === 'owner')),
+      can_manage_settings: Boolean(permissions.can_manage_settings ?? circlePermissions.can_manage_settings ?? circle.can_assign_admin ?? (resolvedRole === 'owner' || resolvedRole === 'admin')),
+      can_manage_governance: Boolean(permissions.can_manage_governance ?? circlePermissions.can_manage_governance ?? circle.can_assign_admin ?? (resolvedRole === 'owner' || resolvedRole === 'admin')),
+      can_view_reports: Boolean(permissions.can_view_reports ?? circlePermissions.can_view_reports),
       can_view_balance: balance.visible != null ? Boolean(balance.visible) : circle.balance_visible !== false,
     },
     dues_summary: duesSummary,

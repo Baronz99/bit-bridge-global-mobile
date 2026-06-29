@@ -168,30 +168,41 @@ const CircleHomeScreen = () => {
     if (!circleId) return
     const cached = readCircleScreenCache<CircleHomeCache>(cacheKey)
     const hasVisibleData = Boolean(workspace || cached?.data.workspace)
+    const cacheIsFresh = Boolean(cached?.data && isCircleScreenCacheFresh(cacheKey, DEFAULT_CIRCLE_SCREEN_CACHE_TTL_MS))
+
+    if (!isRefresh && cacheIsFresh && !workspace) {
+      applyHomePayload(cached.data)
+    }
+
     if (isRefresh) setRefreshing(true)
-    else if (!hasVisibleData) setLoading(true)
+    else if (!hasVisibleData && !cacheIsFresh) setLoading(true)
     setError('')
     try {
-      if (!isRefresh && cached?.data && isCircleScreenCacheFresh(cacheKey, DEFAULT_CIRCLE_SCREEN_CACHE_TTL_MS)) {
-        if (!workspace) applyHomePayload(cached.data)
-        return
-      }
-      const [workspaceResponse, paymentItemsResponse, summaryResponse] = await Promise.all([
+      const [workspaceResult, paymentItemsResult, summaryResult] = await Promise.allSettled([
         getCircleWorkspace(circleId),
         getCirclePaymentItems(circleId),
-        getCircleDuePlanSummary(circleId).catch(() => null),
+        getCircleDuePlanSummary(circleId),
       ])
-      const ws = workspaceResponse || {}
+
+      if (workspaceResult.status !== 'fulfilled') {
+        throw workspaceResult.reason
+      }
+
+      const ws = workspaceResult.value || {}
+      const paymentItemsResponse = paymentItemsResult.status === 'fulfilled' ? paymentItemsResult.value : null
+      const summaryResponse = summaryResult.status === 'fulfilled' ? summaryResult.value : null
       const nextPayload: CircleHomeCache = {
         workspace: ws,
         circleLogoUrl: String(ws?.logo_url || '').trim(),
-        paymentItems: normalizePaymentItems(paymentItemsResponse),
+        paymentItems: paymentItemsResponse ? normalizePaymentItems(paymentItemsResponse) : [],
         dueSummary: summaryResponse?.data && typeof summaryResponse.data === 'object' ? summaryResponse.data : summaryResponse || {},
       }
       applyHomePayload(nextPayload)
       writeCircleScreenCache(cacheKey, nextPayload)
     } catch {
-      setError('Unable to load this circle right now.')
+      if (!hasVisibleData && !cacheIsFresh) {
+        setError('Unable to load this circle right now.')
+      }
     } finally {
       if (isRefresh) setRefreshing(false)
       else setLoading(false)
