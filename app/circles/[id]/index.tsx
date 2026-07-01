@@ -529,14 +529,14 @@ const CircleHomeScreen = () => {
 
           <CommandSection
             title="Records"
-            helper="Review money flow summary and export dues or record CSVs."
+            helper="Review money flow summary, formal statements, and record exports."
             actionLabel="Open"
             onAction={() => router.push(`/circles/${circleId}/audit` as never)}
           >
             <StateRow
-              title="Audit summary and exports"
+              title="Summary, statements, and exports"
               value="Open records"
-              helper="CSV exports live here for members with access."
+              helper="Formal treasury statements and CSV exports live here for members with access."
               tone="info"
               onPress={() => router.push(`/circles/${circleId}/audit` as never)}
             />

@@ -35,6 +35,21 @@ export type CircleTreasuryInflowListParams = {
   reconciliation_state?: 'all' | 'assigned' | 'unassigned'
 }
 
+export type CircleStatementRangeKey =
+  | 'this_month'
+  | 'last_month'
+  | 'year_to_date'
+  | 'last_12_months'
+  | 'all_time'
+  | 'custom'
+
+export type CircleStatementPayload = {
+  range_key?: CircleStatementRangeKey
+  output_format?: 'pdf' | 'csv'
+  date_from?: string
+  date_to?: string
+}
+
 export const listCircles = async (): Promise<any> => {
   const res = await client.get('/circles')
   return res.data
@@ -418,6 +433,27 @@ export const updateCircleActivity = async (
 
 export const getCircleAuditSummary = async (id: string | number): Promise<any> => {
   const res = await client.get(`/circles/${id}/audit_summary`)
+  return res.data
+}
+
+export const listCircleStatements = async (id: string | number): Promise<any> => {
+  const res = await client.get(`/circles/${id}/statements`)
+  return res.data
+}
+
+export const createCircleStatement = async (
+  id: string | number,
+  payload: CircleStatementPayload
+): Promise<any> => {
+  const res = await client.post(`/circles/${id}/statements`, payload)
+  return res.data
+}
+
+export const getCircleStatement = async (
+  id: string | number,
+  statementId: string | number
+): Promise<any> => {
+  const res = await client.get(`/circles/${id}/statements/${statementId}`)
   return res.data
 }
 
