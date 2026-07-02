@@ -1,7 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import DateTimePicker from '@react-native-community/datetimepicker'
-import { Linking, Platform, ScrollView, Text, TouchableOpacity, View } from 'react-native'
+import * as FileSystem from 'expo-file-system/legacy'
+import { Linking, Platform, ScrollView, Share, Text, TouchableOpacity, View } from 'react-native'
 import { useLocalSearchParams } from 'expo-router'
+import APP_CONFIG from '@/api/baseUrl'
+import { getStoredAccessToken } from '@/api/client'
 import Loader from '@/components/Loader'
 import NotificationAlert from '@/components/notification'
 import { createCircleStatement, exportCircleCsv, getCircleAuditSummary, listCircleStatements } from '@/api/circles'
@@ -100,6 +103,43 @@ const dayDifference = (from: string, to: string) => {
   return Math.floor((toDate.getTime() - fromDate.getTime()) / 86_400_000)
 }
 
+
+const sanitizeFilenamePart = (value?: string | null) =>
+  String(value || 'circle-statement')
+    .replace(/[^a-z0-9_-]+/gi, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .toLowerCase() || 'circle-statement'
+
+const statementDownloadFilename = (statement: CircleStatementRecord) => {
+  const extension = String(statement?.output_format || 'pdf').toLowerCase() === 'csv' ? 'csv' : 'pdf'
+  const reference = sanitizeFilenamePart(statement?.reference)
+  return reference + '.' + extension
+}
+
+const safeFilenameBase = (value: string) =>
+  value
+    .trim()
+    .replace(/[\\/:*?"<>|]/g, '-')
+    .replace(/\s+/g, ' ')
+    .replace(/\.+$/g, '')
+    .trim()
+
+const openDownloadedStatement = async (uri: string) => {
+  if (Platform.OS === 'ios') {
+    await Share.share({ url: uri, title: 'Circle statement' })
+    return
+  }
+
+  if (Platform.OS === 'android') {
+    const contentUri = await FileSystem.getContentUriAsync(uri)
+    await Linking.openURL(contentUri)
+    return
+  }
+
+  await Linking.openURL(uri)
+}
+
 const AuditMetric = ({ label, value, tone = 'default' }: { label: string; value: string; tone?: 'default' | 'good' | 'warn' }) => {
   const toneClass = tone === 'good' ? 'text-emerald-300' : tone === 'warn' ? 'text-amber-200' : 'text-white'
   return (
@@ -125,6 +165,7 @@ const AuditSummaryScreen = () => {
   const circleId = Array.isArray(id) ? id[0] : id
   const [loading, setLoading] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const [exportingDues, setExportingDues] = useState(false)
   const [summary, setSummary] = useState<AuditSummaryRecord | null>(null)
   const [notice, setNotice] = useState<NoticeState>({ message: null, error: false, data: null })
   const [forbidden, setForbidden] = useState(false)
@@ -267,6 +308,58 @@ const AuditSummaryScreen = () => {
     }
   }
 
+  const handleExportDuesStatement = async () => {
+    if (!circleId || forbidden) return
+
+    setExportingDues(true)
+    setNotice({ message: null, error: false, data: null })
+
+    try {
+      const accessToken = await getStoredAccessToken()
+      if (!accessToken) throw new Error('Your session expired. Please sign in again.')
+
+      const localBaseDir = FileSystem.cacheDirectory || FileSystem.documentDirectory
+      if (!localBaseDir) throw new Error('No local directory available for downloads')
+
+      const filename = `${safeFilenameBase(`circle-${circleId}-dues-statement`) || `circle-${circleId}-dues-statement`}.pdf`
+      const fileUri = localBaseDir + filename
+      const downloadUrl = `${String(APP_CONFIG.api_base_url || '').replace(/\/+$/, '')}/circles/${circleId}/dues_statement_pdf`
+
+      const downloaded = await FileSystem.downloadAsync(downloadUrl, fileUri, {
+        headers: {
+          Accept: 'application/pdf',
+          Authorization: `Bearer ${accessToken}`,
+        },
+      })
+
+      if (downloaded.status !== 200) {
+        throw new Error(`Unable to download dues statement (${downloaded.status}).`)
+      }
+
+      await Share.share({
+        title: filename,
+        message: `PDF saved to ${downloaded.uri}`,
+        url: downloaded.uri,
+      })
+
+      setNotice({
+        message: 'Printable dues statement is ready to share or save.',
+        error: false,
+        data: null,
+      })
+    } catch (error) {
+      const err = error as ApiErrorLike
+      const message = buildApiErrorMessage({
+        status: err?.response?.status,
+        data: err?.response?.data,
+        fallback: err?.message || 'Unable to export dues statement',
+      })
+      setNotice({ message, error: true, data: null })
+    } finally {
+      setExportingDues(false)
+    }
+  }
+
   const handleRequestStatement = async () => {
     if (!circleId || forbidden || submitting) return
     if (rangeKey === 'custom') {
@@ -314,14 +407,39 @@ const AuditSummaryScreen = () => {
 
   const handleDownloadStatement = async (statement: CircleStatementRecord) => {
     if (!statement?.download_url) return
+
+    setNotice({ message: 'Preparing your statement download...', error: false, data: null })
+
     try {
-      await Linking.openURL(String(statement.download_url))
-    } catch {
+      const downloadUrl = String(statement.download_url)
+      const localBaseDir = FileSystem.cacheDirectory || FileSystem.documentDirectory
+      if (!localBaseDir) throw new Error('No local directory available for downloads')
+
+      const localUri = localBaseDir + statementDownloadFilename(statement)
+      const downloaded = await FileSystem.downloadAsync(downloadUrl, localUri)
+      await openDownloadedStatement(downloaded.uri)
       setNotice({
-        message: 'Unable to open the statement download right now.',
-        error: true,
+        message: Platform.OS === 'ios'
+          ? 'Statement ready. Choose where you want to open or save the file.'
+          : 'Statement ready. Your device should open the file now.',
+        error: false,
         data: null,
       })
+    } catch {
+      try {
+        await Linking.openURL(String(statement.download_url))
+        setNotice({
+          message: 'Your statement is ready. We opened the download in your browser because the device could not open the local file directly.',
+          error: false,
+          data: null,
+        })
+      } catch {
+        setNotice({
+          message: 'Unable to open the statement download right now. Please try again.',
+          error: true,
+          data: null,
+        })
+      }
     }
   }
 
@@ -536,15 +654,29 @@ const AuditSummaryScreen = () => {
         ) : null}
 
         {!forbidden ? (
+          <TouchableOpacity
+            onPress={handleExportDuesStatement}
+            disabled={exporting || exportingDues || submitting}
+            className={`${exportingDues ? 'bg-gray-700' : 'bg-theme-primary'} py-4 rounded-xl border border-transparent`}
+          >
+            <Text className="text-alt text-center font-medium">
+              {exportingDues ? 'Preparing dues statement...' : 'Export dues statement'}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
+
+        {!forbidden ? (
           <TouchableOpacity onPress={handleExport} className={`${exporting ? 'bg-gray-700' : 'bg-gray-900'} py-4 rounded-xl border border-gray-800`}>
             <Text className="text-white text-center font-medium">{exporting ? 'Exporting...' : 'Export CSV'}</Text>
           </TouchableOpacity>
         ) : null}
       </ScrollView>
 
-      <Loader open={loading || exporting || submitting} />
+      <Loader open={loading || exporting || exportingDues || submitting} />
     </View>
   )
 }
 
 export default AuditSummaryScreen
+
+
