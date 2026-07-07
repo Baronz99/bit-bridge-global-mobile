@@ -6,7 +6,7 @@ import {
 } from 'react-native'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { images } from '@/constants/images'
-import { Link } from 'expo-router'
+import { Href, Link } from 'expo-router'
 import { useAuth } from '@/services/useAuth'
 import { AntDesign, Feather, FontAwesome, Ionicons } from '@expo/vector-icons'
 import AppModal from '@/components/modal/Modal'
@@ -33,7 +33,7 @@ import {
 
 type RowItem = {
   label: string
-  href?: string
+  href?: Href
   icon: React.ReactElement
   tone?: 'default' | 'danger'
   onPress?: () => void
@@ -243,6 +243,11 @@ const Profile = () => {
             ]
           : []),
         {
+          label: 'Statements',
+          href: '/statements',
+          icon: <Ionicons name="receipt-outline" size={18} color="white" />,
+        },
+        {
           label: 'Legal',
           href: '/legal',
           icon: <Ionicons name="document-text-outline" size={18} color="white" />,
@@ -304,12 +309,12 @@ const Profile = () => {
             </View>
 
             <View className="flex-row gap-3 mt-4">
-              <Link href={'/accounts' as any} asChild>
+              <Link href="/accounts" asChild>
                 <TouchableOpacity className="flex-1 bg-app-primary rounded-xl py-3">
                   <Text className="text-white text-center text-xs font-semibold">Deposit Accounts</Text>
                 </TouchableOpacity>
               </Link>
-              <Link href={'/cards' as any} asChild>
+              <Link href="/cards" asChild>
                 <TouchableOpacity className="flex-1 bg-gray-900 border border-gray-800 rounded-xl py-3">
                   <Text className="text-white text-center text-xs font-semibold">Cards</Text>
                 </TouchableOpacity>
@@ -350,7 +355,7 @@ const Profile = () => {
 
                     if (item.href) {
                       return (
-                        <Link key={item.label} href={item.href as any} asChild>
+                        <Link key={item.label} href={item.href} asChild>
                           <TouchableOpacity>{row}</TouchableOpacity>
                         </Link>
                       )
@@ -393,6 +398,4 @@ const Profile = () => {
 }
 
 export default Profile
-
-
 
