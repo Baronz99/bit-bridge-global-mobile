@@ -7,6 +7,7 @@ import { initiateMonnifyTransaction } from '@/api/transactions'
 import { createFundingIntent, getFundingIntent, type FundingIntentResponse } from '@/api/funding'
 import Loader from '@/components/Loader'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
+import { useAnchorOnboarding } from '@/services/useAnchorOnboarding'
 
 type FundMethod = 'monnify' | 'anchor'
 
@@ -56,6 +57,7 @@ const FundWalletScreen = () => {
   const router = useRouter()
   const { returnTo, orderId, id, intentId } = useLocalSearchParams()
   const { userProfileData, loadProfile } = useAuth()
+  const anchorState = useAnchorOnboarding({ autoFetchOnMount: true, autoFetchOnFocus: false })
 
   const [loading, setLoading] = useState(false)
   const [method, setMethod] = useState<FundMethod>('monnify')
@@ -71,6 +73,7 @@ const FundWalletScreen = () => {
     error: false,
     data: null,
   })
+  const shouldBypassPooledFunding = anchorState.isHydrated && (anchorState.depositReady || anchorState.hasAccountNumber)
 
   const expiryDate = useMemo(() => resolveExpiryDate(anchorIntent?.expiryTime), [anchorIntent?.expiryTime])
   const countdown = useMemo(() => {
@@ -90,6 +93,11 @@ const FundWalletScreen = () => {
     const timer = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(timer)
   }, [expiryDate])
+
+  useEffect(() => {
+    if (!shouldBypassPooledFunding) return
+    router.replace('/anchor-account')
+  }, [router, shouldBypassPooledFunding])
 
   useEffect(() => {
     const currentIntentId = String(anchorIntent?.id || '').trim()
@@ -264,6 +272,14 @@ const FundWalletScreen = () => {
   }
 
   const statusToneClass = notice.error ? 'border-red-500 bg-red-950' : 'border-green-500 bg-green-950'
+
+  if (!anchorState.isHydrated || anchorState.loading) {
+    return <Loader />
+  }
+
+  if (shouldBypassPooledFunding) {
+    return <Loader />
+  }
 
   return (
     <View className="flex-1 bg-primary px-4">
