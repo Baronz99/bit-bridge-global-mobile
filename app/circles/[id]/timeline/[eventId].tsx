@@ -30,6 +30,8 @@ import { canAccessManageCircle, canViewSharedFundTab, extractCircleRecentActivit
 import { extractReceiptReference } from '@/utils/timelineRefs'
 import { buildApiErrorMessage } from '@/utils/apiErrorMessage'
 import moneyFormat from '@/utils/moneyFormat'
+import HiddenHeaderRecovery from '@/components/navigation/HiddenHeaderRecovery'
+import { CIRCLES_FALLBACK_LABEL, CIRCLES_FALLBACK_ROUTE } from '@/components/navigation/recoveryDefaults'
 
 const findRecord = (records: any[], eventId: string) => {
   const target = String(eventId || '').trim()
@@ -496,9 +498,12 @@ const CircleTimelineEventDetailScreen = () => {
 
   if (!circleId || !resolvedEventId) {
     return (
-      <View className="flex-1 items-center justify-center bg-[#020712] px-6">
-        <Text className="text-center text-sm text-red-300">Missing circle event.</Text>
-      </View>
+      <HiddenHeaderRecovery
+        title="Activity unavailable"
+        message="We couldn't open this activity from here. Return to your circles list and try again."
+        fallbackRoute={CIRCLES_FALLBACK_ROUTE}
+        fallbackLabel={CIRCLES_FALLBACK_LABEL}
+      />
     )
   }
 
@@ -512,9 +517,13 @@ const CircleTimelineEventDetailScreen = () => {
 
   if (error || !workspace) {
     return (
-      <View className="flex-1 items-center justify-center bg-[#020712] px-6">
-        <Text className="text-center text-sm text-red-300">{error || 'Circle unavailable.'}</Text>
-      </View>
+      <HiddenHeaderRecovery
+        title="Activity unavailable"
+        message={error || 'We could not load this Circle activity right now.'}
+        fallbackRoute={CIRCLES_FALLBACK_ROUTE}
+        fallbackLabel={CIRCLES_FALLBACK_LABEL}
+        onRetry={loadEvent}
+      />
     )
   }
 
@@ -560,7 +569,7 @@ const CircleTimelineEventDetailScreen = () => {
                   {recordAmountLabel(record)}
                 </Text>
                 <Text className="mt-2 text-sm text-gray-400">
-                  {[recordStatusLabel(record), recordTimeLabel(record)].filter(Boolean).join(' � ')}
+                  {[recordStatusLabel(record), recordTimeLabel(record)].filter(Boolean).join(' ï¿½ ')}
                 </Text>
               </View>
 
@@ -979,5 +988,4 @@ const CircleTimelineEventDetailScreen = () => {
 }
 
 export default CircleTimelineEventDetailScreen
-
 

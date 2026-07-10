@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useMemo, useState } from 'react'
+import React, { useCallback, useMemo, useState } from 'react'
 import { ActivityIndicator, RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native'
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
 import { useFocusEffect } from '@react-navigation/native'
@@ -23,6 +23,8 @@ import {
   writeCircleScreenCache,
 } from '@/utils/circleScreenCache'
 import { useEffect } from 'react'
+import HiddenHeaderRecovery from '@/components/navigation/HiddenHeaderRecovery'
+import { CIRCLES_FALLBACK_LABEL, CIRCLES_FALLBACK_ROUTE } from '@/components/navigation/recoveryDefaults'
 
 const safeNumber = (value: unknown, fallback = 0) => {
   const parsed = Number(value)
@@ -170,7 +172,7 @@ const CircleHomeScreen = () => {
     const hasVisibleData = Boolean(workspace || cached?.data.workspace)
     const cacheIsFresh = Boolean(cached?.data && isCircleScreenCacheFresh(cacheKey, DEFAULT_CIRCLE_SCREEN_CACHE_TTL_MS))
 
-    if (!isRefresh && cacheIsFresh && !workspace) {
+    if (!isRefresh && cacheIsFresh && !workspace && cached?.data) {
       applyHomePayload(cached.data)
     }
 
@@ -457,9 +459,12 @@ const CircleHomeScreen = () => {
 
   if (!circleId) {
     return (
-      <View className="flex-1 items-center justify-center bg-[#020712]">
-        <Text className="text-sm text-red-300">Missing circle.</Text>
-      </View>
+      <HiddenHeaderRecovery
+        title="Circle unavailable"
+        message="We couldn't open this Circle from here. Return to your circles list and open it again."
+        fallbackRoute={CIRCLES_FALLBACK_ROUTE}
+        fallbackLabel={CIRCLES_FALLBACK_LABEL}
+      />
     )
   }
 
@@ -473,9 +478,13 @@ const CircleHomeScreen = () => {
 
   if (error || !workspace) {
     return (
-      <View className="flex-1 items-center justify-center bg-[#020712] px-6">
-        <Text className="text-center text-sm text-red-300">{error || 'Circle unavailable.'}</Text>
-      </View>
+      <HiddenHeaderRecovery
+        title="Circle unavailable"
+        message={error || 'We could not load this Circle right now.'}
+        fallbackRoute={CIRCLES_FALLBACK_ROUTE}
+        fallbackLabel={CIRCLES_FALLBACK_LABEL}
+        onRetry={() => loadCircle(true)}
+      />
     )
   }
 

@@ -10,6 +10,8 @@ import { canAccessManageCircle, canViewSharedFundTab } from '@/utils/circleWorks
 import { replaceCircleWorkspaceSection } from '@/utils/circleWorkspaceNav'
 import { getCircleRoleLabel } from '@/utils/circleRoleLabel'
 import moneyFormat from '@/utils/moneyFormat'
+import HiddenHeaderRecovery from '@/components/navigation/HiddenHeaderRecovery'
+import { CIRCLES_FALLBACK_LABEL, CIRCLES_FALLBACK_ROUTE } from '@/components/navigation/recoveryDefaults'
 
 const cleanText = (value: unknown) => String(value || '').trim()
 
@@ -136,9 +138,12 @@ const CircleTreasuryInflowDetailScreen = () => {
 
   if (!circleId || !resolvedInflowId) {
     return (
-      <View className="flex-1 items-center justify-center bg-[#020712]">
-        <Text className="text-sm text-red-300">Missing inflow.</Text>
-      </View>
+      <HiddenHeaderRecovery
+        title="Inflow unavailable"
+        message="We couldn't open this inflow review from here. Return to your circles list and try again."
+        fallbackRoute={CIRCLES_FALLBACK_ROUTE}
+        fallbackLabel={CIRCLES_FALLBACK_LABEL}
+      />
     )
   }
 
@@ -152,9 +157,13 @@ const CircleTreasuryInflowDetailScreen = () => {
 
   if ((error || workspaceError) && !workspace) {
     return (
-      <View className="flex-1 items-center justify-center bg-[#020712] px-6">
-        <Text className="text-center text-sm text-red-300">{workspaceError || error}</Text>
-      </View>
+      <HiddenHeaderRecovery
+        title="Inflow unavailable"
+        message={workspaceError || error || 'We could not load this inflow review right now.'}
+        fallbackRoute={CIRCLES_FALLBACK_ROUTE}
+        fallbackLabel={CIRCLES_FALLBACK_LABEL}
+        onRetry={() => loadDetail(true)}
+      />
     )
   }
 
@@ -248,7 +257,7 @@ const CircleTreasuryInflowDetailScreen = () => {
               <View key={String(assignment.id)} className="mt-4 rounded-2xl border border-gray-900 bg-gray-950 px-4 py-4">
                 <Text className="text-sm font-semibold text-white">{cleanText(assignment.circle_person_label) || 'Unlinked person'}</Text>
                 <Text className="mt-1 text-xs text-gray-400">
-                  {cleanText(assignment.purpose_label) || 'No purpose'}{assignment.active ? ' · active' : ' · historical'}
+                  {cleanText(assignment.purpose_label) || 'No purpose'}{assignment.active ? ' Â· active' : ' Â· historical'}
                 </Text>
                 <DetailRow label="Assigned by" value={cleanText(assignment.assigned_by_name)} />
                 <DetailRow label="Note" value={cleanText(assignment.assignment_note)} />
@@ -265,7 +274,7 @@ const CircleTreasuryInflowDetailScreen = () => {
               <View key={String(allocation.id)} className="mt-4 rounded-2xl border border-gray-900 bg-gray-950 px-4 py-4">
                 <Text className="text-sm font-semibold text-white">{cleanText(allocation.circle_person_label) || 'Unlinked person'}</Text>
                 <Text className="mt-1 text-xs text-gray-400">
-                  {formatCents(allocation.amount_cents)} · {cleanText(allocation.receivable_kind)} {cleanText(allocation.receivable_period_key)}
+                  {formatCents(allocation.amount_cents)} Â· {cleanText(allocation.receivable_kind)} {cleanText(allocation.receivable_period_key)}
                 </Text>
                 <DetailRow label="Due on" value={formatDate(allocation.receivable_due_on)} />
                 <DetailRow label="Assigned by" value={cleanText(allocation.assigned_by_name)} />
@@ -293,3 +302,4 @@ const CircleTreasuryInflowDetailScreen = () => {
 }
 
 export default CircleTreasuryInflowDetailScreen
+

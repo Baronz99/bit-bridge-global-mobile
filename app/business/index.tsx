@@ -544,6 +544,11 @@ const BusinessIndexScreen = () => {
     return actions
   }, [router, pendingApprovals, isLive, statusLabel])
 
+  const handleBackToPersonal = useCallback(async () => {
+    await selectPersonalAccount()
+    router.replace('/(tabs)' as any)
+  }, [router, selectPersonalAccount])
+
   const openSwitcher = useCallback(() => {
     setSwitchAccountOpen(true)
     void loadBusinessState({ silent: true })
@@ -595,6 +600,15 @@ const BusinessIndexScreen = () => {
     return (
       <ScreenContainer includeTopInset topPadding={6} horizontalPadding={0} className="flex-1 bg-[#05070D]" scrollProps={{ refreshControl: <RefreshControl refreshing={refreshing} onRefresh={() => void refreshBusinessState()} tintColor="#FFB05A" colors={['#FFB05A']} /> }}>
         <View className="px-3">
+          <TouchableOpacity
+            accessibilityLabel="Back to Personal"
+            onPress={() => {
+              void handleBackToPersonal()
+            }}
+            className="mb-4 self-start rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3"
+          >
+            <Text className="text-sm font-semibold text-white">Back to Personal</Text>
+          </TouchableOpacity>
           <BusinessDashboardSkeleton />
         </View>
       </ScreenContainer>
@@ -605,6 +619,15 @@ const BusinessIndexScreen = () => {
     <>
       <ScreenContainer includeTopInset topPadding={6} horizontalPadding={0} className="flex-1 bg-[#05070D]" scrollProps={{ refreshControl: <RefreshControl refreshing={refreshing} onRefresh={() => void refreshBusinessState()} tintColor="#FFB05A" colors={['#FFB05A']} /> }}>
         <View className="px-3">
+        <TouchableOpacity
+          accessibilityLabel="Back to Personal"
+          onPress={() => {
+            void handleBackToPersonal()
+          }}
+          className="mb-4 self-start rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3"
+        >
+          <Text className="text-sm font-semibold text-white">Back to Personal</Text>
+        </TouchableOpacity>
         <View className="mb-7 flex-row items-center gap-3">
           <View className="h-10 w-10 items-center justify-center rounded-full bg-[#111827]/52">
             <Image source={icons.appLogoClear} className="h-5 w-5" resizeMode="contain" />

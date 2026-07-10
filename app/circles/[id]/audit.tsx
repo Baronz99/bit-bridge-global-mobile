@@ -2,14 +2,16 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import DateTimePicker from '@react-native-community/datetimepicker'
 import * as FileSystem from 'expo-file-system/legacy'
 import { Linking, Platform, ScrollView, Share, Text, TouchableOpacity, View } from 'react-native'
-import { useLocalSearchParams } from 'expo-router'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import APP_CONFIG from '@/api/baseUrl'
 import { getStoredAccessToken } from '@/api/client'
 import Loader from '@/components/Loader'
 import NotificationAlert from '@/components/notification'
 import { createCircleStatement, exportCircleCsv, getCircleAuditSummary, listCircleStatements } from '@/api/circles'
+import { CIRCLES_FALLBACK_LABEL, CIRCLES_FALLBACK_ROUTE } from '@/components/navigation/recoveryDefaults'
 import { buildApiErrorMessage } from '@/utils/apiErrorMessage'
 import moneyFormat from '@/utils/moneyFormat'
+import { backOrFallback, normalizeRouteParam } from '@/utils/navigationRecovery'
 
 type NoticeState = { message: string | null; error: boolean; data: unknown | null }
 
@@ -162,7 +164,8 @@ const SummaryTile = ({ label, value, tone = 'default' }: { label: string; value:
 
 const AuditSummaryScreen = () => {
   const { id } = useLocalSearchParams<{ id?: string | string[] }>()
-  const circleId = Array.isArray(id) ? id[0] : id
+  const circleId = normalizeRouteParam(id)
+  const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [exportingDues, setExportingDues] = useState(false)
@@ -197,7 +200,7 @@ const AuditSummaryScreen = () => {
         setForbidden(true)
         setSummary(null)
         setNotice({
-          message: 'Circle records are visible to owners, admins, and treasurers only.',
+          message: 'You do not have access to Circle records. Only Circle owners, admins, and treasurers can open them. Use the button above to return to your circles list.',
           error: true,
           data: null,
         })
@@ -291,7 +294,7 @@ const AuditSummaryScreen = () => {
       if (status === 403) {
         setForbidden(true)
         setNotice({
-          message: 'Circle record exports are visible to owners, admins, and treasurers only.',
+          message: 'You do not have access to export Circle records. Only Circle owners, admins, and treasurers can export them. Use the button above to return to your circles list.',
           error: true,
           data: null,
         })
@@ -455,6 +458,13 @@ const AuditSummaryScreen = () => {
     <View className="flex-1 bg-primary">
       <ScrollView className="flex-1 px-4" contentContainerStyle={{ paddingTop: 40, paddingBottom: 48, gap: 16 }}>
         <View>
+          <TouchableOpacity
+            accessibilityLabel={CIRCLES_FALLBACK_LABEL}
+            onPress={() => backOrFallback(router, CIRCLES_FALLBACK_ROUTE)}
+            className="mb-4 self-start rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3"
+          >
+            <Text className="text-sm font-semibold text-white">{CIRCLES_FALLBACK_LABEL}</Text>
+          </TouchableOpacity>
           <Text className="text-white text-2xl mb-2">Records</Text>
           <Text className="text-gray-300">
             Review summary, generate formal treasury statements, and export the circle ledger when needed.

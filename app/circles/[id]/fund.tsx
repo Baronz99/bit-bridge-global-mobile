@@ -16,6 +16,7 @@ import { useAuth } from '@/services/useAuth'
 import { resolveTransactionBiometricUserId, useTransactionBiometrics } from '@/services/useTransactionBiometrics'
 import { buildApiErrorMessage } from '@/utils/apiErrorMessage'
 import moneyFormat from '@/utils/moneyFormat'
+import { backOrFallback, normalizeRouteParam } from '@/utils/navigationRecovery'
 import { error as logError, log } from '@/utils/logger'
 
 type NoticeState = { message: string | null; error: boolean; data: any | null }
@@ -93,12 +94,12 @@ const CircleFundScreen = () => {
     dueMonthsOpen?: string | string[]
     paymentItemKey?: string | string[]
   }>()
-  const circleId = Array.isArray(id) ? id[0] : id
-  const dueObligationId = Array.isArray(dueId) ? dueId[0] : dueId
+  const circleId = normalizeRouteParam(id)
+  const dueObligationId = normalizeRouteParam(dueId)
   const prefetchedDueAmountCents = Number(Array.isArray(dueAmountCents) ? dueAmountCents[0] : dueAmountCents || 0)
-  const dueMode = Array.isArray(dueModeParam) ? dueModeParam[0] : dueModeParam
+  const dueMode = normalizeRouteParam(dueModeParam)
   const dueMonthsOpen = Number(Array.isArray(dueMonthsOpenParam) ? dueMonthsOpenParam[0] : dueMonthsOpenParam || 1)
-  const preselectedPaymentItemKey = Array.isArray(paymentItemKeyParam) ? paymentItemKeyParam[0] : paymentItemKeyParam
+  const preselectedPaymentItemKey = normalizeRouteParam(paymentItemKeyParam)
   const isMonthlyDueFlow = dueMode === 'monthly' || !!dueObligationId
   const router = useRouter()
   const { userProfileData } = useAuth()
@@ -277,6 +278,7 @@ const CircleFundScreen = () => {
     },
   ]
   const selectedSourceLabel = sourceOptions.find((option) => option.value === selectedSource)?.label || 'Personal wallet'
+  const paymentsFallbackRoute = circleId ? `/circles/${circleId}/pay` : '/circles'
 
   useEffect(() => {
     if (!selectedIsQuantityItem) return
@@ -530,7 +532,7 @@ const CircleFundScreen = () => {
     <View className="flex-1 bg-primary px-4">
       <KeyboardAvoidWrapper>
         <View className="flex-1 pt-8 gap-4">
-          <TouchableOpacity onPress={() => router.replace(`/circles/${circleId}/pay` as any)} className="self-start rounded-full border border-white/10 bg-white/[0.04] px-4 py-2">
+          <TouchableOpacity accessibilityLabel="Back to Payments" onPress={() => backOrFallback(router, paymentsFallbackRoute)} className="self-start rounded-full border border-white/10 bg-white/[0.04] px-4 py-2">
             <Text className="text-white text-[11px] font-semibold">Back to Payments</Text>
           </TouchableOpacity>
           {isSuccessState ? (

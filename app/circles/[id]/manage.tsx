@@ -33,6 +33,8 @@ import { buildRosterDuesLookup } from '@/utils/circleDues'
 import { canAccessManageCircle, canViewSharedFundTab } from '@/utils/circleWorkspace'
 import { replaceCircleWorkspaceSection } from '@/utils/circleWorkspaceNav'
 import moneyFormat from '@/utils/moneyFormat'
+import HiddenHeaderRecovery from '@/components/navigation/HiddenHeaderRecovery'
+import { CIRCLES_FALLBACK_LABEL, CIRCLES_FALLBACK_ROUTE } from '@/components/navigation/recoveryDefaults'
 
 type ManageSection = 'payment_items' | 'members' | 'governance' | 'settings'
 
@@ -796,7 +798,14 @@ const CircleManageScreen = () => {
   }
 
   if (!circleId) {
-    return <View className="flex-1 items-center justify-center bg-[#020712]"><Text className="text-sm text-red-300">Missing circle.</Text></View>
+    return (
+      <HiddenHeaderRecovery
+        title="Circle management unavailable"
+        message="We couldn't open this management screen from here. Return to your circles list and try again."
+        fallbackRoute={CIRCLES_FALLBACK_ROUTE}
+        fallbackLabel={CIRCLES_FALLBACK_LABEL}
+      />
+    )
   }
 
   if (loading) {
@@ -804,11 +813,38 @@ const CircleManageScreen = () => {
   }
 
   if (error && !workspace) {
-    return <View className="flex-1 items-center justify-center bg-[#020712] px-6"><Text className="text-center text-sm text-red-300">{error}</Text></View>
+    return (
+      <HiddenHeaderRecovery
+        title="Circle management unavailable"
+        message={error}
+        fallbackRoute={CIRCLES_FALLBACK_ROUTE}
+        fallbackLabel={CIRCLES_FALLBACK_LABEL}
+        onRetry={() => loadManage(true, section)}
+      />
+    )
   }
 
-  if (!workspace || !canManage) {
-    return <View className="flex-1 items-center justify-center bg-[#020712] px-6"><Text className="text-center text-sm text-red-300">You do not have permission to manage this circle.</Text></View>
+  if (!workspace) {
+    return (
+      <HiddenHeaderRecovery
+        title="Circle management unavailable"
+        message="We could not load this Circle management workspace right now."
+        fallbackRoute={CIRCLES_FALLBACK_ROUTE}
+        fallbackLabel={CIRCLES_FALLBACK_LABEL}
+        onRetry={() => loadManage(true, section)}
+      />
+    )
+  }
+
+  if (!canManage) {
+    return (
+      <HiddenHeaderRecovery
+        title="Permission required"
+        message="You do not have access to this management screen. Only Circle managers can open it. Return to your circles list or switch to an account with management access."
+        fallbackRoute={CIRCLES_FALLBACK_ROUTE}
+        fallbackLabel={CIRCLES_FALLBACK_LABEL}
+      />
+    )
   }
 
   return (
@@ -1061,7 +1097,7 @@ const CircleManageScreen = () => {
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity onPress={saveDuePlan} disabled={saving} className="rounded-2xl bg-cyan-400 px-4 py-4">
-                    <Text className="text-center text-sm font-semibold text-slate-950">{saving ? 'Saving…' : duePlan ? 'Update dues plan' : 'Save dues plan'}</Text>
+                    <Text className="text-center text-sm font-semibold text-slate-950">{saving ? 'Savingâ€¦' : duePlan ? 'Update dues plan' : 'Save dues plan'}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -1145,7 +1181,7 @@ const CircleManageScreen = () => {
                     </View>
                   ) : null}
                   <TouchableOpacity onPress={saveActivityItem} disabled={saving} className="rounded-2xl bg-cyan-400 px-4 py-4">
-                    <Text className="text-center text-sm font-semibold text-slate-950">{saving ? 'Saving…' : editingActivityId ? 'Update collection' : 'Save collection'}</Text>
+                    <Text className="text-center text-sm font-semibold text-slate-950">{saving ? 'Savingâ€¦' : editingActivityId ? 'Update collection' : 'Save collection'}</Text>
                   </TouchableOpacity>
                   {activityTemplate || editingActivityId ? (
                     <TouchableOpacity onPress={resetActivityForm} className="rounded-2xl border border-gray-800 px-4 py-4">
@@ -1164,7 +1200,7 @@ const CircleManageScreen = () => {
                 <View className="mt-4 gap-4">
                   <TextInput value={inviteEmail} onChangeText={setInviteEmail} placeholder="Email" placeholderTextColor="#64748b" className={inputClass} autoCapitalize="none" />
                   <TouchableOpacity onPress={sendInvite} disabled={saving} className="rounded-2xl bg-cyan-400 px-4 py-4">
-                    <Text className="text-center text-sm font-semibold text-slate-950">{saving ? 'Sending…' : 'Invite BitBridge user'}</Text>
+                    <Text className="text-center text-sm font-semibold text-slate-950">{saving ? 'Sendingâ€¦' : 'Invite BitBridge user'}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -1340,7 +1376,7 @@ const CircleManageScreen = () => {
                                 className={`flex-1 rounded-2xl px-4 py-4 ${acting || !availableActions?.can_approve ? 'bg-gray-800' : 'bg-cyan-400'}`}
                               >
                                 <Text className={`text-center text-sm font-semibold ${acting || !availableActions?.can_approve ? 'text-gray-500' : 'text-slate-950'}`}>
-                                  {acting ? 'Updating…' : 'Approve'}
+                                  {acting ? 'Updatingâ€¦' : 'Approve'}
                                 </Text>
                               </TouchableOpacity>
                               <TouchableOpacity
@@ -1444,7 +1480,7 @@ const CircleManageScreen = () => {
                   </TouchableOpacity>
                 ) : null}
                 <TouchableOpacity onPress={saveSettings} disabled={saving} className="rounded-2xl bg-cyan-400 px-4 py-4">
-                  <Text className="text-center text-sm font-semibold text-slate-950">{saving ? 'Saving…' : 'Save decisions'}</Text>
+                  <Text className="text-center text-sm font-semibold text-slate-950">{saving ? 'Savingâ€¦' : 'Save decisions'}</Text>
                 </TouchableOpacity>
               </View>
             </View>

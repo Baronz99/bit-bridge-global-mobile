@@ -30,6 +30,8 @@ import { replaceCircleWorkspaceSection } from '@/utils/circleWorkspaceNav'
 import { useAuth } from '@/services/useAuth'
 import { resolveTransactionBiometricUserId, useTransactionBiometrics } from '@/services/useTransactionBiometrics'
 import moneyFormat from '@/utils/moneyFormat'
+import HiddenHeaderRecovery from '@/components/navigation/HiddenHeaderRecovery'
+import { CIRCLES_FALLBACK_LABEL, CIRCLES_FALLBACK_ROUTE } from '@/components/navigation/recoveryDefaults'
 
 type TreasuryPayoutRequest = Record<string, any>
 
@@ -382,9 +384,12 @@ const CircleTreasuryPayoutsScreen = () => {
 
   if (!circleId) {
     return (
-      <View className="flex-1 items-center justify-center bg-[#020712]">
-        <Text className="text-sm text-red-300">Missing circle.</Text>
-      </View>
+      <HiddenHeaderRecovery
+        title="Payouts unavailable"
+        message="We couldn't open this payout screen from here. Return to your circles list and try again."
+        fallbackRoute={CIRCLES_FALLBACK_ROUTE}
+        fallbackLabel={CIRCLES_FALLBACK_LABEL}
+      />
     )
   }
 
@@ -398,9 +403,25 @@ const CircleTreasuryPayoutsScreen = () => {
 
   if (error && !workspace) {
     return (
-      <View className="flex-1 items-center justify-center bg-[#020712] px-6">
-        <Text className="text-center text-sm text-red-300">{error}</Text>
-      </View>
+      <HiddenHeaderRecovery
+        title="Payouts unavailable"
+        message={error}
+        fallbackRoute={CIRCLES_FALLBACK_ROUTE}
+        fallbackLabel={CIRCLES_FALLBACK_LABEL}
+        onRetry={() => loadPayouts(true)}
+      />
+    )
+  }
+
+  if (!workspace) {
+    return (
+      <HiddenHeaderRecovery
+        title="Payouts unavailable"
+        message="We could not load this Circle treasury workspace right now."
+        fallbackRoute={CIRCLES_FALLBACK_ROUTE}
+        fallbackLabel={CIRCLES_FALLBACK_LABEL}
+        onRetry={() => loadPayouts(true)}
+      />
     )
   }
 
@@ -438,8 +459,8 @@ const CircleTreasuryPayoutsScreen = () => {
             </Text>
             <View className="mt-4 rounded-2xl border border-gray-900 bg-gray-950 px-4 py-4">
               <Text className="text-xs uppercase tracking-[1.5px] text-gray-500">Policy</Text>
-              <Text className="mt-2 text-sm text-white">Daily principal cap: ₦100,000</Text>
-              <Text className="mt-1 text-sm text-white">Company charge per payout: ₦100</Text>
+              <Text className="mt-2 text-sm text-white">Daily principal cap: â‚¦100,000</Text>
+              <Text className="mt-1 text-sm text-white">Company charge per payout: â‚¦100</Text>
               <Text className="mt-1 text-xs text-gray-400">Total debit per payout = payout amount + company charge.</Text>
             </View>
             {notice ? (
@@ -540,7 +561,7 @@ const CircleTreasuryPayoutsScreen = () => {
                 <View className="rounded-2xl border border-gray-900 bg-gray-950 px-4 py-4">
                   <Text className="text-xs uppercase tracking-[1.5px] text-gray-500">Review</Text>
                   <Text className="mt-2 text-sm text-white">
-                    {formPayload.amount_cents > 0 ? moneyFormat(formPayload.amount_cents / 100) : '₦0.00'} payout
+                    {formPayload.amount_cents > 0 ? moneyFormat(formPayload.amount_cents / 100) : 'â‚¦0.00'} payout
                   </Text>
                   <Text className="mt-1 text-xs text-gray-400">{formPayload.beneficiary_name || 'Beneficiary name'}</Text>
                   <Text className="mt-1 text-xs text-gray-400">

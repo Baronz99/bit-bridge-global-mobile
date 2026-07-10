@@ -9,6 +9,7 @@ import { createCircleActivity, listCircleCollections } from '@/api/circles'
 import { buildApiErrorMessage } from '@/utils/apiErrorMessage'
 import moneyFormat from '@/utils/moneyFormat'
 import { getCircleTypeConfig } from '@/utils/circleTypeConfig'
+import { backOrFallback, normalizeRouteParam } from '@/utils/navigationRecovery'
 
 type NoticeState = { message: string | null; error: boolean; data: any | null }
 type ActivityRecord = Record<string, any>
@@ -39,14 +40,15 @@ const ActivitiesScreen = () => {
     templateName?: string | string[]
     templateFrequency?: string | string[]
   }>()
-  const circleId = Array.isArray(id) ? id[0] : id
-  const routeCircleType = Array.isArray(circleType) ? circleType[0] : circleType
-  const routeCircleName = Array.isArray(circleName) ? circleName[0] : circleName
-  const routeTemplateName = Array.isArray(templateName) ? templateName[0] : templateName
-  const routeTemplateFrequency = Array.isArray(templateFrequency) ? templateFrequency[0] : templateFrequency
+  const circleId = normalizeRouteParam(id)
+  const routeCircleType = normalizeRouteParam(circleType)
+  const routeCircleName = normalizeRouteParam(circleName)
+  const routeTemplateName = normalizeRouteParam(templateName)
+  const routeTemplateFrequency = normalizeRouteParam(templateFrequency)
   const circleTypeConfig = getCircleTypeConfig(routeCircleType)
   const router = useRouter()
   const collectionSingularLabel = 'Collection'
+  const paymentsFallbackRoute = circleId ? `/circles/${circleId}/pay` : '/circles'
   const ACTIVITY_TYPES = [
     { value: 'goal', label: 'Goal', helper: 'Raise toward a target' },
     { value: 'collection', label: 'Collection', helper: 'Collect money for a purpose' },
@@ -186,7 +188,7 @@ const ActivitiesScreen = () => {
             Set up the collection members will see in Money.
           </Text>
 
-          <TouchableOpacity onPress={() => router.replace(`/circles/${circleId}/pay` as any)} className="self-start rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 mb-4">
+          <TouchableOpacity accessibilityLabel="Back to Payments" onPress={() => backOrFallback(router, paymentsFallbackRoute)} className="self-start rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 mb-4">
             <Text className="text-white text-[11px] font-semibold">Back to Payments</Text>
           </TouchableOpacity>
 

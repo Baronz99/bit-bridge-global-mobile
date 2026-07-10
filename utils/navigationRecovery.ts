@@ -1,6 +1,6 @@
 export type RouterWithFallback = {
   back: () => void
-  replace: (href: any) => void
+  replace: (href: string) => void
   canGoBack?: () => boolean
 }
 
@@ -10,7 +10,12 @@ export const backOrFallback = (router: RouterWithFallback, fallbackRoute: string
     router.back()
     return
   }
-  router.replace(fallbackRoute as any)
+  router.replace(fallbackRoute as never)
+}
+
+export const normalizeRouteParam = (value: string | string[] | undefined) => {
+  if (Array.isArray(value)) return String(value[0] || '').trim()
+  return String(value || '').trim()
 }
 
 const SAFE_ROUTE_PATTERNS = [
@@ -92,3 +97,4 @@ export const resolveSafeNotificationRoute = ({
   if (/^\/transaction\/(timeline-receipt|card-receipt)$/i.test(safeRoute)) return '/(tabs)/timeline'
   return safeRoute
 }
+

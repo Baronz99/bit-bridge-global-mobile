@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react'
-import { ActivityIndicator, RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native'
+import { ActivityIndicator, RefreshControl, ScrollView, Text, View } from 'react-native'
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
 import { useFocusEffect } from '@react-navigation/native'
 import { getCircleWorkspace } from '@/api/circles'
@@ -22,6 +22,8 @@ import {
   writeCircleScreenCache,
 } from '@/utils/circleScreenCache'
 import { useEffect } from 'react'
+import HiddenHeaderRecovery from '@/components/navigation/HiddenHeaderRecovery'
+import { CIRCLES_FALLBACK_LABEL, CIRCLES_FALLBACK_ROUTE } from '@/components/navigation/recoveryDefaults'
 
 type CircleWorkspaceRecord = Record<string, unknown>
 type CircleActivityRecord = Record<string, unknown>
@@ -113,9 +115,12 @@ const CircleTimelineScreen = () => {
 
   if (!circleId) {
     return (
-      <View className="flex-1 items-center justify-center bg-[#020712]">
-        <Text className="text-sm text-red-300">Missing circle.</Text>
-      </View>
+      <HiddenHeaderRecovery
+        title="Timeline unavailable"
+        message="We couldn't open this activity timeline from here. Return to your circles list and try again."
+        fallbackRoute={CIRCLES_FALLBACK_ROUTE}
+        fallbackLabel={CIRCLES_FALLBACK_LABEL}
+      />
     )
   }
 
@@ -129,9 +134,13 @@ const CircleTimelineScreen = () => {
 
   if (error || !workspace) {
     return (
-      <View className="flex-1 items-center justify-center bg-[#020712] px-6">
-        <Text className="text-center text-sm text-red-300">{error || 'Circle unavailable.'}</Text>
-      </View>
+      <HiddenHeaderRecovery
+        title="Timeline unavailable"
+        message={error || 'We could not load this Circle timeline right now.'}
+        fallbackRoute={CIRCLES_FALLBACK_ROUTE}
+        fallbackLabel={CIRCLES_FALLBACK_LABEL}
+        onRetry={() => loadTimeline(true)}
+      />
     )
   }
 
@@ -195,3 +204,5 @@ const CircleTimelineScreen = () => {
 }
 
 export default CircleTimelineScreen
+
+

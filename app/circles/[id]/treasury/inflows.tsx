@@ -32,6 +32,8 @@ import { canAccessManageCircle, canViewSharedFundTab } from '@/utils/circleWorks
 import { replaceCircleWorkspaceSection } from '@/utils/circleWorkspaceNav'
 import { getCircleRoleLabel } from '@/utils/circleRoleLabel'
 import moneyFormat from '@/utils/moneyFormat'
+import HiddenHeaderRecovery from '@/components/navigation/HiddenHeaderRecovery'
+import { CIRCLES_FALLBACK_LABEL, CIRCLES_FALLBACK_ROUTE } from '@/components/navigation/recoveryDefaults'
 
 type TreasuryInflow = Record<string, any>
 
@@ -510,9 +512,12 @@ const CircleTreasuryInflowsScreen = () => {
 
   if (!circleId) {
     return (
-      <View className="flex-1 items-center justify-center bg-[#020712]">
-        <Text className="text-sm text-red-300">Missing circle.</Text>
-      </View>
+      <HiddenHeaderRecovery
+        title="Inflows unavailable"
+        message="We couldn't open this inflow queue from here. Return to your circles list and try again."
+        fallbackRoute={CIRCLES_FALLBACK_ROUTE}
+        fallbackLabel={CIRCLES_FALLBACK_LABEL}
+      />
     )
   }
 
@@ -526,19 +531,36 @@ const CircleTreasuryInflowsScreen = () => {
 
   if (error && !workspace) {
     return (
-      <View className="flex-1 items-center justify-center bg-[#020712] px-6">
-        <Text className="text-center text-sm text-red-300">{error}</Text>
-      </View>
+      <HiddenHeaderRecovery
+        title="Inflows unavailable"
+        message={error}
+        fallbackRoute={CIRCLES_FALLBACK_ROUTE}
+        fallbackLabel={CIRCLES_FALLBACK_LABEL}
+        onRetry={() => loadInflows(1, true)}
+      />
+    )
+  }
+
+  if (!workspace) {
+    return (
+      <HiddenHeaderRecovery
+        title="Inflows unavailable"
+        message="We could not load this Circle treasury workspace right now."
+        fallbackRoute={CIRCLES_FALLBACK_ROUTE}
+        fallbackLabel={CIRCLES_FALLBACK_LABEL}
+        onRetry={() => loadInflows(1, true)}
+      />
     )
   }
 
   if (!canView) {
     return (
-      <View className="flex-1 items-center justify-center bg-[#020712] px-6">
-        <Text className="text-center text-sm text-red-300">
-          Only circle owners, admins, or treasurers can review treasury inflows.
-        </Text>
-      </View>
+      <HiddenHeaderRecovery
+        title="Permission required"
+        message="You do not have access to treasury inflows. Only Circle owners, admins, or treasurers can review them. Return to your circles list or open the Circle overview."
+        fallbackRoute={CIRCLES_FALLBACK_ROUTE}
+        fallbackLabel={CIRCLES_FALLBACK_LABEL}
+      />
     )
   }
 

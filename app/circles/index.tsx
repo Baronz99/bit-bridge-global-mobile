@@ -5,6 +5,7 @@ import { createCircle, listCircles } from '@/api/circles'
 import AppModal from '@/components/modal/Modal'
 import FormInput from '@/components/FormInput'
 import { useAuth } from '@/services/useAuth'
+import { useActiveAccount } from '@/services/useActiveAccount'
 import { FEATURE_CIRCLES } from '@/constants/featureFlags'
 import moneyFormat from '@/utils/moneyFormat'
 import MemberAvatars from '@/components/circles/MemberAvatars'
@@ -70,6 +71,7 @@ const featuredRank = (circle: Record<string, unknown>) => {
 
 const CirclesScreen = () => {
   const router = useRouter()
+  const { selectPersonalAccount } = useActiveAccount()
   const { userProfileData, loadProfile, authState, authHydrated } = useAuth()
   const didKickoffProfileRef = useRef(false)
   const [screenLoading, setScreenLoading] = useState(true)
@@ -192,6 +194,11 @@ const CirclesScreen = () => {
     }
   }
 
+  const handleBackToHome = useCallback(async () => {
+    await selectPersonalAccount()
+    router.replace('/(tabs)' as any)
+  }, [router, selectPersonalAccount])
+
   const circles = useMemo(() => extractCircles(data), [data])
   const createTypeChoices = useMemo(
     () => LAUNCH_CIRCLE_TYPES.map((key) => CIRCLE_TYPE_CONFIG[key]),
@@ -225,6 +232,15 @@ const CirclesScreen = () => {
   return (
     <View className="flex-1 bg-primary">
       <View className="px-4 pt-6 pb-4">
+        <TouchableOpacity
+          accessibilityLabel="Back to Home"
+          onPress={() => {
+            void handleBackToHome()
+          }}
+          className="mb-4 self-start rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3"
+        >
+          <Text className="text-sm font-semibold text-white">Back to Home</Text>
+        </TouchableOpacity>
         <View className="rounded-3xl border border-gray-800 bg-gray-900/80 p-5">
           <Text className="text-white text-xs tracking-widest uppercase">BitBridge Circles</Text>
           <Text className="text-white text-2xl font-semibold mt-2">
@@ -364,7 +380,7 @@ const CirclesScreen = () => {
                 (record.circle_type_profile as Record<string, unknown> | undefined) || {}
               const productBucketLabel = String(typeProfile.product_bucket_label || '').trim()
               const profileSubtitle = String(typeProfile.subtitle || '').trim()
-              const typeConfig = getCircleTypeConfig(record.circle_type_profile?.normalized_archetype || record.circle_archetype)
+              const typeConfig = getCircleTypeConfig(typeProfile.normalized_archetype || record.circle_archetype)
               const owner = record.owner as Record<string, unknown> | undefined
               const ownerEmail = (owner?.email as string) || ''
               const initials = String(title || 'BB')

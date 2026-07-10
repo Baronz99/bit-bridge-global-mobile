@@ -14,6 +14,7 @@ import { useAuth } from '@/services/useAuth'
 import { resolveTransactionBiometricUserId, useTransactionBiometrics } from '@/services/useTransactionBiometrics'
 import { buildApiErrorMessage } from '@/utils/apiErrorMessage'
 import moneyFormat from '@/utils/moneyFormat'
+import { backOrFallback, normalizeRouteParam } from '@/utils/navigationRecovery'
 import { error as logError, log } from '@/utils/logger'
 
 type NoticeState = { message: string | null; error: boolean; data: any | null }
@@ -26,7 +27,7 @@ const formatTime = (value?: string) => {
 
 const CircleWithdrawScreen = () => {
   const { id } = useLocalSearchParams<{ id?: string | string[] }>()
-  const circleId = Array.isArray(id) ? id[0] : id
+  const circleId = normalizeRouteParam(id)
   const router = useRouter()
   const { userProfileData } = useAuth()
   const profilePayload = (userProfileData?.data ?? userProfileData) as any
@@ -165,6 +166,7 @@ const CircleWithdrawScreen = () => {
     successTimestamp ? { label: 'Timestamp', value: formatTime(successTimestamp) } : null,
     { label: 'Status', value: successStatus || 'successful' },
   ].filter(Boolean) as { label: string; value: string; emphasis?: boolean; mono?: boolean }[]
+  const withdrawFallbackRoute = circleId ? `/circles/${circleId}/treasury` : '/circles'
 
   return (
     <View className="flex-1 bg-primary px-4">
@@ -194,6 +196,15 @@ const CircleWithdrawScreen = () => {
             />
           ) : (
             <>
+              <TouchableOpacity
+                accessibilityLabel={circleId ? 'Back to Treasury' : 'Back to Circles'}
+                onPress={() => backOrFallback(router, withdrawFallbackRoute)}
+                className="self-start rounded-full border border-white/10 bg-white/[0.04] px-4 py-2"
+              >
+                <Text className="text-white text-[11px] font-semibold">
+                  {circleId ? 'Back to Treasury' : 'Back to Circles'}
+                </Text>
+              </TouchableOpacity>
               <View className="rounded-[30px] bg-[#0F1115] px-5 py-5 border border-white/6">
                 <Text className="text-[#D49A3A] text-[10px] uppercase tracking-[3px]">Circle withdrawal</Text>
                 <Text className="text-white text-[28px] font-semibold mt-2">Move funds from this circle</Text>

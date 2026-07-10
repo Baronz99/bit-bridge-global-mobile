@@ -19,6 +19,8 @@ import {
   readCircleScreenCache,
   writeCircleScreenCache,
 } from '@/utils/circleScreenCache'
+import HiddenHeaderRecovery from '@/components/navigation/HiddenHeaderRecovery'
+import { CIRCLES_FALLBACK_LABEL, CIRCLES_FALLBACK_ROUTE } from '@/components/navigation/recoveryDefaults'
 
 const categoryFromBucket = (workspace: Record<string, any> | null) => {
   const bucket = String(workspace?.product_bucket_key || '').toLowerCase()
@@ -281,9 +283,12 @@ const CircleTreasuryScreen = () => {
 
   if (!circleId) {
     return (
-      <View className="flex-1 items-center justify-center bg-[#020712]">
-        <Text className="text-sm text-red-300">Missing circle.</Text>
-      </View>
+      <HiddenHeaderRecovery
+        title="Shared Fund unavailable"
+        message="We couldn't open this shared fund screen from here. Return to your circles list and try again."
+        fallbackRoute={CIRCLES_FALLBACK_ROUTE}
+        fallbackLabel={CIRCLES_FALLBACK_LABEL}
+      />
     )
   }
 
@@ -297,9 +302,13 @@ const CircleTreasuryScreen = () => {
 
   if (error && !workspace) {
     return (
-      <View className="flex-1 items-center justify-center bg-[#020712] px-6">
-        <Text className="text-center text-sm text-red-300">{error}</Text>
-      </View>
+      <HiddenHeaderRecovery
+        title="Shared Fund unavailable"
+        message={error}
+        fallbackRoute={CIRCLES_FALLBACK_ROUTE}
+        fallbackLabel={CIRCLES_FALLBACK_LABEL}
+        onRetry={() => loadTreasury(true)}
+      />
     )
   }
 
@@ -511,13 +520,13 @@ const CircleTreasuryScreen = () => {
                   <Text className="text-xs uppercase tracking-[1.5px] text-gray-500">At a glance</Text>
                   <Text className="mt-2 text-sm font-medium text-white">{requestPayload.requested_purpose || 'Add a short purpose note'}</Text>
                   <Text className="mt-2 text-xs text-gray-400">
-                    {purposeLabel(form.purpose_key)} • {CATEGORY_OPTIONS.find((item) => item.value === form.circle_category)?.label || 'Other'}
+                    {purposeLabel(form.purpose_key)} â€¢ {CATEGORY_OPTIONS.find((item) => item.value === form.circle_category)?.label || 'Other'}
                   </Text>
                   <Text className="mt-2 text-xs text-gray-400">
                     Expected monthly volume: NGN {Number(form.expected_monthly_volume_ngn || 0).toLocaleString()}
                   </Text>
                   <Text className="mt-1 text-xs text-gray-400">
-                    Members: {requestPayload.expected_member_count} • External senders: {requestPayload.expected_external_sender_count}
+                    Members: {requestPayload.expected_member_count} â€¢ External senders: {requestPayload.expected_external_sender_count}
                   </Text>
                 </View>
                 <TouchableOpacity
@@ -667,5 +676,4 @@ const CircleTreasuryScreen = () => {
 }
 
 export default CircleTreasuryScreen
-
 
