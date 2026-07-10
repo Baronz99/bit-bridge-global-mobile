@@ -10,6 +10,7 @@ import { buildApiErrorMessage } from '@/utils/apiErrorMessage'
 import moneyFormat from '@/utils/moneyFormat'
 import { getCircleTypeConfig } from '@/utils/circleTypeConfig'
 import { backOrFallback, normalizeRouteParam } from '@/utils/navigationRecovery'
+import ScreenContainer from '@/components/ScreenContainer'
 
 type NoticeState = { message: string | null; error: boolean; data: any | null }
 type ActivityRecord = Record<string, any>
@@ -180,9 +181,17 @@ const ActivitiesScreen = () => {
   const emptyState = useMemo(() => activities.length === 0 && !loading, [activities.length, loading])
 
   return (
-    <View className="flex-1 bg-primary px-4">
+    <ScreenContainer
+      scroll={false}
+      includeTopInset
+      includeTabBarPadding={false}
+      horizontalPadding={16}
+      topPadding={16}
+      bottomPadding={16}
+      className="flex-1 bg-primary"
+    >
       <KeyboardAvoidWrapper>
-        <View className="flex-1 pt-10">
+        <View className="flex-1">
           <Text className="text-white text-2xl mb-2">Collections</Text>
           <Text className="text-gray-300 mb-6">
             Set up the collection members will see in Money.
@@ -313,7 +322,7 @@ const ActivitiesScreen = () => {
         </View>
       </KeyboardAvoidWrapper>
       <Loader open={loading} />
-    </View>
+    </ScreenContainer>
   )
 }
 

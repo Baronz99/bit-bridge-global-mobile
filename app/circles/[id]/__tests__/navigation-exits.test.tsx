@@ -82,6 +82,13 @@ jest.mock('@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper', () => {
   }
 })
 
+jest.mock('@/components/ScreenContainer', () => {
+  return function ScreenContainer(props: Record<string, unknown>) {
+    const ReactLocal = jest.requireActual<typeof import('react')>('react')
+    return ReactLocal.createElement('screen-container', props, props.children as ReactNode)
+  }
+})
+
 jest.mock('@/components/Loader', () => {
   return function Loader() {
     return null
@@ -261,6 +268,37 @@ describe('Circle navigation exits', () => {
 
     expect(mockReplace).toHaveBeenCalledWith('/circles')
     expect(mockReplace).not.toHaveBeenCalledWith('/circles/undefined/pay')
+  })
+
+  it('applies hidden-header safe area protection to the circle money flows', async () => {
+    mockUseLocalSearchParams.mockReturnValue({ id: 'circle-3' })
+
+    let fundTree: ReactTestRenderer | null = null
+    await act(async () => {
+      fundTree = create(<CircleFundScreen />)
+    })
+    const fundContainer = fundTree!.root.findAll((node) => String(node.type) === 'screen-container')[0]
+    expect(fundContainer.props.includeTopInset).toBe(true)
+    expect(fundContainer.props.includeTabBarPadding).toBe(false)
+    expect(fundContainer.props.bottomPadding).toBe(16)
+
+    let withdrawTree: ReactTestRenderer | null = null
+    await act(async () => {
+      withdrawTree = create(<CircleWithdrawScreen />)
+    })
+    const withdrawContainer = withdrawTree!.root.findAll((node) => String(node.type) === 'screen-container')[0]
+    expect(withdrawContainer.props.includeTopInset).toBe(true)
+    expect(withdrawContainer.props.includeTabBarPadding).toBe(false)
+    expect(withdrawContainer.props.bottomPadding).toBe(16)
+
+    let activitiesTree: ReactTestRenderer | null = null
+    await act(async () => {
+      activitiesTree = create(<ActivitiesScreen />)
+    })
+    const activitiesContainer = activitiesTree!.root.findAll((node) => String(node.type) === 'screen-container')[0]
+    expect(activitiesContainer.props.includeTopInset).toBe(true)
+    expect(activitiesContainer.props.includeTabBarPadding).toBe(false)
+    expect(activitiesContainer.props.bottomPadding).toBe(16)
   })
 
   it('uses a safe payment fallback for activities and never constructs an undefined route', async () => {

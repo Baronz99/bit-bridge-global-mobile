@@ -19,6 +19,7 @@ import {
   isTierEligibleForBankTransfer,
 } from '@/utils/bankTransfer'
 import { resolveTransferLifecycle } from '@/utils/transferLifecycle'
+import ScreenContainer from '@/components/ScreenContainer'
 
 const DEFAULT_TRANSFER_DESCRIPTION = 'Fund Transfer'
 
@@ -410,8 +411,16 @@ const ReviewTransferScreen = () => {
 
   if (!draft) {
     return (
-      <View className="flex-1 bg-primary px-4">
-        <View className="pt-10">
+      <ScreenContainer
+        scroll={false}
+        includeTopInset={false}
+        includeTabBarPadding={false}
+        horizontalPadding={16}
+        topPadding={16}
+        bottomPadding={16}
+        className="flex-1 bg-primary"
+      >
+        <View>
           <Text className="text-red-300">Transfer details are missing. Please restart the flow.</Text>
           <TouchableOpacity
             onPress={() => router.replace('/bank-transfer')}
@@ -420,7 +429,7 @@ const ReviewTransferScreen = () => {
             <Text className="text-white text-center">Back to transfer</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </ScreenContainer>
     )
   }
 
@@ -434,8 +443,16 @@ const ReviewTransferScreen = () => {
 
   if (!effectiveTierEligible) {
     return (
-      <View className="flex-1 bg-primary px-4">
-        <View className="pt-10">
+      <ScreenContainer
+        scroll={false}
+        includeTopInset={false}
+        includeTabBarPadding={false}
+        horizontalPadding={16}
+        topPadding={16}
+        bottomPadding={16}
+        className="flex-1 bg-primary"
+      >
+        <View>
           <Text className="text-gray-300">Bank transfer is available from Tier 2.</Text>
           <TouchableOpacity
             onPress={() => router.replace('/kyc')}
@@ -444,14 +461,22 @@ const ReviewTransferScreen = () => {
             <Text className="text-alt text-center font-semibold">Upgrade to Tier 2</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </ScreenContainer>
     )
   }
 
   return (
-    <View className="flex-1 bg-primary px-4">
+    <ScreenContainer
+      scroll={false}
+      includeTopInset={false}
+      includeTabBarPadding={false}
+      horizontalPadding={16}
+      topPadding={0}
+      bottomPadding={16}
+      className="flex-1 bg-primary"
+    >
       <ScrollView contentContainerStyle={{ paddingBottom: 30 }}>
-        <View className="pt-10">
+        <View className="pt-6">
           <Text className="text-gray-300 mb-4">Step 2 of 3: Confirm details</Text>
           <Text className="text-gray-500 text-xs mb-3">
             If charged, transfer completion will be reflected in timeline automatically.
@@ -543,7 +568,7 @@ const ReviewTransferScreen = () => {
           </View>
         </View>
       ) : null}
-    </View>
+    </ScreenContainer>
   )
 }
 

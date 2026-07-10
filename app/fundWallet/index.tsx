@@ -8,6 +8,7 @@ import { createFundingIntent, getFundingIntent, type FundingIntentResponse } fro
 import Loader from '@/components/Loader'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
 import { useAnchorOnboarding } from '@/services/useAnchorOnboarding'
+import ScreenContainer from '@/components/ScreenContainer'
 
 type FundMethod = 'monnify' | 'anchor'
 
@@ -282,7 +283,15 @@ const FundWalletScreen = () => {
   }
 
   return (
-    <View className="flex-1 bg-primary px-4">
+    <ScreenContainer
+      scroll={false}
+      includeTopInset={false}
+      includeTabBarPadding={false}
+      horizontalPadding={16}
+      topPadding={0}
+      bottomPadding={16}
+      className="flex-1 bg-primary"
+    >
       <KeyboardAvoidWrapper>
         <View className="flex-1 pt-6 h-full">
           <Text className="text-white text-lg font-semibold mb-3">Choose Funding Method</Text>
@@ -423,7 +432,7 @@ const FundWalletScreen = () => {
         </View>
       </KeyboardAvoidWrapper>
       <Loader open={loading} />
-    </View>
+    </ScreenContainer>
   )
 }
 

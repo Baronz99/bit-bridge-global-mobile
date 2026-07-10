@@ -16,6 +16,7 @@ import { buildApiErrorMessage } from '@/utils/apiErrorMessage'
 import moneyFormat from '@/utils/moneyFormat'
 import { backOrFallback, normalizeRouteParam } from '@/utils/navigationRecovery'
 import { error as logError, log } from '@/utils/logger'
+import ScreenContainer from '@/components/ScreenContainer'
 
 type NoticeState = { message: string | null; error: boolean; data: any | null }
 
@@ -169,9 +170,17 @@ const CircleWithdrawScreen = () => {
   const withdrawFallbackRoute = circleId ? `/circles/${circleId}/treasury` : '/circles'
 
   return (
-    <View className="flex-1 bg-primary px-4">
+    <ScreenContainer
+      scroll={false}
+      includeTopInset
+      includeTabBarPadding={false}
+      horizontalPadding={16}
+      topPadding={16}
+      bottomPadding={16}
+      className="flex-1 bg-primary"
+    >
       <KeyboardAvoidWrapper>
-        <View className="flex-1 pt-8 gap-4">
+        <View className="flex-1 gap-4">
           {successData ? (
             <CompletionPanel
               eyebrow="Circle withdrawal"
@@ -258,7 +267,7 @@ const CircleWithdrawScreen = () => {
       />
 
       <Loader open={loading} />
-    </View>
+    </ScreenContainer>
   )
 }
 

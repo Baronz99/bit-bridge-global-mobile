@@ -18,6 +18,7 @@ import { buildApiErrorMessage } from '@/utils/apiErrorMessage'
 import moneyFormat from '@/utils/moneyFormat'
 import { backOrFallback, normalizeRouteParam } from '@/utils/navigationRecovery'
 import { error as logError, log } from '@/utils/logger'
+import ScreenContainer from '@/components/ScreenContainer'
 
 type NoticeState = { message: string | null; error: boolean; data: any | null }
 type PaymentItemRecord = Record<string, any>
@@ -529,9 +530,17 @@ const CircleFundScreen = () => {
   const isSuccessState = Boolean(successData)
 
   return (
-    <View className="flex-1 bg-primary px-4">
+    <ScreenContainer
+      scroll={false}
+      includeTopInset
+      includeTabBarPadding={false}
+      horizontalPadding={16}
+      topPadding={16}
+      bottomPadding={16}
+      className="flex-1 bg-primary"
+    >
       <KeyboardAvoidWrapper>
-        <View className="flex-1 pt-8 gap-4">
+        <View className="flex-1 gap-4">
           <TouchableOpacity accessibilityLabel="Back to Payments" onPress={() => backOrFallback(router, paymentsFallbackRoute)} className="self-start rounded-full border border-white/10 bg-white/[0.04] px-4 py-2">
             <Text className="text-white text-[11px] font-semibold">Back to Payments</Text>
           </TouchableOpacity>
@@ -831,7 +840,7 @@ const CircleFundScreen = () => {
       />
 
       <Loader open={loading} />
-    </View>
+    </ScreenContainer>
   )
 }
 

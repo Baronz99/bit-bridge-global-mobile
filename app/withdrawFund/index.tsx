@@ -1,4 +1,4 @@
-import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import React, { useState } from 'react'
 import FormInput from '@/components/FormInput'
 import { createTransaction } from '@/api/transactions'
@@ -10,6 +10,7 @@ import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoi
 import TransactionPinModal from '@/components/TransactionPinModal'
 import { getTransactionPinStatus } from '@/api/transactionPin'
 import { useRouter } from 'expo-router'
+import ScreenContainer from '@/components/ScreenContainer'
 type NoticeState = { message: string | null; error: boolean; data: any | null }
 
 const index = () => {
@@ -70,53 +71,59 @@ const index = () => {
     }
   }
   return (
-    <View className="flex-1 bg-primary px-4">
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <KeyboardAvoidWrapper>
-          <View className=" flex-1 pt-10">
-            <FormInput
-              label="Amount"
-              value={formData.amount}
-              name="amount"
-              onChangeText={(text: number) => setFormData({ ...formData, amount: text })}
-            />
-            <FormSelect
-              options={banks}
-              label="Bank"
-              placeHolder={'Select Bank'}
-              name="Select Bank"
-              selectedValue={formData.bank}
-              onValueChange={(text: string) => setFormData({ ...formData, bank: text })}
-            />
-            <FormInput
-              label="Account Number"
-              name="address"
-              value={formData.address}
-              onChangeText={(text: string) => setFormData({ ...formData, address: text })}
-            />
+    <ScreenContainer
+      scroll={false}
+      includeTopInset={false}
+      includeTabBarPadding={false}
+      horizontalPadding={16}
+      topPadding={0}
+      bottomPadding={16}
+      className="flex-1 bg-primary"
+    >
+      <KeyboardAvoidWrapper>
+        <View className=" flex-1 pt-6">
+          <FormInput
+            label="Amount"
+            value={formData.amount}
+            name="amount"
+            onChangeText={(text: number) => setFormData({ ...formData, amount: text })}
+          />
+          <FormSelect
+            options={banks}
+            label="Bank"
+            placeHolder={'Select Bank'}
+            name="Select Bank"
+            selectedValue={formData.bank}
+            onValueChange={(text: string) => setFormData({ ...formData, bank: text })}
+          />
+          <FormInput
+            label="Account Number"
+            name="address"
+            value={formData.address}
+            onChangeText={(text: string) => setFormData({ ...formData, address: text })}
+          />
 
-            <NotificationAlert message={notice.message} data={notice.data} error={notice.error} />
+          <NotificationAlert message={notice.message} data={notice.data} error={notice.error} />
 
-            <TouchableOpacity
-              onPress={() => {
-                if (
-                  !(formData.bank.trim().length > 1) ||
-                  !(formData.address.trim().length > 1) ||
-                  !(formData.amount > 10)
-                ) {
-                } else {
-                  setModalVisible(true)
-                }
-              }}
-              className="bg-theme-primary py-6 mt-auto mb-10 rounded-xl"
-            >
-              <Text className="text-alt font-medium text-center"> Request Withdrawal</Text>
-            </TouchableOpacity>
-          </View>
-        </KeyboardAvoidWrapper>
+          <TouchableOpacity
+            onPress={() => {
+              if (
+                !(formData.bank.trim().length > 1) ||
+                !(formData.address.trim().length > 1) ||
+                !(formData.amount > 10)
+              ) {
+              } else {
+                setModalVisible(true)
+              }
+            }}
+            className="bg-theme-primary py-6 mt-auto mb-10 rounded-xl"
+          >
+            <Text className="text-alt font-medium text-center"> Request Withdrawal</Text>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidWrapper>
 
-        <Loader open={loading} />
-      </ScrollView>
+      <Loader open={loading} />
 
       <Modal
         visible={modalVisible}
@@ -184,7 +191,7 @@ const index = () => {
         errorMessage={pinError}
         title="Enter PIN to Withdraw"
       />
-    </View>
+    </ScreenContainer>
   )
 }
 

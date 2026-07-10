@@ -10,6 +10,7 @@ import {
   useTransactionBiometrics,
 } from '@/services/useTransactionBiometrics'
 import CompletionPanel from '@/components/finance/CompletionPanel'
+import ScreenContainer from '@/components/ScreenContainer'
 
 type TransferSummary = {
   bank_name: string
@@ -177,8 +178,16 @@ const SuccessScreen = () => {
 
   if (!payload) {
     return (
-      <View className="flex-1 bg-primary px-4">
-        <View className="pt-10">
+      <ScreenContainer
+        scroll={false}
+        includeTopInset={false}
+        includeTabBarPadding={false}
+        horizontalPadding={16}
+        topPadding={16}
+        bottomPadding={16}
+        className="flex-1 bg-primary"
+      >
+        <View>
           <CompletionPanel
             eyebrow="Bank transfer"
             title="Transfer submitted"
@@ -198,7 +207,7 @@ const SuccessScreen = () => {
             onSecondaryAction={() => router.replace('/(tabs)/wallet')}
           />
         </View>
-      </View>
+      </ScreenContainer>
     )
   }
 
@@ -209,7 +218,7 @@ const SuccessScreen = () => {
     transferFee > 0 ? { label: 'Transfer fee', value: formatNaira(transferFee) } : null,
     stampDutyFee > 0 ? { label: 'Stamp duty', value: formatNaira(stampDutyFee) } : null,
     { label: 'Recipient', value: payload.account_name },
-    { label: 'Destination', value: `${payload.bank_name} • ${maskAccountNumber(payload.account_number)}` },
+    { label: 'Destination', value: `${payload.bank_name} \u2022 ${maskAccountNumber(payload.account_number)}` },
     payload.description ? { label: 'Narration', value: payload.description } : null,
     { label: 'Transfer ID', value: payload.transfer_reference, mono: true },
     { label: 'Timestamp', value: formatTime(payload.created_at) },
@@ -218,9 +227,17 @@ const SuccessScreen = () => {
   ].filter(Boolean) as { label: string; value: string; emphasis?: boolean; mono?: boolean }[]
 
   return (
-    <View className="flex-1 bg-primary px-4">
+    <ScreenContainer
+      scroll={false}
+      includeTopInset={false}
+      includeTabBarPadding={false}
+      horizontalPadding={16}
+      topPadding={0}
+      bottomPadding={16}
+      className="flex-1 bg-primary"
+    >
       <ScrollView contentContainerStyle={{ paddingBottom: 30 }} showsVerticalScrollIndicator={false}>
-        <View className="pt-8 gap-4">
+        <View className="pt-6 gap-4">
           <CompletionPanel
             eyebrow="Bank transfer"
             title={headerTitle}
@@ -283,7 +300,7 @@ const SuccessScreen = () => {
           ) : null}
         </View>
       </ScrollView>
-    </View>
+    </ScreenContainer>
   )
 }
 
