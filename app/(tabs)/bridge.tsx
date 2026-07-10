@@ -105,7 +105,7 @@ export default function BridgeHub() {
       [
         { id: 'airtime', label: 'Airtime', link: '/airtime-top-up', image: icons.call },
         { id: 'data', label: 'Data', link: '/data-subscription', image: icons.data },
-        { id: 'electricity', label: 'Electricity', link: '/powerProviders', image: icons.power },
+        { id: 'electricity', label: 'Electricity', link: '/electricity-provider', image: icons.power },
         { id: 'cable', label: 'Cable TV', link: '/cableProviders', image: icons.tv },
       ] as HubItem[],
     []

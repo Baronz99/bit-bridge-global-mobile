@@ -98,7 +98,7 @@ export const resolveElectricityRouteFromServiceKey = (serviceKey?: string) => {
   if (!provider?.id) return null
 
   return {
-    pathname: '/powerProviders/[id]' as const,
+    pathname: '/electricity-provider/[id]' as const,
     params: { id: String(provider.id) },
   }
 }

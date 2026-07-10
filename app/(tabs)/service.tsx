@@ -19,7 +19,7 @@ const Utilities = () => {
         items: [
           { id: 0, label: 'Airtime', link: '/airtime-top-up', image: icons.phone },
           { id: 2, label: 'Data', link: '/data-subscription', image: icons.wifi },
-          { id: 1, label: 'Electricity', link: '/powerProviders', image: icons.electricity },
+          { id: 1, label: 'Electricity', link: '/electricity-provider', image: icons.electricity },
           { id: 3, label: 'Cable TV', link: '/cableProviders', image: icons.television },
         ],
       },
