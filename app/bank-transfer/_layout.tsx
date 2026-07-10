@@ -1,10 +1,25 @@
 import React, { useEffect, useState } from 'react'
 import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native'
 import { Redirect, router, Stack, usePathname } from 'expo-router'
+import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '@/services/useAuth'
 import { getTierFromProfile, isTierEligibleForBankTransfer } from '@/utils/bankTransfer'
+import { backOrFallback } from '@/utils/navigationRecovery'
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+const HeaderBackButton = () => (
+  <TouchableOpacity
+    onPress={() => backOrFallback(router, '/(tabs)')}
+    className="flex-row items-center"
+    accessibilityRole="button"
+    accessibilityLabel="Go back"
+    hitSlop={12}
+  >
+    <Ionicons name="chevron-back" size={20} color="white" />
+    <Text className="ml-1 text-sm font-semibold text-white">Back</Text>
+  </TouchableOpacity>
+)
 
 const BankTransferLayout = () => {
   const pathname = usePathname()
@@ -79,7 +94,7 @@ const BankTransferLayout = () => {
             <Text className="text-center font-semibold text-white">Try again</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            onPress={() => router.replace('/(tabs)' as any)}
+            onPress={() => router.replace('/(tabs)' as const)}
             className="mt-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-4"
           >
             <Text className="text-center font-semibold text-white">Go Home</Text>
@@ -105,8 +120,20 @@ const BankTransferLayout = () => {
         headerTintColor: 'white',
       }}
     >
-      <Stack.Screen name="index" options={{ headerTitle: 'Bank Transfer' }} />
-      <Stack.Screen name="locked" options={{ headerTitle: 'Bank Transfer Access' }} />
+      <Stack.Screen
+        name="index"
+        options={{
+          headerTitle: 'Bank Transfer',
+          headerLeft: HeaderBackButton,
+        }}
+      />
+      <Stack.Screen
+        name="locked"
+        options={{
+          headerTitle: 'Bank Transfer Access',
+          headerLeft: HeaderBackButton,
+        }}
+      />
       <Stack.Screen name="review" options={{ headerTitle: 'Review Transfer' }} />
       <Stack.Screen name="success" options={{ headerTitle: 'Transfer Status' }} />
     </Stack>
