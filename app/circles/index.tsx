@@ -4,6 +4,7 @@ import { Link, useRouter } from 'expo-router'
 import { createCircle, listCircles } from '@/api/circles'
 import AppModal from '@/components/modal/Modal'
 import FormInput from '@/components/FormInput'
+import ScreenContainer from '@/components/ScreenContainer'
 import { useAuth } from '@/services/useAuth'
 import { useActiveAccount } from '@/services/useActiveAccount'
 import { FEATURE_CIRCLES } from '@/constants/featureFlags'
@@ -230,8 +231,14 @@ const CirclesScreen = () => {
   }
 
   return (
-    <View className="flex-1 bg-primary">
-      <View className="px-4 pt-6 pb-4">
+    <ScreenContainer
+      includeTopInset
+      topPadding={6}
+      horizontalPadding={0}
+      className="flex-1 bg-primary"
+      scroll={false}
+    >
+      <View className="px-4 pb-4">
         <TouchableOpacity
           accessibilityLabel="Back to Home"
           onPress={() => {
@@ -273,6 +280,7 @@ const CirclesScreen = () => {
               {circles.length} active circle{circles.length === 1 ? '' : 's'}
             </Text>
             <TouchableOpacity
+              accessibilityLabel="Open create circle"
               onPress={() => setCreateOpen(true)}
               className="bg-app-primary px-4 py-2 rounded-full"
               disabled={!canCreateCircle}
@@ -321,6 +329,7 @@ const CirclesScreen = () => {
               Create a circle to start running collections, tracking payments, and managing your group treasury properly.
             </Text>
             <TouchableOpacity
+              accessibilityLabel="Open create circle"
               onPress={() => setCreateOpen(true)}
               className="bg-app-primary px-4 py-2 rounded-lg"
               disabled={!canCreateCircle}
@@ -495,13 +504,23 @@ const CirclesScreen = () => {
 
       <AppModal open={createOpen} onclose={() => setCreateOpen(false)}>
         <View className="bg-gray-900 p-6 rounded-2xl w-full max-w-md">
-          <Text className="text-white text-xl font-semibold text-center mb-2">
-            Create circle
-          </Text>
-          <Text className="text-gray-400 text-center text-xs mb-5">
-            Select the product bucket that best matches how your group collects and manages money.
-          </Text>
-
+          <View className="mb-4 flex-row items-center justify-between gap-3">
+            <View className="flex-1">
+              <Text className="text-white text-xl font-semibold text-center mb-2">
+                Create circle
+              </Text>
+              <Text className="text-gray-400 text-center text-xs">
+                Select the product bucket that best matches how your group collects and manages money.
+              </Text>
+            </View>
+            <TouchableOpacity
+              accessibilityLabel="Close create circle"
+              onPress={() => setCreateOpen(false)}
+              className="self-start rounded-full border border-gray-700 bg-gray-950 px-3 py-2"
+            >
+              <Text className="text-xs font-semibold text-white">Close</Text>
+            </TouchableOpacity>
+          </View>
           {notice ? <Text className="text-yellow-400 text-xs mb-3">{notice}</Text> : null}
 
           <Text className="text-white text-xs uppercase tracking-[0.16em] mb-3">Circle Type</Text>
@@ -559,9 +578,16 @@ const CirclesScreen = () => {
               {creating ? 'Creating...' : 'Create circle'}
             </Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            accessibilityLabel="Cancel create circle"
+            onPress={() => setCreateOpen(false)}
+            className="mt-3 rounded-xl border border-gray-800 py-3 items-center"
+          >
+            <Text className="text-sm font-semibold text-white">Back to circles</Text>
+          </TouchableOpacity>
         </View>
       </AppModal>
-    </View>
+    </ScreenContainer>
   )
 }
 
