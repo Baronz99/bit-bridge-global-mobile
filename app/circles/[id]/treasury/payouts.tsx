@@ -11,7 +11,7 @@ import {
 } from 'react-native'
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
 import { useFocusEffect } from '@react-navigation/native'
-import SearchablePicker from '@/components/bankTransfer/SearchablePicker'
+import BankPickerSheet from '@/components/bankTransfer/BankPickerSheet'
 import TransactionPinModal from '@/components/TransactionPinModal'
 import {
   approveCircleTreasuryPayoutRequest,
@@ -89,6 +89,7 @@ const CircleTreasuryPayoutsScreen = () => {
   })
   const [banks, setBanks] = useState<any[]>([])
   const [bankLoading, setBankLoading] = useState(false)
+  const [bankError, setBankError] = useState<string | null>(null)
   const [accountLookupStatus, setAccountLookupStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [accountLookupError, setAccountLookupError] = useState('')
   const lookupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -202,34 +203,38 @@ const CircleTreasuryPayoutsScreen = () => {
     }, [loadPayouts])
   )
 
-  useEffect(() => {
-    let mounted = true
-    const loadBanks = async () => {
-      setBankLoading(true)
-      try {
-        const response = await getBanks()
-        const raw = Array.isArray(response)
-          ? response
-          : Array.isArray(response?.data?.banks)
-            ? response.data.banks
-            : Array.isArray(response?.data?.data)
-              ? response.data.data
-              : Array.isArray(response?.banks)
-                ? response.banks
-                : []
-        if (mounted) setBanks(raw)
-      } catch {
-        if (mounted) setBanks([])
-      } finally {
-        if (mounted) setBankLoading(false)
-      }
-    }
-
-    void loadBanks()
-    return () => {
-      mounted = false
+  const loadBanks = useCallback(async () => {
+    setBankLoading(true)
+    setBankError(null)
+    try {
+      const response = await getBanks()
+      const raw = Array.isArray(response)
+        ? response
+        : Array.isArray(response?.data?.banks)
+          ? response.data.banks
+          : Array.isArray(response?.data?.data)
+            ? response.data.data
+            : Array.isArray(response?.banks)
+              ? response.banks
+              : []
+      setBanks(raw)
+    } catch (requestError: any) {
+      setBanks([])
+      setBankError(
+        buildApiErrorMessage({
+          status: requestError?.response?.status,
+          data: requestError?.response?.data,
+          fallback: requestError?.message || 'Unable to load bank list right now.',
+        })
+      )
+    } finally {
+      setBankLoading(false)
     }
   }, [])
+
+  useEffect(() => {
+    void loadBanks()
+  }, [loadBanks])
 
   useEffect(() => {
     if (!canResolveAccount) {
@@ -506,11 +511,14 @@ const CircleTreasuryPayoutsScreen = () => {
                     keyboardType="numeric"
                   />
                 </View>
-                <SearchablePicker
-                  label="Bank"
+                <BankPickerSheet
                   selectedValue={form.beneficiary_bank_code}
                   options={bankOptions}
-                  placeholder={bankLoading ? 'Loading banks...' : 'Select bank'}
+                  loading={bankLoading}
+                  errorLabel={bankError}
+                  onRetry={() => {
+                    void loadBanks()
+                  }}
                   onSelect={(option) => {
                     lastLookupKeyRef.current = ''
                     setAccountLookupStatus('idle')
@@ -522,6 +530,15 @@ const CircleTreasuryPayoutsScreen = () => {
                     }))
                   }}
                 />
+                {bankLoading ? <Text className="text-gray-500 text-[11px] mt-2">Loading bank list...</Text> : null}
+                {!bankLoading && bankError ? (
+                  <View className="mt-2 flex-row items-center justify-between">
+                    <Text className="text-yellow-300 text-[11px] flex-1 pr-3">{bankError}</Text>
+                    <TouchableOpacity onPress={() => void loadBanks()}>
+                      <Text className="text-cyan-300 text-[11px]">Retry</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : null}
                 {selectedBankLabel ? (
                   <View className="rounded-2xl border border-gray-900 bg-gray-950 px-4 py-3">
                     <Text className="text-xs uppercase tracking-[1.5px] text-gray-500">Selected bank</Text>

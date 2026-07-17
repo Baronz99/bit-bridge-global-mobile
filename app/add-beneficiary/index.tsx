@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react'
-import { ScrollView, Text, TouchableOpacity, View } from 'react-native'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { Text, TouchableOpacity, View } from 'react-native'
 import FormInput from '@/components/FormInput'
-import FormSelect from '@/components/FormSelect'
+import BankPickerSheet from '@/components/bankTransfer/BankPickerSheet'
 import KeyboardAvoidWrapper from '@/components/keyboardAvoidWrapper/KeyboardAvoidWrapper'
 import Loader from '@/components/Loader'
 import NotificationAlert from '@/components/notification'
@@ -10,10 +10,13 @@ import { useAuth } from '@/services/useAuth'
 
 const AddBeneficiaryScreen = () => {
   const { onLogout } = useAuth()
-  const [loading, setLoading] = useState(false)
+  const [banksLoading, setBanksLoading] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
   const [banks, setBanks] = useState<any[]>([])
+  const [bankError, setBankError] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     bank_code: '',
+    bank_name: '',
     account_number: '',
     account_name: '' })
   const [notice, setNotice] = useState<{ message: string | null; error: boolean; data: any }>({
@@ -21,42 +24,41 @@ const AddBeneficiaryScreen = () => {
     error: false,
     data: null })
 
-  useEffect(() => {
-    const fetchBanks = async () => {
-      setLoading(true)
-      setNotice({ message: null, error: false, data: null })
-      try {
-        const response = await getBanks()
-        const raw =
-          response?.data?.banks ||
-          response?.data?.data ||
-          response?.data ||
-          response?.banks ||
-          response
-        const list = Array.isArray(raw) ? raw : []
-        setBanks(list)
-      } catch (error: any) {
-        const status = error?.response?.status
-        if (status === 401) {
-          return
-        }
-        setNotice({
-          message: error?.response?.data?.message || error?.message || 'Something went wrong',
-          error: true,
-          data: null })
-      } finally {
-        setLoading(false)
+  const fetchBanks = useCallback(async () => {
+    setBanksLoading(true)
+    setBankError(null)
+    try {
+      const response = await getBanks()
+      const raw =
+        response?.data?.banks ||
+        response?.data?.data ||
+        response?.data ||
+        response?.banks ||
+        response
+      const list = Array.isArray(raw) ? raw : []
+      setBanks(list)
+    } catch (error: any) {
+      const status = error?.response?.status
+      if (status === 401) {
+        return
       }
+      setBanks([])
+      setBankError(error?.response?.data?.message || error?.message || 'Unable to load bank list right now.')
+    } finally {
+      setBanksLoading(false)
     }
+  }, [])
 
-    fetchBanks()
-  }, [onLogout])
+  useEffect(() => {
+    void fetchBanks()
+  }, [fetchBanks, onLogout])
 
   const options = useMemo(
     () =>
       banks.map((bank) => ({
         label: bank?.name || bank?.bank_name || bank?.label || 'Unknown bank',
-        value: bank?.code || bank?.bank_code || bank?.value || bank?.id || bank?.name })),
+        value: String(bank?.code || bank?.bank_code || bank?.value || bank?.id || bank?.name || ''),
+        data: bank })),
     [banks]
   )
 
@@ -66,7 +68,7 @@ const AddBeneficiaryScreen = () => {
       return
     }
 
-    setLoading(true)
+    setSubmitting(true)
     setNotice({ message: null, error: false, data: null })
     try {
       const response = await createCounterParty({
@@ -79,7 +81,7 @@ const AddBeneficiaryScreen = () => {
         message: response?.message || 'Beneficiary added.',
         error: false,
         data: response?.data || null })
-      setFormData({ bank_code: '', account_number: '', account_name: '' })
+      setFormData({ bank_code: '', bank_name: '', account_number: '', account_name: '' })
     } catch (error: any) {
       const status = error?.response?.status
       if (status === 401) {
@@ -90,7 +92,7 @@ const AddBeneficiaryScreen = () => {
         error: true,
         data: null })
     } finally {
-      setLoading(false)
+      setSubmitting(false)
     }
   }
 
@@ -103,12 +105,27 @@ const AddBeneficiaryScreen = () => {
 
           <NotificationAlert message={notice.message} data={notice.data} error={notice.error} />
 
-          <FormSelect
-            label="Bank"
+          <BankPickerSheet
             selectedValue={formData.bank_code}
-            onValueChange={(value: string) => setFormData({ ...formData, bank_code: value })}
             options={options}
+            loading={banksLoading}
+            errorLabel={bankError}
+            onRetry={() => {
+              void fetchBanks()
+            }}
+            onSelect={(option) => setFormData({ ...formData, bank_code: option.value, bank_name: option.label })}
           />
+          {banksLoading ? <Text className="text-gray-500 text-[11px] mt-2">Loading bank list...</Text> : null}
+          {!banksLoading && bankError ? (
+            <View className="mt-2 flex-row items-center justify-between">
+              <Text className="text-yellow-300 text-[11px] flex-1 pr-3">{bankError}</Text>
+              <TouchableOpacity onPress={() => {
+                void fetchBanks()
+              }}>
+                <Text className="text-app-primary text-[11px]">Retry</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
 
           <FormInput
             label="Account Number"
@@ -134,7 +151,7 @@ const AddBeneficiaryScreen = () => {
         </View>
       </KeyboardAvoidWrapper>
 
-      <Loader open={loading} />
+      <Loader open={submitting} />
     </View>
   )
 }

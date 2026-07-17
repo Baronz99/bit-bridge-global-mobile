@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import NotificationAlert from '@/components/notification'
@@ -151,6 +151,7 @@ const BankTransferScreen = () => {
   const transferReferenceRef = useRef<string>(buildTransferReference())
 
   const [banksLoading, setBanksLoading] = useState(true)
+  const [banksError, setBanksError] = useState<string | null>(null)
   const [beneficiariesLoading, setBeneficiariesLoading] = useState(true)
   const [balanceLoading, setBalanceLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -335,35 +336,34 @@ const BankTransferScreen = () => {
     }
   }, [tierEligible, loadProfile, userProfileData])
 
+  const loadBanks = useCallback(async () => {
+    setBanksLoading(true)
+    setBanksError(null)
+    try {
+      const bankList = await getBanks()
+      setBanks(Array.isArray(bankList) ? bankList : [])
+    } catch (error: unknown) {
+      const parsedError = error as { response?: { status?: number; data?: unknown }; message?: string }
+      const status = parsedError?.response?.status
+      if (status === 401) return
+      setBanks([])
+      setBanksError(
+        buildApiErrorMessage({
+          status,
+          data: parsedError?.response?.data,
+          fallback: parsedError?.message || 'Unable to load bank list right now.',
+        })
+      )
+    } finally {
+      setBanksLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     let mounted = true
     const fallbackBalance = Number(userProfileData?.wallet?.balance ?? 0)
     if (Number.isFinite(fallbackBalance)) {
       setAvailableBalance(fallbackBalance)
-    }
-
-    const loadBanks = async () => {
-      setBanksLoading(true)
-      try {
-        const bankList = await getBanks()
-        if (mounted) setBanks(Array.isArray(bankList) ? bankList : [])
-      } catch (error: unknown) {
-        const parsedError = error as { response?: { status?: number; data?: unknown }; message?: string }
-        const status = parsedError?.response?.status
-        if (status !== 401 && mounted) {
-          setNotice({
-            message: buildApiErrorMessage({
-              status,
-              data: parsedError?.response?.data,
-              fallback: parsedError?.message || 'Unable to load bank list. You can keep entering details while it retries on reopen.',
-            }),
-            error: true,
-            data: null,
-          })
-        }
-      } finally {
-        if (mounted) setBanksLoading(false)
-      }
     }
 
     const loadBeneficiaries = async () => {
@@ -402,14 +402,14 @@ const BankTransferScreen = () => {
       }
     }
 
-    void loadBanks()
+    void loadBanks().catch(() => null)
     void loadBeneficiaries()
     void loadBalance()
 
     return () => {
       mounted = false
     }
-  }, [activeAccount, userProfileData?.wallet?.balance])
+  }, [activeAccount, loadBanks, userProfileData?.wallet?.balance])
 
   useEffect(() => {
     const quoteAmount = amountValue > 0 ? amountValue : MIN_TRANSFER_AMOUNT
@@ -924,6 +924,11 @@ const BankTransferScreen = () => {
                       selectedValue={formData.bank_code}
                       options={bankOptions}
                       recentValues={recentBankCodes}
+                      loading={banksLoading}
+                      errorLabel={banksError}
+                      onRetry={() => {
+                        void loadBanks()
+                      }}
                       disabled={beneficiaryLocked}
                       onSelect={(option) => {
                         setFormData((prev) => ({
@@ -941,7 +946,17 @@ const BankTransferScreen = () => {
                       }}
                     />
                     {banksLoading ? <Text className="text-gray-500 text-[11px] mt-2">Loading bank list...</Text> : null}
-                    {!banksLoading && bankOptions.length < 1 ? (
+                    {!banksLoading && banksError ? (
+                      <View className="mt-2 flex-row items-center justify-between">
+                        <Text className="text-yellow-300 text-[11px] flex-1 pr-3">
+                          {banksError}
+                        </Text>
+                        <TouchableOpacity onPress={() => void loadBanks()}>
+                          <Text className="text-app-primary text-[11px]">Retry</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : null}
+                    {!banksLoading && !banksError && bankOptions.length < 1 ? (
                       <Text className="text-yellow-300 text-[11px] mt-2">
                         Bank list is not available yet. Reopen this screen or try again shortly.
                       </Text>

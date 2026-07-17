@@ -5,6 +5,7 @@ import AppModal from '@/components/modal/Modal'
 type BankOption = {
   label: string
   value: string
+  data?: unknown
 }
 
 type BankPickerSheetProps = {
@@ -12,6 +13,12 @@ type BankPickerSheetProps = {
   options: BankOption[]
   recentValues?: string[]
   disabled?: boolean
+  loading?: boolean
+  loadingLabel?: string
+  emptyLabel?: string
+  errorLabel?: string | null
+  retryLabel?: string
+  onRetry?: () => void
   onSelect: (option: BankOption) => void
 }
 
@@ -26,6 +33,12 @@ const BankPickerSheet = ({
   options,
   recentValues = [],
   disabled = false,
+  loading = false,
+  loadingLabel = 'Loading banks...',
+  emptyLabel = 'No banks found for this search.',
+  errorLabel = null,
+  retryLabel = 'Retry',
+  onRetry,
   onSelect,
 }: BankPickerSheetProps) => {
   const [open, setOpen] = useState(false)
@@ -57,6 +70,12 @@ const BankPickerSheet = ({
     return options.filter((item) => item.label.toLowerCase().includes(term))
   }, [options, query])
 
+  const queryPresent = query.trim().length > 0
+  const showErrorState = !loading && Boolean(errorLabel)
+  const showLoadingState = loading
+  const showEmptyState = !loading && queryPresent && filteredOptions.length === 0 && !showErrorState
+  const showList = !showLoadingState && !showErrorState && filteredOptions.length > 0
+
   return (
     <View>
       <Text className="text-white mb-2">Bank</Text>
@@ -87,6 +106,7 @@ const BankPickerSheet = ({
             placeholder="Search bank name"
             placeholderTextColor="gray"
             className="border border-gray-700 rounded-xl px-4 py-3 text-white bg-gray-900 mt-4"
+            editable={!loading}
           />
 
           {recentOptions.length > 0 ? (
@@ -111,11 +131,30 @@ const BankPickerSheet = ({
           ) : null}
 
           <View className="mt-4 flex-1">
-            {filteredOptions.length === 0 ? (
+            {showLoadingState ? (
               <View className="border border-gray-800 rounded-xl p-4 bg-gray-900">
-                <Text className="text-gray-300 text-sm text-center">No banks found for this search.</Text>
+                <Text className="text-gray-300 text-sm text-center">{loadingLabel}</Text>
               </View>
-            ) : (
+            ) : null}
+
+            {showErrorState ? (
+              <View className="border border-red-900/40 rounded-xl p-4 bg-red-950/20">
+                <Text className="text-red-200 text-sm text-center">{errorLabel}</Text>
+                {onRetry ? (
+                  <TouchableOpacity onPress={onRetry} className="mt-3 self-center bg-gray-900 border border-gray-700 rounded-full px-4 py-2">
+                    <Text className="text-white text-xs">{retryLabel}</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            ) : null}
+
+            {showEmptyState ? (
+              <View className="border border-gray-800 rounded-xl p-4 bg-gray-900">
+                <Text className="text-gray-300 text-sm text-center">{emptyLabel}</Text>
+              </View>
+            ) : null}
+
+            {showList ? (
               <ScrollView style={{ maxHeight: 420 }}>
                 {filteredOptions.map((bank) => (
                   <TouchableOpacity
@@ -133,7 +172,7 @@ const BankPickerSheet = ({
                   </TouchableOpacity>
                 ))}
               </ScrollView>
-            )}
+            ) : null}
           </View>
         </View>
       </AppModal>

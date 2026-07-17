@@ -43,6 +43,8 @@ const BusinessTransfersScreen = () => {
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [transactions, setTransactions] = useState<Record<string, any>[]>([])
   const [banks, setBanks] = useState<any[]>([])
+  const [banksLoading, setBanksLoading] = useState(false)
+  const [banksError, setBanksError] = useState<string | null>(null)
   const [recentBankCodes, setRecentBankCodes] = useState<string[]>([])
   const [quoteLoading, setQuoteLoading] = useState(false)
   const [quotedFee, setQuotedFee] = useState(0)
@@ -82,6 +84,26 @@ const BusinessTransfersScreen = () => {
 
   const transferItems = useMemo(() => transactions.filter((item) => item?.meta?.transfer_reference), [transactions])
 
+  const loadBanks = useCallback(async () => {
+    setBanksLoading(true)
+    setBanksError(null)
+    try {
+      const bankList = await getBanks()
+      setBanks(Array.isArray(bankList) ? bankList : [])
+    } catch (error: any) {
+      setBanks([])
+      setBanksError(
+        buildApiErrorMessage({
+          status: error?.response?.status,
+          data: error?.response?.data,
+          fallback: 'Unable to load bank list right now.',
+        })
+      )
+    } finally {
+      setBanksLoading(false)
+    }
+  }, [])
+
   const loadTransfers = useCallback(async () => {
     if (!businessId) {
       setLoading(false)
@@ -91,13 +113,9 @@ const BusinessTransfersScreen = () => {
     setLoading(true)
     setErrorMessage(null)
     try {
-      const [transactionsResponse, bankList] = await Promise.all([
-        getBusinessTransactions(businessId, { limit: 40 }),
-        getBanks().catch(() => []),
-      ])
+      const transactionsResponse = await getBusinessTransactions(businessId, { limit: 40 })
       const items = Array.isArray(transactionsResponse?.data?.items) ? transactionsResponse.data.items : []
       setTransactions(items)
-      setBanks(Array.isArray(bankList) ? bankList : [])
       const recentCodes = items
         .map((item) => String(item?.meta?.bank_code || item?.meta?.beneficiary_bank_code || '').trim())
         .filter(Boolean)
@@ -116,8 +134,9 @@ const BusinessTransfersScreen = () => {
   }, [businessId])
 
   useEffect(() => {
-    loadTransfers()
-  }, [loadTransfers])
+    void loadTransfers()
+    void loadBanks()
+  }, [loadBanks, loadTransfers])
 
   useEffect(() => {
     if (!amountValue || amountValue <= 0) {
@@ -368,6 +387,11 @@ const BusinessTransfersScreen = () => {
                     selectedValue={form.bank_code}
                     options={bankOptions}
                     recentValues={recentBankCodes}
+                    loading={banksLoading}
+                    errorLabel={banksError}
+                    onRetry={() => {
+                      void loadBanks()
+                    }}
                     onSelect={(option) => {
                       setForm((current) => ({
                         ...current,
@@ -380,6 +404,15 @@ const BusinessTransfersScreen = () => {
                       setAccountLookupError(null)
                     }}
                   />
+                  {banksLoading ? <Text className="text-gray-500 text-[11px] mt-2">Loading bank list...</Text> : null}
+                  {!banksLoading && banksError ? (
+                    <View className="mt-2 flex-row items-center justify-between">
+                      <Text className="text-yellow-300 text-[11px] flex-1 pr-3">{banksError}</Text>
+                      <TouchableOpacity onPress={() => void loadBanks()}>
+                        <Text className="text-[#FFB05A] text-[11px]">Retry</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : null}
                 </View>
 
                 <View className="mt-4">
