@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Stack, router } from 'expo-router'
-import { Linking, StatusBar, Text, TouchableOpacity, View } from 'react-native'
+import { StatusBar, Text, TouchableOpacity, View } from 'react-native'
 import * as SplashScreen from 'expo-splash-screen'
 import './globals.css'
 
@@ -16,6 +16,7 @@ import { log } from '@/utils/logger'
 import BootScreen from '@/src/components/BootScreen'
 import PushNotificationsBridge from '@/services/PushNotificationsBridge'
 import AppModal from '@/components/modal/Modal'
+import { launchSupportEmail } from '@/services/support/SupportLauncher'
 
 void SplashScreen.preventAutoHideAsync().catch(() => {})
 
@@ -62,10 +63,7 @@ class RootErrorBoundary extends React.Component<{ children: React.ReactNode }, E
       }
 
       const handleContactSupport = async () => {
-        const subject = encodeURIComponent('BitBridge Global mobile support')
-        const body = encodeURIComponent('I hit a recovery screen in the BitBridge Global mobile app and need help.')
-        await Linking.openURL(`mailto:support@bitbridgeglobal.com?subject=${subject}&body=${body}`
-        ).catch(() => null)
+        await launchSupportEmail({ category: 'general' })
       }
 
       return (
@@ -186,10 +184,7 @@ function StartupGate({ children }: { children: React.ReactNode }) {
   }
 
   const handleContactSupport = async () => {
-    const subject = encodeURIComponent('BitBridge Global mobile support')
-    const body = encodeURIComponent('The app is taking too long to open and I need help.')
-    await Linking.openURL(`mailto:support@bitbridgeglobal.com?subject=${subject}&body=${body}`
-    ).catch(() => null)
+    await launchSupportEmail({ category: 'general' })
   }
 
   return (
@@ -385,6 +380,7 @@ export default function RootLayout() {
         <Stack.Screen name="rewards/index" options={{ headerTitle: 'Rewards' }} />
         <Stack.Screen name="wallet/stats" options={{ headerTitle: 'Wallet Stats' }} />
         <Stack.Screen name="legal/index" options={{ headerTitle: 'Legal' }} />
+        <Stack.Screen name="help-support/index" options={{ headerTitle: 'Help & Support' }} />
 
         <Stack.Screen name="accountProfile/index" options={{ headerTitle: 'Update Profile' }} />
         <Stack.Screen name="accountDetails/index" options={{ headerTitle: 'Account Details' }} />

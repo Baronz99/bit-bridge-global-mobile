@@ -20,6 +20,7 @@ export const FEATURE_REWARDS = flagEnabled(process.env.EXPO_PUBLIC_FEATURE_REWAR
 export const FEATURE_STATS = flagEnabled(process.env.EXPO_PUBLIC_FEATURE_STATS ?? '0')
 export const FEATURE_CARD_TOKENS = flagEnabled(process.env.EXPO_PUBLIC_FEATURE_CARD_TOKENS ?? '1')
 export const FEATURE_PAYMENT_TOOLS = flagEnabled(process.env.EXPO_PUBLIC_FEATURE_PAYMENT_TOOLS ?? '1')
+export const FEATURE_WHATSAPP_SUPPORT = flagEnabled(process.env.EXPO_PUBLIC_FEATURE_WHATSAPP_SUPPORT ?? '0')
 export const FEATURE_LEGACY_HOME = flagEnabled(process.env.EXPO_PUBLIC_FEATURE_LEGACY_HOME ?? '0')
 export const FEATURE_PHONE_FIRST_SIGNUP = flagEnabled(
   process.env.EXPO_PUBLIC_ENABLE_PHONE_FIRST_SIGNUP ?? '0'

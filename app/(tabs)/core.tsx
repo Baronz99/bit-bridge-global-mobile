@@ -15,6 +15,7 @@ type RowItem = {
   label: string
   href: Href
   icon: React.ReactElement
+  accessibilityLabel?: string
 }
 
 export default function CoreHub() {
@@ -88,6 +89,12 @@ export default function CoreHub() {
             icon: <Ionicons name="document-text-outline" size={18} color="white" />,
           },
           {
+            label: 'Help & Support',
+            href: '/help-support',
+            icon: <Ionicons name="help-circle-outline" size={18} color="white" />,
+            accessibilityLabel: 'Open Help and Support',
+          },
+          {
             label: 'Deactivate/Delete',
             href: '/delete-deactivate',
             icon: <AntDesign name="delete" size={18} color="white" />,
@@ -142,7 +149,7 @@ export default function CoreHub() {
             <View className="mt-2 gap-2">
               {section.items.map((item) => (
                 <Link key={item.label} href={item.href} asChild>
-                  <TouchableOpacity>
+                  <TouchableOpacity accessibilityRole="button" accessibilityLabel={item.accessibilityLabel || item.label}>
                     <View className="flex-row items-center gap-3 rounded-2xl border border-gray-800 bg-gray-950/60 px-3 py-3">
                       <View className="h-9 w-9 items-center justify-center rounded-2xl border border-gray-800 bg-gray-900">
                         {item.icon}
