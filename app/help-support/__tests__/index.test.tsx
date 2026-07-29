@@ -29,7 +29,7 @@ jest.mock('@/components/modal/Modal', () => {
   return MockModal
 })
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }))
-jest.mock('expo-router', () => ({ Redirect: ({ href }: { href: string }) => <redirect href={href} /> }))
+jest.mock('expo-router', () => ({ Redirect: 'redirect' }))
 
 const button = (tree: renderer.ReactTestRenderer, label: string) => tree.root.findByProps({ accessibilityLabel: label })
 const renderScreen = () => {
@@ -37,7 +37,7 @@ const renderScreen = () => {
   act(() => {
     tree = renderer.create(<HelpSupportScreen />)
   })
-  return tree as renderer.ReactTestRenderer
+  return tree!
 }
 
 describe('HelpSupportScreen', () => {
@@ -52,7 +52,7 @@ describe('HelpSupportScreen', () => {
   it('redirects unauthenticated users to login', () => {
     mockAuthenticated = false
     const tree = renderScreen()
-    expect(tree.root.findByType('redirect').props.href).toBe('/login')
+    expect(tree.root.findByType('redirect' as unknown as React.ElementType).props.href).toBe('/login')
   })
 
   it('opens confirmation before launching WhatsApp and permits cancellation', () => {
@@ -77,7 +77,7 @@ describe('HelpSupportScreen', () => {
     const tree = renderScreen()
     act(() => button(tree, 'Get help with Fraud or security concern').props.onPress())
     expect(button(tree, 'Open WhatsApp to chat with BitBridge Support')).toBeTruthy()
-    expect(tree.root.findAllByType('Text').some((node) => String(node.props.children).includes('WhatsApp is not an emergency service.'))).toBe(true)
+    expect(tree.root.findAll((node) => String(node.props.children).includes('WhatsApp is not an emergency service.')).length).toBeGreaterThan(0)
   })
 
   it('only launches once for immediate repeated taps and unlocks after failure', async () => {
