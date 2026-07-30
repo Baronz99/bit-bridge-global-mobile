@@ -15,6 +15,9 @@ jobs:
     env:
       CI: 1
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      EXPO_PUBLIC_SUPPORT_WHATSAPP_NUMBER: 2348189139719
+      EXPO_PUBLIC_SUPPORT_AVAILABILITY_TEXT: Support availability may vary. We’ll respond as soon as possible.
+      EXPO_PUBLIC_FEATURE_WHATSAPP_SUPPORT: 1
 
     steps:
       - name: Checkout

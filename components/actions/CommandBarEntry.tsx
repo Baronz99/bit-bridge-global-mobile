@@ -16,7 +16,7 @@ export default function CommandBarEntry({ onPress }: { onPress: () => void }) {
         </View>
         <View className="flex-1">
           <Text className="text-[15px] font-semibold text-white">What would you like to do?</Text>
-          <Text className="mt-1 text-xs text-[#94A3B8]">Send money, buy airtime, cards, statements, or support.</Text>
+          <Text className="mt-1 text-xs text-[#94A3B8]">Send money, buy airtime, cards, or statements.</Text>
         </View>
       </View>
     </TouchableOpacity>

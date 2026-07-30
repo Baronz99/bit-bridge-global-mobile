@@ -72,6 +72,9 @@
         "EXPO_PUBLIC_FEATURE_CARD_TOKENS": "1",
         "EXPO_PUBLIC_FEATURE_PAYMENT_TOOLS": "1",
         "EXPO_PUBLIC_FEATURE_LEGACY_HOME": "0",
+        "EXPO_PUBLIC_SUPPORT_WHATSAPP_NUMBER": "2348189139719",
+        "EXPO_PUBLIC_SUPPORT_AVAILABILITY_TEXT": "Support availability may vary. We’ll respond as soon as possible.",
+        "EXPO_PUBLIC_FEATURE_WHATSAPP_SUPPORT": "1",
         "EXPO_PUBLIC_ENABLE_PHONE_FIRST_SIGNUP": "1"
       }
     }
