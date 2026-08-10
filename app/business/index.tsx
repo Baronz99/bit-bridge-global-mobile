@@ -588,6 +588,7 @@ const BusinessIndexScreen = () => {
     const actions = [
       { label: 'Approvals', icon: 'checkmark-done-outline' as const, onPress: () => router.push('/business/approvals' as any), badge: pendingApprovals ? String(pendingApprovals) : null },
       { label: 'Verification', icon: 'document-text-outline' as const, onPress: () => router.push('/business/kyb' as any), badge: isLive ? null : statusLabel },
+      { label: 'People', icon: 'people-outline' as const, onPress: () => router.push('/business/onboarding?section=signatory' as any), badge: isLive ? null : 'Review' },
       { label: 'Statements', icon: 'receipt-outline' as const, badge: 'Soon' },
     ]
     return actions

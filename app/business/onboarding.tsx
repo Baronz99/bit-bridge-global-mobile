@@ -335,6 +335,7 @@ const BusinessOnboardingScreen = () => {
   const [, setTouchedSignatories] = useState<Record<number, Record<string, boolean>>>({})
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [readiness, setReadiness] = useState<Record<string, any> | null>(null)
+  const [reviewPeopleMode, setReviewPeopleMode] = useState(false)
   const [requirements, setRequirements] = useState<Record<string, any> | null>(null)
   const [pickerTarget, setPickerTarget] = useState<PickerTarget>(null)
   const [pickerDraftDate, setPickerDraftDate] = useState<Date>(new Date(2020, 0, 1))
@@ -411,6 +412,7 @@ const BusinessOnboardingScreen = () => {
       const profile = data.profile || {}
       const entity = data.business_entity || {}
       setOnboardingRevision(data.onboarding_revision)
+      setReviewPeopleMode(['under_review', 'documents_pending'].includes(String(entity.status || '').toLowerCase()) || ['pending', 'pending_submission', 'submitted', 'under_review', 'awaiting_documents', 'verification_in_progress', 'provider_documents_required', 'rejected', 'failed'].includes(String(profile.anchor_kyb_status || '').toLowerCase()))
       const incomingRequirements = data.requirements || null
       const incomingTitleOptions = signatoryTitleOptionsFromRequirements(incomingRequirements)
       const incomingSignatories =
@@ -897,6 +899,10 @@ const BusinessOnboardingScreen = () => {
 
   const handleSave = async () => {
     if (!businessId) return
+    if (reviewPeopleMode && section !== 'signatory') {
+      setErrorMessage('Business details are locked during provider review. People additions use the controlled provider flow.')
+      return
+    }
     const localValidationMessage = validateCurrentSection()
     if (localValidationMessage) {
       setErrorMessage(localValidationMessage)
@@ -1578,6 +1584,7 @@ const BusinessOnboardingScreen = () => {
 
               {section === 'signatory' ? (
                 <View className="mt-5">
+                  {reviewPeopleMode ? <View className="rounded-2xl border border-sky-400/25 bg-sky-500/10 px-4 py-3"><Text className="text-sky-100 text-sm">Ownership changes are sent for provider review. Existing submitted identity details remain locked.</Text></View> : null}
                   <View className="mt-5 gap-3">
                     {savedSignatories.map((person) => {
                       const issue = Array.isArray(readiness?.signatory_issues)
@@ -1589,7 +1596,7 @@ const BusinessOnboardingScreen = () => {
                         <Text className="text-white text-base font-semibold">{person.full_name || 'Person'}</Text>
                         {roles.map((role) => <Text key={role} className="text-slate-300 text-sm mt-1">{role}</Text>)}
                         {issue?.submission_ready === false ? <Text className="mt-3 text-amber-200 text-sm">Needs attention</Text> : null}
-                        <View className="mt-4 flex-row gap-3"><TouchableOpacity onPress={() => router.push(`/business/signatories/${person.id}?return_to=${correctionMode ? 'kyb' : returnToSetup ? 'setup' : ''}` as any)} className="flex-1 rounded-2xl border border-gray-700 px-4 py-3 items-center"><Text className="text-white text-sm font-semibold">Edit</Text></TouchableOpacity><TouchableOpacity onPress={() => removeSavedSignatory(person)} className="rounded-2xl border border-red-400/40 px-4 py-3 items-center"><Text className="text-red-300 text-sm font-semibold">Remove</Text></TouchableOpacity></View>
+                        <View pointerEvents={reviewPeopleMode ? 'none' : 'auto'} className="mt-4 flex-row gap-3"><TouchableOpacity onPress={() => router.push(`/business/signatories/${person.id}?return_to=${correctionMode ? 'kyb' : returnToSetup ? 'setup' : ''}` as any)} className="flex-1 rounded-2xl border border-gray-700 px-4 py-3 items-center"><Text className="text-white text-sm font-semibold">Edit</Text></TouchableOpacity><TouchableOpacity onPress={() => removeSavedSignatory(person)} className="rounded-2xl border border-red-400/40 px-4 py-3 items-center"><Text className="text-red-300 text-sm font-semibold">Remove</Text></TouchableOpacity></View>
                       </View>
                     })}
                     {!savedSignatories.length ? <View className="rounded-2xl border border-gray-800 bg-gray-900/50 p-4"><Text className="text-white font-semibold">No representatives added yet</Text><Text className="mt-1 text-gray-400 text-sm">Add a representative and select their role in the business.</Text></View> : null}
