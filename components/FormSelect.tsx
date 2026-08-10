@@ -9,6 +9,7 @@ const FormSelect = ({
   options,
   placeholder,
   placeHolder,
+  errorMessage,
   disabled = false,
 }: any) => {
   const [open, setOpen] = useState(false)
@@ -53,7 +54,7 @@ const FormSelect = ({
           setOpen(true)
         }}
         className={`flex-row items-center justify-between border rounded-xl px-4 py-4 ${
-          disabled ? 'bg-gray-900 border-gray-900 opacity-70' : 'bg-gray-950 border-gray-800'
+          disabled ? 'bg-gray-900 border-gray-900 opacity-70' : errorMessage ? 'bg-gray-950 border-red-400' : 'bg-gray-950 border-gray-800'
         }`}
       >
         <Text className={hasValue ? 'text-white text-sm' : 'text-gray-400 text-sm'}>
@@ -61,6 +62,7 @@ const FormSelect = ({
         </Text>
         <Text className="text-gray-500 text-base">v</Text>
       </TouchableOpacity>
+      {errorMessage ? <Text className="mt-2 text-red-300 text-xs">{errorMessage}</Text> : null}
 
       <AppModal open={open} onclose={() => setOpen(false)}>
         <View className="bg-gray-900 p-4 rounded-2xl w-full max-w-md self-center">

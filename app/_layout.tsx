@@ -310,8 +310,20 @@ export default function RootLayout() {
         <Stack.Screen name="transfer-status/index" options={{ headerTitle: 'Transfer Status' }} />
         <Stack.Screen name="anchor-account/index" options={{ headerTitle: 'Deposit Account' }} />
         <Stack.Screen name="business/index" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="business/setup"
+          options={{ headerTitle: 'Business setup', headerBackTitle: 'Back' }}
+        />
+        <Stack.Screen
+          name="business/signatories/new"
+          options={{ headerTitle: 'Add representative', headerBackTitle: 'Back' }}
+        />
+        <Stack.Screen
+          name="business/signatories/[id]"
+          options={{ headerTitle: 'Edit representative', headerBackTitle: 'Back' }}
+        />
         <Stack.Screen name="business/activate" options={{ headerTitle: 'Activate Business Account' }} />
-        <Stack.Screen name="business/onboarding" options={{ headerTitle: 'Business Profile' }} />
+        <Stack.Screen name="business/onboarding" options={{ headerTitle: 'Business setup', headerBackTitle: 'Back' }} />
         <Stack.Screen name="business/kyb" options={{ headerTitle: 'Business Verification' }} />
         <Stack.Screen name="business/team" options={{ headerTitle: 'Business Team' }} />
         <Stack.Screen name="business/approvals" options={{ headerTitle: 'Business Approvals' }} />

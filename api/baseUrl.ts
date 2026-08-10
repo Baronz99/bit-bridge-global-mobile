@@ -52,12 +52,30 @@ const explicitApiBase = normalize(process.env.EXPO_PUBLIC_API_BASE_URL)
 const rootFromApiBase = apiUrlToRoot(explicitApiBase)
 const envRoot = normalize(RAW_ROOT_URL)
 const hardFallbackRoot = 'https://api.bitbridgeglobal.com'
+const isProductionRoot = (url: string): boolean => normalize(url).toLowerCase() === hardFallbackRoot
 
-const root_url = isPublicHttpsRoot(envRoot)
+const configuredRoot = isPublicHttpsRoot(envRoot)
   ? envRoot
   : isPublicHttpsRoot(rootFromApiBase)
     ? rootFromApiBase
-    : hardFallbackRoot
+    : ''
+
+const root_url =
+  ENV === 'production'
+    ? configuredRoot || hardFallbackRoot
+    : (() => {
+        if (!configuredRoot) {
+          throw new Error(
+            'Invalid non-production API configuration. Set a valid public HTTPS EXPO_PUBLIC_BASE_URL_STAGING or EXPO_PUBLIC_API_BASE_URL.'
+          )
+        }
+
+        if (isProductionRoot(configuredRoot)) {
+          throw new Error('Invalid non-production API configuration. The production API host is not allowed.')
+        }
+
+        return configuredRoot
+      })()
 const api_base_url = root_url ? `${root_url}/api/v1` : ''
 
 const APP_CONFIG = {
@@ -78,7 +96,7 @@ log('[APP_CONFIG]', {
   api_base_url: APP_CONFIG.api_base_url,
 })
 
-if (!isPublicHttpsRoot(envRoot)) {
+if (ENV === 'production' && !isPublicHttpsRoot(envRoot)) {
   const source = isPublicHttpsRoot(rootFromApiBase)
     ? 'EXPO_PUBLIC_API_BASE_URL'
     : 'hardcoded_production_fallback'

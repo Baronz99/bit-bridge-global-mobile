@@ -204,8 +204,10 @@ const buildActivityRows = (transactions: Record<string, any>[]) =>
       return row
     })
 
-const formatStatusLabel = (status: string, isLive: boolean, canActivate: boolean) => {
+const formatStatusLabel = (status: string, isLive: boolean, canActivate: boolean, journeyStage: string) => {
   if (isLive) return 'Live account'
+  if (journeyStage === 'business_banking_provisioning') return 'Activating business banking'
+  if (journeyStage === 'provisioning_reconciliation_required') return 'Account setup confirmation'
   if (canActivate) return 'Verified business'
   if (String(status || '').toLowerCase() === 'under_review') return 'Pending verification'
   return 'Action required'
@@ -221,20 +223,24 @@ const nextActionLabel = (action: string, fallback: string) => {
   switch (String(action || '')) {
     case 'activate_business_account':
       return 'Activate business banking'
+    case 'refresh_activation_status':
+      return 'Refresh activation status'
+    case 'check_activation_status':
+      return 'Check activation status'
     case 'track_verification':
-      return 'Open verification centre'
+      return 'View verification'
     case 'submit_for_verification':
-      return 'Submit business for verification'
-    case 'upload_documents':
-      return 'Upload required documents'
+      return 'Start verification'
+    case 'upload_provider_documents':
+      return 'Upload requested documents'
     case 'add_signatory':
-      return 'Add signatory'
+      return 'Continue setup'
     case 'complete_contact_details':
       return 'Add contact details'
     case 'complete_business_details':
       return 'Complete business details'
     case 'fix_and_resubmit':
-      return 'Review verification issues'
+      return 'Review and correct'
     case 'review_restriction':
       return 'Review restriction'
     case 'operate_account':
@@ -244,19 +250,39 @@ const nextActionLabel = (action: string, fallback: string) => {
   }
 }
 
-const setupStageCopy = ({ isLive, canActivate, businessStatus, missingProfileFields, missingSignatoryRequirements, readiness, journey }: any) => {
+const setupStageCopy = ({ isLive, canActivate, businessStatus, missingProfileFields, missingSignatoryRequirements, journey }: any) => {
   const stage = String(journey?.stage || '')
-  if (journey?.title || journey?.body) {
-    return { stage: String(journey?.title || (isLive ? 'Business banking is live' : 'Business setup')), nextTitle: String(journey?.title || 'Business setup'), nextBody: String(journey?.body || 'Complete the current requirement and continue directly into the next step.'), tone: journeyTone(stage) }
+  if (stage) {
+    switch (stage) {
+      case 'ready_for_verification':
+        return { stage: 'Business verification', nextTitle: 'Ready to begin', nextBody: 'Your business setup is complete. Start verification when you are ready.', tone: 'amber' as const }
+      case 'verification_in_progress':
+        return { stage: 'Business verification', nextTitle: 'Verification in review', nextBody: 'Your business has been submitted and is being reviewed.', tone: 'sky' as const }
+      case 'provider_documents_required':
+        return { stage: 'Business verification', nextTitle: 'Documents needed', nextBody: 'Upload the documents requested during verification.', tone: 'amber' as const }
+      case 'verification_rejected':
+        return { stage: 'Business verification', nextTitle: 'Action required', nextBody: 'Review the requested corrections and update the business information.', tone: 'amber' as const }
+      case 'ready_for_activation':
+        return { stage: 'Business verification', nextTitle: 'Business verified', nextBody: 'Verification is complete. Continue to activate business banking.', tone: 'emerald' as const }
+      case 'business_banking_provisioning':
+        return { stage: 'Business banking', nextTitle: 'Activating business banking', nextBody: 'Your business account is being set up.', tone: 'sky' as const }
+      case 'provisioning_reconciliation_required':
+        return { stage: 'Business banking', nextTitle: 'We’re confirming your account setup', nextBody: 'Your business account setup is being confirmed.', tone: 'sky' as const }
+      case 'business_banking_live':
+        return { stage: 'Business verification', nextTitle: 'Verified', nextBody: 'Business banking is live.', tone: 'emerald' as const }
+      case 'business_restricted':
+        return { stage: 'Business verification', nextTitle: 'Review required', nextBody: 'Review the verification status before continuing.', tone: 'amber' as const }
+      default:
+        return { stage: String(journey?.title || (isLive ? 'Business banking is live' : 'Business setup')), nextTitle: String(journey?.title || 'Business setup'), nextBody: String(journey?.body || 'Complete the current requirement and continue directly into the next step.'), tone: journeyTone(stage) }
+    }
   }
   if (isLive) return { stage: 'Business banking is live', nextTitle: 'Start operating the account', nextBody: 'Fund the account, configure team access, and begin company payments.', tone: 'emerald' }
   if (canActivate) return { stage: 'Business verified', nextTitle: 'Activate business current account', nextBody: 'Verification is complete. Activate the business current account when you are ready.', tone: 'amber' }
   if (String(businessStatus || '').toLowerCase() === 'under_review') return { stage: 'Verification in progress', nextTitle: 'Track verification review', nextBody: 'Your business has already been submitted. Open the verification screen only when you need to refresh status or respond to a request.', tone: 'sky' }
   if (missingProfileFields.some((field: string) => ['legal_name', 'business_type', 'registration_number', 'date_of_registration', 'category', 'anchor_industry'].includes(String(field)))) return { stage: 'Business profile incomplete', nextTitle: 'Complete company details', nextBody: 'Add the registered company information required before verification can start.', tone: 'amber' }
   if (missingProfileFields.some((field: string) => ['contact_email', 'contact_phone', 'address_line_1', 'city', 'state', 'country', 'registered_address_line_1', 'registered_city', 'registered_state', 'registered_country'].includes(String(field)))) return { stage: 'Contact information incomplete', nextTitle: 'Add contact and registered address details', nextBody: 'Add the business contact and registered address used during verification.', tone: 'amber' }
-  if (missingSignatoryRequirements.length > 0) return { stage: 'Signatory information required', nextTitle: 'Add authorized signatory', nextBody: 'Add the officer who will be used for verification and business account control.', tone: 'amber' }
-  if (!readiness?.documents_ready || !readiness?.ready_for_kyb_submission) return { stage: 'Documents required', nextTitle: 'Upload verification documents', nextBody: 'Upload the required business documents before submitting for verification review.', tone: 'amber' }
-  return { stage: 'Ready for verification', nextTitle: 'Submit business for verification', nextBody: 'All required information is present. Submit once and then wait for review.', tone: 'amber' }
+  if (missingSignatoryRequirements.length > 0) return { stage: 'Business setup', nextTitle: 'Business representatives need attention', nextBody: 'Add the owners, directors or authorised signatories associated with this business.', tone: 'amber' }
+  return { stage: 'Business verification', nextTitle: 'Open business verification', nextBody: 'Review the current verification status and next action.', tone: 'amber' }
 }
 
 const emitBusinessLifecycleEvent = (event: string, extra: Record<string, unknown> = {}) => {
@@ -441,13 +467,14 @@ const BusinessIndexScreen = () => {
   }, [loading, errorMessage, businessAccounts.length, router])
 
   const businessStatus = String(businessEntity?.status || selectedBusiness?.status || '').toLowerCase()
+  const journeyStage = String(journey?.stage || '')
   const accountNumber = String(account?.account_number || '').trim()
   const canActivate = Boolean(businessEntity?.provisioning_gate?.can_provision_business_account)
-  const isLive = businessStatus === 'active' || Boolean(accountNumber)
+  const isLive = businessStatus === 'active' || journeyStage === 'business_banking_live'
   const currentRole = String(selectedBusiness?.current_user_role || businessEntity?.current_user_role || '').toLowerCase()
   const roleLabel = formatRole(currentRole || 'member')
-  const statusLabel = formatStatusLabel(businessStatus, isLive, canActivate)
-  const heroTone: 'live' | 'ready' | 'review' | 'setup' = isLive ? 'live' : canActivate ? 'ready' : businessStatus === 'under_review' ? 'review' : 'setup'
+  const statusLabel = formatStatusLabel(businessStatus, isLive, canActivate, journeyStage)
+  const heroTone: 'live' | 'ready' | 'review' | 'setup' = isLive ? 'live' : ['business_banking_provisioning', 'provisioning_reconciliation_required'].includes(journeyStage) ? 'review' : canActivate ? 'ready' : businessStatus === 'under_review' ? 'review' : 'setup'
   const accountLine = accountNumber || null
   const bankLine = String(account?.bank_name || '').trim() || null
   const availableBalance = formatNgn(wallet?.balance ?? wallet?.amount ?? 0)
@@ -472,18 +499,39 @@ const BusinessIndexScreen = () => {
     : Array.isArray(readiness?.missing_signatory_requirements)
       ? readiness.missing_signatory_requirements
       : []
-  const setupStage = useMemo(() => setupStageCopy({ isLive, canActivate, businessStatus, missingProfileFields, missingSignatoryRequirements, readiness, journey }), [isLive, canActivate, businessStatus, missingProfileFields, missingSignatoryRequirements, readiness, journey])
+  const setupStage = useMemo(() => setupStageCopy({ isLive, canActivate, businessStatus, missingProfileFields, missingSignatoryRequirements, journey }), [isLive, canActivate, businessStatus, missingProfileFields, missingSignatoryRequirements, journey])
   const setupSteps = useMemo(() => {
     const hasMissing = (fields: string[]) => fields.some((field) => missingProfileFields.includes(field))
     return [
       { title: 'Business details', ready: !hasMissing(['legal_name', 'business_type', 'registration_number', 'date_of_registration', 'category', 'anchor_industry']) },
       { title: 'Contact details', ready: !hasMissing(['contact_email', 'contact_phone', 'address_line_1', 'city', 'state', 'country', 'registered_address_line_1', 'registered_city', 'registered_state', 'registered_country']) },
-      { title: 'Signatory', ready: missingSignatoryRequirements.length === 0 },
-      { title: 'Verification', ready: Boolean(readiness?.documents_ready && readiness?.ready_for_kyb_submission) },
+      { title: 'Business representatives', ready: missingSignatoryRequirements.length === 0 },
     ]
-  }, [missingProfileFields, missingSignatoryRequirements.length, readiness?.documents_ready, readiness?.ready_for_kyb_submission])
-  const completedSteps = setupSteps.filter((step) => step.ready).length
-  const setupProgress = setupSteps.length ? (completedSteps / setupSteps.length) * 100 : 0
+  }, [missingProfileFields, missingSignatoryRequirements.length])
+  const completedSetupSections = setupSteps.filter((step) => step.ready).length
+  const setupIncomplete = completedSetupSections < setupSteps.length
+  const setupEditingAllowed = !['verification_in_progress', 'verification_rejected', 'provider_documents_required', 'ready_for_activation', 'business_banking_provisioning', 'provisioning_reconciliation_required', 'business_banking_live', 'business_restricted'].includes(journeyStage) && !isLive && !canActivate
+  const dashboardSetupStage = setupEditingAllowed && setupIncomplete
+    ? {
+        stage: 'Business setup',
+        nextTitle: 'Complete business setup',
+        nextBody: !setupSteps[0]?.ready
+          ? 'Business details need attention.'
+          : !setupSteps[1]?.ready
+            ? 'Contact details need attention.'
+            : 'Business representatives need attention.',
+        tone: 'amber' as const,
+      }
+    : setupStage
+  const verificationProgressLabel = journeyStage === 'ready_for_verification'
+    ? 'Verification: ready to begin'
+    : journeyStage === 'verification_in_progress'
+      ? 'Verification: in review'
+      : journeyStage === 'provider_documents_required'
+        ? 'Verification: documents needed'
+        : journeyStage === 'verification_rejected'
+          ? 'Verification: action required'
+          : 'Verification: not started'
 
   const handleActivate = useCallback(async () => {
     if (!selectedBusiness?.id) return
@@ -506,15 +554,16 @@ const BusinessIndexScreen = () => {
     if (isLive || !selectedBusiness?.id) return null
     const nextAction = String(journey?.next_action || '')
     const nextRoute = String(journey?.next_route || '')
-    if (nextAction === 'activate_business_account' || canActivate) return { label: activating ? 'Activating business banking...' : 'Activate business banking', action: handleActivate, loading: activating }
+    if (nextAction === 'activate_business_account') return { label: activating ? 'Activating business banking...' : 'Activate business banking', action: handleActivate, loading: activating }
+    if (setupEditingAllowed && setupIncomplete) return { label: 'Continue setup', action: () => router.push('/business/setup' as any), loading: false }
     if (nextRoute) return { label: nextActionLabel(nextAction, setupStage.nextTitle), action: () => router.push(nextRoute as any), loading: false }
+    if (!journeyStage && canActivate) return { label: activating ? 'Activating business banking...' : 'Activate business banking', action: handleActivate, loading: activating }
     if (businessStatus === 'under_review') return { label: 'Review business verification', action: () => router.push('/business/kyb' as any), loading: false }
     if (missingProfileFields.some((field: any) => ['legal_name', 'business_type', 'registration_number', 'date_of_registration', 'category', 'anchor_industry'].includes(String(field)))) return { label: 'Complete business details', action: () => router.push('/business/onboarding?section=business' as any), loading: false }
     if (missingProfileFields.some((field: any) => ['contact_email', 'contact_phone', 'address_line_1', 'city', 'state', 'country', 'registered_address_line_1', 'registered_city', 'registered_state', 'registered_country'].includes(String(field)))) return { label: 'Add contact details', action: () => router.push('/business/onboarding?section=contact' as any), loading: false }
-    if (missingSignatoryRequirements.length > 0) return { label: 'Add signatory', action: () => router.push('/business/onboarding?section=signatory' as any), loading: false }
-    if (!readiness?.documents_ready || !readiness?.ready_for_kyb_submission) return { label: 'Upload required documents', action: () => router.push('/business/kyb' as any), loading: false }
-    return { label: 'Complete business details', action: () => router.push('/business/onboarding?section=business' as any), loading: false }
-  }, [isLive, selectedBusiness?.id, journey, canActivate, activating, businessStatus, router, missingProfileFields, missingSignatoryRequirements, readiness?.documents_ready, readiness?.ready_for_kyb_submission, setupStage.nextTitle, handleActivate])
+    if (missingSignatoryRequirements.length > 0) return { label: 'Continue setup', action: () => router.push('/business/setup' as any), loading: false }
+    return { label: 'Open business verification', action: () => router.push('/business/kyb' as any), loading: false }
+  }, [isLive, selectedBusiness?.id, journey, canActivate, activating, businessStatus, router, missingProfileFields, missingSignatoryRequirements, setupStage.nextTitle, handleActivate, setupEditingAllowed, setupIncomplete])
 
   const heroPrimaryActions = useMemo(() => {
     const unlocked = isLive
@@ -692,14 +741,15 @@ const BusinessIndexScreen = () => {
 
             {!isLive ? (
               <BusinessSetupBanner
-                stage={setupStage.stage}
-                title={setupStage.nextTitle}
-                body={setupStage.nextBody}
+                stage={dashboardSetupStage.stage}
+                title={dashboardSetupStage.nextTitle}
+                body={dashboardSetupStage.nextBody}
                 ctaLabel={setupPrimaryAction?.label || 'Continue setup'}
                 onPress={() => { setupPrimaryAction?.action() }}
-                progress={setupProgress}
-                progressLabel={`${completedSteps}/${setupSteps.length} complete`}
-                tone={setupStage.tone as 'amber' | 'sky' | 'emerald'}
+                progress={(completedSetupSections / setupSteps.length) * 100}
+                progressLabel={setupIncomplete ? `${completedSetupSections}/3 sections complete` : verificationProgressLabel}
+                tone={dashboardSetupStage.tone as 'amber' | 'sky' | 'emerald'}
+                showProgressBar={false}
               />
             ) : null}
 

@@ -89,6 +89,7 @@ export const BusinessSetupBanner = ({
   progress = 0,
   progressLabel,
   tone = 'amber',
+  showProgressBar = true,
 }: {
   stage: string
   title: string
@@ -98,6 +99,7 @@ export const BusinessSetupBanner = ({
   progress?: number
   progressLabel?: string
   tone?: 'amber' | 'sky' | 'emerald'
+  showProgressBar?: boolean
 }) => {
   const palette = {
     amber: { container: 'border-[#FFB05A]/18 bg-[#FFB05A]/10', title: 'text-[#FFD7A6]', fill: '#FFB05A' },
@@ -118,9 +120,9 @@ export const BusinessSetupBanner = ({
           <Text className="text-[11px] font-medium text-slate-300">{progressLabel || `${Math.round(clamped)}%`}</Text>
         </View>
       </View>
-      <View className="mt-5 h-2 overflow-hidden rounded-full bg-black/25">
+      {showProgressBar ? <View className="mt-5 h-2 overflow-hidden rounded-full bg-black/25">
         <View className="h-full rounded-full" style={{ width: `${clamped}%`, backgroundColor: palette.fill }} />
-      </View>
+      </View> : null}
       <TouchableOpacity onPress={onPress} activeOpacity={0.85} className="mt-5 items-center rounded-[18px] bg-[#FFB05A] px-4 py-4">
         <Text className="text-sm font-semibold text-black">{ctaLabel}</Text>
       </TouchableOpacity>

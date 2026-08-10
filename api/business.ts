@@ -9,6 +9,25 @@ export const getBusinessOnboarding = (businessId: string | number) =>
 export const updateBusinessOnboarding = (businessId: string | number, payload: Record<string, any>) =>
   client.patch(`/business_entities/${businessId}/onboarding`, payload)
 
+export const createBusinessSignatory = (
+  businessId: string | number,
+  signatory: Record<string, any>,
+  onboardingRevision?: string
+) => client.post(`/business_entities/${businessId}/signatories`, { signatory, onboarding_revision: onboardingRevision })
+
+export const updateBusinessSignatory = (
+  businessId: string | number,
+  signatoryId: string | number,
+  signatory: Record<string, any>,
+  onboardingRevision?: string
+) => client.patch(`/business_entities/${businessId}/signatories/${signatoryId}`, { signatory, onboarding_revision: onboardingRevision })
+
+export const deleteBusinessSignatory = (
+  businessId: string | number,
+  signatoryId: string | number,
+  onboardingRevision?: string
+) => client.delete(`/business_entities/${businessId}/signatories/${signatoryId}`, { params: { onboarding_revision: onboardingRevision } })
+
 export const getBusinessKyb = (businessId: string | number) =>
   client.get(`/business_entities/${businessId}/kyb`)
 export const getBusinessKybStatus = (businessId: string | number) =>

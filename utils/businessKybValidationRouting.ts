@@ -1,9 +1,13 @@
 export type BusinessOnboardingSection = 'business' | 'contact' | 'signatory'
+const supportedRepresentativeCorrectionFields = new Set(['phone', 'state', 'title', 'ownership_percentage'])
 
 export type BusinessKybValidationRoute = {
   section: BusinessOnboardingSection
   field?: string
   fieldMessage?: string
+  errorCode?: string
+  signatoryId?: string
+  genericRepresentativeCorrection?: boolean
   providerStatus?: string
   source: 'structured' | 'fallback'
 }
@@ -13,6 +17,10 @@ type ObjectRecord = Record<string, unknown>
 type FieldErrorEntry = {
   path: string
   message: string
+  code?: string
+  section?: string
+  signatoryId?: string
+  canonicalField?: string
 }
 
 const asRecord = (value: unknown): ObjectRecord | null =>
@@ -102,7 +110,14 @@ const fieldErrorEntries = (value: unknown, prefix = ''): FieldErrorEntry[] => {
       if (!record) return []
       const path = compactString(record.field_path || record.path || record.field || prefix)
       const message = compactString(record.message || record.error || collectText(record.messages || record.errors))
-      return path && message ? [{ path, message }] : fieldErrorEntries(record, prefix)
+      return path && message ? [{
+        path,
+        message,
+        code: compactString(record.code || record.error_code) || undefined,
+        section: compactString(record.section) || undefined,
+        signatoryId: compactString(record.signatory_id) || undefined,
+        canonicalField: compactString(record.canonical_field) || undefined,
+      }] : fieldErrorEntries(record, prefix)
     })
     if (objectEntries.length) return objectEntries
     const message = value.map(collectText).filter(Boolean).join(' ')
@@ -114,7 +129,14 @@ const fieldErrorEntries = (value: unknown, prefix = ''): FieldErrorEntry[] => {
 
   const directPath = compactString(record.field_path || record.path || record.field || prefix)
   const directMessage = compactString(record.message || record.error)
-  if (directPath && directMessage) return [{ path: directPath, message: directMessage }]
+  if (directPath && directMessage) return [{
+    path: directPath,
+    message: directMessage,
+    code: compactString(record.code || record.error_code) || undefined,
+    section: compactString(record.section) || undefined,
+    signatoryId: compactString(record.signatory_id) || undefined,
+    canonicalField: compactString(record.canonical_field) || undefined,
+  }]
 
   return Object.entries(record).flatMap(([key, child]) => fieldErrorEntries(child, prefix ? `${prefix}.${key}` : key))
 }
@@ -139,6 +161,44 @@ export const resolveBusinessKybValidationRoute = (data: unknown, fallbackText?: 
   const section = record?.section
   const providerStatus = compactString(record?.provider_status)
   const entries = fieldErrorEntries(record?.field_errors)
+
+  const representativeTargets = entries
+    .filter((entry) =>
+      normalizeSection(entry.section) === 'signatory' &&
+      entry.signatoryId &&
+      entry.canonicalField &&
+      supportedRepresentativeCorrectionFields.has(entry.canonicalField)
+    )
+    .map((entry) => ({
+      signatoryId: entry.signatoryId as string,
+      field: entry.canonicalField as string,
+      errorCode: entry.code,
+    }))
+  const uniqueRepresentativeTargets = representativeTargets.filter((target, index, targets) =>
+    targets.findIndex((candidate) => candidate.signatoryId === target.signatoryId && candidate.field === target.field) === index
+  )
+
+  if (uniqueRepresentativeTargets.length === 1) {
+    const target = uniqueRepresentativeTargets[0]
+    return {
+      section: 'signatory',
+      field: target.field,
+      signatoryId: target.signatoryId,
+      errorCode: target.errorCode,
+      providerStatus: providerStatus || undefined,
+      source: 'structured',
+    }
+  }
+
+  const hasRepresentativeError = entries.some((entry) => normalizeSection(entry.section) === 'signatory') || normalizeSection(section) === 'signatory'
+  if (hasRepresentativeError) {
+    return {
+      section: 'signatory',
+      genericRepresentativeCorrection: true,
+      providerStatus: providerStatus || undefined,
+      source: 'structured',
+    }
+  }
 
   const structuredCandidates = [
     fieldPath,

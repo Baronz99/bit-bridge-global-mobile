@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'expo-router'
-import { ActivityIndicator, LayoutChangeEvent, ScrollView, Text, TouchableOpacity, View } from 'react-native'
+import { ActivityIndicator, ScrollView, Text, TouchableOpacity, View } from 'react-native'
 import ScreenContainer from '@/components/ScreenContainer'
 import {
   createBusinessProvisioning,
@@ -223,6 +223,58 @@ type SubmissionBlocker = {
   onPress: () => void
 }
 
+const customerDocumentStatus = (value: unknown) => {
+  switch (String(value || '').toLowerCase()) {
+    case 'required': return 'Required'
+    case 'submitted':
+    case 'uploaded':
+    case 'pending': return 'Submitted'
+    case 'approved':
+    case 'verified': return 'Verified'
+    case 'rejected': return 'Needs attention'
+    default: return 'Needs attention'
+  }
+}
+
+type JourneyPresentation = {
+  status: string
+  body: string
+}
+
+const journeyPresentation = (stage: string): JourneyPresentation => {
+  switch (stage) {
+    case 'ready_for_verification':
+      return { status: 'Ready for verification', body: 'Review your business information before starting verification.' }
+    case 'verification_in_progress':
+      return { status: 'Verification in review', body: 'Your business has been submitted and is being reviewed.' }
+    case 'provider_documents_required':
+      return { status: 'Documents needed', body: 'Upload the documents requested during verification to continue.' }
+    case 'verification_rejected':
+      return { status: 'Action required', body: 'Review the requested corrections and update the required information.' }
+    case 'ready_for_activation':
+      return { status: 'Business verified', body: 'Verification is complete. You can now activate business banking.' }
+    case 'business_banking_provisioning':
+      return { status: 'Activating business banking', body: 'Your business account is being set up.' }
+    case 'provisioning_reconciliation_required':
+      return { status: 'We’re confirming your account setup', body: 'Your business account setup is being confirmed. You do not need to take any action right now.' }
+    case 'business_banking_live':
+      return { status: 'Verified', body: 'Business banking is live.' }
+    case 'business_restricted':
+      return { status: 'Review required', body: 'Review the verification status before continuing.' }
+    default:
+      return { status: 'Business verification', body: 'Review the current verification status and next action.' }
+  }
+}
+
+const representativeRoles = (representative: Record<string, any>) => {
+  const roles: string[] = []
+  const ownership = Number(representative?.ownership_percentage || 0)
+  if (Number.isFinite(ownership) && ownership > 0) roles.push(`Owner \u00b7 ${ownership}%`)
+  if (representative?.director === true) roles.push('Director')
+  if (representative?.authorized_signatory === true) roles.push('Authorised signatory')
+  return roles
+}
+
 const BusinessKybScreen = () => {
   const router = useRouter()
   const scrollRef = useRef<ScrollView | null>(null)
@@ -244,7 +296,7 @@ const BusinessKybScreen = () => {
   const [onboardingProfile, setOnboardingProfile] = useState<Record<string, any> | null>(null)
   const [onboardingSignatories, setOnboardingSignatories] = useState<Record<string, any>[]>([])
   const [activating, setActivating] = useState(false)
-  const [documentsSectionY, setDocumentsSectionY] = useState(0)
+  const [showPreparationDocuments, setShowPreparationDocuments] = useState(false)
   const businessId = activeAccount.type === 'business' ? activeAccount.businessId : null
   const fallbackRole = activeAccount.type === 'business' ? String((activeAccount as Record<string, any>)?.current_user_role || '') : ''
 
@@ -298,17 +350,32 @@ const BusinessKybScreen = () => {
   const currentRole = String(businessEntity?.current_user_role || fallbackRole || '').toLowerCase()
   const canSubmit = ['owner', 'admin'].includes(currentRole)
   const canUpload = ['owner', 'admin'].includes(currentRole)
-  const canActivate = Boolean(gate?.approved_for_provisioning)
   const missingProfileFields = Array.isArray(readiness?.missing_profile_fields) ? readiness.missing_profile_fields : []
   const missingSignatoryRequirements = Array.isArray(readiness?.missing_signatory_requirements) ? readiness.missing_signatory_requirements : []
-  const missingDocumentKinds = Array.isArray(readiness?.missing_document_kinds) ? readiness.missing_document_kinds : []
-  const readyForSubmission = Boolean(readiness?.ready_for_kyb_submission)
-  const readyFlags = useMemo(() => [
-    { label: 'Business details complete', value: Boolean(readiness?.profile_ready) },
-    { label: 'Required documents uploaded', value: Boolean(readiness?.documents_ready) },
-    { label: 'Ready for review', value: readyForSubmission },
-    { label: 'Ready to activate', value: canActivate },
-  ], [canActivate, readiness?.documents_ready, readiness?.profile_ready, readyForSubmission])
+  const journeyStage = String(journey?.stage || '')
+  const journeyCanSubmit = typeof journey?.can_submit_kyb === 'boolean'
+    ? journey.can_submit_kyb
+    : ['ready_for_verification'].includes(journeyStage) || String(journey?.next_action || '') === 'submit_for_verification'
+  const readyForSubmission = journeyStage || journey?.next_action
+    ? journeyCanSubmit
+    : Boolean(readiness?.ready_for_kyb_submission)
+  const journeyInfo = journeyPresentation(journeyStage)
+  const isReadyForVerification = journeyStage === 'ready_for_verification'
+  const isProviderDocumentsRequired = journeyStage === 'provider_documents_required'
+  const isVerificationRejected = journeyStage === 'verification_rejected'
+  const isReadyForActivation = journeyStage === 'ready_for_activation'
+  const isBusinessBankingProvisioning = journeyStage === 'business_banking_provisioning'
+  const isProvisioningConfirmationRequired = journeyStage === 'provisioning_reconciliation_required'
+  const isBusinessBankingLive = journeyStage === 'business_banking_live'
+  const canEditReview = isReadyForVerification
+  const showCompactReview = !isBusinessBankingLive
+  const showSetupBlockers = !journeyStage && !readyForSubmission
+
+  useEffect(() => {
+    if (!businessId || !isBusinessBankingProvisioning) return undefined
+    const interval = setInterval(() => { void loadKybState({ silent: true }) }, 10_000)
+    return () => clearInterval(interval)
+  }, [businessId, isBusinessBankingProvisioning, loadKybState])
 
   const preSubmissionDocuments = useMemo(() => {
     if (Array.isArray(requirements?.documents?.pre_submission) && requirements.documents.pre_submission.length) {
@@ -317,7 +384,7 @@ const BusinessKybScreen = () => {
     return REQUIRED_DOCUMENT_KINDS.map((kind) => ({
       kind,
       label: formatLabel(kind),
-      description: 'Required before submission for verification.',
+      description: 'Keep this ready. We may request it during verification.',
     }))
   }, [requirements?.documents?.pre_submission])
 
@@ -449,13 +516,28 @@ const BusinessKybScreen = () => {
         ? { ...route, ...savedStateErrorRoute }
         : route
 
+    if (resolved.section === 'signatory' && resolved.signatoryId && resolved.field) {
+      router.replace({
+        pathname: '/business/signatories/[id]',
+        params: {
+          id: resolved.signatoryId,
+          field: resolved.field,
+          ...(resolved.errorCode ? { error_code: resolved.errorCode } : {}),
+          mode: 'fix',
+          return_to: 'kyb',
+        },
+      } as any)
+      return true
+    }
+
     router.replace({
       pathname: '/business/onboarding',
       params: {
         section: resolved.section,
         ...(resolved.field ? { field: resolved.field } : {}),
+        ...(resolved.genericRepresentativeCorrection ? { generic_representative_correction: 'true' } : {}),
         ...(resolved.fieldMessage ? { field_error: resolved.fieldMessage } : {}),
-        ...(!resolved.fieldMessage && fallbackMessage ? { route_error: fallbackMessage } : {}),
+        ...(!resolved.fieldMessage && !resolved.genericRepresentativeCorrection && fallbackMessage ? { route_error: fallbackMessage } : {}),
         ...(resolved.providerStatus ? { provider_status: resolved.providerStatus } : {}),
         mode: 'fix',
         return_to: 'kyb',
@@ -467,18 +549,6 @@ const BusinessKybScreen = () => {
   const handleFixProviderFailure = useCallback(() => {
     navigateToValidationRoute(providerFailureRoute, String(provider?.anchor_failure_reason || 'Update the highlighted field and resubmit verification.'))
   }, [navigateToValidationRoute, provider?.anchor_failure_reason, providerFailureRoute])
-
-  const handleDocumentsSectionLayout = useCallback((event: LayoutChangeEvent) => {
-    setDocumentsSectionY(event.nativeEvent.layout.y)
-  }, [])
-
-  const handleUploadMissingDocuments = useCallback(() => {
-    if (documentsSectionY > 0) {
-      scrollRef.current?.scrollTo({ y: Math.max(documentsSectionY - 16, 0), animated: true })
-      return
-    }
-    router.push('/business/kyb' as any)
-  }, [documentsSectionY, router])
 
   const navigateToProfileField = useCallback((field: string, message?: string) => {
     const route = routeForProfileField(field)
@@ -544,8 +614,8 @@ const BusinessKybScreen = () => {
       if (key === 'authorized_signatory') {
         blockers.push({
           key: `signatory-${key}`,
-          title: 'Mark an authorized signatory',
-          body: 'At least one signatory must be marked authorized for verification and account control.',
+          title: 'Mark an authorised signatory',
+          body: 'At least one representative must be marked authorised for verification.',
           actionLabel: 'Fix signatory',
           onPress: () => navigateToSetupField('signatory', 'authorized_signatory', 'Mark at least one signatory as authorized before submitting.'),
         })
@@ -555,44 +625,25 @@ const BusinessKybScreen = () => {
       blockers.push({
         key: `signatory-${key}`,
         title: `${formatLabel(key)} required`,
-        body: 'Complete the authorized signatory information before submitting.',
+        body: 'Complete the representative information before submitting.',
         actionLabel: 'Fix signatory',
         onPress: () => navigateToSetupField('signatory', key, `${formatLabel(key)} is required before submitting.`),
       })
     })
 
-    missingDocumentKinds.forEach((kind: any) => {
-      const key = String(kind || '').trim()
-      if (!key) return
-      blockers.push({
-        key: `document-${key}`,
-        title: `Upload ${formatLabel(key)}`,
-        body: 'Upload this business document before submitting for verification.',
-        actionLabel: 'Upload document',
-        onPress: handleUploadMissingDocuments,
-      })
-    })
-
-    if (!readiness?.documents_ready && !missingDocumentKinds.length) {
-      blockers.push({
-        key: 'documents',
-        title: 'Upload required documents',
-        body: 'Upload the minimum pre-submission documents before sending this business for review.',
-        actionLabel: 'Upload documents',
-        onPress: handleUploadMissingDocuments,
-      })
-    }
-
     return blockers
   }, [
-    handleUploadMissingDocuments,
-    missingDocumentKinds,
     missingProfileFields,
     missingSignatoryRequirements,
     navigateToSetupField,
-    readiness?.documents_ready,
     readyForSubmission,
   ])
+
+  const showOperationalPanel =
+    (isProviderDocumentsRequired && providerActionRequired) ||
+    directorIdentificationRequired ||
+    directorIdentificationPendingProviderRoute ||
+    (showSetupBlockers && submissionBlockers.length > 0)
 
   const reviewSections = useMemo(
     () => [
@@ -601,81 +652,38 @@ const BusinessKybScreen = () => {
         title: 'Business details',
         route: '/business/onboarding?section=business',
         items: [
-          summarizeItem('Business name', onboardingProfile?.legal_name || businessEntity?.name),
+          summarizeItem('Legal business name', onboardingProfile?.legal_name || businessEntity?.name),
           summarizeItem('Business type', formatLabel(onboardingProfile?.business_type)),
           summarizeItem('Registration number', onboardingProfile?.registration_number),
-          summarizeItem('Business BVN', onboardingProfile?.business_bvn),
         ],
       },
       {
         key: 'contact',
-        title: 'Operating and registered addresses',
+        title: 'Contact & address',
         route: '/business/onboarding?section=contact',
         items: [
           summarizeItem('Contact email', onboardingProfile?.contact_email),
           summarizeItem('Contact phone', onboardingProfile?.contact_phone),
-          summarizeItem('Operating address line 1', onboardingProfile?.address_line_1),
-          summarizeItem('Operating address line 2', onboardingProfile?.address_line_2),
-          summarizeItem('Operating city', onboardingProfile?.city),
-          summarizeItem('Operating state', onboardingProfile?.state),
-          summarizeItem('Operating country', onboardingProfile?.country),
-          summarizeItem('Operating postal code', onboardingProfile?.postal_code),
-          summarizeItem('Registered address line 1', onboardingProfile?.registered_address_line_1),
-          summarizeItem('Registered address line 2', onboardingProfile?.registered_address_line_2),
-          summarizeItem('Registered city', onboardingProfile?.registered_city),
-          summarizeItem('Registered state', onboardingProfile?.registered_state),
-          summarizeItem('Registered country', onboardingProfile?.registered_country),
-          summarizeItem('Registered postal code', onboardingProfile?.registered_postal_code),
+          summarizeItem('Primary business address', addressSummary(onboardingProfile?.address_line_1, onboardingProfile?.city, onboardingProfile?.state, onboardingProfile?.country)),
         ],
       },
       {
         key: 'signatory',
-        title: 'Authorized signatory',
+        title: 'Business representatives',
         route: '/business/onboarding?section=signatory',
         items:
           onboardingSignatories.length > 0
-            ? onboardingSignatories.slice(0, 2).map((item, index) =>
+            ? onboardingSignatories.map((item, index) =>
                 summarizeItem(
-                  onboardingSignatories.length > 1 ? `Signatory ${index + 1}` : 'Primary signatory',
+                  item?.full_name || [item?.first_name, item?.last_name].filter(Boolean).join(' ') || `Representative ${index + 1}`,
                   [
-                    item?.full_name || [item?.first_name, item?.last_name].filter(Boolean).join(' '),
-                    item?.director === false ? 'Owner' : 'Director',
-                    item?.title,
-                    item?.email,
-                    item?.phone,
-                    addressSummary(item?.city, item?.state, item?.country),
+                    ...representativeRoles(item),
                   ]
                     .filter(Boolean)
                     .join(' • ')
                 )
               )
-            : [summarizeItem('Primary signatory', '')],
-      },
-      {
-        key: 'signatory_values',
-        title: 'Signatory field values',
-        route: '/business/onboarding?section=signatory',
-        items:
-          onboardingSignatories.length > 0
-            ? onboardingSignatories.flatMap((item, index) => {
-                const prefix = onboardingSignatories.length > 1 ? `Signatory ${index + 1}` : 'Primary signatory'
-                return [
-                  summarizeItem(`${prefix} full name`, item?.full_name || [item?.first_name, item?.last_name].filter(Boolean).join(' ')),
-                  summarizeItem(`${prefix} title`, item?.title),
-                  summarizeItem(`${prefix} email`, item?.email),
-                  summarizeItem(`${prefix} phone`, item?.phone),
-                  summarizeItem(`${prefix} date of birth`, item?.date_of_birth),
-                  summarizeItem(`${prefix} nationality`, item?.nationality),
-                  summarizeItem(`${prefix} address`, item?.address_line_1),
-                  summarizeItem(`${prefix} city`, item?.city),
-                  summarizeItem(`${prefix} state`, item?.state),
-                  summarizeItem(`${prefix} country`, item?.country),
-                  summarizeItem(`${prefix} ID type`, item?.identification_type),
-                  summarizeItem(`${prefix} ID number`, item?.id_document_number),
-                  summarizeItem(`${prefix} role flags`, `${item?.authorized_signatory === false ? 'Not authorized signatory' : 'Authorized signatory'} / ${item?.director === false ? 'Not director' : 'Director'}`),
-                ]
-              })
-            : [summarizeItem('Primary signatory', '')],
+            : [summarizeItem('Representatives', '')],
       },
     ],
     [businessEntity?.name, onboardingProfile, onboardingSignatories]
@@ -849,7 +857,6 @@ const BusinessKybScreen = () => {
       const response = await createBusinessProvisioning(businessId)
       setSuccessMessage(response?.data?.message || 'Business account activation started.')
       await loadKybState({ silent: true })
-      router.replace('/business' as any)
     } catch (error: any) {
       const message = buildApiErrorMessage({
         status: error?.response?.status,
@@ -891,15 +898,15 @@ const BusinessKybScreen = () => {
         <Text className="text-[#FFB05A] text-[11px] uppercase tracking-[2px]">Business verification</Text>
         <Text className="text-white text-2xl font-semibold mt-3">{businessEntity?.name || 'Business account'}</Text>
         <Text className="text-gray-300 text-sm mt-2">
-          {neutralizeProviderCopy(journey?.body || 'Submit this business for verification, upload any requested documents, and wait for approval before activating business banking.')}
+          {journeyInfo.body}
         </Text>
         <View className="mt-4 gap-2">
           <View className="self-start rounded-full border border-gray-700 bg-gray-950/50 px-3 py-2">
             <Text className="text-slate-300 text-[11px] font-semibold uppercase">
-              {neutralizeProviderCopy(journey?.title || 'Verification stage')}
+              {journeyInfo.status}
             </Text>
           </View>
-          <Text className="text-slate-400 text-xs">Verification review can continue after submission</Text>
+          {isReadyForVerification ? <Text className="text-slate-400 text-xs">You can track your verification status here.</Text> : null}
         </View>
       </View>
 
@@ -945,10 +952,10 @@ const BusinessKybScreen = () => {
 
           {!loading ? (
         <>
-          <View className="mt-4 rounded-2xl border border-gray-800 bg-gray-900/80 p-4">
-            {providerActionRequired ? (
+          {showOperationalPanel ? <View className="mt-4 rounded-2xl border border-gray-800 bg-gray-900/80 p-4">
+            {isProviderDocumentsRequired && providerActionRequired ? (
               <View className="mb-4 rounded-[24px] border border-amber-400/40 bg-amber-500/10 p-4">
-                <Text className="text-amber-100 text-lg font-semibold">Action required</Text>
+                <Text className="text-amber-100 text-lg font-semibold">Documents needed</Text>
                 <Text className="text-amber-50/90 text-sm mt-2">
                   Additional business documents are required before verification can continue.
                 </Text>
@@ -962,11 +969,18 @@ const BusinessKybScreen = () => {
                           {missingProviderRows.map((row: ProviderDocumentRow) => (
                             <View key={`missing-${row.key}`} className="rounded-2xl border border-amber-300/25 bg-black/20 px-3 py-3">
                               <Text className="text-white text-sm font-semibold">{row.label}</Text>
-                              <Text className={`text-xs mt-1 capitalize ${statusTone(row.status)}`}>{row.status}</Text>
+                              <Text className={`text-xs mt-1 ${statusTone(row.status)}`}>{customerDocumentStatus(row.status)}</Text>
                               <Text className="text-amber-50/75 text-xs mt-1">{statusSummaryForRequirement(row)}</Text>
                               <Text className="text-amber-50/60 text-[11px] mt-1">
                                 {row.inputType === 'file' ? 'Document upload' : row.currentValuePresent ? 'Saved business information' : 'Business information'}
                               </Text>
+                              {canUpload && (row.inputType === 'file' || !row.uploaded) ? (
+                                <TouchableOpacity onPress={() => handleProviderRequirementAction(row)} disabled={uploadingKind === (row.providerDocumentId || row.key)} className="mt-3 rounded-2xl border border-amber-300/30 px-4 py-3 items-center">
+                                  <Text className="text-amber-50 text-sm font-semibold">
+                                    {uploadingKind === (row.providerDocumentId || row.key) ? 'Uploading...' : row.actionLabel || (row.inputType === 'file' ? 'Upload document' : row.currentValuePresent ? 'Submit saved information' : 'Enter required information')}
+                                  </Text>
+                                </TouchableOpacity>
+                              ) : null}
                             </View>
                           ))}
                         </View>
@@ -980,7 +994,7 @@ const BusinessKybScreen = () => {
                           {uploadedProviderRows.map((row: ProviderDocumentRow) => (
                             <View key={`uploaded-${row.key}`} className="rounded-2xl border border-emerald-300/20 bg-emerald-500/10 px-3 py-3">
                               <Text className="text-white text-sm font-semibold">{row.label}</Text>
-                              <Text className={`text-xs mt-1 capitalize ${statusTone(row.status)}`}>{row.status}</Text>
+                              <Text className={`text-xs mt-1 ${statusTone(row.status)}`}>{customerDocumentStatus(row.status)}</Text>
                               <Text className="text-emerald-50/80 text-xs mt-1">
                                 {row.document?.provider_synced_at ? `Synced ${formatDate(row.document.provider_synced_at)}` : 'Uploaded locally'}
                               </Text>
@@ -996,29 +1010,29 @@ const BusinessKybScreen = () => {
                   </Text>
                 )}
 
-                <TouchableOpacity onPress={handleUploadMissingDocuments} className="mt-4 rounded-2xl bg-[#FFB05A] px-4 py-4 items-center">
-                  <Text className="text-black text-sm font-semibold">Complete required items</Text>
+                <TouchableOpacity onPress={() => { const firstMissing = missingProviderRows[0]; if (firstMissing) handleProviderRequirementAction(firstMissing) }} disabled={!missingProviderRows.length} className="mt-4 rounded-2xl bg-[#FFB05A] px-4 py-4 items-center">
+                  <Text className="text-black text-sm font-semibold">Upload requested documents</Text>
                 </TouchableOpacity>
               </View>
             ) : null}
 
             {directorIdentificationRequired ? (
               <View className="mb-4 rounded-[24px] border border-amber-400/40 bg-amber-500/10 p-4">
-                <Text className="text-amber-100 text-lg font-semibold">Upload director ID</Text>
+                <Text className="text-amber-100 text-lg font-semibold">Upload representative ID</Text>
                 <Text className="text-amber-50/90 text-sm mt-2">
-                  Upload a valid ID for the director or beneficial owner. Accepted documents include NIN slip, National ID, passport, or driver&apos;s license.
+                  Upload a valid ID for this representative. Accepted documents include NIN slip, National ID, passport, or driver&apos;s license.
                 </Text>
                 <Text className="text-amber-50/75 text-xs mt-3">
                   This collects the ID securely. We will submit it to our banking partner if it is required during review.
                 </Text>
                 {canUpload ? (
                   <TouchableOpacity
-                    onPress={() => handleUpload(DIRECTOR_IDENTIFICATION_KIND, undefined, 'Director ID', true)}
+                    onPress={() => handleUpload(DIRECTOR_IDENTIFICATION_KIND, undefined, 'Representative ID', true)}
                     disabled={uploadingKind === DIRECTOR_IDENTIFICATION_KIND}
                     className="mt-4 rounded-2xl bg-[#FFB05A] px-4 py-4 items-center"
                   >
                     <Text className="text-black text-sm font-semibold">
-                      {uploadingKind === DIRECTOR_IDENTIFICATION_KIND ? 'Uploading...' : 'Upload director ID'}
+                      {uploadingKind === DIRECTOR_IDENTIFICATION_KIND ? 'Uploading...' : 'Upload representative ID'}
                     </Text>
                   </TouchableOpacity>
                 ) : null}
@@ -1027,7 +1041,7 @@ const BusinessKybScreen = () => {
 
             {directorIdentificationPendingProviderRoute ? (
               <View className="mb-4 rounded-[24px] border border-sky-400/30 bg-sky-500/10 p-4">
-                <Text className="text-sky-100 text-lg font-semibold">Director ID collected</Text>
+                <Text className="text-sky-100 text-lg font-semibold">Representative ID collected</Text>
                 <Text className="text-sky-50/90 text-sm mt-2">
                   ID collected. We will submit it to our banking partner if required.
                 </Text>
@@ -1036,19 +1050,19 @@ const BusinessKybScreen = () => {
                 </Text>
                 {canUpload ? (
                   <TouchableOpacity
-                    onPress={() => handleUpload(DIRECTOR_IDENTIFICATION_KIND, undefined, 'Director ID', true)}
+                    onPress={() => handleUpload(DIRECTOR_IDENTIFICATION_KIND, undefined, 'Representative ID', true)}
                     disabled={uploadingKind === DIRECTOR_IDENTIFICATION_KIND}
                     className="mt-4 rounded-2xl border border-sky-300/40 px-4 py-3 items-center"
                   >
                     <Text className="text-sky-50 text-sm font-semibold">
-                      {uploadingKind === DIRECTOR_IDENTIFICATION_KIND ? 'Uploading...' : 'Replace director ID'}
+                      {uploadingKind === DIRECTOR_IDENTIFICATION_KIND ? 'Uploading...' : 'Replace representative ID'}
                     </Text>
                   </TouchableOpacity>
                 ) : null}
               </View>
             ) : null}
 
-            {!readyForSubmission && submissionBlockers.length ? (
+            {showSetupBlockers && submissionBlockers.length ? (
               <View className="mb-4 rounded-[24px] border border-amber-400/35 bg-amber-500/10 p-4">
                 <Text className="text-amber-100 text-lg font-semibold">Complete setup before submission</Text>
                 <Text className="text-amber-50/90 text-sm mt-2">
@@ -1068,97 +1082,37 @@ const BusinessKybScreen = () => {
               </View>
             ) : null}
 
-            <View className="gap-3">
-              <View>
-                <Text className="text-white text-base font-semibold">Business profile completion</Text>
-                <Text className="text-gray-400 text-sm mt-2">
-                  These checks confirm the saved profile, documents, and signatory details are complete before verification review.
-                </Text>
-              </View>
-              <View className="self-start rounded-full border border-gray-700 bg-gray-950/50 px-3 py-2">
-                <Text className="text-slate-300 text-[11px] font-semibold uppercase">
-                  {readyFlags.filter((item) => item.value).length}/{readyFlags.length} ready
-                </Text>
-              </View>
-            </View>
-            <View className="mt-4 gap-3">
-              {readyFlags.map((item) => (
-                <View key={item.label} className="rounded-2xl border border-gray-800 bg-gray-950/45 px-4 py-3 flex-row items-center justify-between">
-                  <Text className="text-white text-sm font-medium">{item.label}</Text>
-                  <Text className={`text-sm font-semibold ${item.value ? 'text-emerald-300' : 'text-amber-300'}`}>
-                    {item.value ? 'Ready' : 'Pending'}
-                  </Text>
-                </View>
-              ))}
-            </View>
+          </View> : null}
 
-            {Array.isArray(readiness?.missing_document_kinds) && readiness.missing_document_kinds.length ? (
-              <View className="mt-4 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-4">
-                <Text className="text-amber-100 text-sm font-semibold">Missing pre-submission documents</Text>
-                <Text className="text-amber-50/90 text-sm mt-2">
-                  {readiness.missing_document_kinds.map((item: any) => formatLabel(item)).join(', ')}
-                </Text>
-              </View>
-            ) : null}
-          </View>
-
-          <View className="mt-4 rounded-2xl border border-gray-800 bg-gray-900/80 p-4">
-            <Text className="text-white text-base font-semibold">Verification review</Text>
-            <View className="mt-4 gap-3">
-              <View>
-                <Text className="text-gray-400 text-xs">Verification status</Text>
-                <Text className={`text-base font-semibold mt-1 capitalize ${statusTone(provider?.anchor_kyb_status)}`}>{provider?.anchor_kyb_status || 'not_started'}</Text>
-              </View>
-              <View>
-                <Text className="text-gray-400 text-xs">Onboarding stage</Text>
-                <Text className={`text-base font-semibold mt-1 capitalize ${statusTone(businessEntity?.status)}`}>{businessEntity?.status || 'draft'}</Text>
-              </View>
-              {provider?.anchor_failure_reason ? (
-                <View className="rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-4">
-                  <Text className="text-red-100 text-sm font-semibold">{providerFailureTitle}</Text>
-                  <Text className="text-red-50/90 text-sm mt-2">{neutralizeProviderCopy(provider.anchor_failure_reason)}</Text>
-                  <Text className="text-red-50/80 text-xs mt-2">
-                    This message came from the previous verification submission. Save the corrected field, then return here and submit verification again.
-                  </Text>
-                  {providerFailureRoute ? (
-                    <TouchableOpacity onPress={handleFixProviderFailure} className="mt-3 rounded-2xl border border-red-200/40 px-4 py-3 items-center">
-                      <Text className="text-red-50 text-sm font-semibold">Fix Now</Text>
-                    </TouchableOpacity>
-                  ) : null}
-                </View>
-              ) : null}
-              {String(businessEntity?.status || '').toLowerCase() === 'under_review' ? (
-                <View className="rounded-2xl border border-sky-500/20 bg-sky-500/10 px-4 py-4">
-                  <Text className="text-sky-100 text-sm font-semibold">Your business is being reviewed</Text>
-                  <Text className="text-sky-50/90 text-xs mt-2">
-                    You do not need to repeat earlier setup steps. We will surface the next action here once review is complete.
-                  </Text>
-                </View>
-              ) : null}
-              {gate?.approved_for_provisioning ? (
-                <View className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-4">
-                  <Text className="text-emerald-100 text-sm font-semibold">Ready to activate</Text>
-                  <Text className="text-emerald-50/90 text-xs mt-2">
-                    Verification is complete. You can activate business banking directly from this screen.
-                  </Text>
-                </View>
+          {isVerificationRejected && provider?.anchor_failure_reason ? (
+            <View className="mt-4 rounded-2xl border border-red-500/20 bg-red-500/10 p-4">
+              <Text className="text-red-100 text-sm font-semibold">{providerFailureTitle}</Text>
+              <Text className="text-red-50/90 text-sm mt-2">{neutralizeProviderCopy(provider.anchor_failure_reason)}</Text>
+              <Text className="text-red-50/80 text-xs mt-2">
+                This message came from the previous verification submission. Save the corrected field, then return here and submit verification again.
+              </Text>
+              {providerFailureRoute ? (
+                <TouchableOpacity onPress={handleFixProviderFailure} className="mt-3 rounded-2xl border border-red-200/40 px-4 py-3 items-center">
+                  <Text className="text-red-50 text-sm font-semibold">Review and correct</Text>
+                </TouchableOpacity>
               ) : null}
             </View>
-          </View>
+          ) : null}
 
-          <View className="mt-4 rounded-2xl border border-gray-800 bg-gray-900/80 p-4">
-            <Text className="text-white text-base font-semibold">Review saved details</Text>
-            <Text className="text-gray-400 text-xs mt-2">
-              Check the saved business profile here before submission. Edit only the section that still needs work.
-            </Text>
-            <View className="mt-4 gap-3">
-              {reviewSections.map((section) => (
+          {showCompactReview ? (
+            <View className="mt-4 rounded-2xl border border-gray-800 bg-gray-900/80 p-4">
+              <Text className="text-white text-base font-semibold">Review your information</Text>
+              <Text className="text-gray-400 text-xs mt-2">
+                {canEditReview ? 'Review your business information before starting verification.' : 'Your saved business information is shown here for reference.'}
+              </Text>
+              <View className="mt-4 gap-3">
+                {reviewSections.map((section) => (
                 <View key={section.key} className="rounded-2xl border border-gray-800 bg-gray-950/45 px-4 py-4">
                   <View className="flex-row items-center justify-between gap-3">
                     <Text className="text-white text-sm font-semibold">{section.title}</Text>
-                    <TouchableOpacity onPress={() => router.push(section.route as any)}>
+                    {canEditReview ? <TouchableOpacity onPress={() => router.push(section.route as any)}>
                       <Text className="text-[#FFD7A6] text-xs font-semibold">Edit</Text>
-                    </TouchableOpacity>
+                    </TouchableOpacity> : null}
                   </View>
                   <View className="mt-3 gap-2">
                     {section.items.map((item) => (
@@ -1169,19 +1123,24 @@ const BusinessKybScreen = () => {
                     ))}
                   </View>
                 </View>
-              ))}
+                ))}
+              </View>
             </View>
-          </View>
+          ) : null}
 
-          <View onLayout={handleDocumentsSectionLayout} className="mt-4 rounded-2xl border border-gray-800 bg-gray-900/80 p-4">
-            <Text className="text-white text-base font-semibold">Documents</Text>
-            <Text className="text-gray-400 text-xs mt-2">
-              Upload the minimum documents required before submission first. Additional requested documents may appear later during verification.
-            </Text>
+          {isReadyForVerification ? (
+            <View className="mt-4 rounded-2xl border border-gray-800 bg-gray-900/80 p-4">
+              <Text className="text-white text-base font-semibold">Documents to keep ready</Text>
+              <Text className="text-gray-400 text-xs mt-2">
+                No documents are required at this stage. We may request documents during verification.
+              </Text>
+              {canUpload ? (
+                <TouchableOpacity onPress={() => setShowPreparationDocuments((current) => !current)} className="mt-4 rounded-2xl border border-gray-700 px-4 py-3 items-center">
+                  <Text className="text-white text-sm font-semibold">{showPreparationDocuments ? 'Hide preparation documents' : 'Add documents in advance'}</Text>
+                </TouchableOpacity>
+              ) : null}
 
-            <View className="mt-4">
-              <Text className="text-[#FFD7A6] text-sm font-semibold">Required before submission</Text>
-              <View className="mt-3 gap-3">
+              {showPreparationDocuments ? <View className="mt-4 gap-3">
                 {preSubmissionDocuments.map((item: any) => {
                   const documentKind = String(item?.kind || '')
                   const document = documents.find((entry) => String(entry.document_kind) === documentKind)
@@ -1194,18 +1153,14 @@ const BusinessKybScreen = () => {
                   return (
                     <View key={documentKind} className="rounded-2xl border border-gray-800 bg-gray-950/45 px-4 py-4">
                       <Text className="text-white text-sm font-semibold">{String(item?.label || formatLabel(documentKind))}</Text>
-                      <Text className="text-gray-400 text-xs mt-1">{String(item?.description || 'Required before submission for verification.')}</Text>
-                      <Text className={`text-xs mt-2 capitalize ${statusTone(document?.status || document?.provider_status || 'pending')}`}>
-                        {document?.provider_status || document?.status || 'missing'}
-                      </Text>
+                      <Text className="text-gray-400 text-xs mt-1">Keep this ready. We may request it during verification.</Text>
+                      {document ? <Text className={`text-xs mt-2 ${statusTone(document?.status || document?.provider_status || 'pending')}`}>{customerDocumentStatus(document?.provider_status || document?.status)}</Text> : null}
                       {phaseLabel ? (
                         <Text className={`text-xs mt-2 ${uploadPhase === 'error' ? 'text-red-200' : uploadPhase === 'success' ? 'text-emerald-200' : 'text-amber-200'}`}>
                           {phaseLabel}
                         </Text>
                       ) : null}
-                      <Text className="text-gray-400 text-xs mt-2">
-                        {document ? `Updated ${formatDate(document.provider_synced_at || document.updated_at || document.created_at)}` : 'No document uploaded yet'}
-                      </Text>
+                      {document ? <Text className="text-gray-400 text-xs mt-2">Updated {formatDate(document.provider_synced_at || document.updated_at || document.created_at)}</Text> : null}
                       {canUpload ? (
                         <TouchableOpacity onPress={() => handleUpload(documentKind, documentProviderId, String(item?.label || formatLabel(documentKind)), Boolean(documentProviderId))} disabled={uploading} className="mt-3 rounded-2xl border border-gray-700 px-4 py-3 items-center">
                           {uploading ? <Text className="text-[#FFB05A] text-sm font-semibold">{phaseLabel || 'Uploading...'}</Text> : <Text className="text-white text-sm font-semibold">{document ? 'Replace document' : 'Upload document'}</Text>}
@@ -1214,79 +1169,40 @@ const BusinessKybScreen = () => {
                     </View>
                   )
                 })}
-              </View>
+              </View> : null}
             </View>
-
-            {providerRequestedDocuments.length ? (
-              <View className="mt-5">
-                <Text className="text-sky-100 text-sm font-semibold">Additional requested documents</Text>
-                <Text className="text-slate-400 text-xs mt-2">
-                  These appear only when extra compliance documents are required.
-                </Text>
-                <View className="mt-3 gap-3">
-                  {providerDocumentRows.map((row: ProviderDocumentRow) => {
-                    const documentKind = row.documentKind
-                    const document = row.document
-                    const uploading = uploadingKind === (row.providerDocumentId || row.key) || uploadingKind === documentKind
-                    const uploadPhase = uploadNotice?.key === (row.providerDocumentId || row.key) || uploadNotice?.key === documentKind
-                      ? uploadNotice.phase
-                      : null
-                    const phaseLabel = uploadPhaseLabel(uploadPhase || undefined)
-                    const actionLabel =
-                      row.uploaded
-                        ? 'Submitted'
-                        : row.actionLabel || (row.inputType === 'file' ? (document ? 'Replace document' : 'Upload document') : row.currentValuePresent ? 'Submit saved value' : 'Enter required value')
-                    return (
-                      <View key={`${row.key}-provider`} className="rounded-2xl border border-sky-500/20 bg-sky-500/10 px-4 py-4">
-                        <Text className="text-white text-sm font-semibold">{row.label}</Text>
-                        <Text className="text-sky-50/90 text-xs mt-1">{neutralizeProviderCopy(row.item?.description || 'Requested during verification review.')}</Text>
-                        <Text className={`text-xs mt-2 capitalize ${statusTone(row.status)}`}>
-                          {row.status}
-                        </Text>
-                        <Text className="text-slate-300 text-xs mt-2">
-                          {statusSummaryForRequirement(row)}
-                        </Text>
-                        {phaseLabel ? (
-                          <Text className={`text-xs mt-2 ${uploadPhase === 'error' ? 'text-red-200' : uploadPhase === 'success' ? 'text-emerald-200' : 'text-amber-200'}`}>
-                            {phaseLabel}
-                          </Text>
-                        ) : null}
-                        {row.profileField ? (
-                          <Text className="text-slate-400 text-[11px] mt-1">
-                            Linked field: {formatLabel(row.profileField)}
-                          </Text>
-                        ) : null}
-                        {canUpload && (row.inputType === 'file' || !row.uploaded) ? (
-                          <TouchableOpacity onPress={() => handleProviderRequirementAction(row)} disabled={uploading} className="mt-3 rounded-2xl border border-sky-400/30 px-4 py-3 items-center">
-                            {uploading ? <Text className="text-[#FFB05A] text-sm font-semibold">{phaseLabel || 'Uploading...'}</Text> : <Text className="text-white text-sm font-semibold">{row.uploaded && row.inputType === 'file' ? 'Replace document' : actionLabel}</Text>}
-                          </TouchableOpacity>
-                        ) : null}
-                      </View>
-                    )
-                  })}
-                </View>
-              </View>
-            ) : null}
-          </View>
+          ) : null}
 
           <View className="mt-4 gap-3">
-            {canActivate ? (
+            {isReadyForActivation ? (
               <TouchableOpacity onPress={handleActivate} disabled={activating} className="rounded-2xl bg-[#FFB05A] px-4 py-4 items-center">
                 {activating ? <ActivityIndicator size="small" color="#111827" /> : <Text className="text-black text-sm font-semibold">Activate business banking</Text>}
               </TouchableOpacity>
-            ) : canSubmit && readyForSubmission ? (
-              <TouchableOpacity onPress={handleSubmit} disabled={submitting} className="rounded-2xl bg-[#FFB05A] px-4 py-4 items-center">
-                {submitting ? <ActivityIndicator size="small" color="#111827" /> : <Text className="text-black text-sm font-semibold">Submit business for verification</Text>}
+            ) : isBusinessBankingProvisioning ? (
+              <TouchableOpacity onPress={handleResync} disabled={resyncing} className="rounded-2xl border border-gray-700 px-4 py-4 items-center">
+                {resyncing ? <ActivityIndicator size="small" color="#FFB05A" /> : <Text className="text-white text-sm font-semibold">Refresh activation status</Text>}
               </TouchableOpacity>
-            ) : canSubmit ? (
+            ) : isProvisioningConfirmationRequired ? (
+              <TouchableOpacity onPress={handleResync} disabled={resyncing} className="rounded-2xl border border-gray-700 px-4 py-4 items-center">
+                {resyncing ? <ActivityIndicator size="small" color="#FFB05A" /> : <Text className="text-white text-sm font-semibold">Check activation status</Text>}
+              </TouchableOpacity>
+            ) : isReadyForVerification && canSubmit && readyForSubmission ? (
+              <TouchableOpacity onPress={handleSubmit} disabled={submitting} className="rounded-2xl bg-[#FFB05A] px-4 py-4 items-center">
+                {submitting ? <ActivityIndicator size="small" color="#111827" /> : <Text className="text-black text-sm font-semibold">Start verification</Text>}
+              </TouchableOpacity>
+            ) : isBusinessBankingLive ? (
+              <TouchableOpacity onPress={() => router.replace('/business' as any)} className="rounded-2xl bg-[#FFB05A] px-4 py-4 items-center">
+                <Text className="text-black text-sm font-semibold">Open business dashboard</Text>
+              </TouchableOpacity>
+            ) : showSetupBlockers && canSubmit ? (
               <View className="rounded-2xl border border-amber-500/25 bg-amber-500/10 px-4 py-4">
                 <Text className="text-amber-100 text-sm font-semibold">Submission locked</Text>
                 <Text className="text-amber-50/85 text-xs mt-2">Complete required items above before submission.</Text>
               </View>
             ) : null}
-            <TouchableOpacity onPress={handleResync} disabled={resyncing} className="rounded-2xl border border-gray-700 px-4 py-4 items-center">
+            {!isReadyForVerification && !isBusinessBankingLive && !isBusinessBankingProvisioning && !isProvisioningConfirmationRequired ? <TouchableOpacity onPress={handleResync} disabled={resyncing} className="rounded-2xl border border-gray-700 px-4 py-4 items-center">
               {resyncing ? <ActivityIndicator size="small" color="#FFB05A" /> : <Text className="text-white text-sm font-semibold">Refresh verification status</Text>}
-            </TouchableOpacity>
+            </TouchableOpacity> : null}
             <TouchableOpacity onPress={() => router.replace('/business' as any)} className="rounded-2xl border border-gray-700 px-4 py-4 items-center">
               <Text className="text-white text-sm font-semibold">Back to business overview</Text>
             </TouchableOpacity>
