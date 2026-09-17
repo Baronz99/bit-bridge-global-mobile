@@ -75,7 +75,6 @@ export default function BridgeHub() {
   const primaryActions = useMemo(
     () =>
       [
-        { id: 'send', label: 'Send Money', subtitle: 'Move money across local rails.', link: '/send-money', image: icons.transfer },
         {
           id: 'receive',
           label: 'Receive',

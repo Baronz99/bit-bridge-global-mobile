@@ -27,7 +27,6 @@ const Utilities = () => {
         title: 'Move Money',
         description: 'Send, transfer, and manage recipients.',
         items: [
-          { id: 7, label: 'Send Money', link: '/send-money', image: icons.transfer },
           ...(canUseBankTransfer
             ? [{ id: 8, label: 'Bank Transfer', link: '/bank-transfer', image: icons.transaction }]
             : []),

@@ -1480,21 +1480,11 @@ export default function Index() {
         </View>
       </AppModal>
 
-      {/* Send money modal */}
+      {/* Bank transfer modal */}
       <AppModal open={sendOpen} onclose={() => setSendOpen(false)}>
         <View className="bg-gray-900 p-6 rounded-2xl w-full max-w-md">
-          <Text className="text-white text-xl font-semibold text-center mb-2">Send money</Text>
-          <Text className="text-gray-400 text-center text-xs mb-5">Choose how you want to send your funds.</Text>
-
-          <TouchableOpacity
-            onPress={() => {
-              setSendOpen(false)
-              router.push('/send-money' as any)
-            }}
-            className="bg-gray-950 border border-gray-800 py-3 rounded-xl items-center"
-          >
-            <Text className="text-white text-sm font-semibold">Send to BitBridge user</Text>
-          </TouchableOpacity>
+          <Text className="text-white text-xl font-semibold text-center mb-2">Bank transfer</Text>
+          <Text className="text-gray-400 text-center text-xs mb-5">Send funds to a Nigerian bank account.</Text>
 
           <TouchableOpacity
             onPress={async () => {
@@ -1512,7 +1502,7 @@ export default function Index() {
               canUseBankTransfer ? 'bg-gray-950 border-gray-800' : 'bg-gray-900 border-gray-700'
             }`}
           >
-            <Text className="text-white text-sm font-semibold">Bank transfer</Text>
+            <Text className="text-white text-sm font-semibold">Continue to bank transfer</Text>
           </TouchableOpacity>
           {!canUseBankTransfer ? (
             <Text className="text-gray-400 text-xs mt-2 text-center">
